@@ -1,0 +1,31 @@
+Manifest-Version: 1.0
+Bnd-LastModified: 1453053070885
+Build-Jdk: 1.8.0_60-ea
+Built-By: mbechler
+Bundle-ManifestVersion: 2
+Bundle-Name: JCIFS NG
+Bundle-SymbolicName: eu.agno3.jcifs
+Bundle-Version: 2.0.0.SNAPSHOT
+Created-By: Apache Maven Bundle Plugin
+Export-Package: jcifs;version="2.0.0.SNAPSHOT";uses:="jcifs.netbios,jcifs.smb",
+ jcifs.config;version="2.0.0.SNAPSHOT";uses:="jcifs",
+ jcifs.context;version="2.0.0.SNAPSHOT";uses:="jcifs,jcifs.netbios,jcifs.smb",
+ jcifs.dcerpc;version="2.0.0.SNAPSHOT";uses:="jcifs,jcifs.dcerpc.ndr,jcifs.smb",
+ jcifs.dcerpc.msrpc;version="2.0.0.SNAPSHOT";uses:="jcifs.dcerpc,jcifs.dcerpc.ndr,jcifs.smb",
+ jcifs.dcerpc.ndr;version="2.0.0.SNAPSHOT";uses:="jcifs",
+ jcifs.http;version="2.0.0.SNAPSHOT";
+  uses:="javax.servlet,
+   javax.servlet.http,
+   jcifs,
+   jcifs.ntlmssp,
+   jcifs.smb",
+ jcifs.https;version="2.0.0.SNAPSHOT";uses:="jcifs,jcifs.http",
+ jcifs.netbios;version="2.0.0.SNAPSHOT";uses:="jcifs",
+ jcifs.ntlmssp;version="2.0.0.SNAPSHOT";uses:="jcifs",
+ jcifs.smb;version="2.0.0.SNAPSHOT";uses:="jcifs,jcifs.dcerpc,jcifs.util.transport",
+ jcifs.spnego;version="2.0.0.SNAPSHOT",
+ jcifs.util;version="2.0.0.SNAPSHOT";uses:="jcifs",
+ jcifs.util.transport;version="2.0.0.SNAPSHOT"
+Import-Package: javax.servlet;version="[3.1,4)";resolution:=optional,
+ javax.servlet.http;version="[3.1,4)";resolution:=optional
+Tool: Bnd-2.1.0.20130426-122213
