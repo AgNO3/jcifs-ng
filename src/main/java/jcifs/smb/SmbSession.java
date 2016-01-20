@@ -213,7 +213,7 @@ public final class SmbSession {
      * @return
      */
     protected boolean matches ( CIFSContext tf ) {
-        return Objects.equals(this.getTransportContext().getCredentials(), tf.getCredentials());
+        return Objects.equals(this.getCredentials(), tf.getCredentials());
     }
 
 
@@ -414,6 +414,14 @@ public final class SmbSession {
      */
     public long getExpiration () {
         return this.expiration;
+    }
+
+
+    /**
+     * @return
+     */
+    public SmbCredentials getCredentials () {
+        return this.credentials;
     }
 
 }

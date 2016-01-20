@@ -611,14 +611,19 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( name.charAt(last) == '/' ) {
             name = name.substring(0, last);
         }
+
+        context.getUncPath0();
         if ( context.share == null ) {
             this.unc = "\\";
+            this.canon = "/";
         }
         else if ( context.unc.equals("\\") ) {
             this.unc = '\\' + name;
+            this.canon = '/' + name;
         }
         else {
             this.unc = context.unc + '\\' + name;
+            this.canon = context.canon + '/' + name;
         }
         /*
          * why? am I going around in circles?
@@ -646,8 +651,17 @@ public class SmbFile extends URLConnection implements SmbConstants {
     /**
      * @return
      */
-    SmbSession getSession () {
+    protected SmbSession getSession () {
         return this.tree.session;
+    }
+
+
+    /**
+     * 
+     * @return the credentials used for the attached session
+     */
+    public SmbCredentials getCredentials () {
+        return this.tree.session.getCredentials();
     }
 
 
@@ -2055,6 +2069,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( p.lastIndexOf('/') != ( p.length() - 1 ) ) {
             throw new SmbException(this.url.toString() + " directory must end with '/'");
         }
+        connect0();
 
         req = new Trans2FindFirst2(getSession().getConfig(), path, wildcard, searchAttributes);
         resp = new Trans2FindFirst2Response(getSession().getConfig());
@@ -3069,19 +3084,9 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    public long getIndexNumber () throws SmbException {
-        int f = open0(O_RDONLY, READ_CONTROL, 0, isDirectory() ? 1 : 0);
-
-        Trans2QueryFileInformation request = new Trans2QueryFileInformation(getSession().getConfig(), f, 6);
-        Trans2QueryFileInformationResponse response = new Trans2QueryFileInformationResponse(getSession().getConfig(), 6);
-
-        try {
-            send(request, response);
-            return response.getInternalInfo().getIndexNumber();
-        }
-        finally {
-            close(f, 0L);
-        }
+    @SuppressWarnings ( "unused" )
+    public long fileIndex () throws SmbException {
+        return 0;
     }
 
 

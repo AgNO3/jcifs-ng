@@ -66,11 +66,6 @@ public class Kerb5Authenticator implements SmbCredentials {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see java.lang.Object#clone()
-     */
     @Override
     public Kerb5Authenticator clone () {
         Kerb5Authenticator kerb5Authenticator = new Kerb5Authenticator(this.config, this.subject);
@@ -113,8 +108,12 @@ public class Kerb5Authenticator implements SmbCredentials {
     /**
      * @return the sessionKey
      */
-    public Key getSessionKey () {
-        return this.sessionKey;
+    @Override
+    public byte[] getSessionKey () {
+        if ( this.sessionKey == null ) {
+            return null;
+        }
+        return this.sessionKey.getEncoded();
     }
 
 

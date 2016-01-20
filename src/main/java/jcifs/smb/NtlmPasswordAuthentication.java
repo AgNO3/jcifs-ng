@@ -67,6 +67,8 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
 
     private boolean nullAuth;
 
+    private byte[] sessionKey;
+
 
     /**
      * 
@@ -74,17 +76,17 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
     private NtlmPasswordAuthentication () {}
 
 
+    /**
+     * 
+     * @param tc
+     * @param nullAuth
+     */
     public NtlmPasswordAuthentication ( CIFSContext tc, boolean nullAuth ) {
         this(tc, "", "", "");
         this.nullAuth = nullAuth;
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see java.lang.Object#clone()
-     */
     @Override
     public NtlmPasswordAuthentication clone () {
         NtlmPasswordAuthentication cloned = new NtlmPasswordAuthentication();
@@ -100,6 +102,15 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
         }
 
         return cloned;
+    }
+
+
+    /**
+     * @return the sessionKey
+     */
+    @Override
+    public byte[] getSessionKey () {
+        return this.sessionKey;
     }
 
 
@@ -408,8 +419,8 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
     public boolean equals ( Object obj ) {
         if ( obj instanceof NtlmPasswordAuthentication ) {
             NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) obj;
-            String domA = ntlm.getUserDomain() != null ? ntlm.getUserDomain() : ntlm.getUserDomain().toUpperCase();
-            String domB = this.getUserDomain() != null ? this.getUserDomain() : this.getUserDomain().toUpperCase();
+            String domA = ntlm.getUserDomain() != null ? ntlm.getUserDomain().toUpperCase() : null;
+            String domB = this.getUserDomain() != null ? this.getUserDomain().toUpperCase() : null;
             if ( Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUserDomain()) ) {
                 if ( this.areHashesExternal() && ntlm.areHashesExternal() ) {
                     return Arrays.equals(this.ansiHash, ntlm.ansiHash) && Arrays.equals(this.unicodeHash, ntlm.unicodeHash);
@@ -554,8 +565,7 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
                     ex = se;
                 }
 
-                if ( response.isLoggedInAsGuest && !isGuest() && session.getTransport().server.security != SmbConstants.SECURITY_SHARE
-                        && !this.isAnonymous() ) {
+                if ( response.isLoggedInAsGuest && session.getTransport().server.security != SmbConstants.SECURITY_SHARE && !this.isAnonymous() ) {
                     throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                 }
 
@@ -617,6 +627,8 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
                         byte[] signingKey = nctx.getSigningKey();
                         if ( signingKey != null )
                             request.digest = new SigningDigest(signingKey, true);
+
+                        this.sessionKey = signingKey;
                     }
 
                     request.uid = session.getUid();

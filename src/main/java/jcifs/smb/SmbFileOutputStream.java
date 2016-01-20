@@ -105,6 +105,7 @@ public class SmbFileOutputStream extends OutputStream {
         this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
         this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
 
+        // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
                 || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
         if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !isSignatureActive ) {

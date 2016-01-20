@@ -154,7 +154,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             if ( ssn.matches(tf) ) {
                 // TODO: here the authenticators were set on the session, is this necessary?
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Using existing session " + ssn);
+                    log.debug("Reusing existing session " + ssn);
                 }
                 return ssn;
             }

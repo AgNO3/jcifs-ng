@@ -22,10 +22,10 @@ package jcifs.dcerpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.security.Principal;
 
 import jcifs.CIFSContext;
 import jcifs.dcerpc.ndr.NdrBuffer;
+import jcifs.smb.SmbCredentials;
 
 
 public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
@@ -329,9 +329,9 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
-    public Principal getPrincipal () {
+    public SmbCredentials getCredentials () {
         if ( this instanceof DcerpcPipeHandle )
-            return ( (DcerpcPipeHandle) this ).pipe.getPrincipal();
+            return ( (DcerpcPipeHandle) this ).pipe.getCredentials();
         return null;
     }
 

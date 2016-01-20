@@ -38,4 +38,7 @@ public interface SmbCredentials extends Cloneable {
 
 
     SmbCredentials clone ();
+
+
+    byte[] getSessionKey ();
 }

@@ -16,6 +16,7 @@ import jcifs.SmbTransportPool;
 import jcifs.netbios.NameServiceClient;
 import jcifs.smb.BufferCache;
 import jcifs.smb.Dfs;
+import jcifs.smb.Handler;
 import jcifs.smb.SmbCredentials;
 
 
@@ -62,10 +63,20 @@ public class CIFSContextWrapper implements CIFSContext {
         return this.delegate.getCredentials();
     }
 
+    private Handler handler;
 
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.context.CIFSContextWrapper#getUrlHandler()
+     */
     @Override
     public URLStreamHandler getUrlHandler () {
-        return this.delegate.getUrlHandler();
+        if ( this.handler == null ) {
+            this.handler = new Handler(this);
+        }
+        return this.handler;
     }
 
 

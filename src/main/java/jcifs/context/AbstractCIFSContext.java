@@ -34,8 +34,8 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
 
 
     /**
-     * @param ntlmPasswordAuthentication
-     * @return
+     * @param creds
+     * @return a wrapped context with the given credentials
      */
     @Override
     public CIFSContext withCredentials ( SmbCredentials creds ) {

@@ -64,11 +64,12 @@
 				<configuration>
 					<instructions>
 						<Export-Package>
-							jcifs.*
+							jcifs.*;version="2.0.0.qualifier"
 						</Export-Package>
 						<Private-Package></Private-Package>
 						<Import-Package>
-							javax.servlet*;resolution:=optional
+							javax.servlet*;resolution:=optional,
+							*
 						</Import-Package>
 					</instructions>
 					<addDependenciesToRepository>true</addDependenciesToRepository>

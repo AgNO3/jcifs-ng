@@ -83,13 +83,20 @@ public class SmbFileInputStream extends InputStream {
         }
         this.readSize = Math.min(file.tree.session.getTransport().rcv_buf_size - 70, file.tree.session.getTransport().server.maxBufferSize - 70);
 
-        boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) && !isSignatureActive ) {
+        // boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
+        // || ( file.tree.session.getTransport().server.signaturesEnabled &&
+        // file.getTransportContext().getConfig().isSigningPreferred() );
+        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) /* && !isSignatureActive */ ) {
+            log.debug("Enabling LARGE_READX");
             this.readSizeFile = Math.min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, 0xFFFF - 70);
         }
         else {
+            log.debug("LARGE_READX disabled");
             this.readSizeFile = this.readSize;
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug("Negotiated file read size is " + this.readSizeFile);
         }
     }
 

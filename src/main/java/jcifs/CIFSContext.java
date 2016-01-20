@@ -29,52 +29,71 @@ public interface CIFSContext {
 
 
     /**
+     * @return the name server client
+     */
+    NameServiceClient getNameServiceClient ();
+
+
+    /**
+     * @return the buffer cache
+     */
+    BufferCache getBufferCache ();
+
+
+    /**
+     * @return the transport pool
+     */
+    SmbTransportPool getTransportPool ();
+
+
+    /**
      * 
-     * @return the configuration
+     * @return the active configuration
      */
     Configuration getConfig ();
 
 
     /**
-     * @return
+     * @return the DFS instance
      */
     Dfs getDfs ();
 
 
     /**
      * 
-     * @return
+     * @return the used credentials
      */
     SmbCredentials getCredentials ();
 
 
     /**
-     * @return
+     * @return an URL handler using this context
      */
     URLStreamHandler getUrlHandler ();
 
 
     /**
-     * @return
+     * @return whether default credentials are available
      */
     boolean hasDefaultCredentials ();
 
 
     /**
-     * @return
+     * @return a child context using the default credentials
      */
     CIFSContext withDefaultCredentials ();
 
 
     /**
-     * @return
+     * @param nullCreds
+     * @return a child context using anonymous credentials
      */
     CIFSContext withAnonymousCredentials ( boolean nullCreds );
 
 
     /**
      * 
-     * @return
+     * @return a child context using guest credentials
      */
     CIFSContext withGuestCrendentials ();
 
@@ -82,7 +101,7 @@ public interface CIFSContext {
     /**
      * 
      * @param creds
-     * @return
+     * @return a child using using the given credentials
      */
     CIFSContext withCredentials ( SmbCredentials creds );
 
@@ -93,23 +112,5 @@ public interface CIFSContext {
      * @return whether new credentials are obtained
      */
     boolean renewCredentials ( String locationHint, Throwable error );
-
-
-    /**
-     * @return
-     */
-    NameServiceClient getNameServiceClient ();
-
-
-    /**
-     * @return
-     */
-    BufferCache getBufferCache ();
-
-
-    /**
-     * @return
-     */
-    SmbTransportPool getTransportPool ();
 
 }

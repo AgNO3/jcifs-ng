@@ -77,10 +77,11 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
 
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
                 || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) && !isSignatureActive ) {
+        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
             this.readSize = Math.min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, 0xFFFF - 70);
         }
 
+        // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
         if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !isSignatureActive ) {
             this.writeSize = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
         }

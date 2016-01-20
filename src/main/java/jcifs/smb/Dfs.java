@@ -90,9 +90,12 @@ public class Dfs {
         }
         catch ( IOException ioe ) {
             log.debug("getting trusted domains failed: " + tf.getCredentials().getUserDomain(), ioe);
+            CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
+            this._domains = entry;
             if ( tf.getConfig().isDfsStrictView() && ioe instanceof SmbAuthException ) {
                 throw (SmbAuthException) ioe;
             }
+            return this._domains.map;
         }
         return null;
     }

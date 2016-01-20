@@ -554,7 +554,8 @@ public class BaseConfiguration implements Configuration {
 
         if ( this.capabilities == 0 ) {
             this.capabilities = ( this.useNTSmbs ? SmbConstants.CAP_NT_SMBS : 0 ) | ( this.useNtStatus ? SmbConstants.CAP_STATUS32 : 0 )
-                    | ( this.useExtendedSecurity ? SmbConstants.CAP_EXTENDED_SECURITY : 0 );
+                    | ( this.useExtendedSecurity ? SmbConstants.CAP_EXTENDED_SECURITY : 0 ) | SmbConstants.CAP_LARGE_READX
+                    | SmbConstants.CAP_LARGE_WRITEX;
         }
 
         if ( this.broadcastAddress == null ) {
