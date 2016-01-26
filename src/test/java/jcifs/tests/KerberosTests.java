@@ -46,7 +46,7 @@ public class KerberosTests {
     public void testKRB () throws IOException, Asn1Exception, KrbException {
         CIFSContext ctx = SingletonContext.getInstance();
         Subject s = getInitiatorSubject(TestConfig.getTestUser(), TestConfig.getTestUserPassword(), TestConfig.getTestUserDomain());
-        ctx = ctx.withCredentials(new Kerb5Authenticator(ctx.getConfig(), s));
+        ctx = ctx.withCredentials(new Kerb5Authenticator(ctx, s));
         SmbFile f = new SmbFile("smb://" + TestConfig.getTestServer() + "/test/", ctx);
 
         for ( SmbFile entry : f.listFiles() ) {

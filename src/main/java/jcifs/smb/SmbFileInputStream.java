@@ -194,8 +194,8 @@ public class SmbFileInputStream extends InputStream {
          * Read AndX Request / Response
          */
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("read: fid=" + this.file.fid + ",off=" + off + ",len=" + len);
+        if ( log.isTraceEnabled() ) {
+            log.trace("read: fid=" + this.file.fid + ",off=" + off + ",len=" + len);
         }
 
         SmbComReadAndXResponse response = new SmbComReadAndXResponse(getSession().getConfig(), b, off);
@@ -205,12 +205,12 @@ public class SmbFileInputStream extends InputStream {
         }
 
         int r, n;
+        int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
         do {
-            int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
             r = len > blockSize ? blockSize : len;
 
-            if ( log.isDebugEnabled() ) {
-                log.debug("read: len=" + len + ",r=" + r + ",fp=" + this.fp);
+            if ( log.isTraceEnabled() ) {
+                log.trace("read: len=" + len + ",r=" + r + ",fp=" + this.fp);
             }
 
             try {
@@ -233,8 +233,11 @@ public class SmbFileInputStream extends InputStream {
             len -= n;
             response.off += n;
         }
-        while ( len > 0 && n == r );
-
+        while ( len > blockSize && n == r );
+        // this used to be len > 0, but this is BS:
+        // - InputStream.read gives no such guarantee
+        // - otherwise the caller would need to figure out the block size, or otherwise might end up with very small
+        // reads
         return (int) ( this.fp - start );
     }
 

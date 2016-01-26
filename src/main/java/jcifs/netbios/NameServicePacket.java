@@ -21,6 +21,7 @@ package jcifs.netbios;
 
 import java.net.InetAddress;
 
+import jcifs.Configuration;
 import jcifs.util.Hexdump;
 
 
@@ -101,9 +102,11 @@ abstract class NameServicePacket {
     int questionType, questionClass, recordType, recordClass, ttl, rDataLength;
 
     InetAddress addr;
+    protected Configuration config;
 
 
-    NameServicePacket () {
+    NameServicePacket ( Configuration config ) {
+        this.config = config;
         this.isRecurDesired = true;
         this.isBroadcast = true;
         this.questionCount = 1;

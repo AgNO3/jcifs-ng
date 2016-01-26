@@ -133,8 +133,12 @@ public abstract class Transport implements Runnable {
                  */
                 boolean hard = timeout == false;
 
-                if ( !timeout )
-                    log.trace("recv failed", ex);
+                if ( !timeout ) {
+                    log.debug("recv failed", ex);
+                }
+                else {
+                    log.trace("transport read time out", ex);
+                }
 
                 try {
                     disconnect(hard);

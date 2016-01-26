@@ -19,10 +19,14 @@
 package jcifs.smb;
 
 
+import org.apache.log4j.Logger;
+
 import jcifs.Configuration;
 
 
 class SmbComClose extends ServerMessageBlock {
+
+    private static final Logger log = Logger.getLogger(SmbComClose.class);
 
     private int fid;
     private long lastWriteTime;
@@ -40,7 +44,12 @@ class SmbComClose extends ServerMessageBlock {
     int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
         SMBUtil.writeInt2(this.fid, dst, dstIndex);
         dstIndex += 2;
-        this.digest.writeUTime(getConfig(), this.lastWriteTime, dst, dstIndex);
+        if ( this.digest != null ) {
+            this.digest.writeUTime(getConfig(), this.lastWriteTime, dst, dstIndex);
+        }
+        else {
+            log.debug("SmbComClose without a digest");
+        }
         return 6;
     }
 

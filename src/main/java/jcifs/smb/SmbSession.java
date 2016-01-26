@@ -19,16 +19,22 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import javax.security.auth.Subject;
+
 import org.apache.log4j.Logger;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.SmbConstants;
 import jcifs.UniAddress;
@@ -170,6 +176,7 @@ public final class SmbSession {
     private CIFSContext transportContext;
 
     private SmbCredentials credentials;
+    private byte[] sessionKey;
 
 
     SmbSession ( CIFSContext tf, SmbTransport transport, UniAddress address, int port, InetAddress localAddr, int localPort ) {
@@ -190,6 +197,17 @@ public final class SmbSession {
      */
     public Configuration getConfig () {
         return this.transportContext.getConfig();
+    }
+
+
+    /**
+     * @return the sessionKey
+     */
+    public byte[] getSessionKey () throws CIFSException {
+        if ( this.sessionKey == null ) {
+            throw new CIFSException("No session key available");
+        }
+        return this.sessionKey;
     }
 
 
@@ -307,7 +325,7 @@ public final class SmbSession {
                  */
                 this.uid = 0;
 
-                this.credentials.sessionSetup(this, andx, andxResponse);
+                this.sessionSetup2(andx, andxResponse);
             }
             catch ( SmbException se ) {
                 log.debug("Session setup failed", se);
@@ -320,6 +338,240 @@ public final class SmbSession {
             }
         }
 
+    }
+
+
+    /**
+     * @param andx
+     * @param andxResponse
+     */
+    private void sessionSetup2 ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException, GeneralSecurityException {
+        SmbException ex = null;
+        SmbComSessionSetupAndX request;
+        SmbComSessionSetupAndXResponse response;
+        SSPContext ctx = null;
+        byte[] token = new byte[0];
+        int state = 10;
+        do {
+            switch ( state ) {
+            case 10: /* NTLM */
+                if ( !this.credentials.isNull() && this.getTransport().hasCapability(SmbConstants.CAP_EXTENDED_SECURITY) ) {
+                    log.debug("Extended security negotiated");
+                    state = 20; /* NTLMSSP */
+                    break;
+                }
+
+                log.debug("Performing legacy session setup");
+                if ( ! ( this.credentials instanceof NtlmPasswordAuthentication ) ) {
+                    throw new SmbAuthException("Incompatible credentials");
+                }
+
+                NtlmPasswordAuthentication npa = (NtlmPasswordAuthentication) this.credentials;
+
+                request = new SmbComSessionSetupAndX(this, andx, this.getCredentials());
+                response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), andxResponse);
+
+                /*
+                 * Create SMB signature digest if necessary
+                 * Only the first SMB_COM_SESSION_SETUP_ANX with non-null or
+                 * blank password initializes signing.
+                 */
+                if ( !npa.isNull() && this.getTransport().isSignatureSetupRequired() ) {
+                    if ( npa.areHashesExternal() && this.getTransportContext().getConfig().getDefaultPassword() != null ) {
+                        /*
+                         * preauthentication
+                         */
+                        this.getTransport().getSmbSession(this.getTransportContext().withDefaultCredentials())
+                                .getSmbTree(this.getTransportContext().getConfig().getLogonShare(), null).treeConnect(null, null);
+                    }
+                    else {
+                        byte[] signingKey = npa.getSigningKey(this.getTransportContext(), this.getTransport().server.encryptionKey);
+                        request.digest = new SigningDigest(signingKey, false);
+                    }
+                }
+
+                try {
+                    this.getTransport().send(request, response);
+                }
+                catch ( SmbAuthException sae ) {
+                    throw sae;
+                }
+                catch ( SmbException se ) {
+                    ex = se;
+                }
+
+                if ( response.isLoggedInAsGuest && this.getTransport().server.security != SmbConstants.SECURITY_SHARE
+                        && !this.credentials.isAnonymous() ) {
+                    throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
+                }
+
+                if ( ex != null )
+                    throw ex;
+
+                this.setUid(response.uid);
+
+                if ( request.digest != null ) {
+                    /* success - install the signing digest */
+                    this.getTransport().digest = request.digest;
+                }
+
+                this.setSessionSetup(true);
+                state = 0;
+
+                break;
+            case 20: /* NTLMSSP */
+                Subject s = this.credentials.getSubject();
+                final byte[] curToken = token;
+                if ( ctx == null ) {
+                    final boolean doSigning = ( this.getTransport().flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
+                    String host = this.getTransport().address.getHostAddress();
+                    try {
+                        host = this.getTransport().address.getHostName();
+                    }
+                    catch ( Exception e ) {
+                        log.debug("Failed to resolve host name", e);
+                    }
+
+                    if ( s == null ) {
+                        ctx = this.credentials.createContext(this.getTransportContext(), host, this.transport.server.encryptionKey, doSigning);
+                    }
+                    else {
+                        try {
+                            final String hostName = host;
+                            ctx = Subject.doAs(s, new PrivilegedExceptionAction<SSPContext>() {
+
+                                @Override
+                                public SSPContext run () throws Exception {
+                                    return getCredentials()
+                                            .createContext(getTransportContext(), hostName, getTransport().server.encryptionKey, doSigning);
+                                }
+
+                            });
+                        }
+                        catch ( PrivilegedActionException e ) {
+                            if ( e.getException() instanceof SmbException ) {
+                                throw (SmbException) e.getException();
+                            }
+                            throw new SmbException("Unexpected exception during context initialization", e);
+                        }
+                    }
+                }
+
+                final SSPContext curCtx = ctx;
+
+                if ( log.isDebugEnabled() ) {
+                    log.debug(ctx);
+                }
+
+                if ( ctx.isEstablished() ) {
+                    this.setNetbiosName(ctx.getNetbiosName());
+                    this.sessionKey = ctx.getSigningKey();
+                    this.setSessionSetup(true);
+                    state = 0;
+                    break;
+                }
+
+                try {
+                    if ( s != null ) {
+
+                        try {
+                            token = Subject.doAs(s, new PrivilegedExceptionAction<byte[]>() {
+
+                                @Override
+                                public byte[] run () throws Exception {
+                                    return curCtx.initSecContext(curToken, 0, curToken == null ? 0 : curToken.length);
+                                }
+
+                            });
+                        }
+                        catch ( PrivilegedActionException e ) {
+                            if ( e.getException() instanceof SmbException ) {
+                                throw (SmbException) e.getException();
+                            }
+                            throw new SmbException("Unexpected exception during context initialization", e);
+                        }
+                    }
+                    else {
+                        token = ctx.initSecContext(token, 0, token == null ? 0 : token.length);
+                    }
+                }
+                catch ( SmbException se ) {
+                    /*
+                     * We must close the transport or the server will be expecting a
+                     * Type3Message. Otherwise, when we send a Type1Message it will return
+                     * "Invalid parameter".
+                     */
+                    try {
+                        this.getTransport().disconnect(true);
+                    }
+                    catch ( IOException ioe ) {
+                        log.debug("Disconnect failed");
+                    }
+                    this.setUid(0);
+                    throw se;
+                }
+
+                if ( token != null ) {
+                    request = new SmbComSessionSetupAndX(this, null, token);
+                    response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), null);
+
+                    if ( !this.credentials.isNull() && ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
+                        byte[] signingKey = ctx.getSigningKey();
+                        if ( signingKey != null )
+                            request.digest = new SigningDigest(signingKey, true);
+
+                        this.sessionKey = signingKey;
+                    }
+
+                    request.uid = this.getUid();
+                    this.setUid(0);
+
+                    try {
+                        this.getTransport().send(request, response);
+                    }
+                    catch ( SmbAuthException sae ) {
+                        throw sae;
+                    }
+                    catch ( SmbException se ) {
+                        ex = se;
+                        /*
+                         * Apparently once a successfull NTLMSSP login occurs, the
+                         * server will return "Access denied" even if a logoff is
+                         * sent. Unfortunately calling disconnect() doesn't always
+                         * actually shutdown the connection before other threads
+                         * have committed themselves (e.g. InterruptTest example).
+                         */
+                        try {
+                            this.getTransport().disconnect(true);
+                        }
+                        catch ( Exception e ) {
+                            log.debug("Failed to disconnect transport", e);
+                        }
+                    }
+
+                    if ( response.isLoggedInAsGuest && this.credentials.isGuest() == false ) {
+                        throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
+                    }
+
+                    if ( ex != null )
+                        throw ex;
+
+                    this.setUid(response.uid);
+
+                    if ( request.digest != null ) {
+                        /* success - install the signing digest */
+                        this.getTransport().digest = request.digest;
+                    }
+
+                    token = response.blob;
+                }
+
+                break;
+            default:
+                throw new SmbException("Unexpected session setup state: " + state);
+            }
+        }
+        while ( state != 0 );
     }
 
 

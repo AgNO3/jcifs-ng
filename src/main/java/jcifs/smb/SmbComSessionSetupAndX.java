@@ -87,7 +87,7 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
                 this.blob = (byte[]) cred;
             }
             else {
-                throw new SmbException("Unsupported credential type");
+                throw new SmbException("Unsupported credential type " + ( cred != null ? cred.getClass() : "NULL" ));
             }
         }
         else if ( session.getTransport().server.security == SmbConstants.SECURITY_SHARE ) {

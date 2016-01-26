@@ -22,6 +22,7 @@ package jcifs.spnego;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Enumeration;
 
 import org.bouncycastle.asn1.ASN1EncodableVector;
@@ -39,6 +40,8 @@ import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
+
+import jcifs.util.Hexdump;
 
 
 public class NegTokenInit extends SpnegoToken {
@@ -110,6 +113,21 @@ public class NegTokenInit extends SpnegoToken {
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString () {
+        String mic = null;
+        if ( this.getMechanismListMIC() != null ) {
+            mic = Hexdump.toHexString(this.getMechanismListMIC(), 0, this.getMechanismListMIC().length);
+        }
+        return String.format("NegTokenInit[flags=%d,mechs=%s,mic=%s]", this.getContextFlags(), Arrays.toString(this.getMechanisms()), mic);
+    }
+
+
     @Override
     public byte[] toByteArray () {
         try {
@@ -157,8 +175,10 @@ public class NegTokenInit extends SpnegoToken {
 
         try ( ASN1InputStream is = new ASN1InputStream(token) ) {
             DERApplicationSpecific constructed = (DERApplicationSpecific) is.readObject();
-            if ( constructed == null || !constructed.isConstructed() || constructed.getApplicationTag() != 0xa0 )
-                throw new IOException("Malformed SPNEGO token " + constructed);
+            if ( constructed == null || !constructed.isConstructed() )
+                throw new IOException(
+                    "Malformed SPNEGO token " + constructed
+                            + ( constructed != null ? " " + constructed.isConstructed() + " " + constructed.getApplicationTag() : "" ));
 
             try ( ASN1InputStream der = new ASN1InputStream(constructed.getContents()) ) {
                 ASN1ObjectIdentifier spnego = (ASN1ObjectIdentifier) der.readObject();
@@ -191,7 +211,12 @@ public class NegTokenInit extends SpnegoToken {
                         ASN1OctetString mechanismToken = ASN1OctetString.getInstance(tagged, true);
                         setMechanismToken(mechanismToken.getOctets());
                         break;
+
                     case 3:
+                        if ( ! ( tagged.getObject() instanceof DEROctetString ) ) {
+                            break;
+                        }
+                    case 4:
                         ASN1OctetString mechanismListMIC = ASN1OctetString.getInstance(tagged, true);
                         setMechanismListMIC(mechanismListMIC.getOctets());
                         break;

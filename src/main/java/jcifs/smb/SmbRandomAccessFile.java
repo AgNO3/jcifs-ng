@@ -123,7 +123,8 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
         SmbComReadAndXResponse response = new SmbComReadAndXResponse(getSession().getConfig(), b, off);
         do {
             r = len > this.readSize ? this.readSize : len;
-            this.file.send(new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, null), response);
+            ServerMessageBlock andX = null;
+            this.file.send(new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, andX), response);
             if ( ( n = response.dataLength ) <= 0 ) {
                 return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
             }

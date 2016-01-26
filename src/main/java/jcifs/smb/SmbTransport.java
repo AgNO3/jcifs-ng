@@ -158,6 +158,11 @@ public class SmbTransport extends Transport implements SmbConstants {
                 }
                 return ssn;
             }
+            else if ( log.isDebugEnabled() ) {
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Existing session " + ssn + " does not match " + tf.getCredentials());
+                }
+            }
         }
 
         /* logoff old sessions */
@@ -442,6 +447,9 @@ public class SmbTransport extends Transport implements SmbConstants {
                 log.debug("Not yet initialized " + this.socket);
             }
         }
+        catch ( Exception e ) {
+            log.debug("Exception in disconnect", e);
+        }
         finally {
             this.digest = null;
             this.socket = null;
@@ -677,8 +685,8 @@ public class SmbTransport extends Transport implements SmbConstants {
             request.digest = this.digest; /* for sign called in encode */
 
         try {
-            if ( log.isDebugEnabled() ) {
-                log.debug("Sending " + request);
+            if ( log.isTraceEnabled() ) {
+                log.trace("Sending " + request);
             }
             if ( response == null ) {
                 doSend0(request);
@@ -771,8 +779,8 @@ public class SmbTransport extends Transport implements SmbConstants {
             throw new SmbException(ioe.getMessage(), ioe);
         }
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("Response is " + response);
+        if ( log.isTraceEnabled() ) {
+            log.trace("Response is " + response);
         }
         checkStatus(request, response);
     }

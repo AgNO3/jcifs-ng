@@ -220,10 +220,7 @@ public interface Configuration {
     /**
      * @return
      */
-    String getNetbiosDefaultScope ();
-
-
-    int getNetbiosDefaultSoTimeout ();
+    String getNetbiosScope ();
 
 
     int getNetbiosSndBufSize ();

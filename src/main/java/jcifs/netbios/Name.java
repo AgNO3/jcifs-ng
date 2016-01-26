@@ -39,7 +39,9 @@ public class Name {
     private Configuration config;
 
 
-    Name () {}
+    Name ( Configuration cfg ) {
+        this.config = cfg;
+    }
 
 
     public Name ( Configuration cfg, String name, int hexCode, String scope ) {
@@ -49,7 +51,7 @@ public class Name {
         }
         this.name = name.toUpperCase();
         this.hexCode = hexCode;
-        this.scope = scope != null && scope.length() > 0 ? scope : cfg.getNetbiosDefaultScope();
+        this.scope = scope != null && scope.length() > 0 ? scope : cfg.getNetbiosScope();
         this.srcHashCode = 0;
     }
 

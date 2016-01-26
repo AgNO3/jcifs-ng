@@ -25,7 +25,7 @@ import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
 import jcifs.dcerpc.ndr.NdrBuffer;
-import jcifs.smb.SmbCredentials;
+import jcifs.smb.SmbSession;
 
 
 public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
@@ -329,9 +329,9 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
-    public SmbCredentials getCredentials () {
+    public SmbSession getSession () {
         if ( this instanceof DcerpcPipeHandle )
-            return ( (DcerpcPipeHandle) this ).pipe.getCredentials();
+            return ( (DcerpcPipeHandle) this ).pipe.getSession();
         return null;
     }
 

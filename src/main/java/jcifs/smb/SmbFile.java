@@ -26,7 +26,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -651,23 +650,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
     /**
      * @return
      */
-    protected SmbSession getSession () {
+    public SmbSession getSession () {
         return this.tree.session;
-    }
-
-
-    /**
-     * 
-     * @return the credentials used for the attached session
-     */
-    public SmbCredentials getCredentials () {
-        return this.tree.session.getCredentials();
-    }
-
-
-    public Principal getPrincipal () {
-        // TODO:
-        return null;
     }
 
 
@@ -965,7 +949,6 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 this.tree.treeConnect(null, null);
             }
             else {
-                log.debug("Not authenticated", sae); //$NON-NLS-1$
                 throw sae;
             }
         }

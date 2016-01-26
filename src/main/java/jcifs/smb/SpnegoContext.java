@@ -4,11 +4,9 @@ package jcifs.smb;
 import java.io.IOException;
 
 import org.apache.log4j.Logger;
-import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
-import jcifs.CIFSException;
 import jcifs.spnego.NegTokenInit;
 import jcifs.spnego.NegTokenTarg;
 import jcifs.spnego.SpnegoToken;
@@ -20,20 +18,24 @@ import jcifs.spnego.SpnegoToken;
  * @author Shun
  *
  */
-class SpnegoContext {
+class SpnegoContext implements SSPContext {
 
     private static final Logger log = Logger.getLogger(SpnegoContext.class);
 
-    private Kerb5Context context;
-    private Oid[] mechs;
+    private static Oid SPNEGO_MECH_OID;
 
 
-    /**
-     * 
-     */
-    public SpnegoContext ( NtlmContext ctx ) {
-
+    static {
+        try {
+            SPNEGO_MECH_OID = new Oid("1.3.6.1.5.5.2");
+        }
+        catch ( GSSException e ) {
+            log.error("Failed to initialize OID", e);
+        }
     }
+
+    private SSPContext mechContext;
+    private Oid[] mechs;
 
 
     /**
@@ -44,10 +46,8 @@ class SpnegoContext {
      *            the {@link GSSContext} to be wrapped
      * @throws GSSException
      */
-    SpnegoContext ( Kerb5Context source ) throws GSSException {
-        this(source, new Oid[] {
-            source.getGSSContext().getMech()
-        });
+    SpnegoContext ( SSPContext source ) {
+        this(source, source.getSupportedMechs());
     }
 
 
@@ -56,13 +56,44 @@ class SpnegoContext {
      * with specified mechanism.
      * 
      * @param source
-     *            the {@link GSSContext} to be wrapped
+     *            the {@link SSPContext} to be wrapped
      * @param mech
      *            the mechanism is being used for this context.
      */
-    SpnegoContext ( Kerb5Context source, Oid[] mech ) {
-        this.context = source;
+    SpnegoContext ( SSPContext source, Oid[] mech ) {
+        this.mechContext = source;
         this.mechs = mech;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#getSupportedMechs()
+     */
+    @Override
+    public Oid[] getSupportedMechs () {
+        return new Oid[] {
+            SPNEGO_MECH_OID
+        };
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#getFlags()
+     */
+    @Override
+    public int getFlags () {
+        return this.mechContext.getFlags();
+    }
+
+
+    @Override
+    public boolean isSupported ( Oid mechanism ) {
+        // prevent nesting
+        return false;
     }
 
 
@@ -87,12 +118,24 @@ class SpnegoContext {
 
 
     /**
-     * Get the GSSContext initialized for SPNEGO.
-     * 
-     * @return the gsscontext
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#getNetbiosName()
      */
-    GSSContext getGSSContext () {
-        return this.context.getGSSContext();
+    @Override
+    public String getNetbiosName () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#getSigningKey()
+     */
+    @Override
+    public byte[] getSigningKey () throws SmbException {
+        return this.mechContext.getSigningKey();
     }
 
 
@@ -105,52 +148,44 @@ class SpnegoContext {
      * @return
      * @throws GSSException
      */
-    byte[] initSecContext ( byte[] inputBuf, int offset, int len ) throws GSSException, CIFSException {
-        byte[] ret = null;
+    @Override
+    public byte[] initSecContext ( byte[] inputBuf, int offset, int len ) throws SmbException {
         if ( len == 0 ) {
-            byte[] mechToken = this.context.getGSSContext().initSecContext(inputBuf, offset, len);
-            int contextFlags = 0;
-            if ( this.getGSSContext().getCredDelegState() ) {
-                contextFlags |= NegTokenInit.DELEGATION;
-            }
-            if ( this.getGSSContext().getMutualAuthState() ) {
-                contextFlags |= NegTokenInit.MUTUAL_AUTHENTICATION;
-            }
-            if ( this.getGSSContext().getReplayDetState() ) {
-                contextFlags |= NegTokenInit.REPLAY_DETECTION;
-            }
-            if ( this.getGSSContext().getSequenceDetState() ) {
-                contextFlags |= NegTokenInit.SEQUENCE_CHECKING;
-            }
-            if ( this.getGSSContext().getAnonymityState() ) {
-                contextFlags |= NegTokenInit.ANONYMITY;
-            }
-            if ( this.getGSSContext().getConfState() ) {
-                contextFlags |= NegTokenInit.CONFIDENTIALITY;
-            }
-            if ( this.getGSSContext().getIntegState() ) {
-                contextFlags |= NegTokenInit.INTEGRITY;
-            }
-            ret = new NegTokenInit(this.mechs, contextFlags, mechToken, null).toByteArray();
+            return initialToken();
         }
-        else {
+
+        return negotitate(inputBuf, offset, len);
+    }
+
+
+    /**
+     * @param inputBuf
+     * @param offset
+     * @param len
+     * @return
+     * @throws GSSException
+     * @throws SmbException
+     */
+    private byte[] negotitate ( byte[] inputBuf, int offset, int len ) throws SmbException {
+        try {
             SpnegoToken spToken = getToken(inputBuf, offset, len);
-            Oid currentMech = this.getGSSContext().getMech();
+
             if ( spToken instanceof NegTokenTarg ) {
                 NegTokenTarg targ = (NegTokenTarg) spToken;
-                if ( targ.getMechanism() != null && !targ.getMechanism().equals(this.getGSSContext().getMech()) ) {
-                    log.error("Selected mech does not match the context " + targ.getMechanism());
+                if ( !this.mechContext.isSupported(targ.getMechanism()) ) {
+                    throw new SmbException("Server chose an unsupported mechanism " + targ.getMechanism());
                 }
             }
 
+            Oid currentMech = null;
             byte[] mechToken = spToken.getMechanismToken();
-            mechToken = this.getGSSContext().initSecContext(mechToken, 0, mechToken.length);
+            mechToken = this.mechContext.initSecContext(mechToken, 0, mechToken.length);
             if ( mechToken != null ) {
                 int result = NegTokenTarg.ACCEPT_INCOMPLETE;
                 byte[] mechMIC = null;
                 if ( spToken instanceof NegTokenTarg ) {
                     NegTokenTarg targ = (NegTokenTarg) spToken;
-                    if ( targ.getResult() == NegTokenTarg.ACCEPT_COMPLETED && this.getGSSContext().isEstablished() ) {
+                    if ( targ.getResult() == NegTokenTarg.ACCEPT_COMPLETED && this.mechContext.isEstablished() ) {
                         result = NegTokenTarg.ACCEPT_COMPLETED;
                         if ( targ.getMechanism() != null ) {
                             currentMech = targ.getMechanism();
@@ -158,13 +193,27 @@ class SpnegoContext {
                         mechMIC = targ.getMechanismListMIC();
                     }
                     else if ( targ.getResult() == NegTokenTarg.REJECTED ) {
-                        throw new CIFSException("SPNEGO mechanism was rejected");
+                        throw new SmbException("SPNEGO mechanism was rejected");
                     }
                 }
-                ret = new NegTokenTarg(result, currentMech, mechToken, mechMIC).toByteArray();
+                return new NegTokenTarg(result, currentMech, mechToken, mechMIC).toByteArray();
             }
+
+            return null;
         }
-        return ret;
+        catch ( GSSException e ) {
+            throw new SmbException("SPNEGO mechanism failed", e);
+        }
+    }
+
+
+    /**
+     * @return
+     * @throws GSSException
+     */
+    private byte[] initialToken () throws SmbException {
+        byte[] mechToken = this.mechContext.initSecContext(new byte[0], 0, 0);
+        return new NegTokenInit(this.mechs, this.mechContext.getFlags(), mechToken, null).toByteArray();
     }
 
 
@@ -173,8 +222,9 @@ class SpnegoContext {
      * 
      * @return
      */
+    @Override
     public boolean isEstablished () {
-        return this.getGSSContext().isEstablished();
+        return this.mechContext.isEstablished();
     }
 
 
@@ -212,9 +262,21 @@ class SpnegoContext {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString () {
+        return "SPNEGO[" + this.mechContext + "]";
+    }
+
+
+    /**
      * 
      */
-    public void dispose () throws GSSException {
-        getGSSContext().dispose();
+    @Override
+    public void dispose () throws SmbException {
+        this.mechContext.dispose();
     }
 }

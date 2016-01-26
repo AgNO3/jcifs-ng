@@ -33,8 +33,6 @@ class NodeStatusResponse extends NameServicePacket {
 
     NbtAddress[] addressArray;
 
-    private Configuration config;
-
 
     /*
      * It is a little awkward but prudent to pass the quering address
@@ -46,9 +44,9 @@ class NodeStatusResponse extends NameServicePacket {
      */
 
     NodeStatusResponse ( Configuration cfg, NbtAddress queryAddress ) {
-        this.config = cfg;
+        super(cfg);
         this.queryAddress = queryAddress;
-        this.recordName = new Name();
+        this.recordName = new Name(cfg);
         this.macAddress = new byte[6];
     }
 

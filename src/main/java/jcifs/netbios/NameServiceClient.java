@@ -148,7 +148,7 @@ public class NameServiceClient implements Runnable {
          * the name deduced above possibly with scope applied and
          * cache it forever.
          */
-        Name localName = new Name(tc.getConfig(), localHostname, 0x00, tc.getConfig().getNetbiosDefaultScope());
+        Name localName = new Name(tc.getConfig(), localHostname, 0x00, tc.getConfig().getNetbiosScope());
         this.localhostAddress = new NbtAddress(
             localName,
             localInetAddress.hashCode(),
@@ -464,8 +464,8 @@ public class NameServiceClient implements Runnable {
 
     NbtAddress[] getAllByName ( Name name, InetAddress addr ) throws UnknownHostException {
         int n;
-        NameQueryRequest request = new NameQueryRequest(name);
-        NameQueryResponse response = new NameQueryResponse();
+        NameQueryRequest request = new NameQueryRequest(this.transportContext.getConfig(), name);
+        NameQueryResponse response = new NameQueryResponse(this.transportContext.getConfig());
 
         request.addr = addr != null ? addr : NbtAddress.getWINSAddress(this.transportContext);
         request.isBroadcast = request.addr == null;
@@ -500,8 +500,8 @@ public class NameServiceClient implements Runnable {
 
     NbtAddress getByName ( Name name, InetAddress addr, CIFSContext tc ) throws UnknownHostException {
         int n;
-        NameQueryRequest request = new NameQueryRequest(name);
-        NameQueryResponse response = new NameQueryResponse();
+        NameQueryRequest request = new NameQueryRequest(tc.getConfig(), name);
+        NameQueryResponse response = new NameQueryResponse(tc.getConfig());
 
         if ( addr != null ) { /*
                                * UniAddress calls always use this
@@ -604,7 +604,9 @@ public class NameServiceClient implements Runnable {
         NodeStatusResponse response;
 
         response = new NodeStatusResponse(this.transportContext.getConfig(), addr);
-        request = new NodeStatusRequest(new Name(this.transportContext.getConfig(), NbtAddress.ANY_HOSTS_NAME, 0x00, null));
+        request = new NodeStatusRequest(
+            this.transportContext.getConfig(),
+            new Name(this.transportContext.getConfig(), NbtAddress.ANY_HOSTS_NAME, 0x00, null));
         request.addr = addr.getInetAddress();
 
         n = this.transportContext.getConfig().getNetbiosRetryCount();

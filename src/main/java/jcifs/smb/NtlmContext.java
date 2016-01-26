@@ -20,6 +20,8 @@ package jcifs.smb;
 
 
 import org.apache.log4j.Logger;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.Oid;
 
 import jcifs.CIFSContext;
 import jcifs.ntlmssp.NtlmFlags;
@@ -35,9 +37,21 @@ import jcifs.util.Hexdump;
  * authentication.
  */
 
-public class NtlmContext {
+public class NtlmContext implements SSPContext {
 
     private static final Logger log = Logger.getLogger(NtlmContext.class);
+
+    private static Oid NTLMSSP_OID;
+
+
+    static {
+        try {
+            NTLMSSP_OID = new Oid("1.3.6.1.4.1.311.2.2.10");
+        }
+        catch ( GSSException e ) {
+            log.error("Failed to parse OID", e);
+        }
+    }
 
     private NtlmPasswordAuthentication auth;
     private int ntlmsspFlags;
@@ -63,6 +77,20 @@ public class NtlmContext {
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#getSupportedMechs()
+     */
+    @Override
+    public Oid[] getSupportedMechs () {
+
+        return new Oid[] {
+            NTLMSSP_OID
+        };
+    }
+
+
     @Override
     public String toString () {
         String ret = "NtlmContext[auth=" + this.auth + ",ntlmsspFlags=0x" + Hexdump.toHexString(this.ntlmsspFlags, 8) + ",workstation="
@@ -85,6 +113,29 @@ public class NtlmContext {
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#getFlags()
+     */
+    @Override
+    public int getFlags () {
+        return 0;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#isSupported(org.ietf.jgss.Oid)
+     */
+    @Override
+    public boolean isSupported ( Oid mechanism ) {
+        return NTLMSSP_OID.equals(mechanism);
+    }
+
+
+    @Override
     public boolean isEstablished () {
         return this.isEstablished;
     }
@@ -95,16 +146,19 @@ public class NtlmContext {
     }
 
 
+    @Override
     public byte[] getSigningKey () {
         return this.signingKey;
     }
 
 
+    @Override
     public String getNetbiosName () {
         return this.netbiosName;
     }
 
 
+    @Override
     public byte[] initSecContext ( byte[] token, int offset, int len ) throws SmbException {
         switch ( this.state ) {
         case 1:
@@ -157,5 +211,16 @@ public class NtlmContext {
             throw new SmbException("Invalid state");
         }
         return token;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#dispose()
+     */
+    @Override
+    public void dispose () throws SmbException {
+        this.isEstablished = false;
     }
 }

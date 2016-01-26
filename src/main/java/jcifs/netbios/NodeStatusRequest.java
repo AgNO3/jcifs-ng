@@ -19,9 +19,13 @@
 package jcifs.netbios;
 
 
+import jcifs.Configuration;
+
+
 class NodeStatusRequest extends NameServicePacket {
 
-    NodeStatusRequest ( Name name ) {
+    NodeStatusRequest ( Configuration cfg, Name name ) {
+        super(cfg);
         this.questionName = name;
         this.questionType = NBSTAT;
         this.isRecurDesired = false;

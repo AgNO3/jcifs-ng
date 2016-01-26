@@ -22,15 +22,17 @@ package jcifs.netbios;
 import java.io.IOException;
 import java.io.InputStream;
 
+import jcifs.Configuration;
+
 
 public class SessionRequestPacket extends SessionServicePacket {
 
     private Name calledName, callingName;
 
 
-    SessionRequestPacket () {
-        this.calledName = new Name();
-        this.callingName = new Name();
+    SessionRequestPacket ( Configuration config ) {
+        this.calledName = new Name(config);
+        this.callingName = new Name(config);
     }
 
 

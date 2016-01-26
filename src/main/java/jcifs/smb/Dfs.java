@@ -71,8 +71,12 @@ public class Dfs {
             return this._domains.map;
         try {
             String authDomain = tf.getCredentials().getUserDomain();
-            UniAddress addr = UniAddress.getByName(authDomain, true, tf);
-            SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
+            // otherwise you end up with a wrong server name for kerberos
+            // seems to be correct according to
+            // https://lists.samba.org/archive/samba-technical/2009-August/066486.html
+            // UniAddress addr = UniAddress.getByName(authDomain, true, tf);
+            // SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
+            SmbTransport trans = getDc(authDomain, tf);
             CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
             DfsReferral dr = trans.getDfsReferrals(tf, "", 0);
             if ( dr != null ) {
@@ -117,7 +121,7 @@ public class Dfs {
         try {
             UniAddress addr = UniAddress.getByName(domain, true, tf);
             SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
-            DfsReferral dr = trans.getDfsReferrals(tf, "\\" + domain, 1);
+            DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(true), "\\" + domain, 1);
             if ( dr != null ) {
                 DfsReferral start = dr;
                 IOException e = null;

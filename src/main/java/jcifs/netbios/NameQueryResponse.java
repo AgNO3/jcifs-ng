@@ -19,10 +19,14 @@
 package jcifs.netbios;
 
 
+import jcifs.Configuration;
+
+
 class NameQueryResponse extends NameServicePacket {
 
-    NameQueryResponse () {
-        this.recordName = new Name();
+    NameQueryResponse ( Configuration config ) {
+        super(config);
+        this.recordName = new Name(config);
     }
 
 

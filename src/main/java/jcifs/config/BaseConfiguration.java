@@ -321,7 +321,7 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
-    public String getNetbiosDefaultScope () {
+    public String getNetbiosScope () {
         return this.netbiosScope;
     }
 
@@ -353,12 +353,6 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getNetbiosSndBufSize () {
         return this.netbiosSendBufferSize;
-    }
-
-
-    @Override
-    public int getNetbiosDefaultSoTimeout () {
-        return this.netbiosSocketTimeout;
     }
 
 
@@ -495,7 +489,6 @@ public class BaseConfiguration implements Configuration {
              * LMHOSTS,BCAST,DNS if jcifs.netbios.wins has not
              * been specified.
              */
-
             if ( this.winsServer.length == 0 ) {
                 this.resolverOrder.add(ResolverType.RESOLVER_LMHOSTS);
                 this.resolverOrder.add(ResolverType.RESOLVER_DNS);
@@ -503,8 +496,8 @@ public class BaseConfiguration implements Configuration {
             }
             else {
                 this.resolverOrder.add(ResolverType.RESOLVER_LMHOSTS);
-                this.resolverOrder.add(ResolverType.RESOLVER_WINS);
                 this.resolverOrder.add(ResolverType.RESOLVER_DNS);
+                this.resolverOrder.add(ResolverType.RESOLVER_WINS);
                 this.resolverOrder.add(ResolverType.RESOLVER_BCAST);
             }
         }

@@ -7,7 +7,9 @@ package jcifs.smb;
  */
 
 
-import java.security.GeneralSecurityException;
+import javax.security.auth.Subject;
+
+import jcifs.CIFSContext;
 
 
 /**
@@ -23,15 +25,6 @@ public interface SmbCredentials extends Cloneable {
 
 
     /**
-     * @param smbSession
-     * @param andx
-     * @param andxResponse
-     */
-    void sessionSetup ( SmbSession smbSession, ServerMessageBlock andx, ServerMessageBlock andxResponse )
-            throws SmbException, GeneralSecurityException;
-
-
-    /**
      * @return whether these are anonymous credentials
      */
     boolean isAnonymous ();
@@ -40,5 +33,26 @@ public interface SmbCredentials extends Cloneable {
     SmbCredentials clone ();
 
 
-    byte[] getSessionKey ();
+    /**
+     * @param transportContext
+     */
+    SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException;
+
+
+    /**
+     * @return
+     */
+    boolean isNull ();
+
+
+    /**
+     * @return
+     */
+    boolean isGuest ();
+
+
+    /**
+     * 
+     */
+    Subject getSubject ();
 }

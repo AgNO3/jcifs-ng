@@ -20,7 +20,6 @@
 package jcifs.smb;
 
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
@@ -29,11 +28,12 @@ import java.security.Principal;
 import java.util.Arrays;
 import java.util.Objects;
 
+import javax.security.auth.Subject;
+
 import org.apache.log4j.Logger;
 
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
-import jcifs.SmbConstants;
 import jcifs.util.Crypto;
 import jcifs.util.Strings;
 
@@ -48,7 +48,7 @@ import jcifs.util.Strings;
  * NtlmAuthenticator</a> for related information.
  */
 
-public final class NtlmPasswordAuthentication implements Principal, SmbCredentials, Serializable {
+public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Serializable {
 
     /**
      * 
@@ -66,14 +66,65 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
     private byte[] clientChallenge = null;
 
     private boolean nullAuth;
-
-    private byte[] sessionKey;
+    private CIFSContext context;
 
 
     /**
      * 
      */
     private NtlmPasswordAuthentication () {}
+
+
+    /**
+     * Create an <tt>NtlmPasswordAuthentication</tt> object from a
+     * domain, username, and password. Parameters that are <tt>null</tt>
+     * will be substituted with <tt>jcifs.smb.client.domain</tt>,
+     * <tt>jcifs.smb.client.username</tt>, <tt>jcifs.smb.client.password</tt>
+     * property values.
+     */
+    public NtlmPasswordAuthentication ( CIFSContext tc, String domain, String username, String password ) {
+        this.context = tc;
+        int ci;
+
+        if ( username != null ) {
+            ci = username.indexOf('@');
+            if ( ci > 0 ) {
+                domain = username.substring(ci + 1);
+                username = username.substring(0, ci);
+            }
+            else {
+                ci = username.indexOf('\\');
+                if ( ci > 0 ) {
+                    domain = username.substring(0, ci);
+                    username = username.substring(ci + 1);
+                }
+            }
+        }
+
+        this.domain = domain;
+        this.username = username;
+        this.password = password;
+
+        setupDefaults(tc);
+    }
+
+
+    /**
+     * Create an <tt>NtlmPasswordAuthentication</tt> object with raw password
+     * hashes. This is used exclusively by the <tt>jcifs.http.NtlmSsp</tt>
+     * class which is in turn used by NTLM HTTP authentication functionality.
+     */
+    public NtlmPasswordAuthentication ( String domain, String username, byte[] challenge, byte[] ansiHash, byte[] unicodeHash ) {
+        if ( domain == null || username == null || ansiHash == null || unicodeHash == null ) {
+            throw new IllegalArgumentException("External credentials cannot be null");
+        }
+        this.domain = domain;
+        this.username = username;
+        this.password = null;
+        this.ansiHash = ansiHash;
+        this.unicodeHash = unicodeHash;
+        this.hashesExternal = true;
+    }
 
 
     /**
@@ -84,33 +135,6 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
     public NtlmPasswordAuthentication ( CIFSContext tc, boolean nullAuth ) {
         this(tc, "", "", "");
         this.nullAuth = nullAuth;
-    }
-
-
-    @Override
-    public NtlmPasswordAuthentication clone () {
-        NtlmPasswordAuthentication cloned = new NtlmPasswordAuthentication();
-        cloned.domain = this.domain;
-        cloned.username = this.username;
-        cloned.password = this.password;
-        cloned.nullAuth = this.nullAuth;
-
-        if ( this.hashesExternal ) {
-            cloned.hashesExternal = true;
-            cloned.ansiHash = this.ansiHash != null ? Arrays.copyOf(this.ansiHash, this.ansiHash.length) : null;
-            cloned.unicodeHash = this.unicodeHash != null ? Arrays.copyOf(this.unicodeHash, this.unicodeHash.length) : null;
-        }
-
-        return cloned;
-    }
-
-
-    /**
-     * @return the sessionKey
-     */
-    @Override
-    public byte[] getSessionKey () {
-        return this.sessionKey;
     }
 
 
@@ -153,6 +177,63 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
 
 
     /**
+     * @return the context
+     */
+    protected CIFSContext getContext () {
+        return this.context;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbCredentials#getSubject()
+     */
+    @Override
+    public Subject getSubject () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbCredentials#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
+     */
+    @Override
+    public SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+        return new NtlmContext(transportContext, this, doSigning);
+    }
+
+
+    @Override
+    public NtlmPasswordAuthentication clone () {
+        NtlmPasswordAuthentication cloned = new NtlmPasswordAuthentication();
+        cloneInternal(cloned, this);
+        return cloned;
+    }
+
+
+    /**
+     * @param to
+     * @param from
+     */
+    static void cloneInternal ( NtlmPasswordAuthentication to, NtlmPasswordAuthentication from ) {
+        to.domain = from.domain;
+        to.username = from.username;
+        to.password = from.password;
+        to.nullAuth = from.nullAuth;
+
+        if ( from.hashesExternal ) {
+            to.hashesExternal = true;
+            to.ansiHash = from.ansiHash != null ? Arrays.copyOf(from.ansiHash, from.ansiHash.length) : null;
+            to.unicodeHash = from.unicodeHash != null ? Arrays.copyOf(from.unicodeHash, from.unicodeHash.length) : null;
+        }
+
+    }
+
+
+    /**
      * @param tc
      */
     private void setupDefaults ( CIFSContext tc ) {
@@ -162,57 +243,6 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
             this.username = tc.getConfig().getDefaultUsername() != null ? tc.getConfig().getDefaultUsername() : "GUEST";
         if ( this.password == null )
             this.password = tc.getConfig().getDefaultPassword() != null ? tc.getConfig().getDefaultPassword() : "";
-    }
-
-
-    /**
-     * Create an <tt>NtlmPasswordAuthentication</tt> object from a
-     * domain, username, and password. Parameters that are <tt>null</tt>
-     * will be substituted with <tt>jcifs.smb.client.domain</tt>,
-     * <tt>jcifs.smb.client.username</tt>, <tt>jcifs.smb.client.password</tt>
-     * property values.
-     */
-    public NtlmPasswordAuthentication ( CIFSContext tc, String domain, String username, String password ) {
-        int ci;
-
-        if ( username != null ) {
-            ci = username.indexOf('@');
-            if ( ci > 0 ) {
-                domain = username.substring(ci + 1);
-                username = username.substring(0, ci);
-            }
-            else {
-                ci = username.indexOf('\\');
-                if ( ci > 0 ) {
-                    domain = username.substring(0, ci);
-                    username = username.substring(ci + 1);
-                }
-            }
-        }
-
-        this.domain = domain;
-        this.username = username;
-        this.password = password;
-
-        setupDefaults(tc);
-    }
-
-
-    /**
-     * Create an <tt>NtlmPasswordAuthentication</tt> object with raw password
-     * hashes. This is used exclusively by the <tt>jcifs.http.NtlmSsp</tt>
-     * class which is in turn used by NTLM HTTP authentication functionality.
-     */
-    public NtlmPasswordAuthentication ( String domain, String username, byte[] challenge, byte[] ansiHash, byte[] unicodeHash ) {
-        if ( domain == null || username == null || ansiHash == null || unicodeHash == null ) {
-            throw new IllegalArgumentException("External credentials cannot be null");
-        }
-        this.domain = domain;
-        this.username = username;
-        this.password = null;
-        this.ansiHash = ansiHash;
-        this.unicodeHash = unicodeHash;
-        this.hashesExternal = true;
     }
 
 
@@ -421,7 +451,7 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
             NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) obj;
             String domA = ntlm.getUserDomain() != null ? ntlm.getUserDomain().toUpperCase() : null;
             String domB = this.getUserDomain() != null ? this.getUserDomain().toUpperCase() : null;
-            if ( Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUserDomain()) ) {
+            if ( Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUsername()) ) {
                 if ( this.areHashesExternal() && ntlm.areHashesExternal() ) {
                     return Arrays.equals(this.ansiHash, ntlm.ansiHash) && Arrays.equals(this.unicodeHash, ntlm.unicodeHash);
                     /*
@@ -464,7 +494,8 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
     }
 
 
-    private boolean isGuest () {
+    @Override
+    public boolean isGuest () {
         return "GUEST".equalsIgnoreCase(getUsername());
     }
 
@@ -510,183 +541,10 @@ public final class NtlmPasswordAuthentication implements Principal, SmbCredentia
 
 
     /**
-     * @param andx
-     * @param andxResponse
-     * @throws SmbException
-     * @throws SmbAuthException
+     * @return whether this is null auth
      */
     @Override
-    public void sessionSetup ( SmbSession session, ServerMessageBlock andx, ServerMessageBlock andxResponse )
-            throws SmbException, SmbAuthException, GeneralSecurityException {
-        SmbException ex = null;
-        SmbComSessionSetupAndX request;
-        SmbComSessionSetupAndXResponse response;
-        NtlmContext nctx = null;
-        byte[] token = new byte[0];
-        int state = 10;
-        do {
-            switch ( state ) {
-            case 10: /* NTLM */
-                if ( session.getTransport().hasCapability(SmbConstants.CAP_EXTENDED_SECURITY) ) {
-                    log.debug("Extended security negotiated");
-                    state = 20; /* NTLMSSP */
-                    break;
-                }
-
-                request = new SmbComSessionSetupAndX(session, andx, this);
-                response = new SmbComSessionSetupAndXResponse(session.getTransportContext().getConfig(), andxResponse);
-
-                /*
-                 * Create SMB signature digest if necessary
-                 * Only the first SMB_COM_SESSION_SETUP_ANX with non-null or
-                 * blank password initializes signing.
-                 */
-                if ( !this.isNull() && session.getTransport().isSignatureSetupRequired() ) {
-                    if ( this.hashesExternal && session.getTransportContext().getConfig().getDefaultPassword() != null ) {
-                        /*
-                         * preauthentication
-                         */
-                        session.getTransport().getSmbSession(session.getTransportContext().withDefaultCredentials())
-                                .getSmbTree(session.getTransportContext().getConfig().getLogonShare(), null).treeConnect(null, null);
-                    }
-                    else {
-                        byte[] signingKey = this.getSigningKey(session.getTransportContext(), session.getTransport().server.encryptionKey);
-                        request.digest = new SigningDigest(signingKey, false);
-                    }
-                }
-
-                try {
-                    session.getTransport().send(request, response);
-                }
-                catch ( SmbAuthException sae ) {
-                    throw sae;
-                }
-                catch ( SmbException se ) {
-                    ex = se;
-                }
-
-                if ( response.isLoggedInAsGuest && session.getTransport().server.security != SmbConstants.SECURITY_SHARE && !this.isAnonymous() ) {
-                    throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
-                }
-
-                if ( ex != null )
-                    throw ex;
-
-                session.setUid(response.uid);
-
-                if ( request.digest != null ) {
-                    /* success - install the signing digest */
-                    session.getTransport().digest = request.digest;
-                }
-
-                session.setSessionSetup(true);
-                state = 0;
-
-                break;
-            case 20: /* NTLMSSP */
-                if ( nctx == null ) {
-                    boolean doSigning = ( session.getTransport().flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
-                    nctx = new NtlmContext(session.getTransportContext(), this, doSigning);
-                }
-
-                if ( log.isDebugEnabled() ) {
-                    log.debug(nctx);
-                }
-
-                if ( nctx.isEstablished() ) {
-                    session.setNetbiosName(nctx.getNetbiosName());
-                    session.setSessionSetup(true);
-                    state = 0;
-                    break;
-                }
-
-                try {
-                    token = nctx.initSecContext(token, 0, token == null ? 0 : token.length);
-                }
-                catch ( SmbException se ) {
-                    /*
-                     * We must close the transport or the server will be expecting a
-                     * Type3Message. Otherwise, when we send a Type1Message it will return
-                     * "Invalid parameter".
-                     */
-                    try {
-                        session.getTransport().disconnect(true);
-                    }
-                    catch ( IOException ioe ) {
-                        log.debug("Disconnect failed");
-                    }
-                    session.setUid(0);
-                    throw se;
-                }
-
-                if ( token != null ) {
-                    request = new SmbComSessionSetupAndX(session, null, token);
-                    response = new SmbComSessionSetupAndXResponse(session.getTransportContext().getConfig(), null);
-
-                    if ( !this.isNull() && session.getTransport().isSignatureSetupRequired() ) {
-                        byte[] signingKey = nctx.getSigningKey();
-                        if ( signingKey != null )
-                            request.digest = new SigningDigest(signingKey, true);
-
-                        this.sessionKey = signingKey;
-                    }
-
-                    request.uid = session.getUid();
-                    session.setUid(0);
-
-                    try {
-                        session.getTransport().send(request, response);
-                    }
-                    catch ( SmbAuthException sae ) {
-                        throw sae;
-                    }
-                    catch ( SmbException se ) {
-                        ex = se;
-                        /*
-                         * Apparently once a successfull NTLMSSP login occurs, the
-                         * server will return "Access denied" even if a logoff is
-                         * sent. Unfortunately calling disconnect() doesn't always
-                         * actually shutdown the connection before other threads
-                         * have committed themselves (e.g. InterruptTest example).
-                         */
-                        try {
-                            session.getTransport().disconnect(true);
-                        }
-                        catch ( Exception e ) {
-                            log.debug("Failed to disconnect transport", e);
-                        }
-                    }
-
-                    if ( response.isLoggedInAsGuest && isGuest() == false ) {
-                        throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
-                    }
-
-                    if ( ex != null )
-                        throw ex;
-
-                    session.setUid(response.uid);
-
-                    if ( request.digest != null ) {
-                        /* success - install the signing digest */
-                        session.getTransport().digest = request.digest;
-                    }
-
-                    token = response.blob;
-                }
-
-                break;
-            default:
-                throw new SmbException("Unexpected session setup state: " + state);
-            }
-        }
-        while ( state != 0 );
-    }
-
-
-    /**
-     * @return
-     */
-    private boolean isNull () {
+    public boolean isNull () {
         return this.nullAuth;
     }
 

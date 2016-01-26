@@ -19,9 +19,13 @@
 package jcifs.netbios;
 
 
+import jcifs.Configuration;
+
+
 class NameQueryRequest extends NameServicePacket {
 
-    NameQueryRequest ( Name name ) {
+    NameQueryRequest ( Configuration config, Name name ) {
+        super(config);
         this.questionName = name;
         this.questionType = NB;
     }

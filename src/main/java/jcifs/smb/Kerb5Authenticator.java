@@ -1,12 +1,12 @@
 package jcifs.smb;
 
 
-import java.security.GeneralSecurityException;
-import java.security.Key;
+import java.io.IOException;
 import java.security.Principal;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.security.auth.Subject;
@@ -18,26 +18,23 @@ import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
-import com.sun.security.jgss.ExtendedGSSContext;
-import com.sun.security.jgss.InquireType;
-
-import jcifs.CIFSException;
-import jcifs.Configuration;
-import jcifs.util.Hexdump;
+import jcifs.CIFSContext;
+import jcifs.spnego.NegTokenInit;
 
 
 /**
- * This class implements SmbExtendedAuthenticator interface to provide Kerberos
- * authentication feature.
- *
+ * 
  * @author Shun
  *
  */
-@SuppressWarnings ( "restriction" )
-public class Kerb5Authenticator implements SmbCredentials {
+public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
+    /**
+     * 
+     */
+
+    private static final long serialVersionUID = 1999400043787454432L;
     private static final Logger log = Logger.getLogger(Kerb5Authenticator.class);
-
     private static final String DEFAULT_SERVICE = "cifs";
 
     private Subject subject = null;
@@ -46,9 +43,6 @@ public class Kerb5Authenticator implements SmbCredentials {
     private String service = DEFAULT_SERVICE;
     private int userLifetime = GSSCredential.DEFAULT_LIFETIME;
     private int contextLifetime = GSSContext.DEFAULT_LIFETIME;
-
-    private Key sessionKey;
-    private Configuration config;
 
 
     /**
@@ -60,21 +54,64 @@ public class Kerb5Authenticator implements SmbCredentials {
      *            represents the user who perform Kerberos authentication.
      *            It contains tickets retrieve from KDC.
      */
-    public Kerb5Authenticator ( Configuration config, Subject subject ) {
-        this.config = config;
+    public Kerb5Authenticator ( CIFSContext tc, Subject subject ) {
+        super(tc, true);
         this.subject = subject;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbCredentials#createContext(jcifs.CIFSContext)
+     */
+    @Override
+    public SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+        try {
+            NegTokenInit tok = new NegTokenInit(initialToken);
+            if ( log.isDebugEnabled() ) {
+                log.debug("Have initial token " + tok);
+            }
+            if ( tok.getMechanisms() != null ) {
+                Set<Oid> mechs = new HashSet<>(Arrays.asList(tok.getMechanisms()));
+                boolean foundKerberos = false;
+                for ( Oid mech : Kerb5Context.SUPPORTED_MECHS ) {
+                    foundKerberos |= mechs.contains(mech);
+                }
+                if ( !foundKerberos ) {
+                    log.debug("Falling back to NTLM authentication");
+                    return super.createContext(transportContext, host, initialToken, doSigning);
+                }
+            }
+        }
+        catch ( IOException e1 ) {
+            log.debug("Ignoring invalid initial token", e1);
+        }
+
+        try {
+            return createContext(host);
+        }
+        catch ( GSSException e ) {
+            throw new SmbException("Context setup failed", e);
+        }
     }
 
 
     @Override
     public Kerb5Authenticator clone () {
-        Kerb5Authenticator kerb5Authenticator = new Kerb5Authenticator(this.config, this.subject);
-        kerb5Authenticator.setUser(this.user);
-        kerb5Authenticator.setRealm(this.realm);
-        kerb5Authenticator.setService(this.service);
-        kerb5Authenticator.setLifeTime(this.contextLifetime);
-        kerb5Authenticator.setUserLifeTime(this.userLifetime);
-        return kerb5Authenticator;
+        Kerb5Authenticator auth = new Kerb5Authenticator(this.getContext(), this.getSubject());
+        cloneInternal(auth, this);
+        return auth;
+    }
+
+
+    public static void cloneInternal ( Kerb5Authenticator to, Kerb5Authenticator from ) {
+        NtlmPasswordAuthentication.cloneInternal(to, from);
+        to.setUser(from.getUser());
+        to.setRealm(from.getRealm());
+        to.setService(from.getService());
+        to.setLifeTime(from.getLifeTime());
+        to.setUserLifeTime(from.getUserLifeTime());
     }
 
 
@@ -106,23 +143,12 @@ public class Kerb5Authenticator implements SmbCredentials {
 
 
     /**
-     * @return the sessionKey
-     */
-    @Override
-    public byte[] getSessionKey () {
-        if ( this.sessionKey == null ) {
-            return null;
-        }
-        return this.sessionKey.getEncoded();
-    }
-
-
-    /**
      * Get the <code>Subject</code> object.
      *
      * @return Subject represents the user who perform Kerberos authentication.
      *         It contains the tickets retrieve from KDC.
      */
+    @Override
     public Subject getSubject () {
         return this.subject;
     }
@@ -214,7 +240,7 @@ public class Kerb5Authenticator implements SmbCredentials {
      */
     @Override
     public boolean isAnonymous () {
-        return this.subject == null;
+        return this.getSubject() == null && super.isAnonymous();
     }
 
 
@@ -225,142 +251,13 @@ public class Kerb5Authenticator implements SmbCredentials {
      */
     @Override
     public String toString () {
-        return "Kerb5Authenticatior[subject=" + ( this.subject != null ? this.subject.getPrincipals() : null ) + ",user=" + this.user + ",realm="
-                + this.realm + "]";
-    }
-
-
-    /**
-     * 
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SessionSetupHandler#sessionSetup(jcifs.smb.SmbSession, jcifs.smb.ServerMessageBlock,
-     *      jcifs.smb.ServerMessageBlock)
-     */
-    @Override
-    public void sessionSetup ( final SmbSession session, final ServerMessageBlock andx, final ServerMessageBlock andxResponse ) throws SmbException {
-        try {
-            Subject.doAs(this.subject, new PrivilegedExceptionAction<Object>() {
-
-                @Override
-                public Object run () throws Exception {
-                    setup(session, andx, andxResponse);
-                    return null;
-                }
-            });
-        }
-        catch ( PrivilegedActionException e ) {
-            if ( e.getException() instanceof SmbException ) {
-                throw (SmbException) e.getException();
-            }
-            throw new SmbException(e.getMessage(), e.getException());
-        }
-    }
-
-
-    void setup ( SmbSession session, ServerMessageBlock andx, ServerMessageBlock andxResponse )
-            throws SmbAuthException, SmbException, GeneralSecurityException {
-        SpnegoContext context = null;
-        try {
-            String host = session.getTransport().address.getHostAddress();
-            try {
-                host = session.getTransport().address.getHostName();
-            }
-            catch ( Exception e ) {
-                log.debug("Failed to resolve host name", e);
-            }
-            context = createContext(host);
-
-            byte[] token = new byte[0];
-
-            SmbComSessionSetupAndX request = null;
-            SmbComSessionSetupAndXResponse response = null;
-
-            while ( !context.isEstablished() ) {
-                if ( token != null && log.isDebugEnabled() ) {
-                    log.debug("Input token is " + Hexdump.toHexString(token, 0, token.length));
-                }
-                token = context.initSecContext(token, 0, token != null ? token.length : 0);
-                if ( token != null ) {
-                    request = new SmbComSessionSetupAndX(session, null/* andx */, token);
-                    response = new SmbComSessionSetupAndXResponse(session.getConfig(), andxResponse);
-                    setupSessionKey(context, this.subject);
-
-                    if ( session.getTransport().digest == null
-                            && ( session.getTransport().server.signaturesRequired || ( session.getTransport().server.signaturesEnabled
-                                    && session.getTransport().getTransportContext().getConfig().isSigningPreferred() ) ) ) {
-                        if ( this.sessionKey == null ) {
-                            throw new SmbAuthException("Kerberos session key not found.");
-                        }
-                        log.debug("SMB Signatures are enabled");
-                        request.digest = new SigningDigest(this.sessionKey.getEncoded());
-                    }
-                    else {
-                        log.debug("SMB Signatures are disabled");
-                    }
-                    session.getTransport().send(request, response);
-                    session.getTransport().digest = request.digest;
-                    token = response.blob;
-                }
-            }
-
-            if ( response == null ) {
-                throw new SmbAuthException("No auth response");
-            }
-
-            session.setUid(response.uid);
-            session.setSessionSetup(true);
-
-        }
-        catch (
-            GSSException |
-            CIFSException e ) {
-            throw new SmbAuthException("Kerberos session setup has failed.", e);
-        }
-        finally {
-            if ( context != null ) {
-                try {
-                    context.dispose();
-                }
-                catch ( GSSException e ) {
-                    log.warn("Failed to dispose context", e);
-                }
-            }
-        }
-    }
-
-
-    /**
-     * @param spnego
-     * @param subj
-     * @throws GSSException
-     */
-    private void setupSessionKey ( SpnegoContext spnego, Subject subj ) throws GSSException {
-        ExtendedGSSContext gss = (ExtendedGSSContext) spnego.getGSSContext();
-        this.sessionKey = (Key) gss.inquireSecContext(InquireType.KRB5_GET_SESSION_KEY);
+        return "Kerb5Authenticatior[subject=" + ( this.getSubject() != null ? this.getSubject().getPrincipals() : null ) + ",user=" + this.user
+                + ",realm=" + this.realm + "]";
     }
 
 
     private SpnegoContext createContext ( String host ) throws GSSException {
-        Kerb5Context kerb5Context = new Kerb5Context(host, this.service, this.user, this.userLifetime, this.contextLifetime, this.realm);
-        kerb5Context.getGSSContext().requestAnonymity(false);
-        kerb5Context.getGSSContext().requestSequenceDet(false);
-        kerb5Context.getGSSContext().requestMutualAuth(false);
-        kerb5Context.getGSSContext().requestConf(false);
-        kerb5Context.getGSSContext().requestInteg(false);
-        kerb5Context.getGSSContext().requestReplayDet(false);
-        return new SpnegoContext(kerb5Context, getSupportedMechs());
-    }
-
-
-    /**
-     * @return
-     */
-    private static Oid[] getSupportedMechs () throws GSSException {
-        Oid[] oids = new Oid[2];
-        oids[ 0 ] = new Oid("1.2.840.113554.1.2.2");
-        oids[ 1 ] = new Oid("1.2.840.48018.1.2.2");
-        return oids;
+        return new SpnegoContext(new Kerb5Context(host, this.service, this.user, this.userLifetime, this.contextLifetime, this.realm));
     }
 
 
@@ -372,8 +269,8 @@ public class Kerb5Authenticator implements SmbCredentials {
     @Override
     public boolean equals ( Object other ) {
         // this method is called from SmbSession
-        if ( other != null && Kerb5Authenticator.class == other.getClass() )
-            return this.getSubject() == ( (Kerb5Authenticator) other ).getSubject();
+        if ( other != null && other instanceof Kerb5Authenticator )
+            return Objects.equals(this.getSubject(), ( (Kerb5Authenticator) other ).getSubject());
 
         return false;
     }
@@ -392,24 +289,24 @@ public class Kerb5Authenticator implements SmbCredentials {
 
     @Override
     public String getUserDomain () {
-        String rlm = "";
-        if ( this.subject != null ) {
-            Set<Principal> pr = this.subject.getPrincipals();
+        if ( this.realm == null && this.getSubject() != null ) {
+            Set<Principal> pr = this.getSubject().getPrincipals();
             for ( Iterator<Principal> ite = pr.iterator(); ite.hasNext(); ) {
                 try {
                     KerberosPrincipal entry = (KerberosPrincipal) ite.next();
-                    rlm = entry.getRealm();
-                    break;
+                    return entry.getRealm();
                 }
                 catch ( Exception e ) {
                     continue;
                 }
             }
         }
-        if ( rlm.isEmpty() ) {
-            return this.config.getDefaultDomain();
+
+        if ( this.realm != null ) {
+            return this.realm;
         }
-        return rlm;
+
+        return super.getUserDomain();
     }
 
 }

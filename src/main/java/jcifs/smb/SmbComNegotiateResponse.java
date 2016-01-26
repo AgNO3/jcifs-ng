@@ -21,6 +21,8 @@ package jcifs.smb;
 
 import java.util.Date;
 
+import org.apache.log4j.Logger;
+
 import jcifs.Configuration;
 import jcifs.SmbConstants;
 import jcifs.util.Hexdump;
@@ -28,6 +30,8 @@ import jcifs.util.Strings;
 
 
 class SmbComNegotiateResponse extends ServerMessageBlock {
+
+    private static final Logger log = Logger.getLogger(SmbComNegotiateResponse.class);
 
     int dialectIndex;
     SmbTransport.ServerData server;
@@ -117,7 +121,16 @@ class SmbComNegotiateResponse extends ServerMessageBlock {
             bufferIndex += this.server.guid.length;
             this.server.oemDomainName = new String();
 
-            // initial SPNEGO token is ignored
+            if ( this.byteCount > 16 ) {
+                // have initial spnego token
+                this.server.encryptionKeyLength = this.byteCount - 16;
+                this.server.encryptionKey = new byte[this.server.encryptionKeyLength];
+                System.arraycopy(buffer, bufferIndex, this.server.encryptionKey, 0, this.server.encryptionKeyLength);
+                if ( log.isDebugEnabled() ) {
+                    log.debug(
+                        String.format("Have initial token %s", Hexdump.toHexString(this.server.encryptionKey, 0, this.server.encryptionKeyLength)));
+                }
+            }
         }
 
         return bufferIndex - start;
