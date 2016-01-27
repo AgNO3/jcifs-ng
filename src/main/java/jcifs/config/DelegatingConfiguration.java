@@ -144,6 +144,17 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getNotifyBufferSize()
+     */
+    @Override
+    public int getNotifyBufferSize () {
+        return this.delegate.getNotifyBufferSize();
+    }
+
+
+    /**
      * @return
      * @see jcifs.Configuration#getSoTimeout()
      */

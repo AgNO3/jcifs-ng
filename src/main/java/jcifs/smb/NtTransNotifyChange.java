@@ -23,43 +23,49 @@ import jcifs.Configuration;
 import jcifs.util.Hexdump;
 
 
-class NtTransQuerySecurityDesc extends SmbComNtTransaction {
+class NtTransNotifyChange extends SmbComNtTransaction {
 
     int fid;
-    int securityInformation;
+    private int completionFilter;
+    private boolean watchTree;
 
 
-    NtTransQuerySecurityDesc ( Configuration config, int fid, int securityInformation ) {
+    NtTransNotifyChange ( Configuration config, int fid, int completionFilter, boolean watchTree ) {
         super(config);
         this.fid = fid;
-        this.securityInformation = securityInformation;
+        this.completionFilter = completionFilter;
+        this.watchTree = watchTree;
         this.command = SMB_COM_NT_TRANSACT;
-        this.function = NT_TRANSACT_QUERY_SECURITY_DESC;
-        this.setupCount = 0;
+        this.function = NT_TRANSACT_NOTIFY_CHANGE;
+        this.setupCount = 0x04;
         this.totalDataCount = 0;
-        this.maxParameterCount = 4;
-        this.maxDataCount = 32768;
+        this.maxDataCount = 0;
+        this.maxParameterCount = config.getNotifyBufferSize();
         this.maxSetupCount = (byte) 0x00;
     }
 
 
     @Override
     int writeSetupWireFormat ( byte[] dst, int dstIndex ) {
-        return 0;
+        int start = dstIndex;
+        SMBUtil.writeInt4(this.completionFilter, dst, dstIndex);
+        dstIndex += 4;
+        SMBUtil.writeInt2(this.fid, dst, dstIndex);
+        dstIndex += 2;
+        dst[ dstIndex++ ] = this.watchTree ? (byte) 0x01 : (byte) 0x00; // watchTree
+        dst[ dstIndex++ ] = (byte) 0x00; // Reserved
+        return dstIndex - start;
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbComTransaction#writeParametersWireFormat(byte[], int)
+     */
     @Override
     int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
-        int start = dstIndex;
-
-        SMBUtil.writeInt2(this.fid, dst, dstIndex);
-        dstIndex += 2;
-        dst[ dstIndex++ ] = (byte) 0x00; // Reserved
-        dst[ dstIndex++ ] = (byte) 0x00; // Reserved
-        SMBUtil.writeInt4(this.securityInformation, dst, dstIndex);
-        dstIndex += 4;
-        return dstIndex - start;
+        return 0;
     }
 
 
@@ -90,7 +96,7 @@ class NtTransQuerySecurityDesc extends SmbComNtTransaction {
     @Override
     public String toString () {
         return new String(
-            "NtTransQuerySecurityDesc[" + super.toString() + ",fid=0x" + Hexdump.toHexString(this.fid, 4) + ",securityInformation=0x"
-                    + Hexdump.toHexString(this.securityInformation, 8) + "]");
+            "NtTransNotifyChange[" + super.toString() + ",fid=0x" + Hexdump.toHexString(this.fid, 4) + ",filter=0x"
+                    + Hexdump.toHexString(this.completionFilter, 4) + ",watchTree=" + this.watchTree + "]");
     }
 }

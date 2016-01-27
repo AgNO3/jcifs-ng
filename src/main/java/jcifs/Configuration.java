@@ -289,4 +289,10 @@ public interface Configuration {
      */
     String[] getSupportedDialects ();
 
+
+    /**
+     * @return the size of the requested server notify buffer
+     */
+    int getNotifyBufferSize ();
+
 }

@@ -65,6 +65,7 @@ public class BaseConfiguration implements Configuration {
     protected int maxMpxCount = SmbConstants.DEFAULT_MAX_MPX_COUNT;
     protected int smbSendBufferSize = SmbConstants.DEFAULT_SND_BUF_SIZE;
     protected int smbRecvBufferSize = SmbConstants.DEFAULT_RCV_BUF_SIZE;
+    protected int smbNotifyBufferSize = SmbConstants.DEFAULT_NOTIFY_BUF_SIZE;
     protected String nativeOs;
     protected String nativeLanMan = "jCIFS";
     protected int vcNumber = 1;
@@ -105,8 +106,15 @@ public class BaseConfiguration implements Configuration {
     /**
      * 
      */
-    public BaseConfiguration () {
-        super();
+    protected BaseConfiguration () {
+        this(false);
+    }
+
+
+    public BaseConfiguration ( boolean initDefaults ) {
+        if ( initDefaults ) {
+            this.initDefaults();
+        }
     }
 
 
@@ -167,6 +175,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getRecieveBufferSize () {
         return this.smbRecvBufferSize;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getNotifyBufferSize()
+     */
+    @Override
+    public int getNotifyBufferSize () {
+        return this.smbNotifyBufferSize;
     }
 
 

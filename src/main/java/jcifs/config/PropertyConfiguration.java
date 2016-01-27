@@ -60,6 +60,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.maxMpxCount = this.cfg.getInt("jcifs.smb.client.maxMpxCount", SmbConstants.DEFAULT_MAX_MPX_COUNT);
         this.smbSendBufferSize = this.cfg.getInt("jcifs.smb.client.snd_buf_size", SmbConstants.DEFAULT_SND_BUF_SIZE);
         this.smbRecvBufferSize = this.cfg.getInt("jcifs.smb.client.rcv_buf_size", SmbConstants.DEFAULT_RCV_BUF_SIZE);
+        this.smbNotifyBufferSize = this.cfg.getInt("jcifs.smb.client.notify_buf_size", SmbConstants.DEFAULT_NOTIFY_BUF_SIZE);
 
         this.nativeOs = this.cfg.getProperty("jcifs.smb.client.nativeOs", System.getProperty("os.name"));
         this.nativeLanMan = this.cfg.getProperty("jcifs.smb.client.nativeLanMan", "jCIFS");

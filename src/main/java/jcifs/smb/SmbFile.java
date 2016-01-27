@@ -771,10 +771,15 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
+        send(request, response, true);
+    }
+
+
+    void send ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException {
         for ( ;; ) {
             resolveDfs(request);
             try {
-                this.tree.send(request, response);
+                this.tree.send(request, response, timeout);
                 break;
             }
             catch ( DfsReferral dre ) {
@@ -966,10 +971,12 @@ public class SmbFile extends URLConnection implements SmbConstants {
              * Tree thinks it is connected but transport disconnected
              * under it, reset tree to reflect the truth.
              */
+            log.debug("Disonnecting failed tree");
             this.tree.treeDisconnect(true);
         }
 
         if ( isConnected() ) {
+            log.debug("Already connected");
             return;
         }
 
@@ -993,7 +1000,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
 
     boolean isConnected () {
-        return this.tree != null && this.tree.connectionState == 2;
+        return this.tree != null && this.tree.connectionState == 2 && !this.tree.session.getTransport().isDisconnected();
     }
 
 
@@ -1515,6 +1522,35 @@ public class SmbFile extends URLConnection implements SmbConstants {
         this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeExpirationPeriod();
 
         return this.isExists;
+    }
+
+
+    public List<FileNotifyInformation> watch ( int filter, boolean recursive ) throws SmbException {
+        if ( !isDirectory() ) {
+            throw new SmbException("Is not a directory");
+        }
+
+        connect0();
+        if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
+            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+        }
+
+        int f = open0(O_RDONLY, READ_CONTROL, 0, 1);
+        /*
+         * NtTrans Notify Change Request / Response
+         */
+
+        NtTransNotifyChange request = new NtTransNotifyChange(getSession().getConfig(), f, filter, recursive);
+        NtTransNotifyChangeResponse response = new NtTransNotifyChangeResponse(getSession().getConfig());
+        try {
+            send(request, response, false);
+        }
+        finally {
+            if ( !this.tree.session.getTransport().isDisconnected() ) {
+                close(f, 0L);
+            }
+        }
+        return response.notifyInformation;
     }
 
 
@@ -3083,6 +3119,12 @@ public class SmbFile extends URLConnection implements SmbConstants {
      *            their numeric representation to their corresponding account names.
      */
     public ACE[] getSecurity ( boolean resolveSids ) throws IOException {
+
+        connect0();
+        if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
+            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+        }
+
         int f;
         ACE[] aces;
 

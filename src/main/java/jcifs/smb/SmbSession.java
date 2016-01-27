@@ -170,7 +170,7 @@ public final class SmbSession {
     private InetAddress localAddr;
 
     private SmbTransport transport = null;
-    private long expiration;
+    private Long expiration;
     private String netbiosName = null;
 
     private CIFSContext transportContext;
@@ -244,48 +244,58 @@ public final class SmbSession {
     }
 
 
-    void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
+    void send ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException {
         synchronized ( transport() ) {
             if ( response != null ) {
                 response.received = false;
             }
 
-            this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
             try {
-                sessionSetup(request, response);
-            }
-            catch ( GeneralSecurityException e ) {
-                throw new SmbException("Session setup failed", e);
-            }
-
-            if ( response != null && response.received ) {
-                return;
-            }
-
-            if ( request instanceof SmbComTreeConnectAndX ) {
-                SmbComTreeConnectAndX tcax = (SmbComTreeConnectAndX) request;
-                if ( this.netbiosName != null && tcax.path.endsWith("\\IPC$") ) {
-                    /*
-                     * Some pipes may require that the hostname in the tree connect
-                     * be the netbios name. So if we have the netbios server name
-                     * from the NTLMSSP type 2 message, and the share is IPC$, we
-                     * assert that the tree connect path uses the netbios hostname.
-                     */
-                    tcax.path = "\\\\" + this.netbiosName + "\\IPC$";
+                if ( !timeout ) {
+                    this.expiration = null;
                 }
-            }
+                else {
+                    this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
+                }
+                try {
+                    sessionSetup(request, response);
+                }
+                catch ( GeneralSecurityException e ) {
+                    throw new SmbException("Session setup failed", e);
+                }
 
-            request.uid = this.uid;
-            try {
-                this.transport.send(request, response);
-            }
-            catch ( SmbException se ) {
-                log.debug("Send failed", se);
+                if ( response != null && response.received ) {
+                    return;
+                }
+
                 if ( request instanceof SmbComTreeConnectAndX ) {
-                    logoff(true);
+                    SmbComTreeConnectAndX tcax = (SmbComTreeConnectAndX) request;
+                    if ( this.netbiosName != null && tcax.path.endsWith("\\IPC$") ) {
+                        /*
+                         * Some pipes may require that the hostname in the tree connect
+                         * be the netbios name. So if we have the netbios server name
+                         * from the NTLMSSP type 2 message, and the share is IPC$, we
+                         * assert that the tree connect path uses the netbios hostname.
+                         */
+                        tcax.path = "\\\\" + this.netbiosName + "\\IPC$";
+                    }
                 }
-                request.digest = null;
-                throw se;
+
+                request.uid = this.uid;
+                try {
+                    this.transport.send(request, response, timeout);
+                }
+                catch ( SmbException se ) {
+                    log.debug("Send failed", se);
+                    if ( request instanceof SmbComTreeConnectAndX ) {
+                        logoff(true);
+                    }
+                    request.digest = null;
+                    throw se;
+                }
+            }
+            finally {
+                this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
             }
         }
     }
@@ -391,7 +401,7 @@ public final class SmbSession {
                 }
 
                 try {
-                    this.getTransport().send(request, response);
+                    this.getTransport().send(request, response, true);
                 }
                 catch ( SmbAuthException sae ) {
                     throw sae;
@@ -527,7 +537,7 @@ public final class SmbSession {
                     this.setUid(0);
 
                     try {
-                        this.getTransport().send(request, response);
+                        this.getTransport().send(request, response, true);
                     }
                     catch ( SmbAuthException sae ) {
                         throw sae;
@@ -596,7 +606,7 @@ public final class SmbSession {
                 SmbComLogoffAndX request = new SmbComLogoffAndX(this.getConfig(), null);
                 request.uid = this.uid;
                 try {
-                    this.transport.send(request, null);
+                    this.transport.send(request, null, true);
                 }
                 catch ( SmbException se ) {
                     log.debug("SmbComLogoffAndX failed", se);
@@ -664,7 +674,7 @@ public final class SmbSession {
     /**
      * @return
      */
-    public long getExpiration () {
+    public Long getExpiration () {
         return this.expiration;
     }
 

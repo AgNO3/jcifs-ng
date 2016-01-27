@@ -85,6 +85,11 @@ class SmbTree {
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
+        send(request, response, true);
+    }
+
+
+    void send ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException {
         synchronized ( this.session.transport() ) {
             if ( response != null ) {
                 response.received = false;
@@ -135,7 +140,7 @@ class SmbTree {
                 request.path = '\\' + this.session.transport().tconHostName + '\\' + this.share + request.path;
             }
             try {
-                this.session.send(request, response);
+                this.session.send(request, response, timeout);
             }
             catch ( SmbException se ) {
                 if ( se.getNtStatus() == NtStatus.NT_STATUS_NETWORK_NAME_DELETED ) {
@@ -197,7 +202,7 @@ class SmbTree {
 
                 SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(this.session.getConfig(), andxResponse);
                 SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(this.session, unc, this.service, andx);
-                this.session.send(request, response);
+                this.session.send(request, response, true);
 
                 this.tid = response.tid;
                 this.service = response.service;

@@ -70,18 +70,37 @@ public abstract class Transport implements Runnable {
     protected abstract void doSkip () throws IOException;
 
 
-    public synchronized void sendrecv ( Request request, Response response, long timeout ) throws IOException {
+    public boolean isDisconnected () {
+        return this.state == 4 || this.state == 0;
+    }
+
+
+    public synchronized void sendrecv ( Request request, Response response, Long timeout ) throws IOException {
         makeKey(request);
         response.isReceived = false;
         try {
             this.response_map.put(request, response);
             doSend(request);
-            response.expiration = System.currentTimeMillis() + timeout;
+            if ( timeout != null ) {
+                response.expiration = System.currentTimeMillis() + timeout;
+            }
+            else {
+                response.expiration = null;
+            }
             while ( !response.isReceived ) {
-                wait(timeout);
-                timeout = response.expiration - System.currentTimeMillis();
-                if ( timeout <= 0 ) {
-                    throw new TransportException(this.name + " timedout waiting for response to " + request);
+                if ( timeout != null ) {
+                    wait(timeout);
+                    timeout = response.expiration - System.currentTimeMillis();
+                    if ( timeout <= 0 ) {
+                        throw new TransportException(this.name + " timedout waiting for response to " + request);
+                    }
+                }
+                else {
+                    wait();
+                    log.debug("Wait returned state is " + this.state);
+                    if ( isDisconnected() ) {
+                        throw new InterruptedException("Connection failed");
+                    }
                 }
             }
         }
@@ -126,6 +145,7 @@ public abstract class Transport implements Runnable {
                 }
             }
             catch ( Exception ex ) {
+
                 String msg = ex.getMessage();
                 boolean timeout = msg != null && msg.equals("Read timed out");
                 /*
@@ -146,6 +166,11 @@ public abstract class Transport implements Runnable {
                 catch ( IOException ioe ) {
                     ex.addSuppressed(ioe);
                     log.warn("Failed to disconnect", ioe);
+                }
+                log.debug("Disconnected");
+                synchronized ( this ) {
+                    notifyAll();
+                    log.debug("Notified clients");
                 }
             }
         }
@@ -243,6 +268,7 @@ public abstract class Transport implements Runnable {
                 break; /* outstanding requests */
             }
             try {
+                this.state = 0;
                 doDisconnect(hard);
             }
             catch ( IOException ioe0 ) {

@@ -10,6 +10,8 @@ public interface SmbConstants {
     static final int DEFAULT_SO_TIMEOUT = 35000;
     static final int DEFAULT_RCV_BUF_SIZE = 0xFFFF;
     static final int DEFAULT_SND_BUF_SIZE = 0xFFFF;
+    static final int DEFAULT_NOTIFY_BUF_SIZE = 1024;
+
     static final int DEFAULT_SSN_LIMIT = 250;
     static final int DEFAULT_CONN_TIMEOUT = 35000;
 

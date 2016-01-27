@@ -20,6 +20,7 @@
 package jcifs.smb;
 
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -171,7 +172,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             iter = this.sessions.listIterator();
             while ( iter.hasNext() ) {
                 ssn = iter.next();
-                if ( ssn.getExpiration() < now ) {
+                if ( ssn.getExpiration() != null && ssn.getExpiration() < now ) {
                     if ( log.isDebugEnabled() ) {
                         log.debug("Closing session after timeout " + ssn);
                     }
@@ -396,7 +397,6 @@ public class SmbTransport extends Transport implements SmbConstants {
         }
 
         /* Adjust negotiated values */
-
         this.tconHostName = this.address.getHostName();
         if ( this.server.signaturesRequired || ( this.server.signaturesEnabled && this.getTransportContext().getConfig().isSigningPreferred() ) ) {
             this.flags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
@@ -428,6 +428,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     @Override
     protected synchronized void doDisconnect ( boolean hard ) throws IOException {
         ListIterator<SmbSession> iter = this.sessions.listIterator();
+
         if ( log.isDebugEnabled() ) {
             log.debug("Disconnecting transport " + this);
         }
@@ -674,7 +675,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     }
 
 
-    void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
+    void send ( ServerMessageBlock request, ServerMessageBlock response, boolean doTimeout ) throws SmbException {
 
         connect(); /* must negotiate before we can test flags2, useUnicode, etc */
 
@@ -710,7 +711,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                     req.nextElement();
                     if ( req.hasMoreElements() ) {
                         SmbComBlankResponse interim = new SmbComBlankResponse(getTransportContext().getConfig());
-                        super.sendrecv(req, interim, this.transportContext.getConfig().getResponseTimeout());
+                        super.sendrecv(req, interim, doTimeout ? (long) this.transportContext.getConfig().getResponseTimeout() : null);
                         if ( interim.errorCode != 0 ) {
                             checkStatus(req, interim);
                         }
@@ -740,12 +741,26 @@ public class SmbTransport extends Transport implements SmbConstants {
                              */
 
                             long timeout = this.transportContext.getConfig().getResponseTimeout();
-                            resp.expiration = System.currentTimeMillis() + timeout;
+                            if ( doTimeout ) {
+                                resp.expiration = System.currentTimeMillis() + timeout;
+                            }
+                            else {
+                                resp.expiration = null;
+                            }
                             while ( resp.hasMoreElements() ) {
-                                wait(timeout);
-                                timeout = resp.expiration - System.currentTimeMillis();
-                                if ( timeout <= 0 ) {
-                                    throw new TransportException(this + " timedout waiting for response to " + req);
+                                if ( doTimeout ) {
+                                    wait(timeout);
+                                    timeout = resp.expiration - System.currentTimeMillis();
+                                    if ( timeout <= 0 ) {
+                                        throw new TransportException(this + " timedout waiting for response to " + req);
+                                    }
+                                }
+                                else {
+                                    wait();
+                                    log.debug("Wait returned " + this.isDisconnected());
+                                    if ( this.isDisconnected() ) {
+                                        throw new EOFException("Transport closed while waiting for result");
+                                    }
                                 }
                             }
 
@@ -769,7 +784,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             }
             else {
                 response.command = request.command;
-                super.sendrecv(request, response, this.transportContext.getConfig().getResponseTimeout());
+                super.sendrecv(request, response, doTimeout ? (long) this.transportContext.getConfig().getResponseTimeout() : null);
             }
         }
         catch ( SmbException se ) {

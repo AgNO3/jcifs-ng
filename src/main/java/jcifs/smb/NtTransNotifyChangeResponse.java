@@ -19,27 +19,21 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import jcifs.Configuration;
-import jcifs.util.Hexdump;
+import jcifs.RuntimeCIFSException;
 
 
-class NtTransQuerySecurityDesc extends SmbComNtTransaction {
+class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse {
 
-    int fid;
-    int securityInformation;
+    List<FileNotifyInformation> notifyInformation = new ArrayList<>();
 
 
-    NtTransQuerySecurityDesc ( Configuration config, int fid, int securityInformation ) {
+    NtTransNotifyChangeResponse ( Configuration config ) {
         super(config);
-        this.fid = fid;
-        this.securityInformation = securityInformation;
-        this.command = SMB_COM_NT_TRANSACT;
-        this.function = NT_TRANSACT_QUERY_SECURITY_DESC;
-        this.setupCount = 0;
-        this.totalDataCount = 0;
-        this.maxParameterCount = 4;
-        this.maxDataCount = 32768;
-        this.maxSetupCount = (byte) 0x00;
     }
 
 
@@ -51,15 +45,7 @@ class NtTransQuerySecurityDesc extends SmbComNtTransaction {
 
     @Override
     int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
-        int start = dstIndex;
-
-        SMBUtil.writeInt2(this.fid, dst, dstIndex);
-        dstIndex += 2;
-        dst[ dstIndex++ ] = (byte) 0x00; // Reserved
-        dst[ dstIndex++ ] = (byte) 0x00; // Reserved
-        SMBUtil.writeInt4(this.securityInformation, dst, dstIndex);
-        dstIndex += 4;
-        return dstIndex - start;
+        return 0;
     }
 
 
@@ -77,7 +63,28 @@ class NtTransQuerySecurityDesc extends SmbComNtTransaction {
 
     @Override
     int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        return 0;
+        int start = bufferIndex;
+        try {
+            int elemStart = start;
+
+            FileNotifyInformation i = new FileNotifyInformation();
+            bufferIndex += i.decode(buffer, bufferIndex, len);
+            this.notifyInformation.add(i);
+
+            while ( i.nextEntryOffset > 0 ) {
+                bufferIndex = elemStart + i.nextEntryOffset;
+                elemStart = bufferIndex;
+
+                i = new FileNotifyInformation();
+                bufferIndex += i.decode(buffer, bufferIndex, len);
+                this.notifyInformation.add(i);
+            }
+
+        }
+        catch ( IOException ioe ) {
+            throw new RuntimeCIFSException(ioe.getMessage());
+        }
+        return bufferIndex - start;
     }
 
 
@@ -89,8 +96,6 @@ class NtTransQuerySecurityDesc extends SmbComNtTransaction {
 
     @Override
     public String toString () {
-        return new String(
-            "NtTransQuerySecurityDesc[" + super.toString() + ",fid=0x" + Hexdump.toHexString(this.fid, 4) + ",securityInformation=0x"
-                    + Hexdump.toHexString(this.securityInformation, 8) + "]");
+        return new String("NtTransQuerySecurityResponse[" + super.toString() + "]");
     }
 }
