@@ -247,6 +247,17 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     /**
      * {@inheritDoc}
      *
+     * @see jcifs.smb.NtlmPasswordAuthentication#isNull()
+     */
+    @Override
+    public boolean isNull () {
+        return this.getSubject() == null && super.isNull();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
      * @see java.lang.Object#toString()
      */
     @Override
