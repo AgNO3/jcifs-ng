@@ -53,7 +53,6 @@ import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFileInputStream;
-import jcifs.smb.SmbSession;
 
 
 /**
@@ -503,7 +502,7 @@ public class NetworkExplorer extends HttpServlet {
                 }
 
                 req.getSession(); /* ensure session id is set for cluster env. */
-                challenge = SmbSession.getChallenge(dc, getTransportContext());
+                challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
                 if ( ( ntlm = NtlmSsp.authenticate(getTransportContext(), req, resp, challenge) ) == null ) {
                     return;
                 }

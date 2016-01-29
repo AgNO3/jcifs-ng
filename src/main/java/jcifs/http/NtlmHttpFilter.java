@@ -48,7 +48,6 @@ import jcifs.smb.NtStatus;
 import jcifs.smb.NtlmChallenge;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
-import jcifs.smb.SmbSession;
 
 
 /**
@@ -179,7 +178,7 @@ public class NtlmHttpFilter implements Filter {
                 if ( this.loadBalance ) {
                     NtlmChallenge chal = (NtlmChallenge) ssn.getAttribute("NtlmHttpChal");
                     if ( chal == null ) {
-                        chal = SmbSession.getChallengeForDomain(getTransportContext(), this.defaultDomain);
+                        chal = getTransportContext().getTransportPool().getChallengeForDomain(getTransportContext(), this.defaultDomain);
                         ssn.setAttribute("NtlmHttpChal", chal);
                     }
                     dc = chal.dc;
@@ -187,7 +186,7 @@ public class NtlmHttpFilter implements Filter {
                 }
                 else {
                     dc = UniAddress.getByName(this.domainController, true, getTransportContext());
-                    challenge = SmbSession.getChallenge(dc, getTransportContext());
+                    challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
                 }
 
                 if ( ( ntlm = NtlmSsp.authenticate(getTransportContext(), req, resp, challenge) ) == null ) {
@@ -210,8 +209,7 @@ public class NtlmHttpFilter implements Filter {
                 dc = UniAddress.getByName(this.domainController, true, getTransportContext());
             }
             try {
-
-                SmbSession.logon(dc, getTransportContext());
+                getTransportContext().getTransportPool().logon(dc, getTransportContext());
 
                 if ( log.isDebugEnabled() ) {
                     log.debug("NtlmHttpFilter: " + ntlm + " successfully authenticated against " + dc);

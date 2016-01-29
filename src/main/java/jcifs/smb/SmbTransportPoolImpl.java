@@ -9,6 +9,7 @@ package jcifs.smb;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -18,6 +19,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.SmbTransportPool;
 import jcifs.UniAddress;
+import jcifs.netbios.NbtAddress;
 
 
 /**
@@ -29,19 +31,25 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     private static final Logger log = Logger.getLogger(SmbTransportPool.class);
 
     private final List<SmbTransport> connections = new LinkedList<>();
+    private final List<SmbTransport> nonPooledConnections = new LinkedList<>();
+
+    private NbtAddress[] dcList = null;
+    private long dcListExpiration;
+    private static int dcListCounter;
 
 
     @Override
-    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port ) {
-        return getSmbTransport(tc, address, port, tc.getConfig().getLocalAddr(), tc.getConfig().getLocalPort(), null);
+    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean nonPooled ) {
+        return getSmbTransport(tc, address, port, tc.getConfig().getLocalAddr(), tc.getConfig().getLocalPort(), null, nonPooled);
     }
 
 
     @Override
-    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName ) {
+    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+            boolean nonPooled ) {
         synchronized ( this.connections ) {
             SmbComNegotiate negotiate = new SmbComNegotiate(tc.getConfig());
-            if ( tc.getConfig().getSessionLimit() != 1 ) {
+            if ( nonPooled || tc.getConfig().getSessionLimit() != 1 ) {
                 for ( SmbTransport conn : this.connections ) {
                     if ( conn.matches(address, port, localAddr, localPort, hostName)
                             && ( tc.getConfig().getSessionLimit() == 0 || conn.sessions.size() < tc.getConfig().getSessionLimit() ) ) {
@@ -65,7 +73,12 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             if ( log.isDebugEnabled() ) {
                 log.debug("New transport connection " + conn);
             }
-            this.connections.add(0, conn);
+            if ( nonPooled ) {
+                this.nonPooledConnections.add(conn);
+            }
+            else {
+                this.connections.add(0, conn);
+            }
             return conn;
         }
     }
@@ -78,6 +91,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                 log.debug("Removing transport connection " + trans + " (" + System.identityHashCode(trans) + ")");
             }
             this.connections.remove(trans);
+            this.nonPooledConnections.remove(trans);
         }
     }
 
@@ -91,6 +105,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     public void close () throws CIFSException {
         synchronized ( this.connections ) {
             List<SmbTransport> toClose = new LinkedList<>(this.connections);
+            toClose.addAll(this.nonPooledConnections);
             for ( SmbTransport conn : toClose ) {
                 try {
                     conn.disconnect(false);
@@ -99,6 +114,118 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                     log.warn("Failed to close connection", e);
                 }
             }
+            this.connections.clear();
+            this.nonPooledConnections.clear();
         }
     }
+
+
+    @Override
+    public synchronized NtlmChallenge getChallengeForDomain ( CIFSContext tc, String domain ) throws SmbException, UnknownHostException {
+        if ( domain == null ) {
+            throw new SmbException("A domain was not specified");
+        }
+        long now = System.currentTimeMillis();
+        int retry = 1;
+
+        do {
+            if ( this.dcListExpiration < now ) {
+                NbtAddress[] list = NbtAddress.getAllByName(domain, 0x1C, null, null, tc);
+                this.dcListExpiration = now + tc.getConfig().getNetbiosCacheTimeout() * 1000L;
+                if ( list != null && list.length > 0 ) {
+                    this.dcList = list;
+                }
+                else { /* keep using the old list */
+                    this.dcListExpiration = now + 1000 * 60 * 15; /* 15 min */
+                    log.warn("Failed to retrieve DC list from WINS");
+                }
+            }
+
+            int max = Math.min(this.dcList.length, tc.getConfig().getNetbiosLookupRespLimit());
+            for ( int j = 0; j < max; j++ ) {
+                int i = dcListCounter++ % max;
+                if ( this.dcList[ i ] != null ) {
+                    try {
+                        return interrogate(tc, this.dcList[ i ]);
+                    }
+                    catch ( SmbException se ) {
+                        log.warn("Failed validate DC: " + this.dcList[ i ], se);
+                    }
+                    this.dcList[ i ] = null;
+                }
+            }
+
+            /*
+             * No DCs found, for retieval of list by expiring it and retry.
+             */
+            this.dcListExpiration = 0;
+        }
+        while ( retry-- > 0 );
+
+        this.dcListExpiration = now + 1000 * 60 * 15; /* 15 min */
+        throw new UnknownHostException("Failed to negotiate with a suitable domain controller for " + domain);
+    }
+
+
+    @Override
+    public byte[] getChallenge ( UniAddress dc, CIFSContext tf ) throws SmbException {
+        return getChallenge(dc, 0, tf);
+    }
+
+
+    public byte[] getChallenge ( UniAddress dc, int port, CIFSContext tf ) throws SmbException {
+        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, port, false);
+        trans.connect();
+        return trans.server.encryptionKey;
+    }
+
+
+    /**
+     * Authenticate arbitrary credentials represented by the
+     * <tt>NtlmPasswordAuthentication</tt> object against the domain controller
+     * specified by the <tt>UniAddress</tt> parameter. If the credentials are
+     * not accepted, an <tt>SmbAuthException</tt> will be thrown. If an error
+     * occurs an <tt>SmbException</tt> will be thrown. If the credentials are
+     * valid, the method will return without throwing an exception. See the
+     * last <a href="../../../faq.html">FAQ</a> question.
+     * <p>
+     * See also the <tt>jcifs.smb.client.logonShare</tt> property.
+     */
+    @Override
+    public void logon ( UniAddress dc, CIFSContext tf ) throws SmbException {
+        logon(dc, 0, tf);
+    }
+
+
+    public void logon ( UniAddress dc, int port, CIFSContext tf ) throws SmbException {
+        SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false);
+        SmbSession smbSession = smbTransport.getSmbSession(tf);
+        SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null);
+        if ( tf.getConfig().getLogonShare() == null ) {
+            tree.treeConnect(null, null);
+        }
+        else {
+            Trans2FindFirst2 req = new Trans2FindFirst2(tree.session.getConfig(), "\\", "*", SmbFile.ATTR_DIRECTORY);
+            Trans2FindFirst2Response resp = new Trans2FindFirst2Response(tree.session.getConfig());
+            tree.send(req, resp);
+        }
+    }
+
+
+    private static NtlmChallenge interrogate ( CIFSContext tf, NbtAddress addr ) throws SmbException {
+        UniAddress dc = new UniAddress(addr);
+        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, 0, false);
+        if ( !tf.hasDefaultCredentials() ) {
+            trans.connect();
+            log.warn(
+                "Default credentials (jcifs.smb.client.username/password)" + " not specified. SMB signing may not work propertly."
+                        + "  Skipping DC interrogation.");
+        }
+        else {
+            SmbSession ssn = trans.getSmbSession(tf.withDefaultCredentials());
+            ssn.getSmbTree(tf.getConfig().getLogonShare(), null).treeConnect(null, null);
+        }
+        return new NtlmChallenge(trans.server.encryptionKey, dc);
+    }
+
 }

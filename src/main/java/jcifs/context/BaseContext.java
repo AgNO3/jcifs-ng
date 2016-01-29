@@ -11,12 +11,14 @@ import java.net.URLStreamHandler;
 
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.SidResolver;
 import jcifs.SmbTransportPool;
 import jcifs.netbios.NameServiceClient;
 import jcifs.smb.BufferCache;
 import jcifs.smb.Dfs;
 import jcifs.smb.Handler;
 import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.SIDCacheImpl;
 import jcifs.smb.SmbCredentials;
 import jcifs.smb.SmbTransportPoolImpl;
 
@@ -29,6 +31,7 @@ public class BaseContext extends AbstractCIFSContext {
 
     private final Configuration config;
     private final Dfs dfs;
+    private final SidResolver sidResolver;
     private final Handler urlHandler;
     private final NameServiceClient nameServiceClient;
     private final BufferCache bufferCache;
@@ -42,6 +45,7 @@ public class BaseContext extends AbstractCIFSContext {
     public BaseContext ( Configuration config ) {
         this.config = config;
         this.dfs = new Dfs(this);
+        this.sidResolver = new SIDCacheImpl(this);
         this.urlHandler = new Handler(this);
         this.nameServiceClient = new NameServiceClient(this);
         this.bufferCache = new BufferCache(this.config);
@@ -108,6 +112,17 @@ public class BaseContext extends AbstractCIFSContext {
     @Override
     public URLStreamHandler getUrlHandler () {
         return this.urlHandler;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.CIFSContext#getSIDResolver()
+     */
+    @Override
+    public SidResolver getSIDResolver () {
+        return this.sidResolver;
     }
 
 

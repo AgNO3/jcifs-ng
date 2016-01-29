@@ -60,6 +60,12 @@ public interface CIFSContext {
 
 
     /**
+     * @return
+     */
+    SidResolver getSIDResolver ();
+
+
+    /**
      * 
      * @return the used credentials
      */

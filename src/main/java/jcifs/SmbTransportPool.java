@@ -8,7 +8,10 @@ package jcifs;
 
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 
+import jcifs.smb.NtlmChallenge;
+import jcifs.smb.SmbException;
 import jcifs.smb.SmbTransport;
 
 
@@ -24,7 +27,7 @@ public interface SmbTransportPool {
      * @param port
      * @return
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port );
+    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean nonPooled );
 
 
     /**
@@ -36,7 +39,8 @@ public interface SmbTransportPool {
      * @param hostName
      * @return
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName );
+    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+            boolean nonPooled );
 
 
     /**
@@ -49,5 +53,28 @@ public interface SmbTransportPool {
      * 
      */
     void close () throws CIFSException;
+
+
+    /**
+     * @param dc
+     * @param transportContext
+     */
+    void logon ( UniAddress dc, CIFSContext transportContext ) throws SmbException;
+
+
+    /**
+     * @param dc
+     * @param transportContext
+     * @return
+     */
+    byte[] getChallenge ( UniAddress dc, CIFSContext transportContext ) throws SmbException;
+
+
+    /**
+     * @param transportContext
+     * @param defaultDomain
+     * @return
+     */
+    NtlmChallenge getChallengeForDomain ( CIFSContext transportContext, String defaultDomain ) throws SmbException, UnknownHostException;
 
 }

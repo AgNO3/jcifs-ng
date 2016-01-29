@@ -120,7 +120,7 @@ public class Dfs {
 
         try {
             UniAddress addr = UniAddress.getByName(domain, true, tf);
-            SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
+            SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false);
             DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(true), "\\" + domain, 1);
             if ( dr != null ) {
                 DfsReferral start = dr;
@@ -128,7 +128,7 @@ public class Dfs {
 
                 do {
                     try {
-                        return tf.getTransportPool().getSmbTransport(tf, UniAddress.getByName(dr.server, tf), 0);
+                        return tf.getTransportPool().getSmbTransport(tf, UniAddress.getByName(dr.server, tf), 0, false);
                     }
                     catch ( IOException ioe ) {
                         e = ioe;

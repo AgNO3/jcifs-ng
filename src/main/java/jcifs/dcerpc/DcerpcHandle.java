@@ -160,9 +160,14 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
-    public static <Authenticator> DcerpcHandle getHandle ( String url, CIFSContext tc ) throws MalformedURLException, DcerpcException {
+    public static DcerpcHandle getHandle ( String url, CIFSContext tc ) throws MalformedURLException, DcerpcException {
+        return getHandle(url, tc, false);
+    }
+
+
+    public static DcerpcHandle getHandle ( String url, CIFSContext tc, boolean unshared ) throws MalformedURLException, DcerpcException {
         if ( url.startsWith("ncacn_np:") ) {
-            return new DcerpcPipeHandle(url, tc);
+            return new DcerpcPipeHandle(url, tc, unshared);
         }
         throw new DcerpcException("DCERPC transport not supported: " + url);
     }

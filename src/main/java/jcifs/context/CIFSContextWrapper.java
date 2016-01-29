@@ -12,6 +12,7 @@ import java.net.URLStreamHandler;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.SidResolver;
 import jcifs.SmbTransportPool;
 import jcifs.netbios.NameServiceClient;
 import jcifs.smb.BufferCache;
@@ -27,6 +28,7 @@ import jcifs.smb.SmbCredentials;
 public class CIFSContextWrapper implements CIFSContext {
 
     private final CIFSContext delegate;
+    private Handler wrappedHandler;
 
 
     /**
@@ -63,8 +65,6 @@ public class CIFSContextWrapper implements CIFSContext {
         return this.delegate.getCredentials();
     }
 
-    private Handler handler;
-
 
     /**
      * {@inheritDoc}
@@ -73,10 +73,21 @@ public class CIFSContextWrapper implements CIFSContext {
      */
     @Override
     public URLStreamHandler getUrlHandler () {
-        if ( this.handler == null ) {
-            this.handler = new Handler(this);
+        if ( this.wrappedHandler == null ) {
+            this.wrappedHandler = new Handler(this);
         }
-        return this.handler;
+        return this.wrappedHandler;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.CIFSContext#getSIDResolver()
+     */
+    @Override
+    public SidResolver getSIDResolver () {
+        return this.delegate.getSIDResolver();
     }
 
 

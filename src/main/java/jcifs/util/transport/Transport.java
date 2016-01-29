@@ -53,6 +53,16 @@ public abstract class Transport implements Runnable {
     TransportException te;
 
     protected Map<Request, Response> response_map = new HashMap<>(4);
+    private boolean dontTimeout;
+
+
+    /**
+     * @param dontTimeout
+     *            the dontTimeout to set
+     */
+    public void setDontTimeout ( boolean dontTimeout ) {
+        this.dontTimeout = dontTimeout;
+    }
 
 
     protected abstract void makeKey ( Request request ) throws IOException;
@@ -158,6 +168,9 @@ public abstract class Transport implements Runnable {
                 }
                 else {
                     log.trace("transport read time out", ex);
+                    if ( this.dontTimeout ) {
+                        continue;
+                    }
                 }
 
                 try {

@@ -21,7 +21,6 @@ package jcifs.smb;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -38,122 +37,11 @@ import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.SmbConstants;
 import jcifs.UniAddress;
-import jcifs.netbios.NbtAddress;
 
 
 public final class SmbSession {
 
     private static final Logger log = Logger.getLogger(SmbSession.class);
-
-    static NbtAddress[] dc_list = null;
-    static long dc_list_expiration;
-    static int dc_list_counter;
-
-
-    private static NtlmChallenge interrogate ( CIFSContext tf, NbtAddress addr ) throws SmbException {
-        UniAddress dc = new UniAddress(addr);
-        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, 0);
-        if ( !tf.hasDefaultCredentials() ) {
-            trans.connect();
-            log.warn(
-                "Default credentials (jcifs.smb.client.username/password)" + " not specified. SMB signing may not work propertly."
-                        + "  Skipping DC interrogation.");
-        }
-        else {
-            SmbSession ssn = trans.getSmbSession(tf.withDefaultCredentials());
-            ssn.getSmbTree(tf.getConfig().getLogonShare(), null).treeConnect(null, null);
-        }
-        return new NtlmChallenge(trans.server.encryptionKey, dc);
-    }
-
-
-    public synchronized static NtlmChallenge getChallengeForDomain ( CIFSContext tc, String domain ) throws SmbException, UnknownHostException {
-        if ( domain == null ) {
-            throw new SmbException("A domain was not specified");
-        }
-        long now = System.currentTimeMillis();
-        int retry = 1;
-
-        do {
-            if ( dc_list_expiration < now ) {
-                NbtAddress[] list = NbtAddress.getAllByName(domain, 0x1C, null, null, tc);
-                dc_list_expiration = now + tc.getConfig().getNetbiosCacheTimeout() * 1000L;
-                if ( list != null && list.length > 0 ) {
-                    dc_list = list;
-                }
-                else { /* keep using the old list */
-                    dc_list_expiration = now + 1000 * 60 * 15; /* 15 min */
-                    log.warn("Failed to retrieve DC list from WINS");
-                }
-            }
-
-            int max = Math.min(dc_list.length, tc.getConfig().getNetbiosLookupRespLimit());
-            for ( int j = 0; j < max; j++ ) {
-                int i = dc_list_counter++ % max;
-                if ( dc_list[ i ] != null ) {
-                    try {
-                        return interrogate(tc, dc_list[ i ]);
-                    }
-                    catch ( SmbException se ) {
-                        log.warn("Failed validate DC: " + dc_list[ i ], se);
-                    }
-                    dc_list[ i ] = null;
-                }
-            }
-
-            /*
-             * No DCs found, for retieval of list by expiring it and retry.
-             */
-            dc_list_expiration = 0;
-        }
-        while ( retry-- > 0 );
-
-        dc_list_expiration = now + 1000 * 60 * 15; /* 15 min */
-        throw new UnknownHostException("Failed to negotiate with a suitable domain controller for " + domain);
-    }
-
-
-    public static byte[] getChallenge ( UniAddress dc, CIFSContext tf ) throws SmbException {
-        return getChallenge(dc, 0, tf);
-    }
-
-
-    public static byte[] getChallenge ( UniAddress dc, int port, CIFSContext tf ) throws SmbException {
-        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, port);
-        trans.connect();
-        return trans.server.encryptionKey;
-    }
-
-
-    /**
-     * Authenticate arbitrary credentials represented by the
-     * <tt>NtlmPasswordAuthentication</tt> object against the domain controller
-     * specified by the <tt>UniAddress</tt> parameter. If the credentials are
-     * not accepted, an <tt>SmbAuthException</tt> will be thrown. If an error
-     * occurs an <tt>SmbException</tt> will be thrown. If the credentials are
-     * valid, the method will return without throwing an exception. See the
-     * last <a href="../../../faq.html">FAQ</a> question.
-     * <p>
-     * See also the <tt>jcifs.smb.client.logonShare</tt> property.
-     */
-    public static void logon ( UniAddress dc, CIFSContext tf ) throws SmbException {
-        logon(dc, 0, tf);
-    }
-
-
-    public static void logon ( UniAddress dc, int port, CIFSContext tf ) throws SmbException {
-        SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port);
-        SmbSession smbSession = smbTransport.getSmbSession(tf);
-        SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null);
-        if ( tf.getConfig().getLogonShare() == null ) {
-            tree.treeConnect(null, null);
-        }
-        else {
-            Trans2FindFirst2 req = new Trans2FindFirst2(tree.session.getConfig(), "\\", "*", SmbFile.ATTR_DIRECTORY);
-            Trans2FindFirst2Response resp = new Trans2FindFirst2Response(tree.session.getConfig());
-            tree.send(req, resp);
-        }
-    }
 
     /*
      * 0 - not connected
@@ -238,7 +126,7 @@ public final class SmbSession {
     synchronized SmbTransport transport () {
         if ( this.transport == null ) {
             this.transport = this.transportContext.getTransportPool()
-                    .getSmbTransport(this.transportContext, this.address, this.port, this.localAddr, this.localPort, null);
+                    .getSmbTransport(this.transportContext, this.address, this.port, this.localAddr, this.localPort, null, false);
         }
         return this.transport;
     }

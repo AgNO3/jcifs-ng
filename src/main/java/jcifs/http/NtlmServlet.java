@@ -40,7 +40,6 @@ import jcifs.UniAddress;
 import jcifs.netbios.NbtAddress;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
-import jcifs.smb.SmbSession;
 
 
 /**
@@ -138,7 +137,7 @@ public abstract class NtlmServlet extends HttpServlet {
             }
             NtlmPasswordAuthentication ntlm;
             if ( msg.startsWith("NTLM ") ) {
-                byte[] challenge = SmbSession.getChallenge(dc, getTransportContext());
+                byte[] challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
                 ntlm = NtlmSsp.authenticate(getTransportContext(), request, response, challenge);
                 if ( ntlm == null )
                     return;
@@ -156,7 +155,7 @@ public abstract class NtlmServlet extends HttpServlet {
                 ntlm = new NtlmPasswordAuthentication(getTransportContext(), domain, user, password);
             }
             try {
-                SmbSession.logon(dc, getTransportContext());
+                getTransportContext().getTransportPool().logon(dc, getTransportContext());
             }
             catch ( SmbAuthException sae ) {
                 response.setHeader("WWW-Authenticate", "NTLM");

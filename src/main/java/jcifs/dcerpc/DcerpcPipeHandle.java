@@ -45,9 +45,10 @@ public class DcerpcPipeHandle extends DcerpcHandle {
      * @param url
      * @param tc
      */
-    public DcerpcPipeHandle ( String url, CIFSContext tc ) throws DcerpcException, MalformedURLException {
+    public DcerpcPipeHandle ( String url, CIFSContext tc, boolean unshared ) throws DcerpcException, MalformedURLException {
         super(tc, DcerpcHandle.parseBinding(url));
         this.pipe = new SmbNamedPipe(makePipeUrl(), pipeFlags, tc);
+        this.pipe.setNonPooled(unshared);
     }
 
 
@@ -121,5 +122,9 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         super.close();
         if ( this.out != null )
             this.out.close();
+
+        if ( this.pipe != null ) {
+            this.pipe.close();
+        }
     }
 }

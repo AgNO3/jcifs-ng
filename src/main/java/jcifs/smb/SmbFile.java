@@ -513,6 +513,9 @@ public class SmbFile extends URLConnection implements SmbConstants {
     private int tree_num;
     private CIFSContext transportContext;
 
+    private boolean nonPooled;
+    private SmbTransport exclusiveTransport;
+
 
     /**
      * Constructs an SmbFile representing a resource on an SMB network such
@@ -640,6 +643,15 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
 
     /**
+     * @param nonPooled
+     *            the nonPooled to set
+     */
+    public void setNonPooled ( boolean nonPooled ) {
+        this.nonPooled = nonPooled;
+    }
+
+
+    /**
      * @return the transportContext
      */
     public CIFSContext getTransportContext () {
@@ -699,7 +711,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
                     }
 
                     UniAddress addr = UniAddress.getByName(dr.server, getTransportContext());
-                    SmbTransport trans = getTransportContext().getTransportPool().getSmbTransport(getTransportContext(), addr, this.url.getPort());
+                    SmbTransport trans = getTransportContext().getTransportPool()
+                            .getSmbTransport(getTransportContext(), addr, this.url.getPort(), false);
                     /*
                      * This is a key point. This is where we set the "tree" of this file which
                      * is like changing the rug out from underneath our feet.
@@ -919,8 +932,17 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( this.tree != null ) {
             trans = getSession().getTransport();
         }
+        else if ( this.nonPooled ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug("Using exclusive transport for " + this);
+            }
+            this.exclusiveTransport = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), true);
+            trans = this.exclusiveTransport;
+            trans.setDontTimeout(true);
+            this.tree = trans.getSmbSession(ctx).getSmbTree(this.share, null);
+        }
         else {
-            trans = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort());
+            trans = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), false);
             this.tree = trans.getSmbSession(ctx).getSmbTree(this.share, null);
         }
 
@@ -976,7 +998,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         }
 
         if ( isConnected() ) {
-            log.debug("Already connected");
+            log.trace("Already connected");
             return;
         }
 
@@ -1074,6 +1096,16 @@ public class SmbFile extends URLConnection implements SmbConstants {
          */
 
         send(new SmbComClose(getSession().getConfig(), f, lastWriteTime), blank_resp());
+
+        if ( this.exclusiveTransport != null ) {
+            try {
+                log.debug("Disconnecting exclusive transport");
+                this.exclusiveTransport.doDisconnect(false);
+            }
+            catch ( IOException e ) {
+                throw new SmbException("Failed to close exclusive transport");
+            }
+        }
     }
 
 
@@ -1086,7 +1118,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    void close () throws SmbException {
+    public void close () throws SmbException {
         close(0L);
     }
 
@@ -3091,7 +3123,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 int len = sids.length - off;
                 if ( len > 64 )
                     len = 64;
-                SID.resolveSids(server, getTransportContext(), sids, off, len);
+
+                getTransportContext().getSIDResolver().resolveSids(getTransportContext(), server, sids, off, len);
             }
         }
         else {
