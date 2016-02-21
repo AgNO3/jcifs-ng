@@ -47,6 +47,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean useUnicode = true;
     protected boolean forceUnicode = false;
     protected boolean signingPreferred = false;
+    protected boolean signingEnforced;
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
     protected boolean useNTSmbs = true;
@@ -414,6 +415,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isSigningPreferred () {
         return this.signingPreferred;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isSigningEnforced()
+     */
+    @Override
+    public boolean isSigningEnforced () {
+        return this.signingEnforced;
     }
 
 

@@ -45,6 +45,8 @@ public class SmbFileInputStream extends InputStream {
 
     SmbFile file;
 
+    private boolean largeReadX;
+
 
     /**
      * @param url
@@ -83,12 +85,13 @@ public class SmbFileInputStream extends InputStream {
         }
         this.readSize = Math.min(file.tree.session.getTransport().rcv_buf_size - 70, file.tree.session.getTransport().server.maxBufferSize - 70);
 
-        // boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-        // || ( file.tree.session.getTransport().server.signaturesEnabled &&
-        // file.getTransportContext().getConfig().isSigningPreferred() );
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) /* && !isSignatureActive */ ) {
-            log.debug("Enabling LARGE_READX");
-            this.readSizeFile = Math.min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, 0xFFFF - 70);
+        boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
+                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
+        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
+            this.largeReadX = true;
+            this.readSizeFile = Math
+                    .min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, isSignatureActive ? 0xFFFF - 70 : 0xFFFFFF - 70);
+            log.debug("Enabling LARGE_READX with " + this.readSizeFile);
         }
         else {
             log.debug("LARGE_READX disabled");
@@ -217,6 +220,10 @@ public class SmbFileInputStream extends InputStream {
                 SmbComReadAndX request = new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, null);
                 if ( this.file.type == SmbFile.TYPE_NAMED_PIPE ) {
                     request.minCount = request.maxCount = request.remaining = 1024;
+                }
+                else if ( this.largeReadX ) {
+                    request.maxCount = blockSize & 0xFFFF;
+                    request.openTimeout = ( blockSize >> 16 ) & 0xFFFF;
                 }
                 this.file.send(request, response);
             }

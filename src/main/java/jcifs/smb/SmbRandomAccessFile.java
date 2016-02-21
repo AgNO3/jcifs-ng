@@ -39,6 +39,8 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
     private byte[] tmp = new byte[8];
     private SmbComWriteAndXResponse write_andx_resp = null;
 
+    private boolean largeReadX;
+
 
     /**
      * This constructor is used to instance a SmbRandomAccessFile object with
@@ -78,7 +80,9 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
                 || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
         if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
-            this.readSize = Math.min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, 0xFFFF - 70);
+            this.largeReadX = true;
+            this.readSize = Math
+                    .min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, isSignatureActive ? 0xFFFF - 70 : 0xFFFFFF - 70);
         }
 
         // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
@@ -124,7 +128,12 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
         do {
             r = len > this.readSize ? this.readSize : len;
             ServerMessageBlock andX = null;
-            this.file.send(new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, andX), response);
+            SmbComReadAndX request = new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, andX);
+            if ( this.largeReadX ) {
+                request.maxCount = r & 0xFFFF;
+                request.openTimeout = ( r >> 16 ) & 0xFFFF;
+            }
+            this.file.send(request, response);
             if ( ( n = response.dataLength ) <= 0 ) {
                 return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
             }
@@ -196,7 +205,8 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
         int w;
         do {
             w = len > this.writeSize ? this.writeSize : len;
-            this.file.send(new SmbComWriteAndX(getSession().getConfig(), this.file.fid, this.fp, len - w, b, off, w, null), this.write_andx_resp);
+            SmbComWriteAndX request = new SmbComWriteAndX(getSession().getConfig(), this.file.fid, this.fp, len - w, b, off, w, null);
+            this.file.send(request, this.write_andx_resp);
             this.fp += this.write_andx_resp.count;
             len -= this.write_andx_resp.count;
             off += this.write_andx_resp.count;

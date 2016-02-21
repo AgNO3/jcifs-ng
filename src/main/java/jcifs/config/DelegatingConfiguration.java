@@ -445,6 +445,17 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isSigningEnforced()
+     */
+    @Override
+    public boolean isSigningEnforced () {
+        return this.delegate.isSigningEnforced();
+    }
+
+
+    /**
      * @return
      * @see jcifs.Configuration#getLmHostsFileName()
      */

@@ -78,7 +78,10 @@ public class Dfs {
             // SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
             SmbTransport trans = getDc(authDomain, tf);
             CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
-            DfsReferral dr = trans.getDfsReferrals(tf, "", 0);
+            DfsReferral dr = null;
+            if ( trans != null ) {
+                dr = trans.getDfsReferrals(tf, "", 0);
+            }
             if ( dr != null ) {
                 DfsReferral start = dr;
                 do {

@@ -212,7 +212,8 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     boolean isSignatureSetupRequired () {
-        return ( this.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 && this.digest == null;
+        return ( this.transportContext.getConfig().isSigningEnforced() || ( this.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 )
+                && this.digest == null;
     }
 
 
@@ -398,12 +399,14 @@ public class SmbTransport extends Transport implements SmbConstants {
 
         /* Adjust negotiated values */
         this.tconHostName = this.address.getHostName();
-        if ( this.server.signaturesRequired || ( this.server.signaturesEnabled && this.getTransportContext().getConfig().isSigningPreferred() ) ) {
+        if ( this.getTransportContext().getConfig().isSigningEnforced() || this.server.signaturesRequired
+                || ( this.server.signaturesEnabled && this.getTransportContext().getConfig().isSigningPreferred() ) ) {
             this.flags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
         }
         else {
             this.flags2 &= 0xFFFF ^ SmbConstants.FLAGS2_SECURITY_SIGNATURES;
         }
+
         this.maxMpxCount = Math.min(this.maxMpxCount, this.server.smaxMpxCount);
         if ( this.maxMpxCount < 1 )
             this.maxMpxCount = 1;

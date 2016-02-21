@@ -28,6 +28,7 @@ public interface SmbConstants {
     static final int FLAGS2_LONG_FILENAMES = 0x0001;
     static final int FLAGS2_EXTENDED_ATTRIBUTES = 0x0002;
     static final int FLAGS2_SECURITY_SIGNATURES = 0x0004;
+    static final int FLAGS2_SECURITY_REQUIRE_SIGNATURES = 0x0010;
     static final int FLAGS2_EXTENDED_SECURITY_NEGOTIATION = 0x0800;
     static final int FLAGS2_RESOLVE_PATHS_IN_DFS = 0x1000;
     static final int FLAGS2_PERMIT_READ_IF_EXECUTE_PERM = 0x2000;

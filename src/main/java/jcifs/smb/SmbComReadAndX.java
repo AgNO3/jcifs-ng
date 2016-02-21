@@ -25,7 +25,8 @@ import jcifs.Configuration;
 class SmbComReadAndX extends AndXServerMessageBlock {
 
     private long offset;
-    private int fid, openTimeout;
+    private int fid;
+    int openTimeout;
     int maxCount, minCount, remaining;
 
 

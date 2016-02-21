@@ -214,6 +214,12 @@ public interface Configuration {
     /**
      * @return
      */
+    boolean isSigningEnforced ();
+
+
+    /**
+     * @return
+     */
     String getLmHostsFileName ();
 
 
