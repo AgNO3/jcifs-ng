@@ -86,6 +86,12 @@ class Trans2FindFirst2Response extends SmbComTransactionResponse {
 
 
         @Override
+        public long lastAccess () {
+            return this.lastAccessTime;
+        }
+
+
+        @Override
         public long length () {
             return this.endOfFile;
         }

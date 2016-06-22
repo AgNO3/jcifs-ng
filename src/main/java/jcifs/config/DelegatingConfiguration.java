@@ -615,4 +615,15 @@ public class DelegatingConfiguration implements Configuration {
         return this.delegate.getSupportedDialects();
     }
 
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getMaxRequestRetries()
+     */
+    @Override
+    public int getMaxRequestRetries () {
+        return this.delegate.getMaxRequestRetries();
+    }
+
 }

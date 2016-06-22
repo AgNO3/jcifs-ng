@@ -19,8 +19,6 @@
 package jcifs.smb;
 
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
 
 import jcifs.CIFSException;
@@ -135,16 +133,14 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
     }
 
     private int status;
-    private Throwable rootCause;
 
 
     SmbException () {}
 
 
     SmbException ( int errcode, Throwable rootCause ) {
-        super(getMessageByCode(errcode));
+        super(getMessageByCode(errcode), rootCause);
         this.status = getStatusByCode(errcode);
-        this.rootCause = rootCause;
     }
 
 
@@ -155,8 +151,7 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
 
 
     SmbException ( String msg, Throwable rootCause ) {
-        super(msg);
-        this.rootCause = rootCause;
+        super(msg, rootCause);
         this.status = NT_STATUS_UNSUCCESSFUL;
     }
 
@@ -173,18 +168,7 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
 
 
     public Throwable getRootCause () {
-        return this.rootCause;
+        return this.getCause();
     }
 
-
-    @Override
-    public String toString () {
-        if ( this.rootCause != null ) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            this.rootCause.printStackTrace(pw);
-            return super.toString() + "\n" + sw;
-        }
-        return super.toString();
-    }
 }

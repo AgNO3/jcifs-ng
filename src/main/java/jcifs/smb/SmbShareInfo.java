@@ -78,6 +78,17 @@ public class SmbShareInfo implements FileEntry {
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.FileEntry#lastAccess()
+     */
+    @Override
+    public long lastAccess () {
+        return 0L;
+    }
+
+
     @Override
     public long length () {
         return 0L;

@@ -46,9 +46,12 @@ public class Dfs {
 
     private static final Logger log = Logger.getLogger(Dfs.class);
 
-    private CacheEntry<DfsReferral> negativeEntry;
+    private final CacheEntry<DfsReferral> negativeEntry;
     private CacheEntry<Map<String, CacheEntry<DfsReferral>>> _domains = null; /* aka trusted domains cache */
+    private Object domainsLock = new Object();
+
     private CacheEntry<DfsReferral> referrals = null;
+    private Object referralsLock = new Object();
 
 
     /**
@@ -59,7 +62,7 @@ public class Dfs {
     }
 
 
-    public Map<String, Map<String, CacheEntry<DfsReferral>>> getTrustedDomains ( CIFSContext tf ) throws SmbAuthException {
+    private Map<String, Map<String, CacheEntry<DfsReferral>>> getTrustedDomains ( CIFSContext tf ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() || tf.getCredentials().getUserDomain() == null || tf.getCredentials().getUserDomain().isEmpty() ) {
             return null;
         }
@@ -109,11 +112,13 @@ public class Dfs {
 
 
     public boolean isTrustedDomain ( String domain, CIFSContext tf ) throws SmbAuthException {
-        Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
-        if ( domains == null )
-            return false;
-        domain = domain.toLowerCase();
-        return domains.get(domain) != null;
+        synchronized ( this.domainsLock ) {
+            Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
+            if ( domains == null )
+                return false;
+            domain = domain.toLowerCase();
+            return domains.get(domain) != null;
+        }
     }
 
 
@@ -177,103 +182,106 @@ public class Dfs {
 
 
     public synchronized DfsReferral resolve ( String domain, String root, String path, CIFSContext tf ) throws SmbAuthException {
-        DfsReferral dr = null;
-        long now = System.currentTimeMillis();
 
         if ( tf.getConfig().isDfsDisabled() || root.equals("IPC$") ) {
             return null;
         }
-        /*
-         * domains that can contain DFS points to maps of roots for each
-         */
-        Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
-        if ( domains != null ) {
-            domain = domain.toLowerCase();
+        DfsReferral dr = null;
+        long now = System.currentTimeMillis();
+        synchronized ( this.domainsLock ) {
             /*
-             * domain-based DFS root shares to links for each
+             * domains that can contain DFS points to maps of roots for each
              */
-            Map<String, CacheEntry<DfsReferral>> roots = domains.get(domain);
-            if ( roots != null ) {
-                SmbTransport trans = null;
-
-                root = root.toLowerCase();
-
+            Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
+            if ( domains != null ) {
+                domain = domain.toLowerCase();
                 /*
-                 * The link entries contain maps of referrals by path representing DFS links.
-                 * Note that paths are relative to the root like "\" and not "\example.com\root".
+                 * domain-based DFS root shares to links for each
                  */
-                CacheEntry<DfsReferral> links = roots.get(root);
-                if ( links != null && now > links.expiration ) {
-                    roots.remove(root);
-                    links = null;
-                }
+                Map<String, CacheEntry<DfsReferral>> roots = domains.get(domain);
+                if ( roots != null ) {
+                    SmbTransport trans = null;
 
-                if ( links == null ) {
-                    if ( ( trans = getDc(domain, tf) ) == null )
-                        return null;
-
-                    dr = getReferral(tf, trans, domain, root, path);
-                    if ( dr != null ) {
-                        int len = 1 + domain.length() + 1 + root.length();
-
-                        links = new CacheEntry<>(0L);
-
-                        DfsReferral tmp = dr;
-                        do {
-                            if ( path == null ) {
-                                /*
-                                 * Store references to the map and key so that
-                                 * SmbFile.resolveDfs can re-insert the dr list with
-                                 * the dr that was successful so that subsequent
-                                 * attempts to resolve DFS use the last successful
-                                 * referral first.
-                                 */
-                                tmp.map = links.map;
-                                tmp.key = "\\";
-                            }
-                            tmp.pathConsumed -= len;
-                            tmp = tmp.next;
-                        }
-                        while ( tmp != dr );
-
-                        if ( dr.key != null )
-                            links.map.put(dr.key, dr);
-
-                        roots.put(root, links);
-                    }
-                    else if ( path == null ) {
-                        roots.put(root, this.negativeEntry);
-                    }
-                }
-                else if ( links == this.negativeEntry ) {
-                    links = null;
-                }
-
-                if ( links != null ) {
-                    String link = "\\";
+                    root = root.toLowerCase();
 
                     /*
-                     * Lookup the domain based DFS root target referral. Note the
-                     * path is just "\" and not "\example.com\root".
+                     * The link entries contain maps of referrals by path representing DFS links.
+                     * Note that paths are relative to the root like "\" and not "\example.com\root".
                      */
-                    dr = links.map.get(link);
-                    if ( dr != null && now > dr.expiration ) {
-                        links.map.remove(link);
-                        dr = null;
+                    CacheEntry<DfsReferral> links = roots.get(root);
+                    if ( links != null && now > links.expiration ) {
+                        roots.remove(root);
+                        links = null;
                     }
 
-                    if ( dr == null ) {
-                        if ( trans == null )
-                            if ( ( trans = getDc(domain, tf) ) == null )
-                                return null;
+                    if ( links == null ) {
+                        if ( ( trans = getDc(domain, tf) ) == null )
+                            return null;
+
                         dr = getReferral(tf, trans, domain, root, path);
                         if ( dr != null ) {
-                            dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
-                            dr.link = link;
-                            links.map.put(link, dr);
+                            int len = 1 + domain.length() + 1 + root.length();
+
+                            links = new CacheEntry<>(0L);
+
+                            DfsReferral tmp = dr;
+                            do {
+                                if ( path == null ) {
+                                    /*
+                                     * Store references to the map and key so that
+                                     * SmbFile.resolveDfs can re-insert the dr list with
+                                     * the dr that was successful so that subsequent
+                                     * attempts to resolve DFS use the last successful
+                                     * referral first.
+                                     */
+                                    tmp.map = links.map;
+                                    tmp.key = "\\";
+                                }
+                                tmp.pathConsumed -= len;
+                                tmp = tmp.next;
+                            }
+                            while ( tmp != dr );
+
+                            if ( dr.key != null )
+                                links.map.put(dr.key, dr);
+
+                            roots.put(root, links);
+                        }
+                        else if ( path == null ) {
+                            roots.put(root, this.negativeEntry);
+                        }
+                    }
+                    else if ( links == this.negativeEntry ) {
+                        links = null;
+                    }
+
+                    if ( links != null ) {
+                        String link = "\\";
+
+                        /*
+                         * Lookup the domain based DFS root target referral. Note the
+                         * path is just "\" and not "\example.com\root".
+                         */
+                        dr = links.map.get(link);
+                        if ( dr != null && now > dr.expiration ) {
+                            links.map.remove(link);
+                            dr = null;
+                        }
+
+                        if ( dr == null ) {
+                            if ( trans == null )
+                                if ( ( trans = getDc(domain, tf) ) == null )
+                                    return null;
+                            dr = getReferral(tf, trans, domain, root, path);
+                            if ( dr != null ) {
+                                dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
+                                dr.link = link;
+                                links.map.put(link, dr);
+                            }
                         }
                     }
                 }
+
             }
         }
 
@@ -351,12 +359,15 @@ public class Dfs {
          */
         dr.pathConsumed -= 1 + server.length() + 1 + share.length();
 
-        if ( this.referrals != null && ( System.currentTimeMillis() + 10000 ) > this.referrals.expiration ) {
-            this.referrals = null;
+        synchronized ( this.referralsLock ) {
+            if ( this.referrals != null && ( System.currentTimeMillis() + 10000 ) > this.referrals.expiration ) {
+                this.referrals = null;
+            }
+            if ( this.referrals == null ) {
+                this.referrals = new CacheEntry<>(0);
+            }
+            this.referrals.map.put(key, dr);
         }
-        if ( this.referrals == null ) {
-            this.referrals = new CacheEntry<>(0);
-        }
-        this.referrals.map.put(key, dr);
+
     }
 }

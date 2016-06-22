@@ -3,6 +3,7 @@ package jcifs.util.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,6 +28,12 @@ public abstract class Transport implements Runnable {
     public static int readn ( InputStream in, byte[] b, int off, int len ) throws IOException {
         int i = 0, n = -5;
 
+        if ( off + len > b.length ) {
+            throw new IOException("Buffer too short, bufsize " + b.length + " read " + len);
+        }
+
+        log.debug("bufsize " + b.length + " read " + len);
+
         while ( i < len ) {
             n = in.read(b, off + i, len - i);
             if ( n <= 0 ) {
@@ -35,6 +42,23 @@ public abstract class Transport implements Runnable {
             i += n;
         }
 
+        return i;
+    }
+
+
+    public static int readn ( InputStream in, ByteBuffer buf, int off, int len ) throws IOException {
+        int i = 0, n = -5;
+        if ( off + len > buf.capacity() ) {
+            throw new IOException("Buffer too short, bufsize " + buf.capacity() + " read " + len);
+        }
+
+        while ( i < len ) {
+            n = in.read(buf.array(), off + i, len - i);
+            if ( n <= 0 ) {
+                break;
+            }
+            i += n;
+        }
         return i;
     }
 

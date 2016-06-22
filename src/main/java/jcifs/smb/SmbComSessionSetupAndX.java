@@ -47,41 +47,38 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
         if ( session.getTransport().server.security == SmbConstants.SECURITY_USER ) {
             if ( cred instanceof NtlmPasswordAuthentication ) {
                 NtlmPasswordAuthentication a = (NtlmPasswordAuthentication) cred;
-
                 if ( a.isAnonymous() ) {
                     this.lmHash = new byte[0];
                     this.ntHash = new byte[0];
                     this.capabilities &= ~SmbConstants.CAP_EXTENDED_SECURITY;
-                }
-                else if ( session.getTransport().server.encryptedPasswords ) {
-                    this.lmHash = a.getAnsiHash(session.getTransportContext(), session.getTransport().server.encryptionKey);
-                    this.ntHash = a.getUnicodeHash(session.getTransportContext(), session.getTransport().server.encryptionKey);
-                    // prohibit HTTP auth attempts for the null session
-                    if ( this.lmHash.length == 0 && this.ntHash.length == 0 ) {
-                        throw new RuntimeException("Null setup prohibited.");
-                    }
-                }
-                else if ( session.getTransportContext().getConfig().isDisablePlainTextPasswords() ) {
-                    throw new RuntimeException("Plain text passwords are disabled");
-                }
-                else if ( this.useUnicode ) {
-                    // plain text
-                    String password = a.getPassword();
-                    this.lmHash = new byte[0];
-                    this.ntHash = new byte[ ( password.length() + 1 ) * 2];
-                    writeString(password, this.ntHash, 0);
+                    this.accountName = "";
+                    this.primaryDomain = "";
                 }
                 else {
-                    // plain text
-                    String password = a.getPassword();
-                    this.lmHash = new byte[ ( password.length() + 1 ) * 2];
-                    this.ntHash = new byte[0];
-                    writeString(password, this.lmHash, 0);
+                    this.accountName = a.getUsername();
+                    if ( this.useUnicode )
+                        this.accountName = this.accountName.toUpperCase();
+                    this.primaryDomain = a.getUserDomain() != null ? a.getUserDomain().toUpperCase() : "?";
+                    if ( session.getTransport().server.encryptedPasswords ) {
+                        this.lmHash = a.getAnsiHash(session.getTransportContext(), session.getTransport().server.encryptionKey);
+                        this.ntHash = a.getUnicodeHash(session.getTransportContext(), session.getTransport().server.encryptionKey);
+                        // prohibit HTTP auth attempts for the null session
+                        if ( this.lmHash.length == 0 && this.ntHash.length == 0 ) {
+                            throw new RuntimeException("Null setup prohibited.");
+                        }
+                    }
+                    else if ( session.getTransportContext().getConfig().isDisablePlainTextPasswords() ) {
+                        throw new RuntimeException("Plain text passwords are disabled");
+                    }
+                    else {
+                        // plain text
+                        String password = a.getPassword();
+                        this.lmHash = new byte[ ( password.length() + 1 ) * 2];
+                        this.ntHash = new byte[0];
+                        writeString(password, this.lmHash, 0);
+                    }
                 }
-                this.accountName = a.getUsername();
-                if ( this.useUnicode )
-                    this.accountName = this.accountName.toUpperCase();
-                this.primaryDomain = a.getUserDomain() != null ? a.getUserDomain().toUpperCase() : "?";
+
             }
             else if ( cred instanceof byte[] ) {
                 this.blob = (byte[]) cred;
@@ -95,10 +92,16 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
                 NtlmPasswordAuthentication a = (NtlmPasswordAuthentication) cred;
                 this.lmHash = new byte[0];
                 this.ntHash = new byte[0];
-                this.accountName = a.getUsername();
-                if ( this.useUnicode )
-                    this.accountName = this.accountName.toUpperCase();
-                this.primaryDomain = a.getUserDomain() != null ? a.getUserDomain().toUpperCase() : "?";
+                if ( !a.isAnonymous() ) {
+                    this.accountName = a.getUsername();
+                    if ( this.useUnicode )
+                        this.accountName = this.accountName.toUpperCase();
+                    this.primaryDomain = a.getUserDomain() != null ? a.getUserDomain().toUpperCase() : "?";
+                }
+                else {
+                    this.accountName = "";
+                    this.primaryDomain = "";
+                }
             }
             else {
                 throw new SmbException("Unsupported credential type");

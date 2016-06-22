@@ -598,8 +598,9 @@ public class SmbTransport extends Transport implements SmbConstants {
                 if ( r.byteCount > 0 && pad > 0 && pad < 4 )
                     readn(this.in, BUF, 4 + off, pad);
 
-                if ( r.dataLength > 0 )
+                if ( r.dataLength > 0 ) {
                     readn(this.in, r.b, r.off, r.dataLength); /* read direct */
+                }
             }
             else {
                 readn(this.in, BUF, 4 + 32, size - 32);

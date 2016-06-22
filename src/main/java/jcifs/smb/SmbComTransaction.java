@@ -127,8 +127,8 @@ abstract class SmbComTransaction extends ServerMessageBlock implements Enumerati
             else if ( this.command == SMB_COM_NT_TRANSACT ) {
                 this.parameterOffset += 2;
             }
-            this.pad = this.parameterOffset % PADDING_SIZE;
-            this.pad = this.pad == 0 ? 0 : PADDING_SIZE - this.pad;
+            this.pad = this.parameterOffset % getPadding();
+            this.pad = this.pad == 0 ? 0 : getPadding() - this.pad;
             this.parameterOffset += this.pad;
 
             this.totalParameterCount = writeParametersWireFormat(this.txn_buf, this.bufParameterOffset);
@@ -139,8 +139,8 @@ abstract class SmbComTransaction extends ServerMessageBlock implements Enumerati
             available -= this.parameterCount;
 
             this.dataOffset = this.parameterOffset + this.parameterCount;
-            this.pad1 = this.dataOffset % PADDING_SIZE;
-            this.pad1 = this.pad1 == 0 ? 0 : PADDING_SIZE - this.pad1;
+            this.pad1 = this.dataOffset % getPadding();
+            this.pad1 = this.pad1 == 0 ? 0 : getPadding() - this.pad1;
             this.dataOffset += this.pad1;
 
             this.totalDataCount = writeDataWireFormat(this.txn_buf, this.bufDataOffset);
@@ -158,8 +158,8 @@ abstract class SmbComTransaction extends ServerMessageBlock implements Enumerati
 
             this.parameterOffset = SECONDARY_PARAMETER_OFFSET;
             if ( ( this.totalParameterCount - this.parameterDisplacement ) > 0 ) {
-                this.pad = this.parameterOffset % PADDING_SIZE;
-                this.pad = this.pad == 0 ? 0 : PADDING_SIZE - this.pad;
+                this.pad = this.parameterOffset % getPadding();
+                this.pad = this.pad == 0 ? 0 : getPadding() - this.pad;
                 this.parameterOffset += this.pad;
             }
 
@@ -171,8 +171,8 @@ abstract class SmbComTransaction extends ServerMessageBlock implements Enumerati
             available -= this.parameterCount;
 
             this.dataOffset = this.parameterOffset + this.parameterCount;
-            this.pad1 = this.dataOffset % PADDING_SIZE;
-            this.pad1 = this.pad1 == 0 ? 0 : PADDING_SIZE - this.pad1;
+            this.pad1 = this.dataOffset % getPadding();
+            this.pad1 = this.pad1 == 0 ? 0 : getPadding() - this.pad1;
             this.dataOffset += this.pad1;
 
             this.dataDisplacement += this.dataCount;
@@ -185,6 +185,15 @@ abstract class SmbComTransaction extends ServerMessageBlock implements Enumerati
             this.hasMore = false;
         }
         return this;
+    }
+
+
+    /**
+     * 
+     * @return padding size
+     */
+    public int getPadding () {
+        return PADDING_SIZE;
     }
 
 

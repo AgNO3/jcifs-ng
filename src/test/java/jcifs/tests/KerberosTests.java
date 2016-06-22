@@ -7,6 +7,8 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
@@ -53,13 +55,15 @@ public class KerberosTests {
             System.out.println(entry);
 
             if ( entry.getContentLength() < 4096 ) {
+                long size = 0;
                 try ( InputStream is = entry.getInputStream() ) {
                     byte[] buffer = new byte[4096];
                     int read = 0;
                     while ( ( read = is.read(buffer) ) >= 0 ) {
-                        System.out.print(new String(buffer, 0, read, "US-ASCII"));
+                        size += read;
                     }
                 }
+                assertEquals(entry.getContentLength(), size);
             }
         }
     }

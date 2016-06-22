@@ -250,10 +250,12 @@ public final class SmbSession {
         SSPContext ctx = null;
         byte[] token = new byte[0];
         int state = 10;
+
         do {
             switch ( state ) {
             case 10: /* NTLM */
-                if ( !this.credentials.isNull() && this.getTransport().hasCapability(SmbConstants.CAP_EXTENDED_SECURITY) ) {
+                boolean anonymous = this.credentials.isAnonymous();
+                if ( !anonymous && this.getTransport().hasCapability(SmbConstants.CAP_EXTENDED_SECURITY) ) {
                     log.debug("Extended security negotiated");
                     state = 20; /* NTLMSSP */
                     break;
@@ -274,7 +276,7 @@ public final class SmbSession {
                  * Only the first SMB_COM_SESSION_SETUP_ANX with non-null or
                  * blank password initializes signing.
                  */
-                if ( !npa.isNull() && this.getTransport().isSignatureSetupRequired() ) {
+                if ( !anonymous && this.getTransport().isSignatureSetupRequired() ) {
                     if ( npa.areHashesExternal() && this.getTransportContext().getConfig().getDefaultPassword() != null ) {
                         /*
                          * preauthentication
@@ -298,8 +300,7 @@ public final class SmbSession {
                     ex = se;
                 }
 
-                if ( response.isLoggedInAsGuest && this.getTransport().server.security != SmbConstants.SECURITY_SHARE
-                        && !this.credentials.isAnonymous() ) {
+                if ( response.isLoggedInAsGuest && this.getTransport().server.security != SmbConstants.SECURITY_SHARE && !anonymous ) {
                     throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                 }
 

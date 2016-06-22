@@ -29,6 +29,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -496,6 +497,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     private String share; // Can be null
     private long createTime;
     private long lastModified;
+    private long lastAccess;
     private int attributes;
     private long attrExpiration;
     private long size;
@@ -515,6 +517,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
     private boolean nonPooled;
     private SmbTransport exclusiveTransport;
+
+    private Random random = new Random();
 
 
     /**
@@ -598,7 +602,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    SmbFile ( SmbFile context, String name, int type, int attributes, long createTime, long lastModified, long size )
+    SmbFile ( SmbFile context, String name, int type, int attributes, long createTime, long lastModified, long lastAccess, long size )
             throws MalformedURLException, UnknownHostException {
         this(
             context.isWorkgroup0() ? new URL(null, "smb://" + name + "/", Handler.SMB_HANDLER)
@@ -635,6 +639,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         this.attributes = attributes;
         this.createTime = createTime;
         this.lastModified = lastModified;
+        this.lastAccess = lastAccess;
         this.size = size;
         this.isExists = true;
 
@@ -679,6 +684,35 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( request instanceof SmbComClose )
             return;
 
+        for ( int retries = 0; retries < 1 + this.getTransportContext().getConfig().getMaxRequestRetries(); retries++ ) {
+            try {
+                resolveDfs0(request);
+                return;
+            }
+            catch ( NullPointerException npe ) {
+                // Bug where transport or tconHostName is null indicates
+                // failed to clean up properly from dropped connection.
+            }
+            catch ( SmbException smbe ) {
+                // The connection may have been dropped?
+                if ( smbe.getNtStatus() != NtStatus.NT_STATUS_NOT_FOUND ) {
+                    throw smbe;
+                }
+            }
+            // If we get here, we apparently have a bad connection.
+            // Disconnect and try again.
+            if ( log.isDebugEnabled() )
+                log.debug("Retrying (" + retries + ") resolveDfs: " + request);
+            disconnect(true);
+            try {
+                Thread.sleep(500 + this.random.nextInt(5000));
+            }
+            catch ( InterruptedException e ) {}
+        }
+    }
+
+
+    private void resolveDfs0 ( ServerMessageBlock request ) throws SmbException {
         connect0();
         DfsReferral dr = getTransportContext().getDfs()
                 .resolve(getSession().getTransport().tconHostName, this.tree.share, this.unc, getTransportContext());
@@ -783,12 +817,56 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
+    void disconnect ( boolean inError ) {
+        if ( isConnected() ) {
+            this.tree.treeDisconnect(inError);
+            this.tree.session.logoff(inError);
+            this.tree = null;
+        }
+    }
+
+
     void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
         send(request, response, true);
     }
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException {
+        String savedPath = ( request != null ) ? request.path : null;
+        for ( int retries = 1; retries < getTransportContext().getConfig().getMaxRequestRetries(); retries++ ) {
+            try {
+                send0(request, response, timeout);
+                return;
+            }
+            catch ( SmbException smbe ) {
+                if ( smbe.getNtStatus() != NtStatus.NT_STATUS_INVALID_PARAMETER ) {
+                    throw smbe;
+                }
+            }
+            // If we get here, we got the 'The Parameter is incorrect' error.
+            // Disconnect and try again from scratch.
+            if ( log.isDebugEnabled() )
+                log.debug("Retrying (" + retries + ") send: " + request);
+            disconnect(true);
+            try {
+                Thread.sleep(500 + this.random.nextInt(5000));
+            }
+            catch ( InterruptedException e ) {}
+            if ( request != null ) {
+                // resolveDfs() and tree.send() modify the request packet.
+                // I want to restore it before retrying. request.reset()
+                // restores almost everything that was modified, except the path.
+                request.reset();
+                request.path = savedPath;
+            }
+            if ( response != null )
+                response.reset();
+            connect0();
+        }
+    }
+
+
+    private void send0 ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException, DfsReferral {
         for ( ;; ) {
             resolveDfs(request);
             try {
@@ -1506,6 +1584,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         this.attributes = ATTR_READONLY | ATTR_DIRECTORY;
         this.createTime = 0L;
         this.lastModified = 0L;
+        this.lastAccess = 0L;
         this.isExists = false;
 
         try {
@@ -1526,6 +1605,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 this.attributes = info.getAttributes();
                 this.createTime = info.getCreateTime();
                 this.lastModified = info.getLastWriteTime();
+                this.lastAccess = info.getLastAccessTime();
             }
 
             /*
@@ -1730,6 +1810,22 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( getUncPath0().length() > 1 ) {
             exists();
             return this.lastModified;
+        }
+        return 0L;
+    }
+
+
+    /**
+     * Retrieve the last acces time of the file represented by this <code>SmbFile</code>
+     * 
+     * @return The number of milliseconds since the 00:00:00 GMT, January 1,
+     *         1970 as a <code>long</code> value
+     * @throws SmbException
+     */
+    public long lastAccess () throws SmbException {
+        if ( getUncPath0().length() > 1 ) {
+            exists();
+            return this.lastAccess;
         }
         return 0L;
     }
@@ -1988,7 +2084,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 continue;
             if ( name.length() > 0 ) {
                 // if !files we don't need to create SmbFiles here
-                SmbFile f = new SmbFile(this, name, e.getType(), ATTR_READONLY | ATTR_DIRECTORY, 0L, 0L, 0L);
+                SmbFile f = new SmbFile(this, name, e.getType(), ATTR_READONLY | ATTR_DIRECTORY, 0L, 0L, 0L, 0L);
                 if ( ff != null && ff.accept(f) == false )
                     continue;
                 if ( files ) {
@@ -2087,7 +2183,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                     continue;
                 if ( name.length() > 0 ) {
                     // if !files we don't need to create SmbFiles here
-                    SmbFile f = new SmbFile(this, name, e.getType(), ATTR_READONLY | ATTR_DIRECTORY, 0L, 0L, 0L);
+                    SmbFile f = new SmbFile(this, name, e.getType(), ATTR_READONLY | ATTR_DIRECTORY, 0L, 0L, 0L, 0L);
                     if ( ff != null && ff.accept(f) == false )
                         continue;
                     if ( files ) {
@@ -2155,7 +2251,15 @@ public class SmbFile extends URLConnection implements SmbConstants {
                     continue;
                 }
                 if ( name.length() > 0 ) {
-                    SmbFile f = new SmbFile(this, name, TYPE_FILESYSTEM, e.getAttributes(), e.createTime(), e.lastModified(), e.length());
+                    SmbFile f = new SmbFile(
+                        this,
+                        name,
+                        TYPE_FILESYSTEM,
+                        e.getAttributes(),
+                        e.createTime(),
+                        e.lastModified(),
+                        e.lastAccess(),
+                        e.length());
                     if ( ff != null && ff.accept(f) == false ) {
                         continue;
                     }
@@ -2330,7 +2434,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             if ( path.length() > 1 ) {
                 try {
                     dest.mkdir();
-                    dest.setPathInformation(this.attributes, this.createTime, this.lastModified);
+                    dest.setPathInformation(this.attributes, this.createTime, this.lastModified, this.lastAccess);
                 }
                 catch ( SmbException se ) {
                     log.trace("copyTo0", se);
@@ -2350,6 +2454,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                         files[ i ].attributes,
                         files[ i ].createTime,
                         files[ i ].lastModified,
+                        files[ i ].lastAccess,
                         files[ i ].size);
                     files[ i ].copyTo0(ndest, b, bsize, w, req, resp);
                 }
@@ -2375,7 +2480,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                         /*
                          * Remove READONLY and try again
                          */
-                        dest.setPathInformation(dest.attributes & ~ATTR_READONLY, 0L, 0L);
+                        dest.setPathInformation(dest.attributes & ~ATTR_READONLY, 0L, 0L, 0L);
                         dest.open(SmbFile.O_CREAT | SmbFile.O_WRONLY | SmbFile.O_TRUNC, FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES, this.attributes, 0);
                     }
                     else {
@@ -2416,7 +2521,13 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 }
 
                 dest.send(
-                    new Trans2SetFileInformation(getSession().getConfig(), dest.fid, this.attributes, this.createTime, this.lastModified),
+                    new Trans2SetFileInformation(
+                        getSession().getConfig(),
+                        dest.fid,
+                        this.attributes,
+                        this.createTime,
+                        this.lastModified,
+                        this.lastAccess),
                     new Trans2SetFileInformationResponse(getSession().getConfig()));
                 dest.close(0L);
             }
@@ -2552,12 +2663,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
             this.attributes = ATTR_READONLY | ATTR_DIRECTORY;
             this.createTime = 0L;
             this.lastModified = 0L;
+            this.lastAccess = 0L;
             this.isExists = false;
 
             Info info = queryPath(getUncPath0(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
             this.attributes = info.getAttributes();
             this.createTime = info.getCreateTime();
             this.lastModified = info.getLastWriteTime();
+            this.lastAccess = info.getLastAccessTime();
 
             this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeExpirationPeriod();
             this.isExists = true;
@@ -2774,17 +2887,21 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    void setPathInformation ( int attrs, long ctime, long mtime ) throws SmbException {
+    void setPathInformation ( int attrs, long ctime, long mtime, long atime ) throws SmbException {
         int f, dir;
 
         exists();
         dir = this.attributes & ATTR_DIRECTORY;
 
         f = open0(O_RDONLY, FILE_WRITE_ATTRIBUTES, dir, dir != 0 ? 0x0001 : 0x0040);
-        send(
-            new Trans2SetFileInformation(getSession().getConfig(), f, attrs | dir, ctime, mtime),
-            new Trans2SetFileInformationResponse(getSession().getConfig()));
-        close(f, 0L);
+        try {
+            send(
+                new Trans2SetFileInformation(getSession().getConfig(), f, attrs | dir, ctime, mtime, atime),
+                new Trans2SetFileInformationResponse(getSession().getConfig()));
+        }
+        finally {
+            close(f, 0L);
+        }
 
         this.attrExpiration = 0;
     }
@@ -2805,7 +2922,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
-        setPathInformation(0, time, 0L);
+        setPathInformation(0, time, 0L, 0L);
     }
 
 
@@ -2824,7 +2941,26 @@ public class SmbFile extends URLConnection implements SmbConstants {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
-        setPathInformation(0, 0L, time);
+        setPathInformation(0, 0L, time, 0L);
+    }
+
+
+    /**
+     * Set the last accesss time of the file. The time is specified as milliseconds
+     * from Jan 1, 1970 which is the same as that which is returned by the
+     * <tt>lastModified()</tt>, <tt>getLastModified()</tt>, and <tt>getDate()</tt> methods.
+     * <p/>
+     * This method does not apply to workgroups, servers, or shares.
+     *
+     * @param time
+     *            the last access time as milliseconds since Jan 1, 1970
+     */
+    public void setLastAccess ( long time ) throws SmbException {
+        if ( getUncPath0().length() == 1 ) {
+            throw new SmbException("Invalid operation for workgroups, servers, or shares");
+        }
+
+        setPathInformation(0, 0L, 0L, time);
     }
 
 
@@ -2858,7 +2994,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( getUncPath0().length() == 1 ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
-        setPathInformation(attrs & ATTR_SET_MASK, 0L, 0L);
+        setPathInformation(attrs & ATTR_SET_MASK, 0L, 0L, 0L);
     }
 
 

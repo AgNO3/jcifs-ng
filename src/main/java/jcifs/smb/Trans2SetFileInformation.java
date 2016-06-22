@@ -28,15 +28,16 @@ class Trans2SetFileInformation extends SmbComTransaction {
 
     private int fid;
     private int attributes;
-    private long createTime, lastWriteTime;
+    private long createTime, lastWriteTime, lastAccessTime;
 
 
-    Trans2SetFileInformation ( Configuration config, int fid, int attributes, long createTime, long lastWriteTime ) {
+    Trans2SetFileInformation ( Configuration config, int fid, int attributes, long createTime, long lastWriteTime, long lastAccessTime ) {
         super(config);
         this.fid = fid;
         this.attributes = attributes;
         this.createTime = createTime;
         this.lastWriteTime = lastWriteTime;
+        this.lastAccessTime = lastAccessTime;
         this.command = SMB_COM_TRANSACTION2;
         this.subCommand = TRANS2_SET_FILE_INFORMATION;
         this.maxParameterCount = 6;
@@ -74,7 +75,7 @@ class Trans2SetFileInformation extends SmbComTransaction {
 
         SMBUtil.writeTime(this.createTime, dst, dstIndex);
         dstIndex += 8;
-        SMBUtil.writeInt8(0L, dst, dstIndex);
+        SMBUtil.writeTime(this.lastAccessTime, dst, dstIndex);
         dstIndex += 8;
         SMBUtil.writeTime(this.lastWriteTime, dst, dstIndex);
         dstIndex += 8;

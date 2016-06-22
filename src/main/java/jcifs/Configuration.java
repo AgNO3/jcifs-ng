@@ -301,4 +301,10 @@ public interface Configuration {
      */
     int getNotifyBufferSize ();
 
+
+    /**
+     * @return retry SMB requests on failure up to n times
+     */
+    int getMaxRequestRetries ();
+
 }

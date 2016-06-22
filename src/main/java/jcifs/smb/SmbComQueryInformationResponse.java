@@ -59,6 +59,13 @@ class SmbComQueryInformationResponse extends ServerMessageBlock implements Info 
 
 
     @Override
+    public long getLastAccessTime () {
+        // Fake access time
+        return this.lastWriteTime + this.serverTimeZoneOffset;
+    }
+
+
+    @Override
     public long getSize () {
         return this.fileSize;
     }

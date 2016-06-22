@@ -216,6 +216,9 @@ class SmbTree {
                 this.connectionState = 0;
                 throw se;
             }
+            finally {
+                this.session.transport().notifyAll();
+            }
         }
     }
 

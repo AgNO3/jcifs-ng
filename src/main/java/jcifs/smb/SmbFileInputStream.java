@@ -213,7 +213,7 @@ public class SmbFileInputStream extends InputStream {
             r = len > blockSize ? blockSize : len;
 
             if ( log.isTraceEnabled() ) {
-                log.trace("read: len=" + len + ",r=" + r + ",fp=" + this.fp);
+                log.trace("read: len=" + len + ",r=" + r + ",fp=" + this.fp + ",b.length=" + b.length);
             }
 
             try {
@@ -222,8 +222,8 @@ public class SmbFileInputStream extends InputStream {
                     request.minCount = request.maxCount = request.remaining = 1024;
                 }
                 else if ( this.largeReadX ) {
-                    request.maxCount = blockSize & 0xFFFF;
-                    request.openTimeout = ( blockSize >> 16 ) & 0xFFFF;
+                    request.maxCount = r & 0xFFFF;
+                    request.openTimeout = ( r >> 16 ) & 0xFFFF;
                 }
                 this.file.send(request, response);
             }

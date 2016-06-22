@@ -70,6 +70,12 @@ class NetServerEnum2Response extends SmbComTransactionResponse {
 
 
         @Override
+        public long lastAccess () {
+            return 0L;
+        }
+
+
+        @Override
         public long length () {
             return 0L;
         }

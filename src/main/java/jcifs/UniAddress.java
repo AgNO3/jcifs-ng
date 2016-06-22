@@ -138,6 +138,7 @@ public class UniAddress {
         catch ( InterruptedException ie ) {
             throw new UnknownHostException(name);
         }
+        waitForQueryThreads(q1x, q20);
         if ( q1x.getAnswer() != null ) {
             return q1x.getAnswer();
         }
@@ -146,6 +147,34 @@ public class UniAddress {
         }
         else {
             throw q1x.getException();
+        }
+    }
+
+
+    private static void waitForQueryThreads ( QueryThread q1x, QueryThread q20 ) {
+        interruptThreadSafely(q1x);
+        joinThread(q1x);
+        interruptThreadSafely(q20);
+        joinThread(q20);
+    }
+
+
+    private static void interruptThreadSafely ( QueryThread thread ) {
+        try {
+            thread.interrupt();
+        }
+        catch ( SecurityException e ) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private static void joinThread ( Thread thread ) {
+        try {
+            thread.join();
+        }
+        catch ( InterruptedException e ) {
+            e.printStackTrace();
         }
     }
 
@@ -211,8 +240,7 @@ public class UniAddress {
     }
 
 
-    public static UniAddress[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup, CIFSContext tc )
-            throws UnknownHostException {
+    public static UniAddress[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup, CIFSContext tc ) throws UnknownHostException {
         Object addr;
         if ( hostname == null || hostname.length() == 0 ) {
             throw new UnknownHostException();

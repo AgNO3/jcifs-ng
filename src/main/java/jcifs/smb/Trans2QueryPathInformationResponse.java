@@ -59,6 +59,12 @@ class Trans2QueryPathInformationResponse extends SmbComTransactionResponse {
 
 
         @Override
+        public long getLastAccessTime () {
+            return this.lastAccessTime;
+        }
+
+
+        @Override
         public long getSize () {
             return 0L;
         }
@@ -96,6 +102,12 @@ class Trans2QueryPathInformationResponse extends SmbComTransactionResponse {
 
         @Override
         public long getLastWriteTime () {
+            return 0L;
+        }
+
+
+        @Override
+        public long getLastAccessTime () {
             return 0L;
         }
 

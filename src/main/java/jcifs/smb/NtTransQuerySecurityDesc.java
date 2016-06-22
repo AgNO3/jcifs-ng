@@ -38,8 +38,14 @@ class NtTransQuerySecurityDesc extends SmbComNtTransaction {
         this.setupCount = 0;
         this.totalDataCount = 0;
         this.maxParameterCount = 4;
-        this.maxDataCount = 32768;
+        this.maxDataCount = 65536;
         this.maxSetupCount = (byte) 0x00;
+    }
+
+
+    @Override
+    public int getPadding () {
+        return 4;
     }
 
 

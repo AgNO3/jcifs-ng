@@ -98,6 +98,7 @@ public class BaseConfiguration implements Configuration {
     protected int smbListCount = 200;
     protected long smbAttributeExpiration = 5000L;
     protected boolean ignoreCopyToException = true;
+    private int maxRequestRetries = 2;
     private String[] supportedDialects = new String[] {
         "NT LM 0.12"
             // , "SMB 2.???",
@@ -473,6 +474,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public String[] getSupportedDialects () {
         return this.supportedDialects;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getMaxRequestRetries()
+     */
+    @Override
+    public int getMaxRequestRetries () {
+        return this.maxRequestRetries;
     }
 
 

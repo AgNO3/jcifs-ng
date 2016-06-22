@@ -18,9 +18,20 @@
 
 package jcifs.smb;
 
+
 interface Info {
-    int getAttributes();
-    long getCreateTime();
-    long getLastWriteTime();
-    long getSize();
+
+    int getAttributes ();
+
+
+    long getCreateTime ();
+
+
+    long getLastWriteTime ();
+
+
+    long getLastAccessTime ();
+
+
+    long getSize ();
 }

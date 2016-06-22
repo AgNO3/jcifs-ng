@@ -182,7 +182,8 @@ public class NtlmContext implements SSPContext {
                 }
 
                 this.serverChallenge = msg2.getChallenge();
-                this.ntlmsspFlags &= msg2.getFlags();
+                // don't drop NTLMSSP_NEGOTIATE_SIGN if we requested it
+                this.ntlmsspFlags &= ( msg2.getFlags() | NtlmFlags.NTLMSSP_NEGOTIATE_SIGN );
                 Type3Message msg3 = new Type3Message(
                     this.transportContext,
                     msg2,
