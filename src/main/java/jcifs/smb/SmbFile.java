@@ -1040,7 +1040,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             log.debug("Authentication failed", sae);
             SmbSession ssn;
             if ( this.share == null ) { // IPC$ - try "anonymous" credentials
-                ssn = trans.getSmbSession(ctx.withAnonymousCredentials(true));
+                ssn = trans.getSmbSession(ctx.withAnonymousCredentials());
                 this.tree = ssn.getSmbTree(null, null);
                 this.tree.treeConnect(null, null);
             }

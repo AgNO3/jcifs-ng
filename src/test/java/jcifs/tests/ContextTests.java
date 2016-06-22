@@ -1,3 +1,20 @@
+/*
+ * © 2016 AgNO3 Gmbh & Co. KG
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package jcifs.tests;
 
 
@@ -21,13 +38,6 @@ import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbCredentials;
 import jcifs.smb.SmbFile;
 
-
-/**
- * © 2016 AgNO3 Gmbh & Co. KG
- * All right reserved.
- * 
- * Created: 17.01.2016 by mbechler
- */
 
 /**
  * @author mbechler
@@ -70,7 +80,7 @@ public class ContextTests {
         assertEquals("GUEST", ntlmGuestCreds.getUsername());
         assertThat("anonymous", ntlmGuestCreds.isAnonymous(), CoreMatchers.is(true));
 
-        SmbCredentials anonCreds = this.context.withAnonymousCredentials(false).getCredentials();
+        SmbCredentials anonCreds = this.context.withAnonymousCredentials().getCredentials();
         assertThat(anonCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
         NtlmPasswordAuthentication ntlmAnonCreds = (NtlmPasswordAuthentication) anonCreds;
         assertEquals("", ntlmAnonCreds.getUsername());

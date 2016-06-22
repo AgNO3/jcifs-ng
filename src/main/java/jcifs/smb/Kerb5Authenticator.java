@@ -55,7 +55,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      *            It contains tickets retrieve from KDC.
      */
     public Kerb5Authenticator ( CIFSContext tc, Subject subject ) {
-        super(tc, true);
+        super(tc);
         this.subject = subject;
     }
 
@@ -241,17 +241,6 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     @Override
     public boolean isAnonymous () {
         return this.getSubject() == null && super.isAnonymous();
-    }
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.NtlmPasswordAuthentication#isNull()
-     */
-    @Override
-    public boolean isNull () {
-        return this.getSubject() == null && super.isNull();
     }
 
 

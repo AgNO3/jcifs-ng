@@ -414,7 +414,7 @@ public final class SmbSession {
                     request = new SmbComSessionSetupAndX(this, null, token);
                     response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), null);
 
-                    if ( !this.credentials.isNull() && ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
+                    if ( ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null )
                             request.digest = new SigningDigest(signingKey, true);

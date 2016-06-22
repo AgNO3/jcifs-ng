@@ -129,7 +129,7 @@ public class Dfs {
         try {
             UniAddress addr = UniAddress.getByName(domain, true, tf);
             SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false);
-            DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(true), "\\" + domain, 1);
+            DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
             if ( dr != null ) {
                 DfsReferral start = dr;
                 IOException e = null;

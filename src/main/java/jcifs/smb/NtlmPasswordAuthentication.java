@@ -132,9 +132,8 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * @param tc
      * @param nullAuth
      */
-    public NtlmPasswordAuthentication ( CIFSContext tc, boolean nullAuth ) {
+    public NtlmPasswordAuthentication ( CIFSContext tc ) {
         this(tc, "", "", "");
-        this.nullAuth = nullAuth;
     }
 
 
@@ -537,15 +536,6 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
         }
 
         return new String(out, 0, j);
-    }
-
-
-    /**
-     * @return whether this is null auth
-     */
-    @Override
-    public boolean isNull () {
-        return this.nullAuth;
     }
 
 
