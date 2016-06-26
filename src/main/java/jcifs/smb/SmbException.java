@@ -60,7 +60,7 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
         }
         if ( ( errcode & 0xC0000000 ) == 0xC0000000 ) {
             int found = Arrays.binarySearch(NT_STATUS_CODES, errcode);
-            if ( NT_STATUS_CODES[ found ] == errcode ) {
+            if ( found >= 0 && NT_STATUS_CODES[ found ] == errcode ) {
                 return NT_STATUS_MESSAGES[ found ];
             }
         }
@@ -156,17 +156,31 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
     }
 
 
+    /**
+     * 
+     * @param errcode
+     * @param winerr
+     */
     public SmbException ( int errcode, boolean winerr ) {
         super(winerr ? getMessageByWinerrCode(errcode) : getMessageByCode(errcode));
         this.status = winerr ? errcode : getStatusByCode(errcode);
     }
 
 
+    /**
+     * 
+     * @return status code
+     */
     public int getNtStatus () {
         return this.status;
     }
 
 
+    /**
+     * 
+     * @return cause
+     */
+    @Deprecated
     public Throwable getRootCause () {
         return this.getCause();
     }

@@ -31,6 +31,10 @@ import jcifs.SmbConstants;
 import jcifs.context.SingletonContext;
 
 
+/**
+ * URL handler for transparent smb:// URL handling
+ * 
+ */
 public class Handler extends URLStreamHandler {
 
     private static final Logger log = Logger.getLogger(Handler.class);
@@ -44,6 +48,9 @@ public class Handler extends URLStreamHandler {
     public Handler () {}
 
 
+    /**
+     * @param tc
+     */
     public Handler ( CIFSContext tc ) {
         this.transportContext = tc;
     }

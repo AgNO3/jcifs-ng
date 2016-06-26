@@ -49,7 +49,7 @@ import jcifs.context.SingletonContext;
  * the <a href="../overview-summary.html#scp">overview page of the API
  * documentation</a> for details.
  */
-
+@SuppressWarnings ( "javadoc" )
 public class Config {
 
     /**
@@ -69,10 +69,10 @@ public class Config {
      * 
      * <pre>
      * Exception MalformedURLException: unknown protocol: smb
-     *     at java.net.URL.<init>(URL.java:480)
-     *     at java.net.URL.<init>(URL.java:376)
-     *     at java.net.URL.<init>(URL.java:330)
-     *     at jcifs.smb.SmbFile.<init>(SmbFile.java:355)
+     *     at java.net.URL.&lt;init&gt;(URL.java:480)
+     *     at java.net.URL.&lt;init&gt;(URL.java:376)
+     *     at java.net.URL.&lt;init&gt;(URL.java:330)
+     *     at jcifs.smb.SmbFile.&lt;init&gt;(SmbFile.java:355)
      *     ...
      * </pre>
      * 
@@ -148,7 +148,6 @@ public class Config {
      * Using this method will also override properties loaded
      * using the <tt>-Djcifs.properties=</tt> commandline parameter.
      */
-
     public void setProperties ( Properties prp ) {
         prp = new Properties(prp);
         try {

@@ -25,6 +25,9 @@ import jcifs.dcerpc.ndr.NdrException;
 import jcifs.dcerpc.ndr.NdrObject;
 
 
+/**
+ * 
+ */
 public abstract class DcerpcMessage extends NdrObject implements DcerpcConstants {
 
     protected int ptype = -1;
@@ -35,21 +38,40 @@ public abstract class DcerpcMessage extends NdrObject implements DcerpcConstants
     protected int result = 0;
 
 
+    /**
+     * 
+     * @param flag
+     * @return whether flag is set
+     */
     public boolean isFlagSet ( int flag ) {
         return ( this.flags & flag ) == flag;
     }
 
 
+    /**
+     * Remove flag
+     * 
+     * @param flag
+     */
     public void unsetFlag ( int flag ) {
         this.flags &= ~flag;
     }
 
 
+    /**
+     * Set flag
+     * 
+     * @param flag
+     */
     public void setFlag ( int flag ) {
         this.flags |= flag;
     }
 
 
+    /**
+     * 
+     * @return result exception, if the call failed
+     */
     public DcerpcException getResult () {
         if ( this.result != 0 )
             return new DcerpcException(this.result);
@@ -133,11 +155,25 @@ public abstract class DcerpcMessage extends NdrObject implements DcerpcConstants
     }
 
 
+    /**
+     * 
+     * @return the operation number
+     */
     public abstract int getOpnum ();
 
 
+    /**
+     * 
+     * @param buf
+     * @throws NdrException
+     */
     public abstract void encode_in ( NdrBuffer buf ) throws NdrException;
 
 
+    /**
+     * 
+     * @param buf
+     * @throws NdrException
+     */
     public abstract void decode_out ( NdrBuffer buf ) throws NdrException;
 }

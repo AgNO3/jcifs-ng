@@ -42,6 +42,15 @@ public final class NtlmUtil {
     private NtlmUtil () {}
 
 
+    /**
+     * 
+     * @param responseKeyNT
+     * @param serverChallenge
+     * @param clientChallenge
+     * @param nanos1601
+     * @param targetInfo
+     * @return the calculated response
+     */
     public static byte[] getNTLMv2Response ( byte[] responseKeyNT, byte[] serverChallenge, byte[] clientChallenge, long nanos1601,
             byte[] targetInfo ) {
         int targetInfoLength = targetInfo != null ? targetInfo.length : 0;
@@ -60,6 +69,13 @@ public final class NtlmUtil {
     }
 
 
+    /**
+     * 
+     * @param responseKeyLM
+     * @param serverChallenge
+     * @param clientChallenge
+     * @return the calculated response
+     */
     public static byte[] getLMv2Response ( byte[] responseKeyLM, byte[] serverChallenge, byte[] clientChallenge ) {
         return NtlmUtil.computeResponse(responseKeyLM, serverChallenge, clientChallenge, 0, clientChallenge.length);
     }
@@ -77,6 +93,14 @@ public final class NtlmUtil {
     }
 
 
+    /**
+     * 
+     * @param domain
+     * @param username
+     * @param password
+     * 
+     * @return the caclulated mac
+     */
     public static byte[] nTOWFv2 ( String domain, String username, String password ) {
         MessageDigest md4 = Crypto.getMD4();
         md4.update(Strings.getUNIBytes(password));
@@ -87,6 +111,11 @@ public final class NtlmUtil {
     }
 
 
+    /**
+     * 
+     * @param password
+     * @return the calulated hash
+     */
     public static byte[] nTOWFv1 ( String password ) {
         if ( password == null )
             throw new NullPointerException("Password parameter is required");
@@ -96,6 +125,14 @@ public final class NtlmUtil {
     }
 
 
+    /**
+     * 
+     * @param nTOWFv1
+     * @param serverChallenge
+     * @param clientChallenge
+     * @return the calculated response
+     * @throws GeneralSecurityException
+     */
     public static byte[] getNTLM2Response ( byte[] nTOWFv1, byte[] serverChallenge, byte[] clientChallenge ) throws GeneralSecurityException {
         byte[] sessionHash = new byte[8];
 
@@ -125,6 +162,8 @@ public final class NtlmUtil {
      *            The server challenge.
      * @param clientChallenge
      *            The client challenge (nonce).
+     * @return the calculated response
+     * @throws GeneralSecurityException
      */
     public static byte[] getLMv2Response ( String domain, String user, String password, byte[] challenge, byte[] clientChallenge )
             throws GeneralSecurityException {
@@ -146,6 +185,11 @@ public final class NtlmUtil {
 
     /**
      * Generate the Unicode MD4 hash for the password associated with these credentials.
+     * 
+     * @param password
+     * @param challenge
+     * @return the calculated response
+     * @throws GeneralSecurityException
      */
     static public byte[] getNTLMResponse ( String password, byte[] challenge ) throws GeneralSecurityException {
         byte[] p21 = new byte[21];
@@ -162,6 +206,12 @@ public final class NtlmUtil {
 
     /**
      * Generate the ANSI DES hash for the password associated with these credentials.
+     * 
+     * @param tc
+     * @param password
+     * @param challenge
+     * @return the calculated response
+     * @throws GeneralSecurityException
      */
     static public byte[] getPreNTLMResponse ( CIFSContext tc, String password, byte[] challenge ) throws GeneralSecurityException {
         byte[] p14 = new byte[14];

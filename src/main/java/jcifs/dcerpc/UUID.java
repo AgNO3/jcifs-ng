@@ -20,9 +20,13 @@
 package jcifs.dcerpc;
 
 
+/**
+ * UUID type wrapper
+ *
+ */
 public class UUID extends rpc.uuid_t {
 
-    public static int hex_to_bin ( char[] arr, int offset, int length ) {
+    private static int hex_to_bin ( char[] arr, int offset, int length ) {
         int value = 0;
         int ai, count;
 
@@ -72,7 +76,7 @@ public class UUID extends rpc.uuid_t {
     };
 
 
-    public static String bin_to_hex ( int value, int length ) {
+    private static String bin_to_hex ( int value, int length ) {
         char[] arr = new char[length];
         int ai = arr.length;
         while ( ai-- > 0 ) {
@@ -93,6 +97,11 @@ public class UUID extends rpc.uuid_t {
     }
 
 
+    /**
+     * 
+     * @param uuid
+     *            wrapped uuid
+     */
     public UUID ( rpc.uuid_t uuid ) {
         this.time_low = uuid.time_low;
         this.time_mid = uuid.time_mid;
@@ -109,6 +118,11 @@ public class UUID extends rpc.uuid_t {
     }
 
 
+    /**
+     * Construct a UUID from string
+     * 
+     * @param str
+     */
     public UUID ( String str ) {
         char[] arr = str.toCharArray();
         this.time_low = hex_to_bin(arr, 0, 8);

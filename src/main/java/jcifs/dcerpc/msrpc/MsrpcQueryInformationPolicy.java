@@ -22,6 +22,7 @@ package jcifs.dcerpc.msrpc;
 import jcifs.dcerpc.ndr.NdrObject;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcQueryInformationPolicy extends lsarpc.LsarQueryInformationPolicy {
 
     public MsrpcQueryInformationPolicy ( LsaPolicyHandle policyHandle, short level, NdrObject info ) {

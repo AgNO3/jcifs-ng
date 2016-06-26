@@ -31,6 +31,9 @@ import jcifs.dcerpc.msrpc.samr;
 import jcifs.dcerpc.msrpc.srvsvc;
 
 
+/**
+ *
+ */
 public class DcerpcBinding {
 
     private static final Map<String, String> INTERFACES = new HashMap<>();
@@ -47,6 +50,12 @@ public class DcerpcBinding {
     }
 
 
+    /**
+     * Add an interface to the registry
+     * 
+     * @param name
+     * @param syntax
+     */
     public static void addInterface ( String name, String syntax ) {
         INTERFACES.put(name, syntax);
     }

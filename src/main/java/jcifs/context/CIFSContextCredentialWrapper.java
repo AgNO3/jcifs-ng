@@ -26,6 +26,8 @@ import jcifs.smb.SmbCredentials;
 
 
 /**
+ * Context wrapper supplying alternate credentials
+ * 
  * @author mbechler
  *
  */
@@ -36,6 +38,8 @@ public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements 
 
     /**
      * @param delegate
+     * @param creds
+     *            Crendentials to use
      */
     public CIFSContextCredentialWrapper ( AbstractCIFSContext delegate, SmbCredentials creds ) {
         super(delegate);
@@ -44,9 +48,10 @@ public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements 
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.CIFSContextWrapper#getCredentials()
+     * @see jcifs.context.CIFSContextWrapper#getCredentials()
      */
     @Override
     public SmbCredentials getCredentials () {

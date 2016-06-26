@@ -41,6 +41,12 @@ public final class Strings {
     private Strings () {}
 
 
+    /**
+     * 
+     * @param str
+     * @param encoding
+     * @return encoded
+     */
     public static byte[] getBytes ( String str, Charset encoding ) {
         if ( str == null ) {
             return new byte[0];
@@ -49,18 +55,28 @@ public final class Strings {
     }
 
 
+    /**
+     * 
+     * @param str
+     * @return the string as bytes (UTF16-LE)
+     */
     public static byte[] getUNIBytes ( String str ) {
         return getBytes(str, UNI_ENCODING);
     }
 
 
+    /**
+     * 
+     * @param str
+     * @return the string as bytes (ASCII)
+     */
     public static byte[] getASCIIBytes ( String str ) {
         return getBytes(str, ASCII_ENCODING);
     }
 
 
     /**
-     * @param password
+     * @param str
      * @param config
      * @return the string as bytes
      */
@@ -81,7 +97,7 @@ public final class Strings {
      * @param src
      * @param srcIndex
      * @param len
-     * @return
+     * @return decoded string
      */
     public static String fromUNIBytes ( byte[] src, int srcIndex, int len ) {
         return new String(src, srcIndex, len, UNI_ENCODING);
@@ -91,8 +107,8 @@ public final class Strings {
     /**
      * @param buffer
      * @param bufferIndex
-     * @param len
-     * @return
+     * @param maxLen
+     * @return position of terminating null bytes
      */
     public static int findUNITermination ( byte[] buffer, int bufferIndex, int maxLen ) {
         int len = 0;
@@ -111,7 +127,7 @@ public final class Strings {
      * @param srcIndex
      * @param len
      * @param config
-     * @return
+     * @return decoded string
      */
     public static String fromOEMBytes ( byte[] src, int srcIndex, int len, Configuration config ) {
         try {
@@ -126,8 +142,8 @@ public final class Strings {
     /**
      * @param buffer
      * @param bufferIndex
-     * @param len
-     * @return
+     * @param maxLen
+     * @return position of terminating null byte
      */
     public static int findTermination ( byte[] buffer, int bufferIndex, int maxLen ) {
         int len = 0;

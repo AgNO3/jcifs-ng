@@ -49,7 +49,7 @@ import jcifs.smb.SmbAuthException;
  * server or domain controller depending on how the
  * <tt>jcifs.smb.client.domain</tt> or <tt>jcifs.http.domainController</tt>
  * properties are be specified. <b>With later containers the
- * <tt>NtlmHttpFilter</tt> should be used/b>. For custom NTLM HTTP Authentication schemes the <tt>NtlmSsp</tt> may be
+ * <tt>NtlmHttpFilter</tt> should be used</b>. For custom NTLM HTTP Authentication schemes the <tt>NtlmSsp</tt> may be
  * used.
  * <p>
  * Read <a href="../../../ntlmhttpauth.html">jCIFS NTLM HTTP Authentication and the Network Explorer Servlet</a> related

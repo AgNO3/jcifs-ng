@@ -1,3 +1,19 @@
+/*
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package jcifs.smb;
 
 
@@ -13,9 +29,8 @@ import jcifs.util.Hexdump;
 
 
 /**
- * To filter 0 len updates and for debugging
+ * 
  */
-
 public class SigningDigest {
 
     private static final Logger log = Logger.getLogger(SigningDigest.class);
@@ -27,12 +42,15 @@ public class SigningDigest {
     private int signSequence;
 
 
+    /**
+     * 
+     * @param macSigningKey
+     * @param bypass
+     */
     public SigningDigest ( byte[] macSigningKey, boolean bypass ) {
         this.digest = Crypto.getMD5();
         this.macSigningKey = macSigningKey;
         this.bypass = bypass;
-        this.updates = 0;
-        this.signSequence = 0;
 
         if ( log.isTraceEnabled() ) {
             log.trace("macSigningKey:");
@@ -50,8 +68,6 @@ public class SigningDigest {
      * 
      * @param macSigningKey
      *            The MAC key used to sign or verify SMB.
-     * @throws SmbException
-     *             When failed to instance MessageDigest with "MD5" algorithm.
      */
     public SigningDigest ( byte[] macSigningKey ) {
         this.digest = Crypto.getMD5();
@@ -59,6 +75,25 @@ public class SigningDigest {
     }
 
 
+    /**
+     * Construct a digest with a non-zero starting sequence number
+     * 
+     * @param macSigningKey
+     * @param initialSequence
+     */
+    public SigningDigest ( byte[] macSigningKey, int initialSequence ) {
+        this.digest = Crypto.getMD5();
+        this.macSigningKey = macSigningKey;
+        this.signSequence = initialSequence;
+    }
+
+
+    /**
+     * 
+     * @param transport
+     * @param auth
+     * @throws SmbException
+     */
     public SigningDigest ( SmbTransport transport, NtlmPasswordAuthentication auth ) throws SmbException {
         this.digest = Crypto.getMD5();
         try {
@@ -93,6 +128,13 @@ public class SigningDigest {
     }
 
 
+    /**
+     * Update digest with data
+     * 
+     * @param input
+     * @param offset
+     * @param len
+     */
     public void update ( byte[] input, int offset, int len ) {
         if ( log.isTraceEnabled() ) {
             log.trace("update: " + this.updates + " " + offset + ":" + len);
@@ -106,6 +148,9 @@ public class SigningDigest {
     }
 
 
+    /**
+     * @return calculated digest
+     */
     public byte[] digest () {
         byte[] b;
 
@@ -135,6 +180,9 @@ public class SigningDigest {
      *            The length of the SMB data starting at offset.
      */
     void sign ( byte[] data, int offset, int length, ServerMessageBlock request, ServerMessageBlock response ) {
+        if ( log.isTraceEnabled() ) {
+            log.trace("Signing with seq " + this.signSequence);
+        }
         request.signSeq = this.signSequence;
         if ( response != null ) {
             response.signSeq = this.signSequence + 1;
@@ -222,7 +270,7 @@ public class SigningDigest {
             SMBUtil.writeInt4(0xFFFFFFFF, dst, dstIndex);
             return;
         }
-    
+
         if ( cfg.getLocalTimezone().inDaylightTime(new Date()) ) {
             // in DST
             if ( cfg.getLocalTimezone().inDaylightTime(new Date(t)) ) {

@@ -26,6 +26,7 @@ import jcifs.smb.ACE;
 import jcifs.smb.SecurityDescriptor;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcShareGetInfo extends srvsvc.ShareGetInfo {
 
     public MsrpcShareGetInfo ( String server, String sharename ) {

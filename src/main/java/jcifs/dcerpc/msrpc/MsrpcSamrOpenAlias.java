@@ -19,6 +19,7 @@
 package jcifs.dcerpc.msrpc;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcSamrOpenAlias extends samr.SamrOpenAlias {
 
     public MsrpcSamrOpenAlias ( SamrDomainHandle handle, int access, int rid, SamrAliasHandle aliasHandle ) {

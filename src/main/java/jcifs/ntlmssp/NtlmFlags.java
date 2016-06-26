@@ -64,6 +64,9 @@ public interface NtlmFlags {
      */
     public static final int NTLMSSP_NEGOTIATE_LM_KEY = 0x00000080;
 
+    /**
+     * ??? According to spec this is a reserved bit and must be set to zero
+     */
     public static final int NTLMSSP_NEGOTIATE_NETWARE = 0x00000100;
 
     /**
@@ -126,10 +129,21 @@ public interface NtlmFlags {
      */
     public static final int NTLMSSP_NEGOTIATE_NTLM2 = 0x00080000;
 
+    /**
+     * ?? According to spec this is a reserved bit and must be set to zero
+     */
     public static final int NTLMSSP_REQUEST_INIT_RESPONSE = 0x00100000;
 
+    /**
+     * ?? According to spec this is NTLMSSP_NEGOTIATE_IDENTIFY
+     * 
+     * If set, requests an identify level token
+     */
     public static final int NTLMSSP_REQUEST_ACCEPT_RESPONSE = 0x00200000;
 
+    /**
+     * Requests the usage of the LMOWF
+     */
     public static final int NTLMSSP_REQUEST_NON_NT_SESSION_KEY = 0x00400000;
 
     /**
@@ -144,6 +158,9 @@ public interface NtlmFlags {
      */
     public static final int NTLMSSP_NEGOTIATE_128 = 0x20000000;
 
+    /**
+     * Request explicit key exchange
+     */
     public static final int NTLMSSP_NEGOTIATE_KEY_EXCH = 0x40000000;
 
     /**

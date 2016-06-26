@@ -19,6 +19,7 @@
 package jcifs.dcerpc.msrpc;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcEnumerateAliasesInDomain extends samr.SamrEnumerateAliasesInDomain {
 
     public MsrpcEnumerateAliasesInDomain ( SamrDomainHandle domainHandle, int acct_flags, samr.SamrSamArray sam ) {

@@ -185,6 +185,9 @@ public class UniAddress {
      *
      * @param hostname
      *            NetBIOS or DNS hostname to resolve
+     * @param tc
+     *            context to use
+     * @return the found address
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
@@ -232,6 +235,13 @@ public class UniAddress {
      * Lookup <tt>hostname</tt> and return it's <tt>UniAddress</tt>. If the
      * <tt>possibleNTDomainOrWorkgroup</tt> parameter is <tt>true</tt> an
      * addtional name query will be performed to locate a master browser.
+     * 
+     * @param hostname
+     * @param possibleNTDomainOrWorkgroup
+     * @param tc
+     * 
+     * @return the first resolved address
+     * @throws UnknownHostException
      */
 
     public static UniAddress getByName ( String hostname, boolean possibleNTDomainOrWorkgroup, CIFSContext tc ) throws UnknownHostException {
@@ -240,6 +250,15 @@ public class UniAddress {
     }
 
 
+    /**
+     * Lookup addresses for the given <tt>hostname</tt>.
+     * 
+     * @param hostname
+     * @param possibleNTDomainOrWorkgroup
+     * @param tc
+     * @return found addresses
+     * @throws UnknownHostException
+     */
     public static UniAddress[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup, CIFSContext tc ) throws UnknownHostException {
         Object addr;
         if ( hostname == null || hostname.length() == 0 ) {
@@ -350,8 +369,10 @@ public class UniAddress {
     /**
      * Create a <tt>UniAddress</tt> by wrapping an <tt>InetAddress</tt> or
      * <tt>NbtAddress</tt>.
+     * 
+     * @param addr
+     *            wrapped address
      */
-
     public UniAddress ( Object addr ) {
         if ( addr == null ) {
             throw new IllegalArgumentException();
@@ -378,18 +399,14 @@ public class UniAddress {
     public boolean equals ( Object obj ) {
         return obj instanceof UniAddress && this.addr.equals( ( (UniAddress) obj ).addr);
     }
-    /*
-     * public boolean equals( Object obj ) {
-     * return obj instanceof UniAddress && addr.hashCode() == obj.hashCode();
-     * }
-     */
 
 
     /**
      * Guess first called name to try for session establishment. This
      * method is used exclusively by the <tt>jcifs.smb</tt> package.
+     * 
+     * @return the guessed name
      */
-
     public String firstCalledName () {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).firstCalledName();
@@ -419,8 +436,12 @@ public class UniAddress {
     /**
      * Guess next called name to try for session establishment. This
      * method is used exclusively by the <tt>jcifs.smb</tt> package.
+     * 
+     * @param tc
+     *            context to use
+     * 
+     * @return guessed alternate name
      */
-
     public String nextCalledName ( CIFSContext tc ) {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).nextCalledName(tc);
@@ -435,8 +456,9 @@ public class UniAddress {
 
     /**
      * Return the underlying <tt>NbtAddress</tt> or <tt>InetAddress</tt>.
+     * 
+     * @return wrapped address
      */
-
     public Object getAddress () {
         return this.addr;
     }
@@ -444,8 +466,9 @@ public class UniAddress {
 
     /**
      * Return the hostname of this address such as "MYCOMPUTER".
+     * 
+     * @return the hostname associated with the address
      */
-
     public String getHostName () {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).getHostName();
@@ -456,8 +479,9 @@ public class UniAddress {
 
     /**
      * Return the IP address as text such as "192.168.1.15".
+     * 
+     * @return the ip address
      */
-
     public String getHostAddress () {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).getHostAddress();

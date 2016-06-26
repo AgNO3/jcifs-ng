@@ -2,11 +2,37 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<name>JCIFS NG</name>
+	<name>jCIFS NG</name>
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
 	<version>2.0.0-SNAPSHOT</version>
+
+	<description>A pure-java CIFS/SMB client library</description>
+	<url>https://github.com/AgNO3/jcifs-ng/</url>
+
+
+	<licenses>
+		<license>
+			<name>LGPL</name>
+			<url>http://www.opensource.org/licenses/mit-license.php</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Moritz Bechler</name>
+			<email>bechler@agno3.eu</email>
+			<organization>AgNO3 GmbH &amp; Co. KG</organization>
+			<organizationUrl>https://github.com/AgNO3/</organizationUrl>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>scm:git:git@github.com:AgNO3/jcifs-ng.git</connection>
+		<developerConnection>scm:git:git@github.com:AgNO3/jcifs-ng.git</developerConnection>
+		<url>git@github.com:AgNO3/jcifs-ng.git</url>
+	</scm>
 
 
 	<properties>
@@ -93,6 +119,37 @@
 			</plugin>
 
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<show>public</show>
+					<excludePackageNames>jcifs.dcerpc.*:</excludePackageNames>
+					<additionalparam>-Xdoclint:-missing</additionalparam>
+				</configuration>
+			</plugin>
+
+			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>clirr-maven-plugin</artifactId>
 				<executions>
@@ -114,6 +171,51 @@
 				</configuration>
 			</plugin>
 
+			<plugin>
+				<groupId>org.apache.rat</groupId>
+				<artifactId>apache-rat-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<addDefaultLicenseMatchers>true</addDefaultLicenseMatchers>
+					<excludes>
+						<exclude>pom.xml</exclude>
+						<exclude>README.md</exclude>
+						<exclude>build.properties</exclude>
+						<exclude>src/test/resources/**</exclude>
+						<exclude>**/*.idl</exclude>
+						<exclude>**/*.css</exclude>
+						<exclude>src/main/java/jcifs/dcerpc/msrpc/netdfs.java</exclude>
+						<exclude>src/main/java/jcifs/dcerpc/msrpc/srvsvc.java</exclude>
+						<exclude>src/main/java/jcifs/dcerpc/msrpc/samr.java</exclude>
+						<exclude>src/main/java/jcifs/dcerpc/msrpc/lsarpc.java</exclude>
+						<exclude>src/main/java/jcifs/dcerpc/rpc.java</exclude>
+					</excludes>
+					<licenses>
+						<license
+							implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+							<licenseFamilyCategory>LGPL</licenseFamilyCategory>
+							<licenseFamilyName>GNU Lesser General Public License</licenseFamilyName>
+							<notes></notes>
+							<patterns>
+								<pattern>This library is free software; you can redistribute it</pattern>
+							</patterns>
+						</license>
+					</licenses>
+					<licenseFamilies>
+						<licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+							<familyName>GNU Lesser General Public License</familyName>
+						</licenseFamily>
+					</licenseFamilies>
+				</configuration>
+			</plugin>
+
 		</plugins>
 		<pluginManagement>
 			<plugins>
@@ -126,6 +228,11 @@
 					<groupId>org.codehaus.mojo</groupId>
 					<artifactId>clirr-maven-plugin</artifactId>
 					<version>2.7</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.rat</groupId>
+					<artifactId>apache-rat-plugin</artifactId>
+					<version>0.12</version>
 				</plugin>
 			</plugins>
 		</pluginManagement>

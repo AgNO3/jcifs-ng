@@ -58,7 +58,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean useUnicode = true;
     protected boolean forceUnicode = false;
     protected boolean signingPreferred = false;
-    protected boolean signingEnforced;
+    protected boolean signingEnforced = false;
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
     protected boolean useNTSmbs = true;
@@ -72,6 +72,7 @@ public class BaseConfiguration implements Configuration {
     protected int smbResponseTimeout = SmbConstants.DEFAULT_RESPONSE_TIMEOUT;
     protected int smbSocketTimeout = SmbConstants.DEFAULT_SO_TIMEOUT;
     protected int smbConnectionTimeout = SmbConstants.DEFAULT_CONN_TIMEOUT;
+    protected int smbSessionTimeout = SmbConstants.DEFAULT_SO_TIMEOUT;
     protected InetAddress smbLocalAddress;
     protected int smbLocalPort = 0;
     protected int maxMpxCount = SmbConstants.DEFAULT_MAX_MPX_COUNT;
@@ -89,7 +90,6 @@ public class BaseConfiguration implements Configuration {
     protected String defaultUserName;
     protected String defaultPassword;
     protected String netbiosHostname;
-    protected int netbiosLookupResponseLimit = 3;
     protected int netbiosCachePolicy = 60 * 60 * 10;
     protected int netbiosSocketTimeout = 5000;
     protected int netbiosSendBufferSize = 576;
@@ -124,6 +124,11 @@ public class BaseConfiguration implements Configuration {
     }
 
 
+    /**
+     * 
+     * @param initDefaults
+     *            whether to initialize defaults based on other settings
+     */
     public BaseConfiguration ( boolean initDefaults ) {
         if ( initDefaults ) {
             this.initDefaults();
@@ -162,12 +167,6 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
-    public boolean isTcpNoDelay () {
-        return this.smbTcpNoDelay;
-    }
-
-
-    @Override
     public int getResponseTimeout () {
         return this.smbResponseTimeout;
     }
@@ -176,6 +175,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getSoTimeout () {
         return this.smbSocketTimeout;
+    }
+
+
+    @Override
+    public int getSessionTimeout () {
+        return this.smbSessionTimeout;
     }
 
 
@@ -191,11 +196,6 @@ public class BaseConfiguration implements Configuration {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#getNotifyBufferSize()
-     */
     @Override
     public int getNotifyBufferSize () {
         return this.smbNotifyBufferSize;
@@ -323,18 +323,6 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
-    public int getNetbiosCacheTimeout () {
-        return this.netbiosCachePolicy;
-    }
-
-
-    @Override
-    public int getNetbiosLookupRespLimit () {
-        return this.netbiosLookupResponseLimit;
-    }
-
-
-    @Override
     public int getNetbiosLocalPort () {
         return this.netbiosLocalPort;
     }
@@ -425,7 +413,7 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
-    public boolean isSigningPreferred () {
+    public boolean isSigningEnabled () {
         return this.signingPreferred;
     }
 
@@ -466,7 +454,7 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
-    public long getAttributeExpirationPeriod () {
+    public long getAttributeCacheTimeout () {
         return this.smbAttributeExpiration;
     }
 
@@ -596,13 +584,14 @@ public class BaseConfiguration implements Configuration {
             this.flags2 = SmbConstants.FLAGS2_LONG_FILENAMES | SmbConstants.FLAGS2_EXTENDED_ATTRIBUTES
                     | ( this.useExtendedSecurity ? SmbConstants.FLAGS2_EXTENDED_SECURITY_NEGOTIATION : 0 )
                     | ( this.signingPreferred ? SmbConstants.FLAGS2_SECURITY_SIGNATURES : 0 )
-                    | ( this.useNtStatus ? SmbConstants.FLAGS2_STATUS32 : 0 ) | ( this.useUnicode ? SmbConstants.FLAGS2_UNICODE : 0 );
+                    | ( this.useNtStatus ? SmbConstants.FLAGS2_STATUS32 : 0 )
+                    | ( this.useUnicode || this.forceUnicode ? SmbConstants.FLAGS2_UNICODE : 0 );
         }
 
         if ( this.capabilities == 0 ) {
             this.capabilities = ( this.useNTSmbs ? SmbConstants.CAP_NT_SMBS : 0 ) | ( this.useNtStatus ? SmbConstants.CAP_STATUS32 : 0 )
                     | ( this.useExtendedSecurity ? SmbConstants.CAP_EXTENDED_SECURITY : 0 ) | SmbConstants.CAP_LARGE_READX
-                    | SmbConstants.CAP_LARGE_WRITEX;
+                    | SmbConstants.CAP_LARGE_WRITEX | ( this.useUnicode ? SmbConstants.CAP_UNICODE : 0 );
         }
 
         if ( this.broadcastAddress == null ) {

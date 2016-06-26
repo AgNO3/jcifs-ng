@@ -22,6 +22,7 @@ package jcifs.netbios;
 import jcifs.CIFSException;
 
 
+@SuppressWarnings ( "javadoc" )
 public class NbtException extends CIFSException {
 
     /**

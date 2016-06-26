@@ -37,15 +37,19 @@ import org.apache.log4j.Logger;
 import jcifs.CIFSContext;
 import jcifs.ResolverType;
 import jcifs.RuntimeCIFSException;
+import jcifs.SmbConstants;
 import jcifs.netbios.NbtAddress.CacheEntry;
 import jcifs.util.Hexdump;
 
 
+/**
+ * 
+ * @author mbechler
+ *
+ */
 public class NameServiceClient implements Runnable {
 
     private static final int NAME_SERVICE_UDP_PORT = 137;
-
-    private static final int FOREVER = -1;
 
     static final byte[] UNKNOWN_MAC_ADDRESS = new byte[] {
         (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
@@ -76,6 +80,10 @@ public class NameServiceClient implements Runnable {
     private NbtAddress unknownAddress;
 
 
+    /**
+     * 
+     * @param tc
+     */
     public NameServiceClient ( CIFSContext tc ) {
         this(tc.getConfig().getNetbiosLocalPort(), tc.getConfig().getNetbiosLocalAddress(), tc);
     }
@@ -103,7 +111,7 @@ public class NameServiceClient implements Runnable {
     private void initCache ( CIFSContext tc ) {
         this.unknownName = new Name(tc.getConfig(), "0.0.0.0", 0x00, null);
         this.unknownAddress = new NbtAddress(this.unknownName, 0, false, NbtAddress.B_NODE);
-        this.addressCache.put(this.unknownName, new CacheEntry(this.unknownName, this.unknownAddress, FOREVER));
+        this.addressCache.put(this.unknownName, new CacheEntry(this.unknownName, this.unknownAddress, SmbConstants.FOREVER));
 
         /*
          * Determine the InetAddress of the local interface
@@ -159,7 +167,7 @@ public class NameServiceClient implements Runnable {
             true,
             false,
             UNKNOWN_MAC_ADDRESS);
-        cacheAddress(localName, this.localhostAddress, FOREVER);
+        cacheAddress(localName, this.localhostAddress, SmbConstants.FOREVER);
     }
 
 
@@ -239,7 +247,7 @@ public class NameServiceClient implements Runnable {
             return;
         }
         long expiration = -1;
-        if ( this.transportContext.getConfig().getNetbiosCachePolicy() != FOREVER ) {
+        if ( this.transportContext.getConfig().getNetbiosCachePolicy() != SmbConstants.FOREVER ) {
             expiration = System.currentTimeMillis() + this.transportContext.getConfig().getNetbiosCachePolicy() * 1000;
         }
         cacheAddress(hostName, addr, expiration);
@@ -269,7 +277,7 @@ public class NameServiceClient implements Runnable {
             return;
         }
         long expiration = -1;
-        if ( this.transportContext.getConfig().getNetbiosCachePolicy() != FOREVER ) {
+        if ( this.transportContext.getConfig().getNetbiosCachePolicy() != SmbConstants.FOREVER ) {
             expiration = System.currentTimeMillis() + this.transportContext.getConfig().getNetbiosCachePolicy() * 1000;
         }
         synchronized ( this.addressCache ) {
@@ -646,7 +654,7 @@ public class NameServiceClient implements Runnable {
 
 
     /**
-     * @return
+     * @return local host address
      */
     public NbtAddress getLocalHost () {
         return this.localhostAddress;
@@ -654,15 +662,18 @@ public class NameServiceClient implements Runnable {
 
 
     /**
-     * @return
+     * @return the
      */
     public Name getLocalName () {
-        return this.localhostAddress.hostName;
+        if ( this.localhostAddress != null ) {
+            return this.localhostAddress.hostName;
+        }
+        return null;
     }
 
 
     /**
-     * @return
+     * @return lmhosts file used
      */
     public Lmhosts getLmhosts () {
         return this.lmhosts;
@@ -670,7 +681,7 @@ public class NameServiceClient implements Runnable {
 
 
     /**
-     * @return
+     * @return the numknown name
      */
     public Name getUnknownName () {
         return this.unknownName;

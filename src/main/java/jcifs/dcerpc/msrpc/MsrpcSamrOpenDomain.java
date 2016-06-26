@@ -22,6 +22,7 @@ package jcifs.dcerpc.msrpc;
 import jcifs.dcerpc.rpc;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcSamrOpenDomain extends samr.SamrOpenDomain {
 
     public MsrpcSamrOpenDomain ( SamrPolicyHandle handle, int access, rpc.sid_t sid, SamrDomainHandle domainHandle ) {

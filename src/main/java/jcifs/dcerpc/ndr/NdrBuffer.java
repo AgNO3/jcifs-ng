@@ -27,6 +27,7 @@ import jcifs.util.Encdec;
 import jcifs.util.Strings;
 
 
+@SuppressWarnings ( "javadoc" )
 public class NdrBuffer {
 
     private int referent;

@@ -80,6 +80,13 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
     private CIFSContext transportContext;
 
 
+    /**
+     * 
+     * @param connection
+     *            connection to wrap
+     * @param tc
+     *            context to use
+     */
     public NtlmHttpURLConnection ( HttpURLConnection connection, CIFSContext tc ) {
         super(connection.getURL());
         this.connection = connection;

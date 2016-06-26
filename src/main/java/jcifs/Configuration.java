@@ -30,273 +30,366 @@ import java.util.TimeZone;
  */
 public interface Configuration {
 
+    /**
+     * 
+     * @return random source to use
+     */
     SecureRandom getRandom ();
 
 
+    /**
+     * 
+     * @return title to live, in seconds, for DFS cache entries
+     */
     long getDfsTtl ();
 
 
+    /**
+     * 
+     * @return whether a authentication failure during DFS resolving will throw an exception
+     */
     boolean isDfsStrictView ();
 
 
+    /**
+     * 
+     * @return whether DFS lookup is disabled
+     */
     boolean isDfsDisabled ();
 
 
-    boolean isForceUnicode ();
-
-
+    /**
+     * 
+     * @return whether to announce support for unicode
+     */
     boolean isUseUnicode ();
 
 
+    /**
+     * 
+     * @return whether to use unicode, even if the server does not announce it
+     */
+    boolean isForceUnicode ();
+
+
+    /**
+     * 
+     * @return whether to use SMB1 AndX command batching
+     */
     boolean isUseBatching ();
 
 
+    /**
+     * 
+     * @return OS string to report
+     */
     String getNativeOs ();
 
 
+    /**
+     * 
+     * @return Lanman string to report
+     */
     String getNativeLanman ();
 
 
+    /**
+     * 
+     * @return recieve buffer size, in bytes
+     */
     int getRecieveBufferSize ();
 
 
+    /**
+     * 
+     * @return send buffer size, in bytes
+     */
     int getSendBufferSize ();
 
 
+    /**
+     * 
+     * @return socket timeout, in milliseconds
+     */
     int getSoTimeout ();
 
 
-    int getResponseTimeout ();
-
-
-    boolean isTcpNoDelay ();
-
-
+    /**
+     * 
+     * @return timeout for establishing a socket connection, in milliseconds
+     */
     int getConnTimeout ();
 
 
+    /**
+     * @return timeout for SMB sessions, in milliseconds
+     */
+    int getSessionTimeout ();
+
+
+    /**
+     * 
+     * @return timeout for SMB responses, in milliseconds
+     */
+    int getResponseTimeout ();
+
+
+    /**
+     * 
+     * @return local port to use for outgoing connections
+     */
     int getLocalPort ();
 
 
+    /**
+     * 
+     * @return local address to use for outgoing connections
+     */
     InetAddress getLocalAddr ();
 
 
+    /**
+     * 
+     * @return local NETBIOS/short name to announce
+     */
     String getNetbiosHostname ();
 
 
     /**
-     * @return
+     * @return share to connect to during authentication, if unset connect to IPC$
      */
     String getLogonShare ();
 
 
     /**
-     * @return
-     */
-    int getNetbiosCacheTimeout ();
-
-
-    /**
-     * @return
-     */
-    int getNetbiosLookupRespLimit ();
-
-
-    /**
-     * @return
+     * @return default credentials, domain name
      */
     String getDefaultDomain ();
 
 
     /**
-     * @return
+     * @return default credentials, user name
      */
     String getDefaultUsername ();
 
 
     /**
-     * @return
+     * @return default credentials, password
      */
     String getDefaultPassword ();
 
 
     /**
-     * @return
-     */
-    boolean isDisablePlainTextPasswords ();
-
-
-    /**
-     * @return
+     * Lanman compatibility level
+     * 
+     * {@href https://technet.microsoft.com/en-us/library/cc960646.aspx}
+     * 
+     * <table summary="values">
+     * <tr>
+     * <td>0 or 1</td>
+     * <td>LM and NTLM</td>
+     * </tr>
+     * <tr>
+     * <td>2</td>
+     * <td>NTLM only</td>
+     * </tr>
+     * <tr>
+     * <td>3-5</td>
+     * <td>NTLMv2 only</td>
+     * </table>
+     * 
+     * @return lanman compatibility level, defaults to 3
      */
     int getLanManCompatibility ();
 
 
     /**
-     * @return
+     * @return whether the usage of plaintext passwords is prohibited, defaults to false
+     */
+    boolean isDisablePlainTextPasswords ();
+
+
+    /**
+     * @return order and selection of resolver modules, see {@link ResolverType}
      */
     List<ResolverType> getResolveOrder ();
 
 
     /**
-     * @return
+     * @return broadcast address to use
      */
     InetAddress getBroadcastAddress ();
 
 
     /**
-     * @return
+     * @return WINS server to use
      */
     InetAddress[] getWinsServers ();
 
 
     /**
-     * @return
+     * @return local bind port for nebios connections
      */
     int getNetbiosLocalPort ();
 
 
     /**
-     * @return
+     * @return local bind address for netbios connections
      */
     InetAddress getNetbiosLocalAddress ();
 
 
     /**
-     * @return
+     * @return socket timeout for netbios connections
      */
     int getNetbiosSoTimeout ();
 
 
     /**
-     * @return
+     * @return virtual circuit number to use
      */
     int getVcNumber ();
 
 
     /**
-     * @return
+     * @return custom capabilities
      */
     int getCapabilities ();
 
 
     /**
-     * @return
+     * @return custom flags2
      */
     int getFlags2 ();
 
 
     /**
-     * @return
+     * @return maximum number of sessions on a single connection
      */
     int getSessionLimit ();
 
 
     /**
-     * @return
+     * @return OEM encoding to use
      */
     String getOemEncoding ();
 
 
     /**
-     * @return
+     * @return local timezone
      */
     TimeZone getLocalTimezone ();
 
 
     /**
-     * @return
+     * @return Process id to send, randomized if unset
      */
     int getPid ();
 
 
     /**
-     * @return
+     * @return maximum count of concurrent commands to announce
      */
     int getMaxMpxCount ();
 
 
     /**
-     * @return
+     * @return whether to enable SMB signing, if available
      */
-    boolean isSigningPreferred ();
+    boolean isSigningEnabled ();
 
 
     /**
-     * @return
+     * @return whether to enforce SMB signing
      */
     boolean isSigningEnforced ();
 
 
     /**
-     * @return
+     * @return lmhosts file to use
      */
     String getLmHostsFileName ();
 
 
     /**
-     * @return
+     * @return default netbios scope to set in requests
      */
     String getNetbiosScope ();
 
 
+    /**
+     * 
+     * @return netbios send buffer size
+     */
     int getNetbiosSndBufSize ();
 
 
-    int getNetbiosRetryTimeout ();
-
-
-    int getNetbiosRetryCount ();
-
-
+    /**
+     * 
+     * @return netbios recieve buffer size
+     */
     int getNetbiosRcvBufSize ();
 
 
     /**
-     * @return
+     * 
+     * @return timeout of retry requests, in milliseconds
+     */
+    int getNetbiosRetryTimeout ();
+
+
+    /**
+     * 
+     * @return maximum number of retries for netbios requests
+     */
+    int getNetbiosRetryCount ();
+
+
+    /**
+     * @return netbios cache timeout, in seconds, 0 - disable caching, -1 - cache forever
      */
     int getNetbiosCachePolicy ();
 
 
     /**
-     * @return
+     * @return maximum data size for SMB transactions
      */
     int getTransactionBufferSize ();
 
 
     /**
-     * @return
+     * @return number of buffers to keep in cache
      */
     int getBufferCacheSize ();
 
 
     /**
-     * @return
+     * @return maxmimum number of elements to request in a list request
      */
     int getListCount ();
 
 
     /**
-     * @return
+     * @return maximum data size for list requests
      */
     int getListSize ();
 
 
     /**
-     * @return
+     * @return timeout of file attribute cache
      */
-    long getAttributeExpirationPeriod ();
+    long getAttributeCacheTimeout ();
 
 
     /**
-     * @return
+     * @return whether to ignore exceptions
      */
     boolean isIgnoreCopyToException ();
 
 
     /**
-     * @param string
-     * @return
+     * @param cmd
+     * @return the batch limit for the given command
      */
     int getBatchLimit ( String cmd );
 

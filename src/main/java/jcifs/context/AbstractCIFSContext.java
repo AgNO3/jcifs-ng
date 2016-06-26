@@ -55,9 +55,10 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.CIFSContext#withAnonymousCredentials(boolean)
+     * @see jcifs.CIFSContext#withAnonymousCredentials()
      */
     @Override
     public CIFSContext withAnonymousCredentials () {

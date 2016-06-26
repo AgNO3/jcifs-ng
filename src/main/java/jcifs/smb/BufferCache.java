@@ -22,18 +22,29 @@ package jcifs.smb;
 import jcifs.Configuration;
 
 
+/**
+ * Cache for reusable byte buffers
+ * 
+ * @author mbechler
+ *
+ */
 public class BufferCache {
 
     private final Object[] cache;
     private int freeBuffers = 0;
 
 
+    /**
+     * 
+     * @param cfg
+     */
     public BufferCache ( Configuration cfg ) {
         this(cfg.getBufferCacheSize());
     }
 
 
     /**
+     * @param maxBuffers
      * 
      */
     public BufferCache ( int maxBuffers ) {
@@ -41,6 +52,10 @@ public class BufferCache {
     }
 
 
+    /**
+     * 
+     * @return a buffer from the cache, or a new one
+     */
     public byte[] getBuffer () {
         synchronized ( this.cache ) {
             byte[] buf;
@@ -68,6 +83,11 @@ public class BufferCache {
     }
 
 
+    /**
+     * Return a buffer to the cache
+     * 
+     * @param buf
+     */
     public void releaseBuffer ( byte[] buf ) {
         synchronized ( this.cache ) {
             if ( this.freeBuffers < this.cache.length ) {

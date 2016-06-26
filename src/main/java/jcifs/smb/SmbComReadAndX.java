@@ -30,8 +30,8 @@ class SmbComReadAndX extends AndXServerMessageBlock {
     int maxCount, minCount, remaining;
 
 
-    SmbComReadAndX () {
-        super(null);
+    SmbComReadAndX ( Configuration config ) {
+        super(config);
         this.command = SMB_COM_READ_ANDX;
         this.openTimeout = 0xFFFFFFFF;
     }

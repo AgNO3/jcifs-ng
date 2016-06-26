@@ -25,12 +25,26 @@ import jcifs.util.Hexdump;
 import jcifs.util.Strings;
 
 
+/**
+ * 
+ * 
+ */
 public class Name {
 
     private static final int TYPE_OFFSET = 31;
     private static final int SCOPE_OFFSET = 33;
 
-    public String name, scope;
+    /**
+     * Name
+     */
+    public String name;
+    /**
+     * Scope id
+     */
+    public String scope;
+    /**
+     * Type
+     */
     public int hexCode;
     int srcHashCode; /*
                       * srcHashCode must be set by name resolution
@@ -44,6 +58,13 @@ public class Name {
     }
 
 
+    /**
+     * 
+     * @param cfg
+     * @param name
+     * @param hexCode
+     * @param scope
+     */
     public Name ( Configuration cfg, String name, int hexCode, String scope ) {
         this.config = cfg;
         if ( name.length() > 15 ) {
@@ -56,6 +77,10 @@ public class Name {
     }
 
 
+    /**
+     * 
+     * @return whether this is the unknown address
+     */
     public boolean isUnknown () {
         return "0.0.0.0".equals(this.name) && this.hexCode == 0 && this.scope == null;
     }

@@ -18,7 +18,7 @@
 package jcifs;
 
 
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import jcifs.smb.SID;
@@ -37,6 +37,8 @@ public interface SidResolver {
      * to resolve SIDs using a cache and cache the results of any SIDs that
      * required resolving with the authority. SID cache entries are currently not
      * expired because under normal circumstances SID information never changes.
+     * 
+     * @param tc
      *
      * @param authorityServerName
      *            The hostname of the server that should be queried. For maximum efficiency this should be the hostname
@@ -50,11 +52,22 @@ public interface SidResolver {
      *            The SIDs that should be resolved. After this function is called, the names associated with the SIDs
      *            may be queried with the <tt>toDisplayString</tt>, <tt>getDomainName</tt>, and <tt>getAccountName</tt>
      *            methods.
+     * @throws CIFSException
      */
     void resolveSids ( CIFSContext tc, String authorityServerName, SID[] sids ) throws CIFSException;
 
 
-    void resolveSids ( CIFSContext tc, String server, SID[] sids, int off, int len ) throws CIFSException;
+    /**
+     * Resolve part of an array of SIDs using a cache and at most one MSRPC request.
+     *
+     * @param tc
+     * @param authorityServerName
+     * @param sids
+     * @param off
+     * @param len
+     * @throws CIFSException
+     */
+    void resolveSids ( CIFSContext tc, String authorityServerName, SID[] sids, int off, int len ) throws CIFSException;
 
 
     /**
@@ -63,8 +76,8 @@ public interface SidResolver {
      * @param domsid
      * @param rid
      * @param flags
-     * @return
-     * @throws IOException
+     * @return the SIDs of the group members
+     * @throws CIFSException
      */
     SID[] getGroupMemberSids ( CIFSContext tc, String authorityServerName, SID domsid, int rid, int flags ) throws CIFSException;
 
@@ -72,7 +85,8 @@ public interface SidResolver {
     /**
      * @param authorityServerName
      * @param tc
-     * @return
+     * @return the server's SID
+     * @throws CIFSException
      */
     SID getServerSid ( CIFSContext tc, String authorityServerName ) throws CIFSException;
 
@@ -101,7 +115,9 @@ public interface SidResolver {
      *            name associated with SIDs will be required, the SID_FLAG_RESOLVE_SIDS
      *            flag should be used which causes all group member SIDs to be resolved
      *            together in a single more efficient operation.
+     * @return a map of group SID to member SIDs
+     * @throws CIFSException
      */
-    Map<SID, ArrayList<SID>> getLocalGroupsMap ( CIFSContext tc, String authorityServerName, int flags ) throws CIFSException;
+    Map<SID, List<SID>> getLocalGroupsMap ( CIFSContext tc, String authorityServerName, int flags ) throws CIFSException;
 
 }

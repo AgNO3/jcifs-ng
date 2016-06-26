@@ -22,48 +22,82 @@ package jcifs.smb;
 import java.io.IOException;
 
 
+/**
+ * 
+ * 
+ *
+ */
 public class SecurityDescriptor {
 
+    /**
+     * Descriptor type
+     */
     public int type;
+
+    /**
+     * ACEs
+     */
     public ACE[] aces;
+    SID owner_user, owner_group;
 
 
+    /**
+     * 
+     */
     public SecurityDescriptor () {}
 
 
+    /**
+     * @param buffer
+     * @param bufferIndex
+     * @param len
+     * @throws IOException
+     */
     public SecurityDescriptor ( byte[] buffer, int bufferIndex, int len ) throws IOException {
         this.decode(buffer, bufferIndex, len);
     }
 
 
-    public int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
+    protected int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
         int start = bufferIndex;
 
         bufferIndex++; // revision
         bufferIndex++;
         this.type = SMBUtil.readInt2(buffer, bufferIndex);
         bufferIndex += 2;
-        SMBUtil.readInt4(buffer, bufferIndex); // offset to owner sid
+        int ownerUOffset = SMBUtil.readInt4(buffer, bufferIndex); // offset to owner sid
         bufferIndex += 4;
-        SMBUtil.readInt4(buffer, bufferIndex); // offset to group sid
+        int ownerGOffset = SMBUtil.readInt4(buffer, bufferIndex); // offset to group sid
         bufferIndex += 4;
         SMBUtil.readInt4(buffer, bufferIndex); // offset to sacl
         bufferIndex += 4;
         int daclOffset = SMBUtil.readInt4(buffer, bufferIndex);
 
+        if ( ownerUOffset > 0 ) {
+            bufferIndex = start + ownerUOffset;
+            this.owner_user = new SID(buffer, bufferIndex);
+            bufferIndex += 8 + 4 * this.owner_user.sub_authority_count;
+        }
+
+        if ( ownerGOffset > 0 ) {
+            bufferIndex = start + ownerGOffset;
+            this.owner_group = new SID(buffer, bufferIndex);
+            bufferIndex += 8 + 4 * this.owner_group.sub_authority_count;
+        }
+
         bufferIndex = start + daclOffset;
 
-        bufferIndex++; // revision
-        bufferIndex++;
-        SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-        int numAces = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
+        if ( daclOffset > 0 ) {
+            bufferIndex++; // revision
+            bufferIndex++;
+            SMBUtil.readInt2(buffer, bufferIndex);
+            bufferIndex += 2;
+            int numAces = SMBUtil.readInt4(buffer, bufferIndex);
+            bufferIndex += 4;
 
-        if ( numAces > 4096 )
-            throw new IOException("Invalid SecurityDescriptor");
+            if ( numAces > 4096 )
+                throw new IOException("Invalid SecurityDescriptor");
 
-        if ( daclOffset != 0 ) {
             this.aces = new ACE[numAces];
             for ( int i = 0; i < numAces; i++ ) {
                 this.aces[ i ] = new ACE();

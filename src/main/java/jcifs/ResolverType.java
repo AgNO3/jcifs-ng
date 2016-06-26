@@ -18,9 +18,15 @@
 package jcifs;
 
 
+/**
+ * Enumeration of usable resolver types
+ * 
+ * @author mbechler
+ *
+ */
 public enum ResolverType {
     /**
-     * 
+     * Resolve using WINS server
      */
     RESOLVER_WINS,
 
@@ -34,7 +40,7 @@ public enum ResolverType {
      */
     RESOLVER_DNS,
 
-    /*
+    /**
      * 
      */
     RESOLVER_LMHOSTS

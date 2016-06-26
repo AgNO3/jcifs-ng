@@ -39,6 +39,7 @@ import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
 
+@SuppressWarnings ( "javadoc" )
 public class NegTokenTarg extends SpnegoToken {
 
     public static final int UNSPECIFIED_RESULT = -1;

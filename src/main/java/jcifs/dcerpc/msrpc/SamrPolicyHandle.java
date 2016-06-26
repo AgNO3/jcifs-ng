@@ -27,6 +27,7 @@ import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.rpc;
 
 
+@SuppressWarnings ( "javadoc" )
 public class SamrPolicyHandle extends rpc.policy_handle {
 
     public SamrPolicyHandle ( DcerpcHandle handle, String server, int access ) throws IOException {

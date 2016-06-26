@@ -37,6 +37,9 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
 
 
     /**
+     * @param p
+     *            read from properties
+     * @throws CIFSException
      * 
      */
     public PropertyConfiguration ( Properties p ) throws CIFSException {
@@ -44,8 +47,9 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
 
         this.useBatching = this.cfg.getBoolean("jcifs.smb.client.useBatching", true);
         this.useUnicode = this.cfg.getBoolean("jcifs.smb.client.useUnicode", true);
-        this.forceUnicode = this.cfg.getBoolean("jcifs.smb.client.useUnicode", true);
-        this.signingPreferred = this.cfg.getBoolean("jcifs.smb.client.signingPreferred", true);
+        this.forceUnicode = this.cfg.getBoolean("jcifs.smb.client.forceUnicode", false);
+        this.signingPreferred = this.cfg.getBoolean("jcifs.smb.client.signingPreferred", false);
+        this.signingEnforced = this.cfg.getBoolean("jcifs.smb.client.signingEnforced", false);
 
         this.lanmanCompatibility = this.cfg.getInt("jcifs.smb.lmCompatibility", 3);
         this.disablePlainTextPasswords = this.cfg.getBoolean("jcifs.smb.client.disablePlainTextPasswords", true);
@@ -89,7 +93,6 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
 
         this.netbiosHostname = this.cfg.getProperty("jcifs.netbios.hostname", null);
 
-        this.netbiosLookupResponseLimit = this.cfg.getInt("jcifs.netbios.lookupRespLimit", 3);
         this.netbiosCachePolicy = this.cfg.getInt("jcifs.netbios.cachePolicy", 60 * 10) * 60; /* 10 hours */
 
         this.netbiosSocketTimeout = this.cfg.getInt("jcifs.netbios.soTimeout", 5000);

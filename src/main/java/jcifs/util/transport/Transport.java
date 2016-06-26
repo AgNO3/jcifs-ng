@@ -1,9 +1,24 @@
+/*
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package jcifs.util.transport;
 
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,14 +40,22 @@ public abstract class Transport implements Runnable {
     private static final Logger log = Logger.getLogger(Transport.class);
 
 
+    /**
+     * Read bytes from the input stream into a buffer
+     * 
+     * @param in
+     * @param b
+     * @param off
+     * @param len
+     * @return number of bytes read
+     * @throws IOException
+     */
     public static int readn ( InputStream in, byte[] b, int off, int len ) throws IOException {
         int i = 0, n = -5;
 
         if ( off + len > b.length ) {
             throw new IOException("Buffer too short, bufsize " + b.length + " read " + len);
         }
-
-        log.debug("bufsize " + b.length + " read " + len);
 
         while ( i < len ) {
             n = in.read(b, off + i, len - i);
@@ -45,23 +68,6 @@ public abstract class Transport implements Runnable {
         return i;
     }
 
-
-    public static int readn ( InputStream in, ByteBuffer buf, int off, int len ) throws IOException {
-        int i = 0, n = -5;
-        if ( off + len > buf.capacity() ) {
-            throw new IOException("Buffer too short, bufsize " + buf.capacity() + " read " + len);
-        }
-
-        while ( i < len ) {
-            n = in.read(buf.array(), off + i, len - i);
-            if ( n <= 0 ) {
-                break;
-            }
-            i += n;
-        }
-        return i;
-    }
-
     /*
      * state values
      * 0 - not connected
@@ -69,8 +75,9 @@ public abstract class Transport implements Runnable {
      * 2 - run connected
      * 3 - connected
      * 4 - error
+     * 5 - disconnecting
      */
-    int state = 0;
+    protected int state = 0;
 
     String name = "Transport" + id++;
     Thread thread;
@@ -104,11 +111,23 @@ public abstract class Transport implements Runnable {
     protected abstract void doSkip () throws IOException;
 
 
+    /**
+     * 
+     * @return whether the transport is disconnected
+     */
     public boolean isDisconnected () {
-        return this.state == 4 || this.state == 0;
+        return this.state == 4 || this.state == 5 || this.state == 0;
     }
 
 
+    /**
+     * Send a request message and recieve response
+     * 
+     * @param request
+     * @param response
+     * @param timeout
+     * @throws IOException
+     */
     public synchronized void sendrecv ( Request request, Response response, Long timeout ) throws IOException {
         makeKey(request);
         response.isReceived = false;
@@ -233,6 +252,12 @@ public abstract class Transport implements Runnable {
     protected abstract void doDisconnect ( boolean hard ) throws IOException;
 
 
+    /**
+     * Connect the transport
+     * 
+     * @param timeout
+     * @throws TransportException
+     */
     public synchronized void connect ( long timeout ) throws TransportException {
         try {
             switch ( this.state ) {
@@ -243,6 +268,8 @@ public abstract class Transport implements Runnable {
             case 4:
                 this.state = 0;
                 throw new TransportException("Connection in error", this.te);
+            case 5:
+                return;
             default:
                 TransportException tex = new TransportException("Invalid state: " + this.state);
                 this.state = 0;
@@ -283,7 +310,7 @@ public abstract class Transport implements Runnable {
             /*
              * This guarantees that we leave in a valid state
              */
-            if ( this.state != 0 && this.state != 3 && this.state != 4 ) {
+            if ( this.state != 0 && this.state != 3 && this.state != 4 && this.state != 5 ) {
                 log.error("Invalid state: " + this.state);
                 this.state = 0;
                 this.thread = null;
@@ -292,11 +319,18 @@ public abstract class Transport implements Runnable {
     }
 
 
+    /**
+     * Disconnect the transport
+     * 
+     * @param hard
+     * @throws IOException
+     */
     public synchronized void disconnect ( boolean hard ) throws IOException {
         IOException ioe = null;
 
         switch ( this.state ) {
         case 0: /* not connected - just return */
+        case 5:
             return;
         case 2:
             hard = true;
@@ -305,7 +339,7 @@ public abstract class Transport implements Runnable {
                 break; /* outstanding requests */
             }
             try {
-                this.state = 0;
+                this.state = 5;
                 doDisconnect(hard);
             }
             catch ( IOException ioe0 ) {
@@ -338,7 +372,9 @@ public abstract class Transport implements Runnable {
              * thread.wait( timeout ) cannot reaquire the lock and
              * return which would render the timeout effectively useless.
              */
-            doConnect();
+            if ( this.state != 5 ) {
+                doConnect();
+            }
         }
         catch ( Exception ex ) {
             ex0 = ex; // Defer to below where we're locked

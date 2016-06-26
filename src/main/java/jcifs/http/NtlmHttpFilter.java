@@ -24,6 +24,7 @@ package jcifs.http;
 
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.util.Enumeration;
 import java.util.Properties;
 
@@ -44,10 +45,16 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
 import jcifs.UniAddress;
+import jcifs.config.PropertyConfiguration;
+import jcifs.context.BaseContext;
+import jcifs.netbios.NbtAddress;
 import jcifs.smb.NtStatus;
 import jcifs.smb.NtlmChallenge;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
+import jcifs.smb.SmbException;
+import jcifs.smb.SmbSession;
+import jcifs.smb.SmbTransport;
 
 
 /**
@@ -72,6 +79,12 @@ public class NtlmHttpFilter implements Filter {
     private String realm;
 
     private CIFSContext transportContext;
+    private NbtAddress[] dcList = null;
+    private long dcListExpiration;
+
+    private int netbiosLookupRespLimit = 3;
+    private long netbiosCacheTimeout = 60 * 60 * 10;
+    private static int dcListCounter;
 
 
     @Override
@@ -112,11 +125,13 @@ public class NtlmHttpFilter implements Filter {
             this.enableBasic = Boolean.valueOf(cfg.getProperty("jcifs.http.enableBasic")).booleanValue();
             this.insecureBasic = Boolean.valueOf(cfg.getProperty("jcifs.http.insecureBasic")).booleanValue();
             this.realm = cfg.getProperty("jcifs.http.basicRealm");
+            this.netbiosLookupRespLimit = cfg.getInt("jcifs.netbios.lookupRespLimit", 3);
+            this.netbiosCacheTimeout = cfg.getInt("jcifs.netbios.cachePolicy", 60 * 10) * 60; /* 10 hours */
+
             if ( this.realm == null )
                 this.realm = "jCIFS";
 
-            // TODO: initialize
-            this.transportContext = null;
+            this.transportContext = new BaseContext(new PropertyConfiguration(p));
         }
         catch ( CIFSException ex ) {
             throw new ServletException("Failed to initialize CIFS context");
@@ -161,9 +176,10 @@ public class NtlmHttpFilter implements Filter {
      *            the client will be forced to send an authentication (server sends
      *            HttpServletResponse.SC_UNAUTHORIZED).
      * @return True if the negotiation is complete, otherwise false
+     * @throws ServletException
      */
     protected NtlmPasswordAuthentication negotiate ( HttpServletRequest req, HttpServletResponse resp, boolean skipAuthentication )
-            throws IOException {
+            throws IOException, ServletException {
         UniAddress dc;
         String msg;
         NtlmPasswordAuthentication ntlm = null;
@@ -178,7 +194,7 @@ public class NtlmHttpFilter implements Filter {
                 if ( this.loadBalance ) {
                     NtlmChallenge chal = (NtlmChallenge) ssn.getAttribute("NtlmHttpChal");
                     if ( chal == null ) {
-                        chal = getTransportContext().getTransportPool().getChallengeForDomain(getTransportContext(), this.defaultDomain);
+                        chal = getChallengeForDomain(getTransportContext(), this.defaultDomain);
                         ssn.setAttribute("NtlmHttpChal", chal);
                     }
                     dc = chal.dc;
@@ -258,6 +274,69 @@ public class NtlmHttpFilter implements Filter {
     }
 
 
+    private synchronized NtlmChallenge getChallengeForDomain ( CIFSContext tc, String domain ) throws UnknownHostException, ServletException {
+        if ( domain == null ) {
+            throw new ServletException("A domain was not specified");
+        }
+        long now = System.currentTimeMillis();
+        int retry = 1;
+
+        do {
+            if ( this.dcListExpiration < now ) {
+                NbtAddress[] list = NbtAddress.getAllByName(domain, 0x1C, null, null, tc);
+                this.dcListExpiration = now + this.netbiosCacheTimeout * 1000L;
+                if ( list != null && list.length > 0 ) {
+                    this.dcList = list;
+                }
+                else { /* keep using the old list */
+                    this.dcListExpiration = now + 1000 * 60 * 15; /* 15 min */
+                    log.warn("Failed to retrieve DC list from WINS");
+                }
+            }
+
+            int max = Math.min(this.dcList.length, this.netbiosLookupRespLimit);
+            for ( int j = 0; j < max; j++ ) {
+                int i = dcListCounter++ % max;
+                if ( this.dcList[ i ] != null ) {
+                    try {
+                        return interrogate(tc, this.dcList[ i ]);
+                    }
+                    catch ( SmbException se ) {
+                        log.warn("Failed validate DC: " + this.dcList[ i ], se);
+                    }
+                    this.dcList[ i ] = null;
+                }
+            }
+
+            /*
+             * No DCs found, for retieval of list by expiring it and retry.
+             */
+            this.dcListExpiration = 0;
+        }
+        while ( retry-- > 0 );
+
+        this.dcListExpiration = now + 1000 * 60 * 15; /* 15 min */
+        throw new UnknownHostException("Failed to negotiate with a suitable domain controller for " + domain);
+    }
+
+
+    private static NtlmChallenge interrogate ( CIFSContext tf, NbtAddress addr ) throws SmbException {
+        UniAddress dc = new UniAddress(addr);
+        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, 0, false);
+        if ( !tf.hasDefaultCredentials() ) {
+            trans.connect();
+            log.warn(
+                "Default credentials (jcifs.smb.client.username/password)" + " not specified. SMB signing may not work propertly."
+                        + "  Skipping DC interrogation.");
+        }
+        else {
+            SmbSession ssn = trans.getSmbSession(tf.withDefaultCredentials());
+            ssn.treeConnect();
+        }
+        return new NtlmChallenge(trans.getServerEncryptionKey(), dc);
+    }
+
+
     /**
      * @return
      */
@@ -267,6 +346,9 @@ public class NtlmHttpFilter implements Filter {
 
 
     // Added by cgross to work with weblogic 6.1.
+    /**
+     * @param f
+     */
     public void setFilterConfig ( FilterConfig f ) {
         try {
             init(f);
@@ -277,6 +359,9 @@ public class NtlmHttpFilter implements Filter {
     }
 
 
+    /**
+     * @return filter config
+     */
     public FilterConfig getFilterConfig () {
         return null;
     }

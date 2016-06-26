@@ -28,28 +28,31 @@ import org.ietf.jgss.Oid;
 public interface SSPContext {
 
     /**
-     * @return
+     * @return the signing key for the session
+     * 
+     * @throws SmbException
      */
     byte[] getSigningKey () throws SmbException;
 
 
     /**
-     * @return
+     * @return whether the context is established
      */
     boolean isEstablished ();
 
 
     /**
      * @param token
-     * @param i
-     * @param j
-     * @return
+     * @param off
+     * @param len
+     * @return result token
+     * @throws SmbException
      */
     byte[] initSecContext ( byte[] token, int off, int len ) throws SmbException;
 
 
     /**
-     * @return
+     * @return the name of the remote endpoint
      */
     String getNetbiosName ();
 
@@ -62,18 +65,19 @@ public interface SSPContext {
 
     /**
      * @param mechanism
+     * @return whether the specified mechanism is supported
      */
     boolean isSupported ( Oid mechanism );
 
 
     /**
-     * @return
+     * @return context flags
      */
     int getFlags ();
 
 
     /**
-     * @return
+     * @return array of supported mechanism OIDs
      */
     Oid[] getSupportedMechs ();
 

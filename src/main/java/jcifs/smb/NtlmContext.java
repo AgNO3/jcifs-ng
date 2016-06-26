@@ -36,7 +36,6 @@ import jcifs.util.Hexdump;
  * this is what you want to use. See the code for details. Note that JCIFS does not implement the acceptor side of NTLM
  * authentication.
  */
-
 public class NtlmContext implements SSPContext {
 
     private static final Logger log = Logger.getLogger(NtlmContext.class);
@@ -65,6 +64,14 @@ public class NtlmContext implements SSPContext {
     private CIFSContext transportContext;
 
 
+    /**
+     * @param tc
+     *            context to use
+     * @param auth
+     *            credentials
+     * @param doSigning
+     *            whether signing is requested
+     */
     public NtlmContext ( CIFSContext tc, NtlmPasswordAuthentication auth, boolean doSigning ) {
         this.transportContext = tc;
         this.auth = auth;
@@ -141,6 +148,9 @@ public class NtlmContext implements SSPContext {
     }
 
 
+    /**
+     * @return the server's challenge
+     */
     public byte[] getServerChallenge () {
         return this.serverChallenge;
     }

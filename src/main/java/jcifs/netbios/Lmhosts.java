@@ -34,6 +34,10 @@ import jcifs.CIFSContext;
 import jcifs.smb.SmbFileInputStream;
 
 
+/**
+ * 
+ *
+ */
 public class Lmhosts {
 
     private static final Logger log = Logger.getLogger(Lmhosts.class);
@@ -48,8 +52,11 @@ public class Lmhosts {
      * not throw an {@link java.net.UnknownHostException} because this
      * is queried frequently and exceptions would be rather costly to
      * throw on a regular basis here.
+     * 
+     * @param host
+     * @param tc
+     * @return resolved name, null if not found
      */
-
     public synchronized NbtAddress getByName ( String host, CIFSContext tc ) {
         return getByName(new Name(tc.getConfig(), host, 0x20, null), tc);
     }

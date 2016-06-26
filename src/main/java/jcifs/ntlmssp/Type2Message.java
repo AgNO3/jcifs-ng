@@ -112,6 +112,9 @@ public class Type2Message extends NtlmMessage {
     /**
      * Creates a Type-2 message using default values from the current
      * environment.
+     * 
+     * @param tc
+     *            context to use
      */
     public Type2Message ( CIFSContext tc ) {
         this(tc, getDefaultFlags(tc), null, null);
@@ -121,7 +124,9 @@ public class Type2Message extends NtlmMessage {
     /**
      * Creates a Type-2 message in response to the given Type-1 message
      * using default values from the current environment.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param type1
      *            The Type-1 message which this represents a response to.
      */
@@ -132,7 +137,9 @@ public class Type2Message extends NtlmMessage {
 
     /**
      * Creates a Type-2 message in response to the given Type-1 message.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param type1
      *            The Type-1 message which this represents a response to.
      * @param challenge
@@ -151,7 +158,9 @@ public class Type2Message extends NtlmMessage {
 
     /**
      * Creates a Type-2 message with the specified parameters.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param flags
      *            The flags to apply to this message.
      * @param challenge
@@ -337,7 +346,9 @@ public class Type2Message extends NtlmMessage {
     /**
      * Returns the default flags for a generic Type-2 message in the
      * current environment.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @return An <code>int</code> containing the default flags.
      */
     public static int getDefaultFlags ( CIFSContext tc ) {
@@ -348,6 +359,11 @@ public class Type2Message extends NtlmMessage {
     /**
      * Returns the default flags for a Type-2 message created in response
      * to the given Type-1 message in the current environment.
+     * 
+     * @param tc
+     *            context to use
+     * @param type1
+     *            request message
      *
      * @return An <code>int</code> containing the default flags.
      */

@@ -27,6 +27,7 @@ import jcifs.dcerpc.rpc;
 import jcifs.smb.SmbException;
 
 
+@SuppressWarnings ( "javadoc" )
 public class LsaPolicyHandle extends rpc.policy_handle {
 
     public LsaPolicyHandle ( DcerpcHandle handle, String server, int access ) throws IOException {

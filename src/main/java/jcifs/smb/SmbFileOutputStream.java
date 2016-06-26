@@ -54,8 +54,8 @@ public class SmbFileOutputStream extends OutputStream {
      *
      * @param file
      *            An <code>SmbFile</code> specifying the file to write to
+     * @throws SmbException
      */
-
     public SmbFileOutputStream ( SmbFile file ) throws SmbException {
         this(file, false);
     }
@@ -72,6 +72,7 @@ public class SmbFileOutputStream extends OutputStream {
      *            An <code>SmbFile</code> representing the file to write to
      * @param append
      *            Append to the end of file
+     * @throws SmbException
      */
 
     public SmbFileOutputStream ( SmbFile file, boolean append ) throws SmbException {
@@ -107,7 +108,7 @@ public class SmbFileOutputStream extends OutputStream {
 
         // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
+                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningEnabled() );
         if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !isSignatureActive ) {
             this.writeSizeFile = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
         }
@@ -175,6 +176,10 @@ public class SmbFileOutputStream extends OutputStream {
     }
 
 
+    /**
+     * 
+     * @return whether the file is open
+     */
     public boolean isOpen () {
         return this.file.isOpen();
     }
@@ -214,6 +219,12 @@ public class SmbFileOutputStream extends OutputStream {
 
     /**
      * Just bypasses TransWaitNamedPipe - used by DCERPC bind.
+     * 
+     * @param b
+     * @param off
+     * @param len
+     * @param flags
+     * @throws IOException
      */
     public void writeDirect ( byte[] b, int off, int len, int flags ) throws IOException {
         if ( len <= 0 ) {

@@ -22,6 +22,7 @@ package jcifs.smb;
 import java.util.Map;
 
 
+@SuppressWarnings ( "javadoc" )
 public class DfsReferral extends SmbException {
 
     /**
@@ -43,6 +44,9 @@ public class DfsReferral extends SmbException {
     String key = null;
 
 
+    /**
+     * 
+     */
     public DfsReferral () {
         this.next = this;
     }
@@ -57,6 +61,7 @@ public class DfsReferral extends SmbException {
     @Override
     public String toString () {
         return "DfsReferral[pathConsumed=" + this.pathConsumed + ",server=" + this.server + ",share=" + this.share + ",link=" + this.link + ",path="
-                + this.path + ",ttl=" + this.ttl + ",expiration=" + this.expiration + ",resolveHashes=" + this.resolveHashes + "]";
+                + this.path + ",ttl=" + this.ttl + ",expiration=" + this.expiration + ",remain=" + ( this.expiration - System.currentTimeMillis() )
+                + ",resolveHashes=" + this.resolveHashes + "]";
     }
 }

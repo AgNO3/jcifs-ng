@@ -30,6 +30,7 @@ import java.util.Date;
 import jcifs.SmbConstants;
 
 
+@SuppressWarnings ( "javadoc" )
 public final class Encdec {
 
     private static final long SEC_BETWEEEN_1904_AND_1970 = 2082844800L;

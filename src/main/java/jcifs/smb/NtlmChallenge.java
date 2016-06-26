@@ -25,6 +25,10 @@ import jcifs.UniAddress;
 import jcifs.util.Hexdump;
 
 
+/**
+ * 
+ * 
+ */
 public final class NtlmChallenge implements Serializable {
 
     /**
@@ -32,11 +36,22 @@ public final class NtlmChallenge implements Serializable {
      */
     private static final long serialVersionUID = 2484853610174848092L;
 
+    /**
+     * Challenge
+     */
     public byte[] challenge;
+
+    /**
+     * Server address
+     */
     public UniAddress dc;
 
 
-    NtlmChallenge ( byte[] challenge, UniAddress dc ) {
+    /**
+     * @param challenge
+     * @param dc
+     */
+    public NtlmChallenge ( byte[] challenge, UniAddress dc ) {
         this.challenge = challenge;
         this.dc = dc;
     }

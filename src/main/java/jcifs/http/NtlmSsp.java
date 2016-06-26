@@ -55,9 +55,11 @@ import jcifs.smb.NtlmPasswordAuthentication;
 public class NtlmSsp implements NtlmFlags {
 
     /**
-     * Calls the static {@link #authenticate(HttpServletRequest,
+     * Calls the static {@link #authenticate(CIFSContext, HttpServletRequest,
      * HttpServletResponse, byte[])} method to perform NTLM authentication
      * for the specified servlet request.
+     * 
+     * @param tc
      *
      * @param req
      *            The request being serviced.
@@ -65,10 +67,9 @@ public class NtlmSsp implements NtlmFlags {
      *            The response.
      * @param challenge
      *            The domain controller challenge.
+     * @return credentials passed in the servlet request
      * @throws IOException
      *             If an IO error occurs.
-     * @throws ServletException
-     *             If an error occurs.
      */
     public NtlmPasswordAuthentication doAuthentication ( CIFSContext tc, HttpServletRequest req, HttpServletResponse resp, byte[] challenge )
             throws IOException {
@@ -78,6 +79,9 @@ public class NtlmSsp implements NtlmFlags {
 
     /**
      * Performs NTLM authentication for the servlet request.
+     * 
+     * @param tc
+     *            context to use
      *
      * @param req
      *            The request being serviced.
@@ -85,13 +89,12 @@ public class NtlmSsp implements NtlmFlags {
      *            The response.
      * @param challenge
      *            The domain controller challenge.
+     * @return credentials passed in the servlet request
      * @throws IOException
      *             If an IO error occurs.
-     * @throws ServletException
-     *             If an error occurs.
      */
-    public static NtlmPasswordAuthentication authenticate ( CIFSContext tc, HttpServletRequest req, HttpServletResponse resp,
-            byte[] challenge ) throws IOException {
+    public static NtlmPasswordAuthentication authenticate ( CIFSContext tc, HttpServletRequest req, HttpServletResponse resp, byte[] challenge )
+            throws IOException {
         String msg = req.getHeader("Authorization");
         if ( msg != null && msg.startsWith("NTLM ") ) {
             byte[] src = Base64.decode(msg.substring(5));

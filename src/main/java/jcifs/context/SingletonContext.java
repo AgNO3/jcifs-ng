@@ -35,6 +35,10 @@ public class SingletonContext extends BaseContext implements CIFSContext {
     private static SingletonContext INSTANCE;
 
 
+    /**
+     * 
+     * @return a global context, initialized on first call
+     */
     public static final SingletonContext getInstance () {
         if ( INSTANCE == null ) {
             try {

@@ -43,6 +43,8 @@ public class CIFSContextWrapper implements CIFSContext {
 
 
     /**
+     * @param delegate
+     *            context to delegate non-override methods to
      * 
      */
     public CIFSContextWrapper ( CIFSContext delegate ) {
@@ -50,10 +52,6 @@ public class CIFSContextWrapper implements CIFSContext {
     }
 
 
-    /**
-     * @param withCredentials
-     * @return
-     */
     protected CIFSContext wrap ( CIFSContext newContext ) {
         return newContext;
     }
@@ -77,11 +75,6 @@ public class CIFSContextWrapper implements CIFSContext {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.context.CIFSContextWrapper#getUrlHandler()
-     */
     @Override
     public URLStreamHandler getUrlHandler () {
         if ( this.wrappedHandler == null ) {
@@ -91,11 +84,6 @@ public class CIFSContextWrapper implements CIFSContext {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.CIFSContext#getSIDResolver()
-     */
     @Override
     public SidResolver getSIDResolver () {
         return this.delegate.getSIDResolver();
@@ -108,11 +96,6 @@ public class CIFSContextWrapper implements CIFSContext {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.CIFSContext#withCredentials(jcifs.smb.SmbCredentials)
-     */
     @Override
     public CIFSContext withCredentials ( SmbCredentials creds ) {
         return wrap(this.delegate.withCredentials(creds));
@@ -161,11 +144,6 @@ public class CIFSContextWrapper implements CIFSContext {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.CIFSContext#close()
-     */
     @Override
     public void close () throws CIFSException {
         this.delegate.close();

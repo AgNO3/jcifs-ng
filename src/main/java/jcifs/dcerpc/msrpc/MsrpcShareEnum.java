@@ -24,6 +24,7 @@ import jcifs.smb.FileEntry;
 import jcifs.smb.SmbShareInfo;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcShareEnum extends srvsvc.ShareEnumAll {
 
     class MsrpcShareInfo1 extends SmbShareInfo {

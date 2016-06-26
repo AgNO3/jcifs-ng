@@ -1,3 +1,19 @@
+/*
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package jcifs.smb;
 
 
@@ -49,7 +65,9 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * Contruct a <code>Kerb5Authenticator</code> object with <code>Subject</code>
      * which hold TGT retrieved from KDC. If multiple TGT are contained, the
      * first one will be used to retrieve user principal.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param subject
      *            represents the user who perform Kerberos authentication.
      *            It contains tickets retrieve from KDC.
@@ -61,9 +79,10 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbCredentials#createContext(jcifs.CIFSContext)
+     * @see jcifs.smb.NtlmPasswordAuthentication#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
      */
     @Override
     public SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
@@ -105,6 +124,12 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     }
 
 
+    /**
+     * Clone the context
+     * 
+     * @param to
+     * @param from
+     */
     public static void cloneInternal ( Kerb5Authenticator to, Kerb5Authenticator from ) {
         NtlmPasswordAuthentication.cloneInternal(to, from);
         to.setUser(from.getUser());
@@ -137,6 +162,10 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     }
 
 
+    /**
+     * 
+     * @return the kerberos realm
+     */
     public String getRealm () {
         return this.realm;
     }

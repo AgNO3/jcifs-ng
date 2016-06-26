@@ -1,9 +1,26 @@
+/*
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package jcifs.smb;
 
 
 import java.io.IOException;
 
 import org.apache.log4j.Logger;
+import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
@@ -145,8 +162,7 @@ class SpnegoContext implements SSPContext {
      * @param inputBuf
      * @param offset
      * @param len
-     * @return
-     * @throws GSSException
+     * @return response token
      */
     @Override
     public byte[] initSecContext ( byte[] inputBuf, int offset, int len ) throws SmbException {
@@ -217,11 +233,6 @@ class SpnegoContext implements SSPContext {
     }
 
 
-    /**
-     * 
-     * 
-     * @return
-     */
     @Override
     public boolean isEstablished () {
         return this.mechContext.isEstablished();

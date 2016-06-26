@@ -21,6 +21,7 @@ package jcifs.smb;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import jcifs.CIFSContext;
@@ -152,9 +153,8 @@ public class SIDCacheImpl implements SidResolver {
      *            of a domain controller however a member server will work as well and a domain controller may not
      *            return names for SIDs corresponding to local accounts for which the domain controller is not an
      *            authority.
-     * @param auth
-     *            The credentials that should be used to communicate with the named server. As usual, <tt>null</tt>
-     *            indicates that default credentials should be used.
+     * @param tc
+     *            The context that should be used to communicate with the named server.
      * @param sids
      *            The SIDs that should be resolved. After this function is called, the names associated with the SIDs
      *            may be queried with the <tt>toDisplayString</tt>, <tt>getDomainName</tt>, and <tt>getAccountName</tt>
@@ -259,12 +259,13 @@ public class SIDCacheImpl implements SidResolver {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.SidResolver#getLocalGroupsMap(jcifs.CIFSContext, jcifs.smb.SID, int)
+     * @see jcifs.SidResolver#getLocalGroupsMap(jcifs.CIFSContext, java.lang.String, int)
      */
     @Override
-    public Map<SID, ArrayList<SID>> getLocalGroupsMap ( CIFSContext tc, String authorityServerName, int flags ) throws CIFSException {
+    public Map<SID, List<SID>> getLocalGroupsMap ( CIFSContext tc, String authorityServerName, int flags ) throws CIFSException {
         SID domSid = tc.getSIDResolver().getServerSid(tc, authorityServerName);
         synchronized ( this.sidCache ) {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + authorityServerName + "[\\PIPE\\samr]", tc) ) {
@@ -276,7 +277,7 @@ public class SIDCacheImpl implements SidResolver {
                 if ( rpc.retval != 0 )
                     throw new SmbException(rpc.retval, false);
 
-                Map<SID, ArrayList<SID>> map = new HashMap<>();
+                Map<SID, List<SID>> map = new HashMap<>();
 
                 for ( int ei = 0; ei < rpc.sam.count; ei++ ) {
                     samr.SamrSamEntry entry = rpc.sam.entries[ ei ];
@@ -288,7 +289,7 @@ public class SIDCacheImpl implements SidResolver {
                     groupSid.acctName = ( new UnicodeString(entry.name, false) ).toString();
 
                     for ( int mi = 0; mi < mems.length; mi++ ) {
-                        ArrayList<SID> groups = map.get(mems[ mi ]);
+                        List<SID> groups = map.get(mems[ mi ]);
                         if ( groups == null ) {
                             groups = new ArrayList<>();
                             map.put(mems[ mi ], groups);

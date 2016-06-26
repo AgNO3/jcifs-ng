@@ -23,6 +23,7 @@ package jcifs.dcerpc.msrpc;
 import jcifs.smb.SID;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcLookupSids extends lsarpc.LsarLookupSids {
 
     public MsrpcLookupSids ( LsaPolicyHandle policyHandle, SID[] sids ) {

@@ -42,22 +42,31 @@ public interface SmbCredentials extends Cloneable {
 
 
     /**
-     * @return
+     * @return whether these are guest credentials
      */
     boolean isGuest ();
 
 
+    /**
+     * 
+     * @return a copy of the credentials
+     */
     SmbCredentials clone ();
 
 
     /**
      * @param transportContext
+     * @param host
+     * @param initialToken
+     * @param doSigning
+     * @return a new context
+     * @throws SmbException
      */
     SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException;
 
 
     /**
-     * 
+     * @return subject associated with the credentials
      */
     Subject getSubject ();
 }

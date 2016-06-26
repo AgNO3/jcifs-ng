@@ -19,6 +19,8 @@
 package jcifs.smb;
 
 
+import java.util.Arrays;
+
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
@@ -43,7 +45,7 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
         String node = null;
 
 
-        int readWireFormat ( byte[] buffer, int bufferIndex, int len ) {
+        int readWireFormat ( byte[] buffer, int bufferIndex, int len, boolean unicode ) {
             int start = bufferIndex;
 
             this.version = SMBUtil.readInt2(buffer, bufferIndex);
@@ -69,20 +71,12 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
                 this.nodeOffset = SMBUtil.readInt2(buffer, bufferIndex);
                 bufferIndex += 2;
 
-                this.rpath = readString(
-                    buffer,
-                    start + this.pathOffset,
-                    len,
-                    ( Trans2GetDfsReferralResponse.this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0);
+                this.rpath = readString(buffer, start + this.pathOffset, len, unicode);
                 if ( this.nodeOffset > 0 )
-                    this.node = readString(
-                        buffer,
-                        start + this.nodeOffset,
-                        len,
-                        ( Trans2GetDfsReferralResponse.this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0);
+                    this.node = readString(buffer, start + this.nodeOffset, len, unicode);
             }
             else if ( this.version == 1 ) {
-                this.node = readString(buffer, bufferIndex, len, ( Trans2GetDfsReferralResponse.this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0);
+                this.node = readString(buffer, bufferIndex, len, unicode);
             }
 
             return this.size;
@@ -147,12 +141,16 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
 
         this.pathConsumed = SMBUtil.readInt2(buffer, bufferIndex);
         bufferIndex += 2;
+
+        boolean unicode = ( this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0;
         /*
          * Samba 2.2.8a will reply with Unicode paths even though
          * ASCII is negotiated so we must use flags2 (probably
          * should anyway).
+         * 
+         * No, samba will always send unicode
          */
-        if ( ( this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0 ) {
+        if ( unicode ) {
             this.pathConsumed /= 2;
         }
         this.numReferrals = SMBUtil.readInt2(buffer, bufferIndex);
@@ -163,7 +161,7 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
         this.referrals = new Referral[this.numReferrals];
         for ( int ri = 0; ri < this.numReferrals; ri++ ) {
             this.referrals[ ri ] = new Referral();
-            bufferIndex += this.referrals[ ri ].readWireFormat(buffer, bufferIndex, len);
+            bufferIndex += this.referrals[ ri ].readWireFormat(buffer, bufferIndex, len, unicode);
         }
 
         return bufferIndex - start;
@@ -174,6 +172,6 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
     public String toString () {
         return new String(
             "Trans2GetDfsReferralResponse[" + super.toString() + ",pathConsumed=" + this.pathConsumed + ",numReferrals=" + this.numReferrals
-                    + ",flags=" + this.tflags + "]");
+                    + ",flags=" + this.tflags + "]:\n " + Arrays.toString(this.referrals));
     }
 }

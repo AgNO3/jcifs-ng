@@ -37,6 +37,9 @@ public class Type1Message extends NtlmMessage {
     /**
      * Creates a Type-1 message using default values from the current
      * environment.
+     * 
+     * @param tc
+     *            context to use
      */
     public Type1Message ( CIFSContext tc ) {
         this(tc, getDefaultFlags(tc), tc.getConfig().getDefaultDomain(), tc.getNameServiceClient().getLocalHost().getHostName());
@@ -45,7 +48,9 @@ public class Type1Message extends NtlmMessage {
 
     /**
      * Creates a Type-1 message with the specified parameters.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param flags
      *            The flags to apply to this message.
      * @param suppliedDomain
@@ -172,6 +177,8 @@ public class Type1Message extends NtlmMessage {
      * Returns the default flags for a generic Type-1 message in the
      * current environment.
      * 
+     * @param tc
+     *            context to use
      * @return An <code>int</code> containing the default flags.
      */
     public static int getDefaultFlags ( CIFSContext tc ) {

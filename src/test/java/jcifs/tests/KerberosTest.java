@@ -18,14 +18,12 @@
 package jcifs.tests;
 
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import javax.security.auth.Subject;
@@ -34,11 +32,11 @@ import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.kerberos.KeyTab;
 
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import jcifs.CIFSContext;
-import jcifs.context.SingletonContext;
 import jcifs.smb.Kerb5Authenticator;
-import jcifs.smb.SmbFile;
 import sun.security.jgss.krb5.Krb5Util;
 import sun.security.krb5.Asn1Exception;
 import sun.security.krb5.Credentials;
@@ -52,42 +50,28 @@ import sun.security.krb5.PrincipalName;
  * @author mbechler
  *
  */
-@SuppressWarnings ( "restriction" )
-public class KerberosTests {
+@SuppressWarnings ( {
+    "javadoc", "restriction"
+} )
+@RunWith ( Parameterized.class )
+public class KerberosTest extends BaseCIFSTest {
 
-    @Test
-    public void testKRB () throws IOException, Asn1Exception, KrbException {
-        CIFSContext ctx = SingletonContext.getInstance();
-        Subject s = getInitiatorSubject(TestConfig.getTestUser(), TestConfig.getTestUserPassword(), TestConfig.getTestUserDomain());
-        ctx = ctx.withCredentials(new Kerb5Authenticator(ctx, s));
-        SmbFile f = new SmbFile("smb://" + TestConfig.getTestServer() + "/test/", ctx);
-
-        for ( SmbFile entry : f.listFiles() ) {
-            System.out.println(entry);
-
-            if ( entry.getContentLength() < 4096 ) {
-                long size = 0;
-                try ( InputStream is = entry.getInputStream() ) {
-                    byte[] buffer = new byte[4096];
-                    int read = 0;
-                    while ( ( read = is.read(buffer) ) >= 0 ) {
-                        size += read;
-                    }
-                }
-                assertEquals(entry.getContentLength(), size);
-            }
-        }
+    /**
+     * @param properties
+     */
+    public KerberosTest ( String name, Map<String, String> properties ) {
+        super(name, properties);
     }
 
 
-    /**
-     * @param keytab
-     * @param principal
-     * @param ticketCacheName
-     * @param renewTGT
-     * @return a subjct with the kerberos initiate credentials (TGT)
-     * @throws KerberosException
-     */
+    @Test
+    public void testKRB () throws IOException, Asn1Exception, KrbException {
+        Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired());
+        CIFSContext ctx = getContext().withCredentials(new Kerb5Authenticator(getContext(), s));
+        getDefaultShareRoot(ctx).exists();
+    }
+
+
     public static Subject getInitiatorSubject ( KeyTab keytab, final KerberosPrincipal principal ) throws Asn1Exception, KrbException, IOException {
         KerberosTicket ticket = getKerberosTicket(keytab, principal);
         Set<Object> privCreds = new HashSet<>();
@@ -95,15 +79,6 @@ public class KerberosTests {
         return new Subject(false, new HashSet<>(Arrays.asList((Principal) principal)), Collections.EMPTY_SET, privCreds);
     }
 
-
-    /**
-     * @param keytab
-     * @param principal
-     * @param ticketCacheName
-     * @param renewTGT
-     * @return
-     * @throws KerberosException
-     */
 
     private static KerberosTicket getKerberosTicket ( KeyTab keytab, final KerberosPrincipal principal )
             throws Asn1Exception, KrbException, IOException {
@@ -122,14 +97,6 @@ public class KerberosTests {
     }
 
 
-    /**
-     * @param principal
-     * @param password
-     * @param ticketCacheName
-     * @param renewTGT
-     * @return a subjct with the kerberos initiate credentials (TGT)
-     * @throws KerberosException
-     */
     public static Subject getInitiatorSubject ( KerberosPrincipal principal, String password ) throws Asn1Exception, KrbException, IOException {
         KerberosTicket ticket = getKerberosTicket(principal, password);
         Set<Object> privCreds = new HashSet<>();
@@ -138,14 +105,6 @@ public class KerberosTests {
     }
 
 
-    /**
-     * @param principal
-     * @param password
-     * @param ticketCacheName
-     * @param renewTGT
-     * @return
-     * @throws KerberosException
-     */
     private static KerberosTicket getKerberosTicket ( KerberosPrincipal principal, String password ) throws Asn1Exception, KrbException, IOException {
         PrincipalName principalName;
 
@@ -160,15 +119,6 @@ public class KerberosTests {
     }
 
 
-    /**
-     * @param userName
-     * @param password
-     * @param realm
-     * @param ticketCacheName
-     * @param renewTGT
-     * @return a subjct with the kerberos initiate credentials (TGT)
-     * @throws KerberosException
-     */
     public static Subject getInitiatorSubject ( String userName, String password, String realm ) throws Asn1Exception, KrbException, IOException {
         String fullPrincipal = String.format("%s@%s", userName, realm); //$NON-NLS-1$
         KerberosPrincipal principal = new KerberosPrincipal(fullPrincipal, KerberosPrincipal.KRB_NT_PRINCIPAL);

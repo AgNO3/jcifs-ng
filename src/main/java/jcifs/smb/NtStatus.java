@@ -19,6 +19,7 @@
 package jcifs.smb;
 
 
+@SuppressWarnings ( "javadoc" )
 public interface NtStatus {
 
     /*
@@ -71,6 +72,7 @@ public interface NtStatus {
     public static final int NT_STATUS_DUPLICATE_NAME = 0xC00000bd;
     public static final int NT_STATUS_NETWORK_NAME_DELETED = 0xC00000c9;
     public static final int NT_STATUS_NETWORK_ACCESS_DENIED = 0xC00000ca;
+    public static final int NT_STATUS_BAD_DEVICE_TYPE = 0xC00000cb;
     public static final int NT_STATUS_BAD_NETWORK_NAME = 0xC00000cc;
     public static final int NT_STATUS_REQUEST_NOT_ACCEPTED = 0xC00000d0;
     public static final int NT_STATUS_CANT_ACCESS_DOMAIN_INFO = 0xC00000da;
@@ -88,6 +90,7 @@ public interface NtStatus {
     public static final int NT_STATUS_PASSWORD_MUST_CHANGE = 0xC0000224;
     public static final int NT_STATUS_NOT_FOUND = 0xC0000225;
     public static final int NT_STATUS_ACCOUNT_LOCKED_OUT = 0xC0000234;
+    public static final int NT_STATUS_CONNECTION_REFUSED = 0xC0000236;
     public static final int NT_STATUS_PATH_NOT_COVERED = 0xC0000257;
     public static final int NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED = 0xC0000279;
 
@@ -101,12 +104,12 @@ public interface NtStatus {
         NT_STATUS_INVALID_WORKSTATION, NT_STATUS_PASSWORD_EXPIRED, NT_STATUS_ACCOUNT_DISABLED, NT_STATUS_NONE_MAPPED, NT_STATUS_INVALID_SID,
         NT_STATUS_DISK_FULL, NT_STATUS_INSTANCE_NOT_AVAILABLE, NT_STATUS_PIPE_NOT_AVAILABLE, NT_STATUS_INVALID_PIPE_STATE, NT_STATUS_PIPE_BUSY,
         NT_STATUS_PIPE_DISCONNECTED, NT_STATUS_PIPE_CLOSING, NT_STATUS_PIPE_LISTENING, NT_STATUS_FILE_IS_A_DIRECTORY, NT_STATUS_DUPLICATE_NAME,
-        NT_STATUS_NETWORK_NAME_DELETED, NT_STATUS_NETWORK_ACCESS_DENIED, NT_STATUS_BAD_NETWORK_NAME, NT_STATUS_REQUEST_NOT_ACCEPTED,
-        NT_STATUS_CANT_ACCESS_DOMAIN_INFO, NT_STATUS_NO_SUCH_DOMAIN, NT_STATUS_NOT_A_DIRECTORY, NT_STATUS_CANNOT_DELETE,
-        NT_STATUS_INVALID_COMPUTER_NAME, NT_STATUS_PIPE_BROKEN, NT_STATUS_NO_SUCH_ALIAS, NT_STATUS_LOGON_TYPE_NOT_GRANTED,
+        NT_STATUS_NETWORK_NAME_DELETED, NT_STATUS_NETWORK_ACCESS_DENIED, NT_STATUS_BAD_DEVICE_TYPE, NT_STATUS_BAD_NETWORK_NAME,
+        NT_STATUS_REQUEST_NOT_ACCEPTED, NT_STATUS_CANT_ACCESS_DOMAIN_INFO, NT_STATUS_NO_SUCH_DOMAIN, NT_STATUS_NOT_A_DIRECTORY,
+        NT_STATUS_CANNOT_DELETE, NT_STATUS_INVALID_COMPUTER_NAME, NT_STATUS_PIPE_BROKEN, NT_STATUS_NO_SUCH_ALIAS, NT_STATUS_LOGON_TYPE_NOT_GRANTED,
         NT_STATUS_NO_TRUST_SAM_ACCOUNT, NT_STATUS_TRUSTED_DOMAIN_FAILURE, NT_STATUS_TRUSTED_RELATIONSHIP_FAILURE,
         NT_STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT, NT_STATUS_PASSWORD_MUST_CHANGE, NT_STATUS_NOT_FOUND, NT_STATUS_ACCOUNT_LOCKED_OUT,
-        NT_STATUS_PATH_NOT_COVERED, NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED,
+        NT_STATUS_CONNECTION_REFUSED, NT_STATUS_PATH_NOT_COVERED, NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED,
     };
 
     static final String[] NT_STATUS_MESSAGES = {
@@ -125,7 +128,7 @@ public interface NtStatus {
         "The security ID structure is invalid.", "The file system is full.", "All pipe instances are busy.", "All pipe instances are busy.",
         "The pipe state is invalid.", "All pipe instances are busy.", "No process is on the other end of the pipe.", "The pipe is being closed.",
         "Waiting for a process to open the other end of the pipe.", "File is a directory.", "A duplicate name exists on the network.",
-        "The specified network name is no longer available.", "Network access is denied.", "The network name cannot be found.",
+        "The specified network name is no longer available.", "Network access is denied.", "Bad device type", "The network name cannot be found.",
         "No more connections can be made to this remote computer at this time because there are already as many connections as the computer can accept.",
         "Indicates a Windows NT Server could not be contacted or that objects within the domain are protected such that necessary information could not be retrieved.",
         "The specified domain did not exist.", "The directory name is invalid.", "Access is denied.",
@@ -136,7 +139,7 @@ public interface NtStatus {
         "The logon request failed because the trust relationship between this workstation and the primary domain failed.",
         "The account used is a Computer Account. Use your global user account or local user account to access this server.",
         "The user must change his password before he logs on the first time.", "The object was not found.",
-        "The referenced account is currently locked out and may not be logged on to.", "The remote system is not reachable by the transport.",
-        "The layered file system driver for this I/O tag did not handle it when needed.",
+        "The referenced account is currently locked out and may not be logged on to.", "Connection refused",
+        "The remote system is not reachable by the transport.", "The layered file system driver for this I/O tag did not handle it when needed.",
     };
 }

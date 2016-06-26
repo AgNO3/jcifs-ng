@@ -28,6 +28,10 @@ import jcifs.dcerpc.ndr.NdrBuffer;
 import jcifs.smb.SmbSession;
 
 
+/**
+ * 
+ * 
+ */
 public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
 
     /*
@@ -118,6 +122,7 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
 
 
     /**
+     * @param tc
      * 
      */
     public DcerpcHandle ( CIFSContext tc ) {
@@ -160,11 +165,32 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
+    /**
+     * Get a handle to a service
+     * 
+     * @param url
+     * @param tc
+     *            context to use
+     * @return a DCERPC handle for the given url
+     * @throws MalformedURLException
+     * @throws DcerpcException
+     */
     public static DcerpcHandle getHandle ( String url, CIFSContext tc ) throws MalformedURLException, DcerpcException {
         return getHandle(url, tc, false);
     }
 
 
+    /**
+     * Get a handle to a service
+     * 
+     * @param url
+     * @param tc
+     * @param unshared
+     *            whether an exclusive connection should be used
+     * @return a DCERPC handle for the given url
+     * @throws MalformedURLException
+     * @throws DcerpcException
+     */
     public static DcerpcHandle getHandle ( String url, CIFSContext tc, boolean unshared ) throws MalformedURLException, DcerpcException {
         if ( url.startsWith("ncacn_np:") ) {
             return new DcerpcPipeHandle(url, tc, unshared);
@@ -173,6 +199,12 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
+    /**
+     * Bind the handle
+     * 
+     * @throws DcerpcException
+     * @throws IOException
+     */
     public void bind () throws DcerpcException, IOException {
         synchronized ( this ) {
             try {
@@ -188,6 +220,12 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
+    /**
+     * 
+     * @param msg
+     * @throws DcerpcException
+     * @throws IOException
+     */
     public void sendrecv ( DcerpcMessage msg ) throws DcerpcException, IOException {
         byte[] stub, frag;
         NdrBuffer buf, fbuf;
@@ -311,11 +349,19 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
+    /**
+     * 
+     * @param securityProvider
+     */
     public void setDcerpcSecurityProvider ( DcerpcSecurityProvider securityProvider ) {
         this.securityProvider = securityProvider;
     }
 
 
+    /**
+     * 
+     * @return the server connected to
+     */
     public String getServer () {
         if ( this instanceof DcerpcPipeHandle )
             return ( (DcerpcPipeHandle) this ).pipe.getServer();
@@ -324,7 +370,7 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
 
 
     /**
-     * @return
+     * @return the transport context used
      */
     public CIFSContext getTransportContext () {
         if ( this instanceof DcerpcPipeHandle ) {
@@ -334,6 +380,10 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
+    /**
+     * 
+     * @return the session attached to
+     */
     public SmbSession getSession () {
         if ( this instanceof DcerpcPipeHandle )
             return ( (DcerpcPipeHandle) this ).pipe.getSession();

@@ -25,6 +25,14 @@ import jcifs.util.Hexdump;
 import jcifs.util.Strings;
 
 
+/**
+ * File notification information
+ * 
+ * 
+ * @author mbechler
+ *
+ */
+@SuppressWarnings ( "javadoc" )
 public class FileNotifyInformation {
 
     // filter flags
@@ -59,15 +67,25 @@ public class FileNotifyInformation {
     public String fileName;
 
 
+    /**
+     * 
+     */
     public FileNotifyInformation () {}
 
 
+    /**
+     * 
+     * @param buffer
+     * @param bufferIndex
+     * @param len
+     * @throws IOException
+     */
     public FileNotifyInformation ( byte[] buffer, int bufferIndex, int len ) throws IOException {
         this.decode(buffer, bufferIndex, len);
     }
 
 
-    public int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
+    protected int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
         int start = bufferIndex;
 
         this.nextEntryOffset = SMBUtil.readInt4(buffer, bufferIndex);

@@ -23,12 +23,23 @@ import java.io.IOException;
 import java.io.InputStream;
 
 
+/**
+ *
+ */
 public abstract class SessionServicePacket {
 
     // session service packet types
     static final int SESSION_MESSAGE = 0x00;
     static final int SESSION_REQUEST = 0x81;
+
+    /**
+     * 
+     */
     public static final int POSITIVE_SESSION_RESPONSE = 0x82;
+
+    /**
+     * 
+     */
     public static final int NEGATIVE_SESSION_RESPONSE = 0x83;
     static final int SESSION_RETARGET_RESPONSE = 0x84;
     static final int SESSION_KEEP_ALIVE = 0x85;
@@ -98,6 +109,11 @@ public abstract class SessionServicePacket {
     int type, length;
 
 
+    /**
+     * @param dst
+     * @param dstIndex
+     * @return written bytes
+     */
     public int writeWireFormat ( byte[] dst, int dstIndex ) {
         this.length = writeTrailerWireFormat(dst, dstIndex + HEADER_LENGTH);
         writeHeaderWireFormat(dst, dstIndex);

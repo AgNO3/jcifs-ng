@@ -29,6 +29,11 @@ import jcifs.SmbConstants;
 import jcifs.util.Encdec;
 
 
+/**
+ * 
+ * 
+ *
+ */
 public class SmbRandomAccessFile implements DataOutput, DataInput {
 
     private static final int WRITE_OPTIONS = 0x0842;
@@ -43,8 +48,7 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
 
 
     /**
-     * This constructor is used to instance a SmbRandomAccessFile object with
-     * a SmbTransportContext
+     * Instantiate a random access file from URL
      * 
      * @param url
      * @param mode
@@ -52,13 +56,19 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
      * @param tc
      * @throws SmbException
      * @throws MalformedURLException
-     * @throws UnknownHostException
      */
     public SmbRandomAccessFile ( String url, String mode, int shareAccess, CIFSContext tc ) throws SmbException, MalformedURLException {
         this(new SmbFile(url, tc, shareAccess), mode);
     }
 
 
+    /**
+     * Instantiate a random access file from a {@link SmbFile}
+     * 
+     * @param file
+     * @param mode
+     * @throws SmbException
+     */
     public SmbRandomAccessFile ( SmbFile file, String mode ) throws SmbException {
         this.file = file;
         if ( mode.equals("r") ) {
@@ -78,7 +88,7 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
         this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
 
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
+                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningEnabled() );
         if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
             this.largeReadX = true;
             this.readSize = Math
@@ -99,6 +109,12 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
     }
 
 
+    /**
+     * Read a single byte from the current position
+     * 
+     * @return read byte, -1 if EOF
+     * @throws SmbException
+     */
     public int read () throws SmbException {
         if ( read(this.tmp, 0, 1) == -1 ) {
             return -1;
@@ -107,11 +123,31 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
     }
 
 
+    /**
+     * Read into buffer from current position
+     * 
+     * @param b
+     *            buffer
+     * @return number of bytes read
+     * @throws SmbException
+     */
     public int read ( byte b[] ) throws SmbException {
         return read(b, 0, b.length);
     }
 
 
+    /**
+     * Read into buffer from current position
+     * 
+     * @param b
+     *            buffer
+     * @param off
+     *            offset into buffer
+     * @param len
+     *            read up to <tt>len</tt> bytes
+     * @return number of bytes read
+     * @throws SmbException
+     */
     public int read ( byte b[], int off, int len ) throws SmbException {
         if ( len <= 0 ) {
             return 0;
@@ -215,31 +251,61 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
     }
 
 
+    /**
+     * Current position in file
+     * 
+     * @return current position
+     */
     public long getFilePointer () {
         return this.fp;
     }
 
 
+    /**
+     * Seek to new position
+     * 
+     * 
+     * @param pos
+     */
     public void seek ( long pos ) {
         this.fp = pos;
     }
 
 
+    /**
+     * Get the current file length
+     * 
+     * @return file length
+     * @throws SmbException
+     */
     public long length () throws SmbException {
         return this.file.length();
     }
 
 
+    /**
+     * Expand file length
+     * 
+     * @param newLength
+     *            new file length, 32-bit max
+     * @throws SmbException
+     */
     public void setLength ( long newLength ) throws SmbException {
         // ensure file is open
         if ( this.file.isOpen() == false ) {
             this.file.open(this.openFlags, 0, SmbFile.ATTR_NORMAL, this.options);
         }
+        // TODO: is there a way to make this 64-bit safe
         SmbComWriteResponse rsp = new SmbComWriteResponse(getSession().getConfig());
         this.file.send(new SmbComWrite(getSession().getConfig(), this.file.fid, (int) ( newLength & 0xFFFFFFFFL ), 0, this.tmp, 0, 0), rsp);
     }
 
 
+    /**
+     * Close the file
+     * 
+     * @throws SmbException
+     */
     public void close () throws SmbException {
         this.file.close();
     }

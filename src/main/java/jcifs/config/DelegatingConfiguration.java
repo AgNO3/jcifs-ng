@@ -37,6 +37,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
+     * @param delegate
+     *            delegate to pass all non-overriden method calls to
      * 
      */
     public DelegatingConfiguration ( Configuration delegate ) {
@@ -45,7 +47,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getRandom()
      */
     @Override
@@ -55,7 +58,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getDfsTtl()
      */
     @Override
@@ -65,7 +69,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#isDfsStrictView()
      */
     @Override
@@ -75,7 +80,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#isDfsDisabled()
      */
     @Override
@@ -85,7 +91,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#isForceUnicode()
      */
     @Override
@@ -95,7 +102,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#isUseUnicode()
      */
     @Override
@@ -105,7 +113,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#isUseBatching()
      */
     @Override
@@ -115,7 +124,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNativeOs()
      */
     @Override
@@ -125,7 +135,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNativeLanman()
      */
     @Override
@@ -135,7 +146,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getRecieveBufferSize()
      */
     @Override
@@ -145,7 +157,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getSendBufferSize()
      */
     @Override
@@ -166,7 +179,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getSoTimeout()
      */
     @Override
@@ -176,7 +190,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getResponseTimeout()
      */
     @Override
@@ -186,17 +201,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
-     * @see jcifs.Configuration#isTcpNoDelay()
-     */
-    @Override
-    public boolean isTcpNoDelay () {
-        return this.delegate.isTcpNoDelay();
-    }
-
-
-    /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getConnTimeout()
      */
     @Override
@@ -206,7 +212,19 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getSessionTimeout()
+     */
+    @Override
+    public int getSessionTimeout () {
+        return this.delegate.getSessionTimeout();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getLocalPort()
      */
     @Override
@@ -216,7 +234,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getLocalAddr()
      */
     @Override
@@ -226,7 +245,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosHostname()
      */
     @Override
@@ -236,7 +256,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getLogonShare()
      */
     @Override
@@ -246,27 +267,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
-     * @see jcifs.Configuration#getNetbiosCacheTimeout()
-     */
-    @Override
-    public int getNetbiosCacheTimeout () {
-        return this.delegate.getNetbiosCacheTimeout();
-    }
-
-
-    /**
-     * @return
-     * @see jcifs.Configuration#getNetbiosLookupRespLimit()
-     */
-    @Override
-    public int getNetbiosLookupRespLimit () {
-        return this.delegate.getNetbiosLookupRespLimit();
-    }
-
-
-    /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getDefaultDomain()
      */
     @Override
@@ -276,7 +278,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getDefaultUsername()
      */
     @Override
@@ -286,7 +289,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getDefaultPassword()
      */
     @Override
@@ -296,7 +300,7 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * 
      * @see jcifs.Configuration#isDisablePlainTextPasswords()
      */
     @Override
@@ -306,7 +310,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getLanManCompatibility()
      */
     @Override
@@ -316,7 +321,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getResolveOrder()
      */
     @Override
@@ -326,7 +332,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getBroadcastAddress()
      */
     @Override
@@ -336,7 +343,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getWinsServers()
      */
     @Override
@@ -346,7 +354,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosLocalPort()
      */
     @Override
@@ -356,7 +365,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosLocalAddress()
      */
     @Override
@@ -366,7 +376,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getVcNumber()
      */
     @Override
@@ -376,7 +387,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getCapabilities()
      */
     @Override
@@ -386,7 +398,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getFlags2()
      */
     @Override
@@ -396,7 +409,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getSessionLimit()
      */
     @Override
@@ -406,7 +420,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getOemEncoding()
      */
     @Override
@@ -416,7 +431,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getLocalTimezone()
      */
     @Override
@@ -426,7 +442,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getPid()
      */
     @Override
@@ -436,7 +453,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getMaxMpxCount()
      */
     @Override
@@ -446,12 +464,13 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
-     * @see jcifs.Configuration#isSigningPreferred()
+     * {@inheritDoc}
+     * 
+     * @see jcifs.Configuration#isSigningEnabled()
      */
     @Override
-    public boolean isSigningPreferred () {
-        return this.delegate.isSigningPreferred();
+    public boolean isSigningEnabled () {
+        return this.delegate.isSigningEnabled();
     }
 
 
@@ -467,7 +486,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getLmHostsFileName()
      */
     @Override
@@ -477,8 +497,9 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
-     * @see jcifs.Configuration#getNetbiosDefaultScope()
+     * {@inheritDoc}
+     * 
+     * @see jcifs.Configuration#getNetbiosScope()
      */
     @Override
     public String getNetbiosScope () {
@@ -487,8 +508,9 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
-     * @see jcifs.Configuration#getNetbiosDefaultSoTimeout()
+     * {@inheritDoc}
+     * 
+     * @see jcifs.Configuration#getNetbiosSoTimeout()
      */
     @Override
     public int getNetbiosSoTimeout () {
@@ -497,7 +519,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosSndBufSize()
      */
     @Override
@@ -507,7 +530,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosRetryTimeout()
      */
     @Override
@@ -517,7 +541,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosRetryCount()
      */
     @Override
@@ -527,7 +552,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosRcvBufSize()
      */
     @Override
@@ -537,7 +563,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getNetbiosCachePolicy()
      */
     @Override
@@ -547,7 +574,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getTransactionBufferSize()
      */
     @Override
@@ -557,7 +585,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getBufferCacheSize()
      */
     @Override
@@ -567,7 +596,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getListCount()
      */
     @Override
@@ -577,7 +607,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getListSize()
      */
     @Override
@@ -587,17 +618,19 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
-     * @see jcifs.Configuration#getAttributeExpirationPeriod()
+     * {@inheritDoc}
+     * 
+     * @see jcifs.Configuration#getAttributeCacheTimeout()
      */
     @Override
-    public long getAttributeExpirationPeriod () {
-        return this.delegate.getAttributeExpirationPeriod();
+    public long getAttributeCacheTimeout () {
+        return this.delegate.getAttributeCacheTimeout();
     }
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#isIgnoreCopyToException()
      */
     @Override
@@ -607,8 +640,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @param cmd
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getBatchLimit(java.lang.String)
      */
     @Override
@@ -618,7 +651,8 @@ public class DelegatingConfiguration implements Configuration {
 
 
     /**
-     * @return
+     * {@inheritDoc}
+     * 
      * @see jcifs.Configuration#getSupportedDialects()
      */
     @Override

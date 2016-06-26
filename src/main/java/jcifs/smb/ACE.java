@@ -1,3 +1,19 @@
+/*
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package jcifs.smb;
 
 
@@ -50,29 +66,98 @@ import jcifs.util.Hexdump;
 
 public class ACE {
 
+    /**
+     * 
+     */
     public static final int FILE_READ_DATA = 0x00000001; // 1
+    /**
+     * 
+     */
     public static final int FILE_WRITE_DATA = 0x00000002; // 2
+    /**
+     * 
+     */
     public static final int FILE_APPEND_DATA = 0x00000004; // 3
+    /**
+     * 
+     */
     public static final int FILE_READ_EA = 0x00000008; // 4
+    /**
+     * 
+     */
     public static final int FILE_WRITE_EA = 0x00000010; // 5
+    /**
+     * 
+     */
     public static final int FILE_EXECUTE = 0x00000020; // 6
+    /**
+     * 
+     */
     public static final int FILE_DELETE = 0x00000040; // 7
+    /**
+     * 
+     */
     public static final int FILE_READ_ATTRIBUTES = 0x00000080; // 8
+    /**
+     * 
+     */
     public static final int FILE_WRITE_ATTRIBUTES = 0x00000100; // 9
+    /**
+     * 
+     */
     public static final int DELETE = 0x00010000; // 16
+    /**
+     * 
+     */
     public static final int READ_CONTROL = 0x00020000; // 17
+    /**
+     * 
+     */
     public static final int WRITE_DAC = 0x00040000; // 18
+    /**
+     * 
+     */
     public static final int WRITE_OWNER = 0x00080000; // 19
+    /**
+     * 
+     */
     public static final int SYNCHRONIZE = 0x00100000; // 20
+    /**
+     * 
+     */
     public static final int GENERIC_ALL = 0x10000000; // 28
+    /**
+     * 
+     */
     public static final int GENERIC_EXECUTE = 0x20000000; // 29
+    /**
+     * 
+     */
     public static final int GENERIC_WRITE = 0x40000000; // 30
+    /**
+     * 
+     */
     public static final int GENERIC_READ = 0x80000000; // 31
 
+    /**
+     * 
+     */
     public static final int FLAGS_OBJECT_INHERIT = 0x01;
+    /**
+     * 
+     */
     public static final int FLAGS_CONTAINER_INHERIT = 0x02;
+    /**
+     * 
+     */
     public static final int FLAGS_NO_PROPAGATE = 0x04;
+    /**
+     * 
+     */
     public static final int FLAGS_INHERIT_ONLY = 0x08;
+    /**
+     * 
+     */
     public static final int FLAGS_INHERITED = 0x10;
 
     boolean allow;
@@ -83,6 +168,8 @@ public class ACE {
 
     /**
      * Returns true if this ACE is an allow ACE and false if it is a deny ACE.
+     * 
+     * @return whether this in an allow ACE
      */
     public boolean isAllow () {
         return this.allow;
@@ -96,6 +183,8 @@ public class ACE {
      * not be set within all security descriptors even though the ACE was in
      * face inherited. If an inherited ACE is added to a parent the Windows
      * ACL editor will rebuild all children ACEs and set this flag accordingly.
+     * 
+     * @return whether this is an inherited ACE
      */
     public boolean isInherited () {
         return ( this.flags & FLAGS_INHERITED ) != 0;
@@ -103,8 +192,10 @@ public class ACE {
 
 
     /**
-     * Returns the flags for this ACE. The </tt>isInherited()</tt>
+     * Returns the flags for this ACE. The <tt>isInherited()</tt>
      * method checks the <tt>FLAGS_INHERITED</tt> bit in these flags.
+     * 
+     * @return the ACE falgs
      */
     public int getFlags () {
         return this.flags;
@@ -115,6 +206,8 @@ public class ACE {
      * Returns the 'Apply To' text for inheritance of ACEs on
      * directories such as 'This folder, subfolder and files'. For
      * files the text is always 'This object only'.
+     * 
+     * @return descriptive text for the ACE scope
      */
     public String getApplyToText () {
         switch ( this.flags & ( FLAGS_OBJECT_INHERIT | FLAGS_CONTAINER_INHERIT | FLAGS_INHERIT_ONLY ) ) {
@@ -142,6 +235,8 @@ public class ACE {
      * constants for <tt>FILE_READ_DATA</tt>, <tt>FILE_WRITE_DATA</tt>,
      * <tt>READ_CONTROL</tt>, <tt>GENERIC_ALL</tt>, etc with bitwise
      * operators to determine which bits of the mask are on or off.
+     * 
+     * @return the access mask
      */
     public int getAccessMask () {
         return this.access;
@@ -150,6 +245,8 @@ public class ACE {
 
     /**
      * Return the SID associated with this ACE.
+     * 
+     * @return ACE target SID
      */
     public SID getSID () {
         return this.sid;

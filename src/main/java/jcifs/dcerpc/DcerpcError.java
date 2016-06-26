@@ -20,6 +20,7 @@
 package jcifs.dcerpc;
 
 
+@SuppressWarnings ( "javadoc" )
 public interface DcerpcError {
 
     public static final int DCERPC_FAULT_OTHER = 0x00000001;

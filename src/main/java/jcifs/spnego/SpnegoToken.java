@@ -23,6 +23,7 @@ package jcifs.spnego;
 import java.io.IOException;
 
 
+@SuppressWarnings ( "javadoc" )
 public abstract class SpnegoToken {
 
     private byte[] mechanismToken;

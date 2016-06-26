@@ -65,13 +65,13 @@ public interface CIFSContext {
 
 
     /**
-     * @return the DFS instance
+     * @return the DFS instance for this context
      */
     Dfs getDfs ();
 
 
     /**
-     * @return
+     * @return the SID resolver for this context
      */
     SidResolver getSIDResolver ();
 

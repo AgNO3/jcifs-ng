@@ -24,7 +24,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 
 import org.hamcrest.CoreMatchers;
@@ -43,15 +42,15 @@ import jcifs.smb.SmbFile;
  * @author mbechler
  *
  */
-public class ContextTests {
+@SuppressWarnings ( "javadoc" )
+public class ContextConfigTest {
 
     private SingletonContext context;
 
 
     @Before
-    public void setup () {
+    public void setUp () {
         this.context = SingletonContext.getInstance();
-
     }
 
 
@@ -99,72 +98,10 @@ public class ContextTests {
 
 
     @Test
-    public void testURLHandler () throws IOException {
+    public void testURLHandlerRegistration () throws IOException {
         Config.registerSmbURLHandler();
-        URL u = new URL("smb://localhost/test/");
+        URL u = new URL("smb://localhost/test");
         assertThat(u.openConnection(), CoreMatchers.is(CoreMatchers.instanceOf(SmbFile.class)));
-    }
-
-
-    @Test
-    public void testSMB () throws IOException {
-        CIFSContext ctx = withTestNTLMCredentials();
-        SmbFile f = new SmbFile("smb://" + TestConfig.getTestServer() + "/test/", ctx);
-
-        for ( SmbFile entry : f.listFiles() ) {
-            System.out.println(entry);
-
-            if ( entry.getContentLength() < 4096 ) {
-                long size = 0;
-                try ( InputStream is = entry.getInputStream() ) {
-                    byte[] buffer = new byte[4096];
-                    int read = 0;
-                    while ( ( read = is.read(buffer) ) >= 0 ) {
-                        size += read;
-                    }
-                }
-                assertEquals(entry.getContentLength(), size);
-            }
-        }
-
-        f = new SmbFile("smb://" + TestConfig.getTestServer() + "/test-guest/", ctx);
-        f.list();
-
-    }
-
-
-    /**
-     * @return
-     */
-    private CIFSContext withTestNTLMCredentials () {
-        return this.context.withCredentials(
-            new NtlmPasswordAuthentication(this.context, TestConfig.getTestUserDomain(), TestConfig.getTestUser(), TestConfig.getTestUserPassword()));
-    }
-
-
-    @Test
-    public void testSMB2 () throws IOException {
-        CIFSContext ctx = withTestNTLMCredentials();
-        SmbFile f = new SmbFile("smb://" + TestConfig.getTestServer() + "/test/", ctx);
-        f.length();
-    }
-
-
-    // @Test
-    public void testPerf () throws IOException {
-        long start = System.currentTimeMillis();
-        SmbFile f = new SmbFile("smb://" + TestConfig.getTestServer() + "/test/100MB", withTestNTLMCredentials());
-
-        f.length();
-        byte[] buffer = new byte[0xFFFF];
-
-        try ( InputStream is = f.getInputStream() ) {
-            while ( is.read(buffer) >= 0 ) {
-
-            }
-        }
-
-        System.out.println("100MB took " + ( System.currentTimeMillis() - start ) + " ms");
     }
 
 }

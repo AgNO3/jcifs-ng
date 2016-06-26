@@ -25,15 +25,22 @@ package jcifs.util;
 
 public class Hexdump {
 
+    /**
+     * 
+     */
     public static final char[] HEX_DIGITS = {
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
     };
 
 
     /**
-     * This is an alternative to the <code>java.lang.Integer.toHexString</cod>
+     * This is an alternative to the <code>java.lang.Integer.toHexString</code>
      * method. It is an efficient relative that also will pad the left side so
      * that the result is <code>size</code> digits.
+     * 
+     * @param val
+     * @param size
+     * @return hex string
      */
     public static String toHexString ( int val, int size ) {
         char[] c = new char[size];
@@ -42,6 +49,11 @@ public class Hexdump {
     }
 
 
+    /**
+     * @param val
+     * @param size
+     * @return hex string
+     */
     public static String toHexString ( long val, int size ) {
         char[] c = new char[size];
         toHexChars(val, c, 0, size);
@@ -49,6 +61,13 @@ public class Hexdump {
     }
 
 
+    /**
+     * 
+     * @param src
+     * @param srcIndex
+     * @param size
+     * @return hex string
+     */
     public static String toHexString ( byte[] src, int srcIndex, int size ) {
         char[] c = new char[size];
         size = ( size % 2 == 0 ) ? size / 2 : size / 2 + 1;
@@ -67,6 +86,11 @@ public class Hexdump {
      * This is the same as {@link jcifs.util.Hexdump#toHexString(int val, int
      * size)} but provides a more practical form when trying to avoid {@link
      * java.lang.String} concatenation and {@link java.lang.StringBuffer}.
+     * 
+     * @param val
+     * @param dst
+     * @param dstIndex
+     * @param size
      */
     public static void toHexChars ( int val, char dst[], int dstIndex, int size ) {
         while ( size > 0 ) {
@@ -82,6 +106,12 @@ public class Hexdump {
     }
 
 
+    /**
+     * @param val
+     * @param dst
+     * @param dstIndex
+     * @param size
+     */
     public static void toHexChars ( long val, char dst[], int dstIndex, int size ) {
         while ( size > 0 ) {
             dst[ dstIndex + size - 1 ] = HEX_DIGITS[ (int) ( val & 0x000FL ) ];

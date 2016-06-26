@@ -81,6 +81,12 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * will be substituted with <tt>jcifs.smb.client.domain</tt>,
      * <tt>jcifs.smb.client.username</tt>, <tt>jcifs.smb.client.password</tt>
      * property values.
+     * 
+     * @param tc
+     *            context to use
+     * @param domain
+     * @param username
+     * @param password
      */
     public NtlmPasswordAuthentication ( CIFSContext tc, String domain, String username, String password ) {
         this.context = tc;
@@ -113,6 +119,12 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * Create an <tt>NtlmPasswordAuthentication</tt> object with raw password
      * hashes. This is used exclusively by the <tt>jcifs.http.NtlmSsp</tt>
      * class which is in turn used by NTLM HTTP authentication functionality.
+     * 
+     * @param domain
+     * @param username
+     * @param challenge
+     * @param ansiHash
+     * @param unicodeHash
      */
     public NtlmPasswordAuthentication ( String domain, String username, byte[] challenge, byte[] ansiHash, byte[] unicodeHash ) {
         if ( domain == null || username == null || ansiHash == null || unicodeHash == null ) {
@@ -128,9 +140,9 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
 
 
     /**
+     * Construct anonymous credentials
      * 
      * @param tc
-     * @param nullAuth
      */
     public NtlmPasswordAuthentication ( CIFSContext tc ) {
         this(tc, "", "", "");
@@ -141,6 +153,9 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * Create an <tt>NtlmPasswordAuthentication</tt> object from the userinfo
      * component of an SMB URL like "<tt>domain;user:pass</tt>". This constructor
      * is used internally be jCIFS when parsing SMB URLs.
+     * 
+     * @param tc
+     * @param userInfo
      */
 
     public NtlmPasswordAuthentication ( CIFSContext tc, String userInfo ) {
@@ -256,6 +271,8 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
 
     /**
      * Returns the username.
+     * 
+     * @return the username
      */
     public String getUsername () {
         return this.username;
@@ -268,6 +285,8 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * object which will be the case when NTLM HTTP Authentication is
      * used. There is no way to retrieve a users password in plain text unless
      * it is supplied by the user at runtime.
+     * 
+     * @return the password
      */
     public String getPassword () {
         return this.password;
@@ -287,6 +306,11 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
 
     /**
      * Computes the 24 byte ANSI password hash given the 8 byte server challenge.
+     * 
+     * @param tc
+     * @param chlng
+     * @return the hash for the given challenge
+     * @throws GeneralSecurityException
      */
     public byte[] getAnsiHash ( CIFSContext tc, byte[] chlng ) throws GeneralSecurityException {
         if ( this.hashesExternal ) {
@@ -314,6 +338,11 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
 
     /**
      * Computes the 24 byte Unicode password hash given the 8 byte server challenge.
+     * 
+     * @param tc
+     * @param chlng
+     * @return the hash for the given challenge
+     * @throws GeneralSecurityException
      */
     public byte[] getUnicodeHash ( CIFSContext tc, byte[] chlng ) throws GeneralSecurityException {
         if ( this.hashesExternal ) {
@@ -334,6 +363,13 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
     }
 
 
+    /**
+     * @param tc
+     * @param chlng
+     * @return the signing key
+     * @throws SmbException
+     * @throws GeneralSecurityException
+     */
     public byte[] getSigningKey ( CIFSContext tc, byte[] chlng ) throws SmbException, GeneralSecurityException {
         switch ( tc.getConfig().getLanManCompatibility() ) {
         case 0:
@@ -360,7 +396,8 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
     /**
      * Returns the effective user session key.
      * 
-     * @param challenge
+     * @param tc
+     * @param chlng
      *            The server challenge.
      * @return A <code>byte[]</code> containing the effective user session key,
      *         used in SMB MAC signing and NTLMSSP signing and sealing.
@@ -540,7 +577,7 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
 
 
     /**
-     * @return
+     * @return whether the hashes are externally supplied
      */
     public boolean areHashesExternal () {
         return this.hashesExternal;

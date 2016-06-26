@@ -20,6 +20,7 @@
 package jcifs.dcerpc.ndr;
 
 
+@SuppressWarnings ( "javadoc" )
 public class NdrLong extends NdrObject {
 
     public int value;

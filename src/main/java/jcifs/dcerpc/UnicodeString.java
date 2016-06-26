@@ -20,16 +20,32 @@
 package jcifs.dcerpc;
 
 
+/**
+ * Unicode string type wrapper
+ * 
+ */
 public class UnicodeString extends rpc.unicode_string {
 
     boolean zterm;
 
 
+    /**
+     * 
+     * @param zterm
+     *            whether the string should be zero terminated
+     */
     public UnicodeString ( boolean zterm ) {
         this.zterm = zterm;
     }
 
 
+    /**
+     * 
+     * @param rus
+     *            wrapped string
+     * @param zterm
+     *            whether the string should be zero terminated
+     */
     public UnicodeString ( rpc.unicode_string rus, boolean zterm ) {
         this.length = rus.length;
         this.maximum_length = rus.maximum_length;
@@ -38,6 +54,13 @@ public class UnicodeString extends rpc.unicode_string {
     }
 
 
+    /**
+     * 
+     * @param str
+     *            wrapped string
+     * @param zterm
+     *            whether the string should be zero terminated
+     */
     public UnicodeString ( String str, boolean zterm ) {
         this.zterm = zterm;
 

@@ -22,6 +22,9 @@ package jcifs.smb;
 import jcifs.util.Hexdump;
 
 
+/**
+ * 
+ */
 public class SmbShareInfo implements FileEntry {
 
     protected String netName;
@@ -29,9 +32,18 @@ public class SmbShareInfo implements FileEntry {
     protected String remark;
 
 
+    /**
+     * 
+     */
     public SmbShareInfo () {}
 
 
+    /**
+     * 
+     * @param netName
+     * @param type
+     * @param remark
+     */
     public SmbShareInfo ( String netName, int type, String remark ) {
         this.netName = netName;
         this.type = type;

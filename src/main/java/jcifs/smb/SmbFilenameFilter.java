@@ -18,6 +18,19 @@
 
 package jcifs.smb;
 
+
+/**
+ * 
+ * 
+ */
 public interface SmbFilenameFilter {
-    public boolean accept( SmbFile dir, String name ) throws SmbException;
+
+    /**
+     * 
+     * @param dir
+     * @param name
+     * @return whether the given filename should be included
+     * @throws SmbException
+     */
+    public boolean accept ( SmbFile dir, String name ) throws SmbException;
 }

@@ -19,9 +19,7 @@ package jcifs;
 
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 
-import jcifs.smb.NtlmChallenge;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbTransport;
 
@@ -33,59 +31,110 @@ import jcifs.smb.SmbTransport;
 public interface SmbTransportPool {
 
     /**
+     * Get transport connection
+     * 
      * @param tc
+     *            context to use
      * @param address
      * @param port
-     * @return
+     * @param exclusive
+     *            whether to acquire an unshared connection
+     * @return a transport connection to the target
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean nonPooled );
+    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean exclusive );
 
 
     /**
+     * Get transport connection, with local binding
+     * 
      * @param tc
+     *            context to use
      * @param address
      * @param port
      * @param localAddr
      * @param localPort
      * @param hostName
-     * @return
+     * @param exclusive
+     *            whether to acquire an unshared connection
+     * @return a transport connection to the target
      */
     SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
-            boolean nonPooled );
+            boolean exclusive );
 
 
     /**
+     * 
      * @param trans
      */
     void removeTransport ( SmbTransport trans );
 
 
     /**
+     * Closes the pool and all connections in it
+     * 
+     * @throws CIFSException
      * 
      */
     void close () throws CIFSException;
 
 
     /**
+     * Authenticate arbitrary credentials represented by the
+     * <tt>NtlmPasswordAuthentication</tt> object against the domain controller
+     * specified by the <tt>UniAddress</tt> parameter. If the credentials are
+     * not accepted, an <tt>SmbAuthException</tt> will be thrown. If an error
+     * occurs an <tt>SmbException</tt> will be thrown. If the credentials are
+     * valid, the method will return without throwing an exception. See the
+     * last <a href="../../../faq.html">FAQ</a> question.
+     * <p>
+     * See also the <tt>jcifs.smb.client.logonShare</tt> property.
+     * 
      * @param dc
      * @param transportContext
+     * @throws SmbException
      */
     void logon ( UniAddress dc, CIFSContext transportContext ) throws SmbException;
 
 
     /**
+     * Authenticate arbitrary credentials represented by the
+     * <tt>NtlmPasswordAuthentication</tt> object against the domain controller
+     * specified by the <tt>UniAddress</tt> parameter. If the credentials are
+     * not accepted, an <tt>SmbAuthException</tt> will be thrown. If an error
+     * occurs an <tt>SmbException</tt> will be thrown. If the credentials are
+     * valid, the method will return without throwing an exception. See the
+     * last <a href="../../../faq.html">FAQ</a> question.
+     * <p>
+     * See also the <tt>jcifs.smb.client.logonShare</tt> property.
+     * 
+     * @param dc
+     * @param port
+     * @param transportContext
+     * @throws SmbException
+     */
+    void logon ( UniAddress dc, int port, CIFSContext transportContext ) throws SmbException;
+
+
+    /**
+     * Get NTLM challenge from a server
+     * 
      * @param dc
      * @param transportContext
-     * @return
+     * @return NTLM challenge
+     * @throws SmbException
      */
     byte[] getChallenge ( UniAddress dc, CIFSContext transportContext ) throws SmbException;
 
 
     /**
+     * Get NTLM challenge from a server
+     * 
+     * @param dc
+     * @param port
      * @param transportContext
-     * @param defaultDomain
-     * @return
+     * @return NTLM challenge
+     * @throws SmbException
      */
-    NtlmChallenge getChallengeForDomain ( CIFSContext transportContext, String defaultDomain ) throws SmbException, UnknownHostException;
+    byte[] getChallenge ( UniAddress dc, int port, CIFSContext transportContext ) throws SmbException;
 
 }

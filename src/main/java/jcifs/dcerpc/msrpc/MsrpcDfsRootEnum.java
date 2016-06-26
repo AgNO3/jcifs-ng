@@ -24,6 +24,7 @@ import jcifs.smb.FileEntry;
 import jcifs.smb.SmbShareInfo;
 
 
+@SuppressWarnings ( "javadoc" )
 public class MsrpcDfsRootEnum extends netdfs.NetrDfsEnumEx {
 
     public MsrpcDfsRootEnum ( String server ) {

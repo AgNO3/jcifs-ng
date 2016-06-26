@@ -24,6 +24,11 @@ import jcifs.dcerpc.ndr.NdrBuffer;
 import jcifs.dcerpc.ndr.NdrException;
 
 
+/**
+ * 
+ * @author mbechler
+ *
+ */
 public class DcerpcBind extends DcerpcMessage {
 
     private static final String[] result_message = {
@@ -48,6 +53,10 @@ public class DcerpcBind extends DcerpcMessage {
     private int max_xmit, max_recv;
 
 
+    /**
+     * Construct bind message
+     * 
+     */
     public DcerpcBind () {}
 
 

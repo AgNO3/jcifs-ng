@@ -18,6 +18,18 @@
 
 package jcifs.smb;
 
+
+/**
+ * 
+ * 
+ */
 public interface SmbFileFilter {
-    public boolean accept( SmbFile file ) throws SmbException;
+
+    /**
+     * 
+     * @param file
+     * @return whether the given file should be included
+     * @throws SmbException
+     */
+    public boolean accept ( SmbFile file ) throws SmbException;
 }

@@ -87,7 +87,7 @@ public class SMBUtil {
 
 
     static long readUTime ( byte[] buffer, int bufferIndex ) {
-        return readInt4(buffer, bufferIndex) * 1000L;
+        return ( readInt4(buffer, bufferIndex) & 0xFFFFFFFFL ) * 1000L;
     }
 
     static final byte[] SMB_HEADER = {

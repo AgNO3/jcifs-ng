@@ -30,6 +30,9 @@ import jcifs.smb.SmbNamedPipe;
 import jcifs.util.Encdec;
 
 
+/**
+ *
+ */
 public class DcerpcPipeHandle extends DcerpcHandle {
 
     /* This 0x20000 bit is going to get chopped! */
@@ -44,6 +47,9 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     /**
      * @param url
      * @param tc
+     * @param unshared
+     * @throws DcerpcException
+     * @throws MalformedURLException
      */
     public DcerpcPipeHandle ( String url, CIFSContext tc, boolean unshared ) throws DcerpcException, MalformedURLException {
         super(tc, DcerpcHandle.parseBinding(url));

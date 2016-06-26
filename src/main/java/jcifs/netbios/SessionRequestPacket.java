@@ -25,6 +25,9 @@ import java.io.InputStream;
 import jcifs.Configuration;
 
 
+/**
+ *
+ */
 public class SessionRequestPacket extends SessionServicePacket {
 
     private Name calledName, callingName;
@@ -36,6 +39,11 @@ public class SessionRequestPacket extends SessionServicePacket {
     }
 
 
+    /**
+     * 
+     * @param calledName
+     * @param callingName
+     */
     public SessionRequestPacket ( Name calledName, Name callingName ) {
         this.type = SESSION_REQUEST;
         this.calledName = calledName;

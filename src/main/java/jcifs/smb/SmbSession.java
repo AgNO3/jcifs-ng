@@ -39,6 +39,9 @@ import jcifs.SmbConstants;
 import jcifs.UniAddress;
 
 
+/**
+ *
+ */
 public final class SmbSession {
 
     private static final Logger log = Logger.getLogger(SmbSession.class);
@@ -81,7 +84,7 @@ public final class SmbSession {
 
 
     /**
-     * @return
+     * @return the configuration used by this session
      */
     public Configuration getConfig () {
         return this.transportContext.getConfig();
@@ -90,6 +93,7 @@ public final class SmbSession {
 
     /**
      * @return the sessionKey
+     * @throws CIFSException
      */
     public byte[] getSessionKey () throws CIFSException {
         if ( this.sessionKey == null ) {
@@ -111,6 +115,16 @@ public final class SmbSession {
         SmbTree t = new SmbTree(this, share, service);
         this.trees.add(t);
         return t;
+    }
+
+
+    /**
+     * Establish a tree connection
+     * 
+     * @throws SmbException
+     */
+    public void treeConnect () throws SmbException {
+        this.getSmbTree(this.getTransportContext().getConfig().getLogonShare(), null).treeConnect(null, null);
     }
 
 
@@ -171,10 +185,25 @@ public final class SmbSession {
 
                 request.uid = this.uid;
                 try {
+                    if ( log.isTraceEnabled() ) {
+                        log.trace("Request " + request);
+                    }
                     this.transport.send(request, response, timeout);
+                    if ( log.isTraceEnabled() ) {
+                        log.trace("Response " + response);
+                    }
+                }
+                catch ( DfsReferral r ) {
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Have referral " + r);
+                    }
+                    request.digest = null;
+                    throw r;
                 }
                 catch ( SmbException se ) {
-                    log.debug("Send failed", se);
+                    log.trace("Send failed", se);
+                    log.trace("Request: " + request);
+                    log.trace("Response: " + response);
                     if ( request instanceof SmbComTreeConnectAndX ) {
                         logoff(true);
                     }
@@ -245,11 +274,12 @@ public final class SmbSession {
      */
     private void sessionSetup2 ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException, GeneralSecurityException {
         SmbException ex = null;
-        SmbComSessionSetupAndX request;
-        SmbComSessionSetupAndXResponse response;
+        SmbComSessionSetupAndX request = null;
+        SmbComSessionSetupAndXResponse response = null;
         SSPContext ctx = null;
         byte[] token = new byte[0];
         int state = 10;
+        int signSequence = 0;
 
         do {
             switch ( state ) {
@@ -358,16 +388,8 @@ public final class SmbSession {
 
                 final SSPContext curCtx = ctx;
 
-                if ( log.isDebugEnabled() ) {
-                    log.debug(ctx);
-                }
-
-                if ( ctx.isEstablished() ) {
-                    this.setNetbiosName(ctx.getNetbiosName());
-                    this.sessionKey = ctx.getSigningKey();
-                    this.setSessionSetup(true);
-                    state = 0;
-                    break;
+                if ( log.isTraceEnabled() ) {
+                    log.trace(ctx);
                 }
 
                 try {
@@ -417,9 +439,12 @@ public final class SmbSession {
                     if ( ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null )
-                            request.digest = new SigningDigest(signingKey, true);
+                            request.digest = new SigningDigest(signingKey);
 
                         this.sessionKey = signingKey;
+                    }
+                    else {
+                        log.trace("Not yet initializing signing");
                     }
 
                     request.uid = this.getUid();
@@ -427,6 +452,7 @@ public final class SmbSession {
 
                     try {
                         this.getTransport().send(request, response, true);
+                        signSequence += 2;
                     }
                     catch ( SmbAuthException sae ) {
                         throw sae;
@@ -459,12 +485,34 @@ public final class SmbSession {
 
                     if ( request.digest != null ) {
                         /* success - install the signing digest */
+                        log.debug("Setting digest");
                         this.getTransport().digest = request.digest;
                     }
 
                     token = response.blob;
                 }
 
+                if ( ctx.isEstablished() ) {
+                    log.debug("Context is established");
+                    this.setNetbiosName(ctx.getNetbiosName());
+                    this.sessionKey = ctx.getSigningKey();
+                    if ( request != null && request.digest != null ) {
+                        /* success - install the signing digest */
+                        this.getTransport().digest = request.digest;
+                    }
+                    else if ( this.getTransport().isSignatureSetupRequired() ) {
+                        byte[] signingKey = ctx.getSigningKey();
+                        if ( signingKey != null && response != null )
+                            this.getTransport().digest = new SigningDigest(signingKey, signSequence);
+                        else {
+                            throw new SmbException("Signing required but no session key available");
+                        }
+                        this.sessionKey = signingKey;
+                    }
+                    this.setSessionSetup(true);
+                    state = 0;
+                    break;
+                }
                 break;
             default:
                 throw new SmbException("Unexpected session setup state: " + state);
@@ -528,16 +576,13 @@ public final class SmbSession {
     }
 
 
-    /**
-     * @param netbiosName2
-     */
     void setNetbiosName ( String netbiosName ) {
         this.netbiosName = netbiosName;
     }
 
 
     /**
-     * @return
+     * @return the context this session is attached to
      */
     public CIFSContext getTransportContext () {
         return this.transport.getTransportContext();
@@ -545,7 +590,7 @@ public final class SmbSession {
 
 
     /**
-     * @return
+     * @return the transport this session is attached to
      */
     public SmbTransport getTransport () {
         return this.transport;
@@ -553,7 +598,7 @@ public final class SmbSession {
 
 
     /**
-     * @return
+     * @return this session's UID
      */
     public int getUid () {
         return this.uid;
@@ -561,7 +606,7 @@ public final class SmbSession {
 
 
     /**
-     * @return
+     * @return this session's expiration time
      */
     public Long getExpiration () {
         return this.expiration;
@@ -569,7 +614,7 @@ public final class SmbSession {
 
 
     /**
-     * @return
+     * @return this session's credentials
      */
     public SmbCredentials getCredentials () {
         return this.credentials;

@@ -36,6 +36,8 @@ public abstract class NtlmAuthenticator {
     /**
      * Set the default <tt>NtlmAuthenticator</tt>. Once the default authenticator is set it cannot be changed. Calling
      * this metho again will have no effect.
+     * 
+     * @param a
      */
 
     public synchronized static void setDefault ( NtlmAuthenticator a ) {
@@ -46,6 +48,10 @@ public abstract class NtlmAuthenticator {
     }
 
 
+    /**
+     * 
+     * @return the default authentiucation credentials
+     */
     public static NtlmAuthenticator getDefault () {
         return auth;
     }
@@ -63,13 +69,22 @@ public abstract class NtlmAuthenticator {
 
     /**
      * Used internally by jCIFS when an <tt>SmbAuthException</tt> is trapped to retrieve new user credentials.
+     * 
+     * @param url
+     * @param sae
+     * @return credentials returned by prompt
      */
-
     public static NtlmPasswordAuthentication requestNtlmPasswordAuthentication ( String url, SmbAuthException sae ) {
         return requestNtlmPasswordAuthentication(auth, url, sae);
     }
 
 
+    /**
+     * @param a
+     * @param url
+     * @param sae
+     * @return credentials returned by prompt
+     */
     public static NtlmPasswordAuthentication requestNtlmPasswordAuthentication ( NtlmAuthenticator a, String url, SmbAuthException sae ) {
         if ( a == null ) {
             return null;

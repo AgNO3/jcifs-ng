@@ -49,6 +49,9 @@ public class Type3Message extends NtlmMessage {
     /**
      * Creates a Type-3 message using default values from the current
      * environment.
+     * 
+     * @param tc
+     *            context to use
      */
     public Type3Message ( CIFSContext tc ) {
         setFlags(getDefaultFlags(tc));
@@ -61,9 +64,12 @@ public class Type3Message extends NtlmMessage {
     /**
      * Creates a Type-3 message in response to the given Type-2 message
      * using default values from the current environment.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param type2
      *            The Type-2 message which this represents a response to.
+     * @throws GeneralSecurityException
      */
     public Type3Message ( CIFSContext tc, Type2Message type2 ) throws GeneralSecurityException {
         setFlags(getDefaultFlags(tc, type2));
@@ -104,7 +110,9 @@ public class Type3Message extends NtlmMessage {
 
     /**
      * Creates a Type-3 message in response to the given Type-2 message.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param type2
      *            The Type-2 message which this represents a response to.
      * @param password
@@ -116,6 +124,8 @@ public class Type3Message extends NtlmMessage {
      * @param workstation
      *            The workstation from which authentication is
      *            taking place.
+     * @param flags
+     * @throws GeneralSecurityException
      */
     public Type3Message ( CIFSContext tc, Type2Message type2, String password, String domain, String user, String workstation, int flags )
             throws GeneralSecurityException {
@@ -477,7 +487,9 @@ public class Type3Message extends NtlmMessage {
     /**
      * Returns the default flags for a generic Type-3 message in the
      * current environment.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @return An <code>int</code> containing the default flags.
      */
     public static int getDefaultFlags ( CIFSContext tc ) {
@@ -488,7 +500,11 @@ public class Type3Message extends NtlmMessage {
     /**
      * Returns the default flags for a Type-3 message created in response
      * to the given Type-2 message in the current environment.
-     *
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message.
      * @return An <code>int</code> containing the default flags.
      */
     public static int getDefaultFlags ( CIFSContext tc, Type2Message type2 ) {
@@ -503,12 +519,15 @@ public class Type3Message extends NtlmMessage {
     /**
      * Constructs the LanManager response to the given Type-2 message using
      * the supplied password.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param type2
      *            The Type-2 message.
      * @param password
      *            The password.
      * @return A <code>byte[]</code> containing the LanManager response.
+     * @throws GeneralSecurityException
      */
     public static byte[] getLMResponse ( CIFSContext tc, Type2Message type2, String password ) throws GeneralSecurityException {
         if ( type2 == null || password == null )
@@ -517,6 +536,17 @@ public class Type3Message extends NtlmMessage {
     }
 
 
+    /**
+     * 
+     * @param tc
+     * @param type2
+     * @param domain
+     * @param user
+     * @param password
+     * @param clientChallenge
+     * @return the calculated response
+     * @throws GeneralSecurityException
+     */
     public static byte[] getLMv2Response ( CIFSContext tc, Type2Message type2, String domain, String user, String password, byte[] clientChallenge )
             throws GeneralSecurityException {
         if ( type2 == null || domain == null || user == null || password == null || clientChallenge == null ) {
@@ -526,6 +556,16 @@ public class Type3Message extends NtlmMessage {
     }
 
 
+    /**
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message.
+     * @param responseKeyNT
+     * @param clientChallenge
+     * @return A <code>byte[]</code> containing the NTLMv2 response.
+     */
     public static byte[] getNTLMv2Response ( CIFSContext tc, Type2Message type2, byte[] responseKeyNT, byte[] clientChallenge ) {
         if ( type2 == null || responseKeyNT == null || clientChallenge == null ) {
             return null;
@@ -538,12 +578,15 @@ public class Type3Message extends NtlmMessage {
     /**
      * Constructs the NT response to the given Type-2 message using
      * the supplied password.
-     *
+     * 
+     * @param tc
+     *            context to use
      * @param type2
      *            The Type-2 message.
      * @param password
      *            The password.
      * @return A <code>byte[]</code> containing the NT response.
+     * @throws GeneralSecurityException
      */
     public static byte[] getNTResponse ( CIFSContext tc, Type2Message type2, String password ) throws GeneralSecurityException {
         if ( type2 == null || password == null )

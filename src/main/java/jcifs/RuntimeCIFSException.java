@@ -30,21 +30,34 @@ public class RuntimeCIFSException extends RuntimeException {
     private static final long serialVersionUID = -2611196678846438579L;
 
 
+    /**
+     * 
+     */
     public RuntimeCIFSException () {
         super();
     }
 
 
+    /**
+     * @param message
+     * @param cause
+     */
     public RuntimeCIFSException ( String message, Throwable cause ) {
         super(message, cause);
     }
 
 
+    /**
+     * @param message
+     */
     public RuntimeCIFSException ( String message ) {
         super(message);
     }
 
 
+    /**
+     * @param cause
+     */
     public RuntimeCIFSException ( Throwable cause ) {
         super(cause);
     }

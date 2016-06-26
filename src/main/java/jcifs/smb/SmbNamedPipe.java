@@ -54,7 +54,7 @@ import jcifs.CIFSContext;
  * is desired.
  *
  * <p>
- * <table border="1" cellpadding="3" cellspacing="0" width="100%">
+ * <table border="1" cellpadding="3" cellspacing="0" width="100%" summary="Usage examples">
  * <tr bgcolor="#ccccff">
  * <td colspan="2"><b><code>SmbNamedPipe</code> Constructor Examples</b></td>
  * <tr>
@@ -65,7 +65,7 @@ import jcifs.CIFSContext;
  * <td width="20%">
  * 
  * <pre>
- * new SmbNamedPipe("smb://server/IPC$/PIPE/foo", SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_CALL);
+ * new SmbNamedPipe("smb://server/IPC$/PIPE/foo", SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_CALL, context);
  * </pre>
  * 
  * </td>
@@ -77,7 +77,7 @@ import jcifs.CIFSContext;
  * <td width="20%">
  * 
  * <pre>
- * new SmbNamedPipe("smb://server/IPC$/foo", SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_TRANSACT);
+ * new SmbNamedPipe("smb://server/IPC$/foo", SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_TRANSACT, context);
  * </pre>
  * 
  * </td>
@@ -90,7 +90,7 @@ import jcifs.CIFSContext;
  * <td width="20%">
  * 
  * <pre>
- * new SmbNamedPipe("smb://server/IPC$/foo", SmbNamedPipe.PIPE_TYPE_RDWR);
+ * new SmbNamedPipe("smb://server/IPC$/foo", SmbNamedPipe.PIPE_TYPE_RDWR, context);
  * </pre>
  * 
  * </td>
@@ -142,6 +142,9 @@ public class SmbNamedPipe extends SmbFile {
 
     public static final int PIPE_TYPE_TRANSACT = 0x0200;
 
+    /**
+     * Pipe is used for DCE
+     */
     public static final int PIPE_TYPE_DCE_TRANSACT = 0x0200 | 0x0400;
 
     InputStream pipeIn;
@@ -154,6 +157,11 @@ public class SmbNamedPipe extends SmbFile {
      * parameter. The pipeType parameter should be at least one of
      * the <code>PIPE_TYPE</code> flags combined with the bitwise OR
      * operator <code>|</code>. See the examples listed above.
+     * 
+     * @param url
+     * @param pipeType
+     * @param tc
+     * @throws MalformedURLException
      */
 
     public SmbNamedPipe ( String url, int pipeType, CIFSContext tc ) throws MalformedURLException {
@@ -172,6 +180,9 @@ public class SmbNamedPipe extends SmbFile {
      * connection). Reading from this stream may block. Therefore it
      * may be necessary that an addition thread be used to read and
      * write to a Named Pipe.
+     * 
+     * @return pipe input stream
+     * @throws IOException
      */
 
     public InputStream getNamedPipeInputStream () throws IOException {
@@ -193,8 +204,10 @@ public class SmbNamedPipe extends SmbFile {
      * to this stream will result in response data recieved in the
      * <code>InputStream</code> associated with this Named Pipe
      * instance (unless of course it does not elicite a response or the pipe is write-only).
+     * 
+     * @return pipe output stream
+     * @throws IOException
      */
-
     public OutputStream getNamedPipeOutputStream () throws IOException {
         if ( this.pipeOut == null ) {
             if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {

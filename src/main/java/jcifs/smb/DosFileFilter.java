@@ -19,17 +19,24 @@
 package jcifs.smb;
 
 
+/**
+ * 
+ *
+ */
 public class DosFileFilter implements SmbFileFilter {
 
     protected String wildcard;
     protected int attributes;
 
 
-    /*
+    /**
      * This filter can be considerably more efficient than other file filters
      * as the specifed wildcard and attributes are passed to the server for
      * filtering there (although attributes are largely ignored by servers
      * they are filtered locally by the default accept method).
+     * 
+     * @param wildcard
+     * @param attributes
      */
     public DosFileFilter ( String wildcard, int attributes ) {
         this.wildcard = wildcard;
@@ -37,7 +44,7 @@ public class DosFileFilter implements SmbFileFilter {
     }
 
 
-    /*
+    /**
      * This returns true if the file's attributes contain any of the attributes
      * specified for this filter. The wildcard has no influence on this
      * method as the server should have performed that filtering already. The

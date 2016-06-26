@@ -26,6 +26,7 @@ import jcifs.dcerpc.rpc;
 import jcifs.smb.SmbException;
 
 
+@SuppressWarnings ( "javadoc" )
 public class SamrDomainHandle extends rpc.policy_handle {
 
     public SamrDomainHandle ( DcerpcHandle handle, SamrPolicyHandle policyHandle, int access, rpc.sid_t sid ) throws IOException {

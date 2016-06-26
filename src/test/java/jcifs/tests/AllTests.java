@@ -18,6 +18,23 @@
 package jcifs.tests;
 
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
@@ -29,8 +46,158 @@ import org.junit.runners.Suite.SuiteClasses;
  */
 @RunWith ( Suite.class )
 @SuiteClasses ( {
-    ContextTests.class, KerberosTests.class
+    ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class
 } )
 public class AllTests {
+
+    private static final Logger log = Logger.getLogger(AllTests.class);
+
+    private static Map<String, TestMutation> MUTATIONS = new HashMap<>();
+
+
+    static {
+        MUTATIONS.put("noSigning", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.signingPreferred", "false");
+                cfg.put("jcifs.smb.client.signingEnforced", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("forceSigning", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.signingPreferred", "true");
+                cfg.put("jcifs.smb.client.signingEnforced", "true");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("legacyAuth", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.lmCompatibility", "2");
+                cfg.put("jcifs.smb.client.useExtendedSecurity", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("noUnicode", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.useUnicode", "false");
+                cfg.put("jcifs.smb.forceUnicode", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("forceUnicode", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.useUnicode", "true");
+                cfg.put("jcifs.smb.forceUnicode", "true");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("noNTStatus", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.useNtStatus", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("noNTSmbs", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.useNTSmbs", "false");
+                return cfg;
+            }
+        });
+    }
+
+
+    /**
+     * @param applyMutations
+     * @return configurations available for running
+     * 
+     */
+    public synchronized static Map<String, Map<String, String>> getConfigs ( String[] applyMutations ) {
+        Map<String, Map<String, String>> configs = new HashMap<>();
+
+        if ( System.getProperties().containsKey(TestProperties.TEST_SERVER) ) {
+            configs.put("properties", toMap(System.getProperties()));
+        }
+
+        if ( System.getProperties().containsKey(TestProperties.TEST_CONFIG_DIR) ) {
+            try {
+                Iterator<Path> it = Files.list(Paths.get(System.getProperty(TestProperties.TEST_CONFIG_DIR))).iterator();
+
+                while ( it.hasNext() ) {
+                    Path config = it.next();
+                    String fname = config.getFileName().toString();
+                    if ( !fname.endsWith(".conf") ) {
+                        continue;
+                    }
+                    Properties props = new Properties();
+                    try ( FileChannel ch = FileChannel.open(config, StandardOpenOption.READ);
+                          InputStream is = Channels.newInputStream(ch) ) {
+                        props.load(is);
+
+                    }
+                    if ( !props.isEmpty() ) {
+                        Map<String, String> map = toMap(props);
+                        String cfgname = fname.substring(0, fname.length() - 5);
+                        configs.put(cfgname, map);
+                        Set<String> apply = new HashSet<>(Arrays.asList(applyMutations));
+
+                        Set<String> excludes = new HashSet<>();
+                        if ( map.get(TestProperties.EXCLUDE_TEST_MUTATIONS) != null ) {
+                            excludes.addAll(Arrays.asList(map.get(TestProperties.EXCLUDE_TEST_MUTATIONS).split("\\s*,\\s*")));
+                        }
+                        if ( applyMutations != null && applyMutations.length > 0 && map.get(TestProperties.TEST_MUTATIONS) != null ) {
+                            for ( String mutate : map.get(TestProperties.TEST_MUTATIONS).split("\\s*,\\s*") ) {
+                                if ( !excludes.contains(mutate) && apply.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
+                                    configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
+                                }
+                            }
+                        }
+                        else if ( applyMutations != null && applyMutations.length > 0 ) {
+                            for ( String mutate : applyMutations ) {
+                                if ( !excludes.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
+                                    configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch ( IOException e ) {
+                log.error("Failed to load test config directory " + System.getProperty(TestProperties.TEST_CONFIG_DIR), e);
+            }
+        }
+        return configs;
+    }
+
+
+    /**
+     * @return
+     */
+    static Map<String, String> toMap ( Properties props ) {
+        Map<String, String> res = new HashMap<>();
+        for ( Object object : props.keySet() ) {
+            res.put((String) object, props.getProperty((String) object).trim());
+        }
+        return res;
+    }
 
 }

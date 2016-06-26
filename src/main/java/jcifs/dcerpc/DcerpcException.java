@@ -20,14 +20,14 @@
 package jcifs.dcerpc;
 
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 import jcifs.CIFSException;
 import jcifs.smb.WinError;
 import jcifs.util.Hexdump;
 
 
+/**
+ *
+ */
 public class DcerpcException extends CIFSException implements DcerpcError, WinError {
 
     /**
@@ -58,7 +58,6 @@ public class DcerpcException extends CIFSException implements DcerpcError, WinEr
     }
 
     private int error;
-    private Throwable rootCause;
 
 
     DcerpcException ( int error ) {
@@ -67,35 +66,39 @@ public class DcerpcException extends CIFSException implements DcerpcError, WinEr
     }
 
 
+    /**
+     * @param msg
+     */
     public DcerpcException ( String msg ) {
         super(msg);
     }
 
 
+    /**
+     * @param msg
+     * @param rootCause
+     */
     public DcerpcException ( String msg, Throwable rootCause ) {
-        super(msg);
-        this.rootCause = rootCause;
+        super(msg, rootCause);
     }
 
 
+    /**
+     * 
+     * @return the error code
+     */
     public int getErrorCode () {
         return this.error;
     }
 
 
+    /**
+     * 
+     * @return the root cause
+     */
+    @Deprecated
     public Throwable getRootCause () {
-        return this.rootCause;
+        return getCause();
     }
 
-
-    @Override
-    public String toString () {
-        if ( this.rootCause != null ) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            this.rootCause.printStackTrace(pw);
-            return super.toString() + "\n" + sw;
-        }
-        return super.toString();
-    }
 }

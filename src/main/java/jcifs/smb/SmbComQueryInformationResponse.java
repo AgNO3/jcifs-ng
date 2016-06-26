@@ -48,20 +48,29 @@ class SmbComQueryInformationResponse extends ServerMessageBlock implements Info 
 
     @Override
     public long getCreateTime () {
-        return this.lastWriteTime + this.serverTimeZoneOffset;
+        return convertTime(this.lastWriteTime);
+    }
+
+
+    /**
+     * @param time
+     * @return
+     */
+    private long convertTime ( long time ) {
+        return time + this.serverTimeZoneOffset;
     }
 
 
     @Override
     public long getLastWriteTime () {
-        return this.lastWriteTime + this.serverTimeZoneOffset;
+        return convertTime(this.lastWriteTime);
     }
 
 
     @Override
     public long getLastAccessTime () {
         // Fake access time
-        return this.lastWriteTime + this.serverTimeZoneOffset;
+        return convertTime(this.lastWriteTime);
     }
 
 

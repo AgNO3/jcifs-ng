@@ -51,6 +51,10 @@ public class BaseContext extends AbstractCIFSContext {
 
 
     /**
+     * Construct a context
+     * 
+     * @param config
+     *            configuration for the context
      * 
      */
     public BaseContext ( Configuration config ) {

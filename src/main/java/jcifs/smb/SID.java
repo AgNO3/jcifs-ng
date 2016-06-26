@@ -55,24 +55,73 @@ public class SID extends rpc.sid_t {
 
     private static final Logger log = Logger.getLogger(SID.class);
 
+    /**
+     * 
+     */
     public static final int SID_TYPE_USE_NONE = lsarpc.SID_NAME_USE_NONE;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_USER = lsarpc.SID_NAME_USER;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_DOM_GRP = lsarpc.SID_NAME_DOM_GRP;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_DOMAIN = lsarpc.SID_NAME_DOMAIN;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_ALIAS = lsarpc.SID_NAME_ALIAS;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_WKN_GRP = lsarpc.SID_NAME_WKN_GRP;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_DELETED = lsarpc.SID_NAME_DELETED;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_INVALID = lsarpc.SID_NAME_INVALID;
+
+    /**
+     * 
+     */
     public static final int SID_TYPE_UNKNOWN = lsarpc.SID_NAME_UNKNOWN;
 
     static final String[] SID_TYPE_NAMES = {
         "0", "User", "Domain group", "Domain", "Local group", "Builtin group", "Deleted", "Invalid", "Unknown"
     };
 
+    /**
+     * 
+     */
     public static final int SID_FLAG_RESOLVE_SIDS = 0x0001;
 
+    /**
+     * Well known SID: EVERYONE
+     */
     public static SID EVERYONE = null;
+
+    /**
+     * Well known SID: CREATOR_OWNER
+     */
     public static SID CREATOR_OWNER = null;
+
+    /**
+     * Well known SID: SYSTEM
+     */
     public static SID SYSTEM = null;
 
 
@@ -88,6 +137,12 @@ public class SID extends rpc.sid_t {
     }
 
 
+    /**
+     * Convert a sid_t to byte array
+     * 
+     * @param sid
+     * @return byte encoded form
+     */
     public static byte[] toByteArray ( rpc.sid_t sid ) {
         byte[] dst = new byte[1 + 1 + 6 + sid.sub_authority_count * 4];
         int di = 0;
@@ -109,8 +164,12 @@ public class SID extends rpc.sid_t {
     CIFSContext origin_ctx = null;
 
 
-    /*
+    /**
      * Construct a SID from it's binary representation.
+     *
+     * 
+     * @param src
+     * @param si
      */
     public SID ( byte[] src, int si ) {
         this.revision = src[ si++ ];
@@ -131,6 +190,9 @@ public class SID extends rpc.sid_t {
     /**
      * Construct a SID from it's textual representation such as
      * <tt>S-1-5-21-1496946806-2192648263-3843101252-1029</tt>.
+     * 
+     * @param textual
+     * @throws SmbException
      */
     public SID ( String textual ) throws SmbException {
         StringTokenizer st = new StringTokenizer(textual, "-");
@@ -166,6 +228,9 @@ public class SID extends rpc.sid_t {
      * (relative identifier). For example, a domain SID
      * <tt>S-1-5-21-1496946806-2192648263-3843101252</tt> and RID <tt>1029</tt> would
      * yield the SID <tt>S-1-5-21-1496946806-2192648263-3843101252-1029</tt>.
+     * 
+     * @param domsid
+     * @param rid
      */
     public SID ( SID domsid, int rid ) {
         this.revision = domsid.revision;
@@ -181,7 +246,9 @@ public class SID extends rpc.sid_t {
 
 
     /**
-     * @param resourceDomainId
+     * Construct a relative SID
+     * 
+     * @param domsid
      * @param id
      */
     public SID ( SID domsid, SID id ) {
@@ -199,6 +266,14 @@ public class SID extends rpc.sid_t {
     }
 
 
+    /**
+     * 
+     * @param sid
+     * @param type
+     * @param domainName
+     * @param acctName
+     * @param decrementAuthority
+     */
     public SID ( rpc.sid_t sid, int type, String domainName, String acctName, boolean decrementAuthority ) {
         this.revision = sid.revision;
         this.sub_authority_count = sid.sub_authority_count;
@@ -218,16 +293,28 @@ public class SID extends rpc.sid_t {
     }
 
 
+    /**
+     * 
+     * @return encoded SID
+     */
     public byte[] toByteArray () {
         return toByteArray(this);
     }
 
 
+    /**
+     * 
+     * @return whether the SID is empty (no sub-authorities)
+     */
     public boolean isEmpty () {
         return this.sub_authority_count == 0;
     }
 
 
+    /**
+     * 
+     * @return whether the SID is blank (all sub-authorities zero)
+     */
     public boolean isBlank () {
         boolean blank = true;
         for ( int sub : this.sub_authority )
@@ -236,11 +323,22 @@ public class SID extends rpc.sid_t {
     }
 
 
+    /**
+     * 
+     * @return domain SID
+     */
     public SID getDomainSid () {
         return new SID(this, SID_TYPE_DOMAIN, this.domainName, null, getType() != SID_TYPE_DOMAIN);
     }
 
 
+    /**
+     * Get the RID
+     * 
+     * This is the last subauthority identifier
+     * 
+     * @return the RID
+     */
     public int getRid () {
         if ( getType() == SID_TYPE_DOMAIN )
             throw new IllegalArgumentException("This SID is a domain sid");
@@ -252,20 +350,50 @@ public class SID extends rpc.sid_t {
      * Returns the type of this SID indicating the state or type of account.
      * <p>
      * SID types are described in the following table.
-     * <tt>
-     * <table>
-     * <tr><th>Type</th><th>Name</th></tr>
-     * <tr><td>SID_TYPE_USE_NONE</td><td>0</td></tr>
-     * <tr><td>SID_TYPE_USER</td><td>User</td></tr>
-     * <tr><td>SID_TYPE_DOM_GRP</td><td>Domain group</td></tr>
-     * <tr><td>SID_TYPE_DOMAIN</td><td>Domain</td></tr>
-     * <tr><td>SID_TYPE_ALIAS</td><td>Local group</td></tr>
-     * <tr><td>SID_TYPE_WKN_GRP</td><td>Builtin group</td></tr>
-     * <tr><td>SID_TYPE_DELETED</td><td>Deleted</td></tr>
-     * <tr><td>SID_TYPE_INVALID</td><td>Invalid</td></tr>
-     * <tr><td>SID_TYPE_UNKNOWN</td><td>Unknown</td></tr>
+     * <table summary="Type codes">
+     * <tr>
+     * <th>Type</th>
+     * <th>Name</th>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_USE_NONE</td>
+     * <td>0</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_USER</td>
+     * <td>User</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_DOM_GRP</td>
+     * <td>Domain group</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_DOMAIN</td>
+     * <td>Domain</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_ALIAS</td>
+     * <td>Local group</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_WKN_GRP</td>
+     * <td>Builtin group</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_DELETED</td>
+     * <td>Deleted</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_INVALID</td>
+     * <td>Invalid</td>
+     * </tr>
+     * <tr>
+     * <td>SID_TYPE_UNKNOWN</td>
+     * <td>Unknown</td>
+     * </tr>
      * </table>
-     * </tt>
+     * 
+     * @return type code
      */
     public int getType () {
         if ( this.origin_server != null )
@@ -277,6 +405,8 @@ public class SID extends rpc.sid_t {
     /**
      * Return text represeting the SID type suitable for display to
      * users. Text includes 'User', 'Domain group', 'Local group', etc.
+     * 
+     * @return textual representation of type
      */
     public String getTypeText () {
         if ( this.origin_server != null )
@@ -288,6 +418,8 @@ public class SID extends rpc.sid_t {
     /**
      * Return the domain name of this SID unless it could not be
      * resolved in which case the numeric representation is returned.
+     * 
+     * @return the domain name
      */
     public String getDomainName () {
         if ( this.origin_server != null )
@@ -304,6 +436,8 @@ public class SID extends rpc.sid_t {
      * Return the sAMAccountName of this SID unless it could not
      * be resolved in which case the numeric RID is returned. If this
      * SID is a domain SID, this method will return an empty String.
+     * 
+     * @return the account name
      */
     public String getAccountName () {
         if ( this.origin_server != null )
@@ -396,6 +530,8 @@ public class SID extends rpc.sid_t {
      * only the name component will be returned (e.g. SYSTEM).
      * If the sid cannot be resolved the numeric representation from
      * toString() is returned.
+     * 
+     * @return display format, potentially with resolved names
      */
     public String toDisplayString () {
         if ( this.origin_server != null )
@@ -433,8 +569,9 @@ public class SID extends rpc.sid_t {
      * 
      * @param authorityServerName
      *            The FQDN of the server that is an authority for the SID.
-     * @param auth
-     *            Credentials suitable for accessing the SID's information.
+     * @param tc
+     *            Context to use
+     * @throws IOException
      */
     public void resolve ( String authorityServerName, CIFSContext tc ) throws IOException {
         SID[] sids = new SID[1];
@@ -459,6 +596,15 @@ public class SID extends rpc.sid_t {
     }
 
 
+    /**
+     * Get members of the group represented by this SID, if it is one.
+     * 
+     * @param authorityServerName
+     * @param tc
+     * @param flags
+     * @return the members of the group
+     * @throws IOException
+     */
     public SID[] getGroupMemberSids ( String authorityServerName, CIFSContext tc, int flags ) throws IOException {
         if ( this.type != SID_TYPE_DOM_GRP && this.type != SID_TYPE_ALIAS )
             return new SID[0];

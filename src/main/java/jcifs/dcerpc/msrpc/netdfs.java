@@ -1,6 +1,8 @@
 package jcifs.dcerpc.msrpc;
 
 
+import javax.annotation.Generated;
+
 import jcifs.dcerpc.DcerpcMessage;
 import jcifs.dcerpc.ndr.NdrBuffer;
 import jcifs.dcerpc.ndr.NdrException;
@@ -8,6 +10,8 @@ import jcifs.dcerpc.ndr.NdrLong;
 import jcifs.dcerpc.ndr.NdrObject;
 
 
+@Generated ( "midlc" )
+@SuppressWarnings ( "all" )
 public class netdfs {
 
     public static String getSyntax () {

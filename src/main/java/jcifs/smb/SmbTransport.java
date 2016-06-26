@@ -51,6 +51,9 @@ import jcifs.util.transport.Transport;
 import jcifs.util.transport.TransportException;
 
 
+/**
+ * 
+ */
 public class SmbTransport extends Transport implements SmbConstants {
 
     private static final byte[] BUF = new byte[0xFFFF];
@@ -113,7 +116,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         this.key = new SmbComBlankResponse(tc.getConfig());
         this.NEGOTIATE_REQUEST = nego;
         this.flags2 = this.NEGOTIATE_REQUEST.flags2;
-        this.sessionExpiration = System.currentTimeMillis() + tc.getConfig().getSoTimeout();
+        this.sessionExpiration = System.currentTimeMillis() + tc.getConfig().getSessionTimeout();
         this.capabilities = tc.getConfig().getCapabilities();
         this.address = address;
         this.port = port;
@@ -134,40 +137,54 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     /**
-     * @return
+     * @return the context associated with this transport connection
      */
     public CIFSContext getTransportContext () {
         return this.transportContext;
     }
 
 
-    synchronized SmbSession getSmbSession ( CIFSContext tf ) {
+    /**
+     * @return the server's encryption key
+     */
+    public byte[] getServerEncryptionKey () {
+        if ( this.server == null ) {
+            return null;
+        }
+        return this.server.encryptionKey;
+    }
+
+
+    /**
+     * 
+     * @param tf
+     *            context to use
+     * @return a session for the context
+     */
+    public synchronized SmbSession getSmbSession ( CIFSContext tf ) {
         SmbSession ssn;
         long now;
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("Currently " + this.sessions.size() + " session(s) active for " + this);
+        if ( log.isTraceEnabled() ) {
+            log.trace("Currently " + this.sessions.size() + " session(s) active for " + this);
         }
 
         ListIterator<SmbSession> iter = this.sessions.listIterator();
         while ( iter.hasNext() ) {
             ssn = iter.next();
             if ( ssn.matches(tf) ) {
-                // TODO: here the authenticators were set on the session, is this necessary?
-                if ( log.isDebugEnabled() ) {
-                    log.debug("Reusing existing session " + ssn);
+                if ( log.isTraceEnabled() ) {
+                    log.trace("Reusing existing session " + ssn);
                 }
                 return ssn;
             }
-            else if ( log.isDebugEnabled() ) {
-                if ( log.isDebugEnabled() ) {
-                    log.debug("Existing session " + ssn + " does not match " + tf.getCredentials());
-                }
+            else if ( log.isTraceEnabled() ) {
+                log.trace("Existing session " + ssn + " does not match " + tf.getCredentials());
             }
         }
 
         /* logoff old sessions */
-        if ( tf.getConfig().getSoTimeout() > 0 && this.sessionExpiration < ( now = System.currentTimeMillis() ) ) {
+        if ( tf.getConfig().getSessionTimeout() > 0 && this.sessionExpiration < ( now = System.currentTimeMillis() ) ) {
             this.sessionExpiration = now + tf.getConfig().getSoTimeout();
             iter = this.sessions.listIterator();
             while ( iter.hasNext() ) {
@@ -182,7 +199,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         }
         ssn = new SmbSession(tf, this, this.address, this.port, this.localAddr, this.localPort);
         if ( log.isDebugEnabled() ) {
-            log.debug("New session " + ssn);
+            log.debug("Establishing new session " + ssn);
         }
         this.sessions.add(ssn);
         return ssn;
@@ -200,7 +217,12 @@ public class SmbTransport extends Transport implements SmbConstants {
     }
 
 
-    boolean hasCapability ( int cap ) throws SmbException {
+    /**
+     * @param cap
+     * @return whether the given capability was negotiated
+     * @throws SmbException
+     */
+    public boolean hasCapability ( int cap ) throws SmbException {
         try {
             connect(this.transportContext.getConfig().getResponseTimeout());
         }
@@ -360,6 +382,11 @@ public class SmbTransport extends Transport implements SmbConstants {
     }
 
 
+    /**
+     * Connect the transport
+     * 
+     * @throws SmbException
+     */
     public void connect () throws SmbException {
         try {
             super.connect(this.transportContext.getConfig().getResponseTimeout());
@@ -375,6 +402,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         /*
          * Negotiate Protocol Request / Response
          */
+        log.debug("Connecting in state " + this.state);
 
         SmbComNegotiateResponse resp;
         try {
@@ -399,9 +427,15 @@ public class SmbTransport extends Transport implements SmbConstants {
 
         /* Adjust negotiated values */
         this.tconHostName = this.address.getHostName();
-        if ( this.getTransportContext().getConfig().isSigningEnforced() || this.server.signaturesRequired
-                || ( this.server.signaturesEnabled && this.getTransportContext().getConfig().isSigningPreferred() ) ) {
+        if ( this.getTransportContext().getConfig().isSigningEnforced() && !this.server.signaturesEnabled ) {
+            throw new SmbException("Signatures are requried but the server does not support them");
+        }
+        else if ( this.getTransportContext().getConfig().isSigningEnforced() || this.server.signaturesRequired
+                || ( this.server.signaturesEnabled && this.getTransportContext().getConfig().isSigningEnabled() ) ) {
             this.flags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
+            if ( this.getTransportContext().getConfig().isSigningEnforced() ) {
+                this.flags2 |= SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;
+            }
         }
         else {
             this.flags2 &= 0xFFFF ^ SmbConstants.FLAGS2_SECURITY_SIGNATURES;
@@ -415,6 +449,10 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( ( this.server.scapabilities & CAP_EXTENDED_SECURITY ) == CAP_EXTENDED_SECURITY )
             this.capabilities |= CAP_EXTENDED_SECURITY; // & doesn't copy high bit
 
+        if ( this.getTransportContext().getConfig().isUseUnicode() || this.getTransportContext().getConfig().isForceUnicode() ) {
+            this.capabilities |= SmbConstants.CAP_UNICODE;
+        }
+
         if ( ( this.capabilities & SmbConstants.CAP_UNICODE ) == 0 ) {
             // server doesn't want unicode
             if ( this.getTransportContext().getConfig().isForceUnicode() ) {
@@ -424,6 +462,9 @@ public class SmbTransport extends Transport implements SmbConstants {
                 this.useUnicode = false;
                 this.flags2 &= 0xFFFF ^ SmbConstants.FLAGS2_UNICODE;
             }
+        }
+        else {
+            this.useUnicode = true;
         }
     }
 
@@ -435,10 +476,22 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( log.isDebugEnabled() ) {
             log.debug("Disconnecting transport " + this);
         }
+
         try {
+            if ( log.isTraceEnabled() ) {
+                log.trace("Currently " + this.sessions.size() + " session(s) active for " + this);
+            }
             while ( iter.hasNext() ) {
                 SmbSession ssn = iter.next();
-                ssn.logoff(hard);
+                try {
+                    ssn.logoff(hard);
+                }
+                catch ( Exception e ) {
+                    log.debug("Failed to close session", e);
+                }
+                finally {
+                    iter.remove();
+                }
             }
 
             if ( this.socket != null ) {
@@ -446,9 +499,10 @@ public class SmbTransport extends Transport implements SmbConstants {
                 this.out.close();
                 this.in.close();
                 this.socket.close();
+                log.trace("Socket closed");
             }
             else {
-                log.debug("Not yet initialized " + this.socket);
+                log.trace("Not yet initialized");
             }
         }
         catch ( Exception e ) {
@@ -641,7 +695,13 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     void checkStatus ( ServerMessageBlock req, ServerMessageBlock resp ) throws SmbException {
-        resp.errorCode = SmbException.getStatusByCode(resp.errorCode);
+        if ( resp.errorCode == 0x30002 ) {
+            // if using DOS error codes this indicates a DFS referral
+            resp.errorCode = NtStatus.NT_STATUS_PATH_NOT_COVERED;
+        }
+        else {
+            resp.errorCode = SmbException.getStatusByCode(resp.errorCode);
+        }
         switch ( resp.errorCode ) {
         case NtStatus.NT_STATUS_OK:
             break;
@@ -657,12 +717,20 @@ public class SmbTransport extends Transport implements SmbConstants {
         case NtStatus.NT_STATUS_TRUSTED_DOMAIN_FAILURE:
             throw new SmbAuthException(resp.errorCode);
         case NtStatus.NT_STATUS_PATH_NOT_COVERED:
-            DfsReferral dr = getDfsReferrals(getTransportContext(), req.path, 1);
+            // samba fails to report the proper status for some operations
+        case 0xC00000A2: // NT_STATUS_MEDIA_WRITE_PROTECTED
+            DfsReferral dr = null;
+            if ( !this.getTransportContext().getConfig().isDfsDisabled() ) {
+                dr = getDfsReferrals(getTransportContext(), req.path, 1);
+            }
             if ( dr == null ) {
                 log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8));
                 throw new SmbException(resp.errorCode, null);
             }
 
+            if ( log.isDebugEnabled() ) {
+                log.debug("Got referral " + dr);
+            }
             this.getTransportContext().getDfs().insert(req.path, getTransportContext(), dr);
             throw dr;
         case 0x80000005: /* STATUS_BUFFER_OVERFLOW */
@@ -670,7 +738,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         case NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED:
             break; /* normal for NTLMSSP */
         default:
-            log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8));
+            log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8) + " for " + req.getClass().getSimpleName());
             throw new SmbException(resp.errorCode, null);
         }
         if ( resp.verifyFailed ) {
@@ -844,6 +912,9 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     DfsReferral getDfsReferrals ( CIFSContext ctx, String path, int rn ) throws SmbException {
+        if ( log.isDebugEnabled() ) {
+            log.debug("Resolving DFS path " + path);
+        }
         SmbTree ipc = getSmbSession(ctx).getSmbTree("IPC$", null);
         Trans2GetDfsReferralResponse resp = new Trans2GetDfsReferralResponse(ctx.getConfig());
         ipc.send(new Trans2GetDfsReferral(ctx.getConfig(), path), resp);
@@ -858,7 +929,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         DfsReferral dr = new DfsReferral();
 
         String[] arr = new String[4];
-        long expiration = System.currentTimeMillis() + ctx.getConfig().getDfsTtl() * 1000;
+        long expiration = System.currentTimeMillis() + ( ctx.getConfig().getDfsTtl() * 1000 );
 
         int di = 0;
         for ( ;; ) {
@@ -890,6 +961,9 @@ public class SmbTransport extends Transport implements SmbConstants {
             dr = dr.next;
         }
 
+        if ( log.isDebugEnabled() ) {
+            log.debug("Got referral " + dr);
+        }
         return dr.next;
     }
 

@@ -34,7 +34,6 @@ import jcifs.util.transport.TransportException;
 /**
  * This InputStream can read bytes from a file on an SMB file server. Offsets are 64 bits.
  */
-
 public class SmbFileInputStream extends InputStream {
 
     private static final Logger log = Logger.getLogger(SmbFileInputStream.class);
@@ -51,6 +50,9 @@ public class SmbFileInputStream extends InputStream {
     /**
      * @param url
      * @param tc
+     *            context to use
+     * @throws SmbException
+     * @throws MalformedURLException
      */
     public SmbFileInputStream ( String url, CIFSContext tc ) throws SmbException, MalformedURLException {
         this(new SmbFile(url, tc));
@@ -65,8 +67,8 @@ public class SmbFileInputStream extends InputStream {
      *
      * @param file
      *            An <code>SmbFile</code> specifying the file to read from
+     * @throws SmbException
      */
-
     public SmbFileInputStream ( SmbFile file ) throws SmbException {
         this(file, SmbFile.O_RDONLY);
     }
@@ -86,7 +88,7 @@ public class SmbFileInputStream extends InputStream {
         this.readSize = Math.min(file.tree.session.getTransport().rcv_buf_size - 70, file.tree.session.getTransport().server.maxBufferSize - 70);
 
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningPreferred() );
+                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningEnabled() );
         if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
             this.largeReadX = true;
             this.readSizeFile = Math
@@ -106,10 +108,10 @@ public class SmbFileInputStream extends InputStream {
 
     protected IOException seToIoe ( SmbException se ) {
         IOException ioe = se;
-        Throwable root = se.getRootCause();
+        Throwable root = se.getCause();
         if ( root instanceof TransportException ) {
             ioe = (TransportException) root;
-            root = ( (TransportException) ioe ).getRootCause();
+            root = ( (TransportException) ioe ).getCause();
         }
         if ( root instanceof InterruptedException ) {
             ioe = new InterruptedIOException(root.getMessage());
@@ -181,6 +183,17 @@ public class SmbFileInputStream extends InputStream {
     }
 
 
+    /**
+     * Reads up to len bytes of data from this input stream into an array of bytes.
+     * 
+     * @param b
+     * @param off
+     * @param len
+     * @return number of bytes read
+     *
+     * @throws IOException
+     *             if a network error occurs
+     */
     public int readDirect ( byte[] b, int off, int len ) throws IOException {
         if ( len <= 0 ) {
             return 0;

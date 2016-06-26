@@ -136,7 +136,7 @@ class SmbTree {
                  * as opposed to normally
                  * \path\to\file
                  */
-                request.flags2 = SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
+                request.flags2 |= SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
                 request.path = '\\' + this.session.transport().tconHostName + '\\' + this.share + request.path;
             }
             try {
