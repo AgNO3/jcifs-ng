@@ -457,6 +457,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             // server doesn't want unicode
             if ( this.getTransportContext().getConfig().isForceUnicode() ) {
                 this.capabilities |= SmbConstants.CAP_UNICODE;
+                this.useUnicode = true;
             }
             else {
                 this.useUnicode = false;
@@ -464,7 +465,14 @@ public class SmbTransport extends Transport implements SmbConstants {
             }
         }
         else {
-            this.useUnicode = true;
+            this.useUnicode = this.getTransportContext().getConfig().isUseUnicode();
+        }
+
+        if ( this.useUnicode ) {
+            log.debug("Unicode is enabled");
+        }
+        else {
+            log.debug("Unicode is disabled");
         }
     }
 
@@ -915,8 +923,10 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( log.isDebugEnabled() ) {
             log.debug("Resolving DFS path " + path);
         }
-        SmbTree ipc = getSmbSession(ctx).getSmbTree("IPC$", null);
+        SmbSession sess = getSmbSession(ctx);
+        SmbTree ipc = sess.getSmbTree("IPC$", null);
         Trans2GetDfsReferralResponse resp = new Trans2GetDfsReferralResponse(ctx.getConfig());
+
         ipc.send(new Trans2GetDfsReferral(ctx.getConfig(), path), resp);
 
         if ( resp.numReferrals == 0 ) {

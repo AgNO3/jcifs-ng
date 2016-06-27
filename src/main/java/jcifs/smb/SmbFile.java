@@ -540,7 +540,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     public SmbFile ( SmbFile context, String name ) throws MalformedURLException, UnknownHostException {
         this(
             context.isWorkgroup0() ? new URL(null, "smb://" + name, context.transportContext.getUrlHandler())
-                    : new URL(context.url, name, context.transportContext.getUrlHandler()),
+                    : new URL(context.getURL(), name, context.transportContext.getUrlHandler()),
             context.transportContext);
         setupContext(context, name);
     }
@@ -571,7 +571,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     public SmbFile ( SmbFile context, String name, int shareAccess ) throws MalformedURLException, UnknownHostException {
         this(
             context.isWorkgroup0() ? new URL(null, "smb://" + name, context.getTransportContext().getUrlHandler())
-                    : new URL(context.url, name, context.getTransportContext().getUrlHandler()),
+                    : new URL(context.getURL(), name, context.getTransportContext().getUrlHandler()),
             context.transportContext);
         if ( ( shareAccess & ~ ( FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE ) ) != 0 ) {
             throw new RuntimeCIFSException("Illegal shareAccess parameter");
@@ -660,7 +660,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             this.dfsReferral = context.dfsReferral;
         }
         int last = name.length() - 1;
-        if ( name.charAt(last) == '/' ) {
+        if ( last >= 0 && name.charAt(last) == '/' ) {
             name = name.substring(0, last);
         }
 
@@ -1740,7 +1740,9 @@ public class SmbFile extends URLConnection implements SmbConstants {
         NtTransNotifyChange request = new NtTransNotifyChange(getSession().getConfig(), f, filter, recursive);
         NtTransNotifyChangeResponse response = new NtTransNotifyChangeResponse(getSession().getConfig());
         try {
+            log.debug("Sending NtTransNotifyChange");
             send(request, response, false);
+            log.debug("Got result");
         }
         finally {
             if ( !this.tree.session.getTransport().isDisconnected() ) {
@@ -2309,7 +2311,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         String p = this.url.getPath();
 
         if ( p.lastIndexOf('/') != ( p.length() - 1 ) ) {
-            // throw new SmbException(this.url.toString() + " directory must end with '/'");
+            throw new SmbException(this.url.toString() + " directory must end with '/'");
         }
         connect0();
 
@@ -3156,7 +3158,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
      */
     @Deprecated
     public URL toURL () {
-        return this.url;
+        return this.getURL();
     }
 
 

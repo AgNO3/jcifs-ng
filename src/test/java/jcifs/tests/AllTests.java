@@ -46,7 +46,8 @@ import org.junit.runners.Suite.SuiteClasses;
  */
 @RunWith ( Suite.class )
 @SuiteClasses ( {
-    ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class
+    ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class,
+    NamingTest.class, WatchTest.class
 } )
 public class AllTests {
 
@@ -90,8 +91,8 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
-                cfg.put("jcifs.smb.useUnicode", "false");
-                cfg.put("jcifs.smb.forceUnicode", "false");
+                cfg.put("jcifs.smb.client.useUnicode", "false");
+                cfg.put("jcifs.smb.client.forceUnicode", "false");
                 return cfg;
             }
         });
@@ -100,8 +101,8 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
-                cfg.put("jcifs.smb.useUnicode", "true");
-                cfg.put("jcifs.smb.forceUnicode", "true");
+                cfg.put("jcifs.smb.client.useUnicode", "true");
+                cfg.put("jcifs.smb.client.forceUnicode", "true");
                 return cfg;
             }
         });
@@ -120,6 +121,26 @@ public class AllTests {
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
                 cfg.put("jcifs.smb.client.useNTSmbs", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("noUnicode-cp850", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.useUnicode", "false");
+                cfg.put("jcifs.encoding", "cp850");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("noUnicode-windows-1252", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.useUnicode", "false");
+                cfg.put("jcifs.encoding", "windows-1252");
                 return cfg;
             }
         });
@@ -166,14 +187,20 @@ public class AllTests {
                         }
                         if ( applyMutations != null && applyMutations.length > 0 && map.get(TestProperties.TEST_MUTATIONS) != null ) {
                             for ( String mutate : map.get(TestProperties.TEST_MUTATIONS).split("\\s*,\\s*") ) {
-                                if ( !excludes.contains(mutate) && apply.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
+                                if ( excludes.contains(mutate) || shouldSkip(excludes, mutate) ) {
+                                    continue;
+                                }
+                                if ( apply.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
                                     configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
                                 }
                             }
                         }
                         else if ( applyMutations != null && applyMutations.length > 0 ) {
                             for ( String mutate : applyMutations ) {
-                                if ( !excludes.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
+                                if ( excludes.contains(mutate) || shouldSkip(excludes, mutate) ) {
+                                    continue;
+                                }
+                                if ( MUTATIONS.containsKey(mutate) ) {
                                     configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
                                 }
                             }
@@ -186,6 +213,23 @@ public class AllTests {
             }
         }
         return configs;
+    }
+
+
+    /**
+     * @param excludes
+     * @param mutate
+     * @return
+     */
+    private static boolean shouldSkip ( Set<String> excludes, String mutate ) {
+        boolean skip = false;
+        for ( String exclude : excludes ) {
+            if ( mutate.startsWith(exclude) ) {
+                skip = true;
+                break;
+            }
+        }
+        return skip;
     }
 
 

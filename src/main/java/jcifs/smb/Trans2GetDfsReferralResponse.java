@@ -97,6 +97,7 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
     int numReferrals;
     int tflags;
     Referral[] referrals;
+    boolean forceUnicode;
 
 
     Trans2GetDfsReferralResponse ( Configuration config ) {
@@ -142,14 +143,14 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
         this.pathConsumed = SMBUtil.readInt2(buffer, bufferIndex);
         bufferIndex += 2;
 
-        boolean unicode = ( this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0;
         /*
          * Samba 2.2.8a will reply with Unicode paths even though
          * ASCII is negotiated so we must use flags2 (probably
          * should anyway).
          * 
-         * No, samba will always send unicode
+         * That does not help, samba also does not send an unicode flag
          */
+        boolean unicode = this.forceUnicode || ( this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0;
         if ( unicode ) {
             this.pathConsumed /= 2;
         }

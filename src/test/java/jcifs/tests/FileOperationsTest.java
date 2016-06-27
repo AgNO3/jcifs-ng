@@ -60,7 +60,61 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
+    public void testMoveFile () throws SmbException, MalformedURLException, UnknownHostException {
+        SmbFile defaultShareRoot = getDefaultShareRoot();
+        SmbFile d = createTestDirectory();
+        SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+        SmbFile f2 = new SmbFile(d, makeRandomName());
+        f.createNewFile();
+        boolean renamed = false;
+        try {
+            f.renameTo(f2);
+            try {
+                assertTrue(f2.exists());
+                renamed = true;
+            }
+            finally {
+                f2.delete();
+            }
+        }
+        finally {
+            if ( !renamed && f.exists() ) {
+                f.delete();
+            }
+            d.delete();
+        }
+    }
+
+
+    @Test
     public void testRenameDirectory () throws SmbException, MalformedURLException, UnknownHostException {
+        SmbFile defaultShareRoot = getDefaultShareRoot();
+        SmbFile d = createTestDirectory();
+        SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+        SmbFile d2 = new SmbFile(d, makeRandomDirectoryName());
+        d1.mkdir();
+        boolean renamed = false;
+        try {
+            d1.renameTo(d2);
+            try {
+                assertTrue(d2.exists());
+                renamed = true;
+            }
+            finally {
+                d2.delete();
+            }
+        }
+        finally {
+            if ( !renamed && d1.exists() ) {
+                d1.delete();
+            }
+            d.delete();
+        }
+    }
+
+
+    @Test
+    public void testMoveDirectory () throws SmbException, MalformedURLException, UnknownHostException {
         SmbFile defaultShareRoot = getDefaultShareRoot();
         SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
         SmbFile d2 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
@@ -93,6 +147,31 @@ public class FileOperationsTest extends BaseCIFSTest {
             try {
                 f.copyTo(t);
                 assertTrue(f.exists());
+            }
+            finally {
+                d1.delete();
+            }
+        }
+        finally {
+            f.delete();
+        }
+    }
+
+
+    @Test
+    public void testCopyDir () throws SmbException, MalformedURLException, UnknownHostException {
+        SmbFile f = createTestDirectory();
+        SmbFile e = new SmbFile(f, "test");
+        e.createNewFile();
+        try {
+            SmbFile d1 = createTestDirectory();
+            SmbFile t = new SmbFile(d1, makeRandomName());
+            try {
+                f.copyTo(t);
+                assertTrue(f.exists());
+
+                SmbFile e2 = new SmbFile(t, "test");
+                assertTrue(e2.exists());
             }
             finally {
                 d1.delete();
