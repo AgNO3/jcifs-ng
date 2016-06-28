@@ -166,8 +166,12 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
 					<includes>
-						<include>**/**Tests.java</include>
+						<include>**/**Test.java</include>
 					</includes>
+					<systemPropertyVariables>
+						<networkaddress.cache.ttl>-1</networkaddress.cache.ttl>
+						<networkaddress.cache.negative.ttl>-1</networkaddress.cache.negative.ttl>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 

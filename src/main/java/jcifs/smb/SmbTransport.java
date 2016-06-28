@@ -38,11 +38,11 @@ import org.apache.log4j.Logger;
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
-import jcifs.UniAddress;
 import jcifs.netbios.Name;
 import jcifs.netbios.NbtException;
 import jcifs.netbios.SessionRequestPacket;
 import jcifs.netbios.SessionServicePacket;
+import jcifs.netbios.UniAddress;
 import jcifs.util.Encdec;
 import jcifs.util.Hexdump;
 import jcifs.util.transport.Request;
@@ -55,8 +55,6 @@ import jcifs.util.transport.TransportException;
  * 
  */
 public class SmbTransport extends Transport implements SmbConstants {
-
-    private static final byte[] BUF = new byte[0xFFFF];
 
     private static Logger log = Logger.getLogger(SmbTransport.class);
 
@@ -109,6 +107,8 @@ public class SmbTransport extends Transport implements SmbConstants {
     String tconHostName = null;
 
     private CIFSContext transportContext;
+
+    private Object socketLock = new Object();
 
 
     SmbTransport ( CIFSContext tc, SmbComNegotiate nego, UniAddress address, int port, InetAddress localAddr, int localPort ) {
@@ -242,16 +242,6 @@ public class SmbTransport extends Transport implements SmbConstants {
     void ssn139 () throws IOException {
         Name calledName = new Name(this.transportContext.getConfig(), this.address.firstCalledName(), 0x20, null);
         do {
-            /*
-             * These Socket constructors attempt to connect before SO_TIMEOUT can be applied
-             * if (localAddr == null) {
-             * socket = new Socket( address.getHostAddress(), 139 );
-             * } else {
-             * socket = new Socket( address.getHostAddress(), 139, localAddr, localPort );
-             * }
-             * socket.setSoTimeout( SO_TIMEOUT );
-             */
-
             this.socket = new Socket();
             if ( this.localAddr != null )
                 this.socket.bind(new InetSocketAddress(this.localAddr, this.localPort));
@@ -317,15 +307,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             else {
                 if ( prt == 0 )
                     prt = DEFAULT_PORT; // 445
-                /*
-                 * These Socket constructors attempt to connect before SO_TIMEOUT can be applied
-                 * if (localAddr == null) {
-                 * socket = new Socket( address.getHostAddress(), port );
-                 * } else {
-                 * socket = new Socket( address.getHostAddress(), port, localAddr, localPort );
-                 * }
-                 * socket.setSoTimeout( SO_TIMEOUT );
-                 */
+
                 this.socket = new Socket();
                 if ( this.localAddr != null )
                     this.socket.bind(new InetSocketAddress(this.localAddr, this.localPort));
@@ -592,23 +574,30 @@ public class SmbTransport extends Transport implements SmbConstants {
 
     @Override
     protected void doSend ( Request request ) throws IOException {
-        synchronized ( BUF ) {
-            ServerMessageBlock smb = (ServerMessageBlock) request;
-            int n = smb.encode(BUF, 4);
-            Encdec.enc_uint32be(n & 0xFFFF, BUF, 0); /* 4 byte session message header */
+
+        ServerMessageBlock smb = (ServerMessageBlock) request;
+        byte[] buffer = this.getTransportContext().getBufferCache().getBuffer();
+        try {
+            int n = smb.encode(buffer, 4);
+            Encdec.enc_uint32be(n & 0xFFFF, buffer, 0); /* 4 byte session message header */
             if ( log.isTraceEnabled() ) {
                 do {
                     log.trace(smb);
                 }
                 while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).andx ) != null );
-                log.trace(Hexdump.toHexString(BUF, 4, n));
+                log.trace(Hexdump.toHexString(buffer, 4, n));
 
             }
             /*
              * For some reason this can sometimes get broken up into another
              * "NBSS Continuation Message" frame according to WireShark
              */
-            this.out.write(BUF, 0, 4 + n);
+            synchronized ( this.socketLock ) {
+                this.out.write(buffer, 0, 4 + n);
+            }
+        }
+        finally {
+            this.getTransportContext().getBufferCache().releaseBuffer(buffer);
         }
     }
 
@@ -635,40 +624,46 @@ public class SmbTransport extends Transport implements SmbConstants {
     protected void doRecv ( Response response ) throws IOException {
         ServerMessageBlock resp = (ServerMessageBlock) response;
         resp.useUnicode = this.useUnicode;
-        resp.extendedSecurity = ( this.capabilities & CAP_EXTENDED_SECURITY ) == CAP_EXTENDED_SECURITY;
-
-        synchronized ( BUF ) {
-            System.arraycopy(this.sbuf, 0, BUF, 0, 4 + HEADER_LENGTH);
-            int size = Encdec.dec_uint16be(BUF, 2) & 0xFFFF;
-            if ( size < ( HEADER_LENGTH + 1 ) || ( 4 + size ) > this.rcv_buf_size ) {
-                throw new IOException("Invalid payload size: " + size);
-            }
-            int errorCode = Encdec.dec_uint32le(BUF, 9) & 0xFFFFFFFF;
-            if ( resp.command == ServerMessageBlock.SMB_COM_READ_ANDX && ( errorCode == 0 || errorCode == 0x80000005 ) ) { // overflow
-                                                                                                                           // indicator
-                                                                                                                           // normal
-                                                                                                                           // for
-                                                                                                                           // pipe
-                SmbComReadAndXResponse r = (SmbComReadAndXResponse) resp;
-                int off = HEADER_LENGTH;
-                /* WordCount thru dataOffset always 27 */
-                readn(this.in, BUF, 4 + off, 27);
-                off += 27;
-                resp.decode(BUF, 4);
-                /* EMC can send pad w/o data */
-                int pad = r.dataOffset - off;
-                if ( r.byteCount > 0 && pad > 0 && pad < 4 )
-                    readn(this.in, BUF, 4 + off, pad);
-
-                if ( r.dataLength > 0 ) {
-                    readn(this.in, r.b, r.off, r.dataLength); /* read direct */
+        byte[] buffer = this.getTransportContext().getBufferCache().getBuffer();
+        try {
+            int size;
+            synchronized ( this.socketLock ) {
+                System.arraycopy(this.sbuf, 0, buffer, 0, 4 + HEADER_LENGTH);
+                size = Encdec.dec_uint16be(buffer, 2) & 0xFFFF;
+                if ( size < ( HEADER_LENGTH + 1 ) || ( 4 + size ) > this.rcv_buf_size ) {
+                    throw new IOException("Invalid payload size: " + size);
                 }
-            }
-            else {
-                readn(this.in, BUF, 4 + 32, size - 32);
-                resp.decode(BUF, 4);
-                if ( resp instanceof SmbComTransactionResponse ) {
-                    ( (SmbComTransactionResponse) resp ).nextElement();
+                int errorCode = Encdec.dec_uint32le(buffer, 9) & 0xFFFFFFFF;
+                if ( resp.command == ServerMessageBlock.SMB_COM_READ_ANDX && ( errorCode == 0 || errorCode == 0x80000005 ) ) {
+                    // overflow indicator normal for pipe
+
+                    SmbComReadAndXResponse r = (SmbComReadAndXResponse) resp;
+                    int off = HEADER_LENGTH;
+                    /* WordCount thru dataOffset always 27 */
+                    readn(this.in, buffer, 4 + off, 27);
+                    off += 27;
+                    try {
+                        resp.decode(buffer, 4);
+                    }
+                    catch ( Exception e ) {
+                        resp.isError = true;
+                        throw e;
+                    }
+                    /* EMC can send pad w/o data */
+                    int pad = r.dataOffset - off;
+                    if ( r.byteCount > 0 && pad > 0 && pad < 4 )
+                        readn(this.in, buffer, 4 + off, pad);
+
+                    if ( r.dataLength > 0 ) {
+                        readn(this.in, r.b, r.off, r.dataLength); /* read direct */
+                    }
+                }
+                else {
+                    readn(this.in, buffer, 4 + 32, size - 32);
+                    resp.decode(buffer, 4);
+                    if ( resp instanceof SmbComTransactionResponse ) {
+                        ( (SmbComTransactionResponse) resp ).nextElement();
+                    }
                 }
             }
 
@@ -678,13 +673,20 @@ public class SmbTransport extends Transport implements SmbConstants {
              * (perhaps for DOS reasons).
              */
             if ( this.digest != null && resp.errorCode == 0 ) {
-                this.digest.verify(BUF, 4, resp);
+                this.digest.verify(buffer, 4, resp);
             }
 
             if ( log.isTraceEnabled() ) {
                 log.trace(response);
-                log.trace(Hexdump.toHexString(BUF, 4, size));
+                log.trace(Hexdump.toHexString(buffer, 4, size));
             }
+        }
+        catch ( Exception e ) {
+            resp.isError = true;
+            throw e;
+        }
+        finally {
+            this.getTransportContext().getBufferCache().releaseBuffer(buffer);
         }
     }
 
@@ -739,7 +741,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             if ( log.isDebugEnabled() ) {
                 log.debug("Got referral " + dr);
             }
-            this.getTransportContext().getDfs().insert(req.path, getTransportContext(), dr);
+            this.getTransportContext().getDfs().cache(req.path, dr, getTransportContext());
             throw dr;
         case 0x80000005: /* STATUS_BUFFER_OVERFLOW */
             break; /* normal for DCERPC named pipes */
@@ -782,7 +784,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                 resp.reset();
 
                 try {
-                    this.getTransportContext().getBufferCache().getBuffers(req, resp);
+                    setupBuffers(req, resp);
 
                     /*
                      * First request w/ interim response
@@ -837,7 +839,9 @@ public class SmbTransport extends Transport implements SmbConstants {
                                 }
                                 else {
                                     wait();
-                                    log.debug("Wait returned " + this.isDisconnected());
+                                    if ( log.isTraceEnabled() ) {
+                                        log.trace("Wait returned " + this.isDisconnected());
+                                    }
                                     if ( this.isDisconnected() ) {
                                         throw new EOFException("Transport closed while waiting for result");
                                     }
@@ -881,44 +885,19 @@ public class SmbTransport extends Transport implements SmbConstants {
     }
 
 
+    void setupBuffers ( SmbComTransaction req, SmbComTransactionResponse rsp ) {
+        req.txn_buf = getTransportContext().getBufferCache().getBuffer();
+        rsp.txn_buf = getTransportContext().getBufferCache().getBuffer();
+    }
+
+
     @Override
     public String toString () {
         return super.toString() + "[" + this.address + ":" + this.port + "]";
     }
 
+
     /* DFS */
-
-
-    /*
-     * Split DFS path like \fs1.example.com\root5\link2\foo\bar.txt into at
-     * most 3 components (not including the first index which is always empty):
-     * result[0] = ""
-     * result[1] = "fs1.example.com"
-     * result[2] = "root5"
-     * result[3] = "link2\foo\bar.txt"
-     */
-    void dfsPathSplit ( String path, String[] result ) {
-        int ri = 0, rlast = result.length - 1;
-        int i = 0, b = 0, len = path.length();
-
-        do {
-            if ( ri == rlast ) {
-                result[ rlast ] = path.substring(b);
-                return;
-            }
-            if ( i == len || path.charAt(i) == '\\' ) {
-                result[ ri++ ] = path.substring(b, i);
-                b = i + 1;
-            }
-        }
-        while ( i++ < len );
-
-        while ( ri < result.length ) {
-            result[ ri++ ] = "";
-        }
-    }
-
-
     DfsReferral getDfsReferrals ( CIFSContext ctx, String path, int rn ) throws SmbException {
         if ( log.isDebugEnabled() ) {
             log.debug("Resolving DFS path " + path);
@@ -975,6 +954,36 @@ public class SmbTransport extends Transport implements SmbConstants {
             log.debug("Got referral " + dr);
         }
         return dr.next;
+    }
+
+
+    /*
+     * Split DFS path like \fs1.example.com\root5\link2\foo\bar.txt into at
+     * most 3 components (not including the first index which is always empty):
+     * result[0] = ""
+     * result[1] = "fs1.example.com"
+     * result[2] = "root5"
+     * result[3] = "link2\foo\bar.txt"
+     */
+    void dfsPathSplit ( String path, String[] result ) {
+        int ri = 0, rlast = result.length - 1;
+        int i = 0, b = 0, len = path.length();
+
+        do {
+            if ( ri == rlast ) {
+                result[ rlast ] = path.substring(b);
+                return;
+            }
+            if ( i == len || path.charAt(i) == '\\' ) {
+                result[ ri++ ] = path.substring(b, i);
+                b = i + 1;
+            }
+        }
+        while ( i++ < len );
+
+        while ( ri < result.length ) {
+            result[ ri++ ] = "";
+        }
     }
 
 }

@@ -149,7 +149,7 @@ abstract class ServerMessageBlock extends Response implements Request {
 
 
     String readString ( byte[] src, int srcIndex ) {
-        return readString(src, srcIndex, 256, this.useUnicode);
+        return readString(src, srcIndex, 255, this.useUnicode);
     }
 
 

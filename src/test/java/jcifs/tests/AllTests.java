@@ -47,7 +47,7 @@ import org.junit.runners.Suite.SuiteClasses;
 @RunWith ( Suite.class )
 @SuiteClasses ( {
     ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class,
-    NamingTest.class, WatchTest.class
+    NamingTest.class, WatchTest.class, ReadWriteTest.class, ConcurrencyTest.class
 } )
 public class AllTests {
 
@@ -141,6 +141,15 @@ public class AllTests {
             public Map<String, String> mutate ( Map<String, String> cfg ) {
                 cfg.put("jcifs.smb.client.useUnicode", "false");
                 cfg.put("jcifs.encoding", "windows-1252");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("noLargeReadWrite", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.useLargeReadWrite", "false");
                 return cfg;
             }
         });

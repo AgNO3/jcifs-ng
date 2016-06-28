@@ -28,13 +28,12 @@ import jcifs.SmbConstants;
 
 
 /**
+ * Configuration implementation reading the classic jcifs settings from properties
+ * 
  * @author mbechler
  *
  */
 public final class PropertyConfiguration extends BaseConfiguration implements Configuration {
-
-    private final Config cfg;
-
 
     /**
      * @param p
@@ -43,82 +42,81 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
      * 
      */
     public PropertyConfiguration ( Properties p ) throws CIFSException {
-        this.cfg = new Config(p);
+        this.useBatching = Config.getBoolean(p, "jcifs.smb.client.useBatching", true);
+        this.useUnicode = Config.getBoolean(p, "jcifs.smb.client.useUnicode", true);
+        this.useLargeReadWrite = Config.getBoolean(p, "jcifs.smb.client.useLargeReadWrite", true);
+        this.forceUnicode = Config.getBoolean(p, "jcifs.smb.client.forceUnicode", false);
+        this.signingPreferred = Config.getBoolean(p, "jcifs.smb.client.signingPreferred", false);
+        this.signingEnforced = Config.getBoolean(p, "jcifs.smb.client.signingEnforced", false);
 
-        this.useBatching = this.cfg.getBoolean("jcifs.smb.client.useBatching", true);
-        this.useUnicode = this.cfg.getBoolean("jcifs.smb.client.useUnicode", true);
-        this.forceUnicode = this.cfg.getBoolean("jcifs.smb.client.forceUnicode", false);
-        this.signingPreferred = this.cfg.getBoolean("jcifs.smb.client.signingPreferred", false);
-        this.signingEnforced = this.cfg.getBoolean("jcifs.smb.client.signingEnforced", false);
+        this.lanmanCompatibility = Config.getInt(p, "jcifs.smb.lmCompatibility", 3);
+        this.disablePlainTextPasswords = Config.getBoolean(p, "jcifs.smb.client.disablePlainTextPasswords", true);
 
-        this.lanmanCompatibility = this.cfg.getInt("jcifs.smb.lmCompatibility", 3);
-        this.disablePlainTextPasswords = this.cfg.getBoolean("jcifs.smb.client.disablePlainTextPasswords", true);
+        this.oemEncoding = p.getProperty("jcifs.encoding", SmbConstants.DEFAULT_OEM_ENCODING);
 
-        this.oemEncoding = this.cfg.getProperty("jcifs.encoding", SmbConstants.DEFAULT_OEM_ENCODING);
+        this.useNtStatus = Config.getBoolean(p, "jcifs.smb.client.useNtStatus", true);
+        this.useExtendedSecurity = Config.getBoolean(p, "jcifs.smb.client.useExtendedSecurity", true);
+        this.useNTSmbs = Config.getBoolean(p, "jcifs.smb.client.useNTSmbs", true);
 
-        this.useNtStatus = this.cfg.getBoolean("jcifs.smb.client.useNtStatus", true);
-        this.useExtendedSecurity = this.cfg.getBoolean("jcifs.smb.client.useExtendedSecurity", true);
-        this.useNTSmbs = this.cfg.getBoolean("jcifs.smb.client.useNTSmbs", true);
+        this.flags2 = Config.getInt(p, "jcifs.smb.client.flags2", 0);
 
-        this.flags2 = this.cfg.getInt("jcifs.smb.client.flags2", 0);
+        this.capabilities = Config.getInt(p, "jcifs.smb.client.capabilities", 0);
 
-        this.capabilities = this.cfg.getInt("jcifs.smb.client.capabilities", 0);
+        this.sessionLimit = Config.getInt(p, "jcifs.smb.client.ssnLimit", SmbConstants.DEFAULT_SSN_LIMIT);
 
-        this.sessionLimit = this.cfg.getInt("jcifs.smb.client.ssnLimit", SmbConstants.DEFAULT_SSN_LIMIT);
+        this.smbTcpNoDelay = Config.getBoolean(p, "jcifs.smb.client.tcpNoDelay", false);
+        this.smbResponseTimeout = Config.getInt(p, "jcifs.smb.client.responseTimeout", SmbConstants.DEFAULT_RESPONSE_TIMEOUT);
+        this.smbSocketTimeout = Config.getInt(p, "jcifs.smb.client.soTimeout", SmbConstants.DEFAULT_SO_TIMEOUT);
+        this.smbConnectionTimeout = Config.getInt(p, "jcifs.smb.client.connTimeout", SmbConstants.DEFAULT_CONN_TIMEOUT);
+        this.smbLocalAddress = Config.getLocalHost(p);
+        this.smbLocalPort = Config.getInt(p, "jcifs.smb.client.lport", 0);
+        this.maxMpxCount = Config.getInt(p, "jcifs.smb.client.maxMpxCount", SmbConstants.DEFAULT_MAX_MPX_COUNT);
+        this.smbSendBufferSize = Config.getInt(p, "jcifs.smb.client.snd_buf_size", SmbConstants.DEFAULT_SND_BUF_SIZE);
+        this.smbRecvBufferSize = Config.getInt(p, "jcifs.smb.client.rcv_buf_size", SmbConstants.DEFAULT_RCV_BUF_SIZE);
+        this.smbNotifyBufferSize = Config.getInt(p, "jcifs.smb.client.notify_buf_size", SmbConstants.DEFAULT_NOTIFY_BUF_SIZE);
 
-        this.smbTcpNoDelay = this.cfg.getBoolean("jcifs.smb.client.tcpNoDelay", false);
-        this.smbResponseTimeout = this.cfg.getInt("jcifs.smb.client.responseTimeout", SmbConstants.DEFAULT_RESPONSE_TIMEOUT);
-        this.smbSocketTimeout = this.cfg.getInt("jcifs.smb.client.soTimeout", SmbConstants.DEFAULT_SO_TIMEOUT);
-        this.smbConnectionTimeout = this.cfg.getInt("jcifs.smb.client.connTimeout", SmbConstants.DEFAULT_CONN_TIMEOUT);
-        this.smbLocalAddress = this.cfg.getLocalHost();
-        this.smbLocalPort = this.cfg.getInt("jcifs.smb.client.lport", 0);
-        this.maxMpxCount = this.cfg.getInt("jcifs.smb.client.maxMpxCount", SmbConstants.DEFAULT_MAX_MPX_COUNT);
-        this.smbSendBufferSize = this.cfg.getInt("jcifs.smb.client.snd_buf_size", SmbConstants.DEFAULT_SND_BUF_SIZE);
-        this.smbRecvBufferSize = this.cfg.getInt("jcifs.smb.client.rcv_buf_size", SmbConstants.DEFAULT_RCV_BUF_SIZE);
-        this.smbNotifyBufferSize = this.cfg.getInt("jcifs.smb.client.notify_buf_size", SmbConstants.DEFAULT_NOTIFY_BUF_SIZE);
-
-        this.nativeOs = this.cfg.getProperty("jcifs.smb.client.nativeOs", System.getProperty("os.name"));
-        this.nativeLanMan = this.cfg.getProperty("jcifs.smb.client.nativeLanMan", "jCIFS");
+        this.nativeOs = p.getProperty("jcifs.smb.client.nativeOs", System.getProperty("os.name"));
+        this.nativeLanMan = p.getProperty("jcifs.smb.client.nativeLanMan", "jCIFS");
         this.vcNumber = 1;
 
-        this.dfsDisabled = this.cfg.getBoolean("jcifs.smb.client.dfs.disabled", false);
-        this.dfsTTL = this.cfg.getLong("jcifs.smb.client.dfs.ttl", 300);
-        this.dfsStrictView = this.cfg.getBoolean("jcifs.smb.client.dfs.strictView", false);
+        this.dfsDisabled = Config.getBoolean(p, "jcifs.smb.client.dfs.disabled", false);
+        this.dfsTTL = Config.getLong(p, "jcifs.smb.client.dfs.ttl", 300);
+        this.dfsStrictView = Config.getBoolean(p, "jcifs.smb.client.dfs.strictView", false);
 
-        this.logonShare = this.cfg.getProperty("jcifs.smb.client.logonShare", null);
+        this.logonShare = p.getProperty("jcifs.smb.client.logonShare", null);
 
-        this.defaultDomain = this.cfg.getProperty("jcifs.smb.client.domain", null);
-        this.defaultUserName = this.cfg.getProperty("jcifs.smb.client.username", null);
-        this.defaultPassword = this.cfg.getProperty("jcifs.smb.client.password", null);
+        this.defaultDomain = p.getProperty("jcifs.smb.client.domain", null);
+        this.defaultUserName = p.getProperty("jcifs.smb.client.username", null);
+        this.defaultPassword = p.getProperty("jcifs.smb.client.password", null);
 
-        this.netbiosHostname = this.cfg.getProperty("jcifs.netbios.hostname", null);
+        this.netbiosHostname = p.getProperty("jcifs.netbios.hostname", null);
 
-        this.netbiosCachePolicy = this.cfg.getInt("jcifs.netbios.cachePolicy", 60 * 10) * 60; /* 10 hours */
+        this.netbiosCachePolicy = Config.getInt(p, "jcifs.netbios.cachePolicy", 60 * 10) * 60; /* 10 hours */
 
-        this.netbiosSocketTimeout = this.cfg.getInt("jcifs.netbios.soTimeout", 5000);
-        this.netbiosSendBufferSize = this.cfg.getInt("jcifs.netbios.snd_buf_size", 576);
-        this.netbiosRevcBufferSize = this.cfg.getInt("jcifs.netbios.rcv_buf_size", 576);
-        this.netbiosRetryCount = this.cfg.getInt("jcifs.netbios.retryCount", 2);
-        this.netbiosRetryTimeout = this.cfg.getInt("jcifs.netbios.retryTimeout", 3000);
+        this.netbiosSocketTimeout = Config.getInt(p, "jcifs.netbios.soTimeout", 5000);
+        this.netbiosSendBufferSize = Config.getInt(p, "jcifs.netbios.snd_buf_size", 576);
+        this.netbiosRevcBufferSize = Config.getInt(p, "jcifs.netbios.rcv_buf_size", 576);
+        this.netbiosRetryCount = Config.getInt(p, "jcifs.netbios.retryCount", 2);
+        this.netbiosRetryTimeout = Config.getInt(p, "jcifs.netbios.retryTimeout", 3000);
 
-        this.netbiosScope = this.cfg.getProperty("jcifs.netbios.scope");
-        this.netbiosLocalPort = this.cfg.getInt("jcifs.netbios.lport", 0);
-        this.netbiosLocalAddress = this.cfg.getInetAddress("jcifs.netbios.laddr", null);
+        this.netbiosScope = p.getProperty("jcifs.netbios.scope");
+        this.netbiosLocalPort = Config.getInt(p, "jcifs.netbios.lport", 0);
+        this.netbiosLocalAddress = Config.getInetAddress(p, "jcifs.netbios.laddr", null);
 
-        this.lmhostsFilename = this.cfg.getProperty("jcifs.netbios.lmhosts");
-        this.winsServer = this.cfg.getInetAddressArray("jcifs.netbios.wins", ",", new InetAddress[0]);
+        this.lmhostsFilename = p.getProperty("jcifs.netbios.lmhosts");
+        this.winsServer = Config.getInetAddressArray(p, "jcifs.netbios.wins", ",", new InetAddress[0]);
 
-        this.transactionBufferSize = this.cfg.getInt("jcifs.smb.client.transaction_buf_size", 0xFFFF) - 512;
-        this.bufferCacheSize = this.cfg.getInt("jcifs.smb.maxBuffers", 16);
+        this.transactionBufferSize = Config.getInt(p, "jcifs.smb.client.transaction_buf_size", 0xFFFF) - 512;
+        this.bufferCacheSize = Config.getInt(p, "jcifs.smb.maxBuffers", 16);
 
-        this.smbListSize = this.cfg.getInt("jcifs.smb.client.listSize", 65535);
-        this.smbListCount = this.cfg.getInt("jcifs.smb.client.listCount", 200);
+        this.smbListSize = Config.getInt(p, "jcifs.smb.client.listSize", 65535);
+        this.smbListCount = Config.getInt(p, "jcifs.smb.client.listCount", 200);
 
-        this.smbAttributeExpiration = this.cfg.getLong("jcifs.smb.client.attrExpirationPeriod", 5000L);
-        this.ignoreCopyToException = this.cfg.getBoolean("jcifs.smb.client.ignoreCopyToException", true);
-        this.broadcastAddress = this.cfg.getInetAddress("jcifs.netbios.baddr", null);
+        this.smbAttributeExpiration = Config.getLong(p, "jcifs.smb.client.attrExpirationPeriod", 5000L);
+        this.ignoreCopyToException = Config.getBoolean(p, "jcifs.smb.client.ignoreCopyToException", true);
+        this.broadcastAddress = Config.getInetAddress(p, "jcifs.netbios.baddr", null);
 
-        initResolverOrder(this.cfg.getProperty("jcifs.resolveOrder"));
+        initResolverOrder(p.getProperty("jcifs.resolveOrder"));
         initDefaults();
     }
 }

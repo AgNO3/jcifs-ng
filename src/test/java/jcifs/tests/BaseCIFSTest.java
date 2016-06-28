@@ -34,7 +34,6 @@ import org.junit.Before;
 import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.CIFSContext;
-import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.config.DelegatingConfiguration;
 import jcifs.config.PropertyConfiguration;
@@ -99,7 +98,7 @@ public abstract class BaseCIFSTest {
 
 
     @Before
-    public void setUp () throws CIFSException {
+    public void setUp () throws Exception {
         Properties props = new Properties();
         props.putAll(this.properties);
         this.context = new BaseContext(new PropertyConfiguration(props));
@@ -107,7 +106,7 @@ public abstract class BaseCIFSTest {
 
 
     @After
-    public void tearDown () throws CIFSException {
+    public void tearDown () throws Exception {
         this.context.close();
     }
 

@@ -31,17 +31,17 @@ public enum ResolverType {
     RESOLVER_WINS,
 
     /**
-     * 
+     * NETBIOS broadcast
      */
     RESOLVER_BCAST,
 
     /**
-     * 
+     * DNS
      */
     RESOLVER_DNS,
 
     /**
-     * 
+     * LMHosts file lookup
      */
     RESOLVER_LMHOSTS
 }

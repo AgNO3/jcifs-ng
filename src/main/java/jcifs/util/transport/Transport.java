@@ -144,6 +144,9 @@ public abstract class Transport implements Runnable {
                 if ( timeout != null ) {
                     wait(timeout);
                     timeout = response.expiration - System.currentTimeMillis();
+                    if ( response.isError ) {
+                        throw new TransportException(this.name + " error reading response to " + request);
+                    }
                     if ( timeout <= 0 ) {
                         throw new TransportException(this.name + " timedout waiting for response to " + request);
                     }
@@ -201,12 +204,16 @@ public abstract class Transport implements Runnable {
 
                 String msg = ex.getMessage();
                 boolean timeout = msg != null && msg.equals("Read timed out");
+                boolean closed = msg != null && msg.equals("Socket closed");
                 /*
                  * If just a timeout, try to disconnect gracefully
                  */
                 boolean hard = timeout == false;
 
-                if ( !timeout ) {
+                if ( closed ) {
+                    log.trace("Remote closed connection");
+                }
+                else if ( !timeout ) {
                     log.debug("recv failed", ex);
                 }
                 else {

@@ -20,6 +20,7 @@ package jcifs;
 
 import java.net.InetAddress;
 
+import jcifs.netbios.UniAddress;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbTransport;
 

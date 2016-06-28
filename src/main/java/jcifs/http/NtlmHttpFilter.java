@@ -44,10 +44,10 @@ import org.bouncycastle.util.encoders.Base64;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
-import jcifs.UniAddress;
 import jcifs.config.PropertyConfiguration;
 import jcifs.context.BaseContext;
 import jcifs.netbios.NbtAddress;
+import jcifs.netbios.UniAddress;
 import jcifs.smb.NtStatus;
 import jcifs.smb.NtlmChallenge;
 import jcifs.smb.NtlmPasswordAuthentication;
@@ -115,18 +115,17 @@ public class NtlmHttpFilter implements Filter {
         }
 
         try {
-            Config cfg = new Config(p);
-            this.defaultDomain = cfg.getProperty("jcifs.smb.client.domain");
-            this.domainController = cfg.getProperty("jcifs.http.domainController");
+            this.defaultDomain = p.getProperty("jcifs.smb.client.domain");
+            this.domainController = p.getProperty("jcifs.http.domainController");
             if ( this.domainController == null ) {
                 this.domainController = this.defaultDomain;
-                this.loadBalance = cfg.getBoolean("jcifs.http.loadBalance", true);
+                this.loadBalance = Config.getBoolean(p, "jcifs.http.loadBalance", true);
             }
-            this.enableBasic = Boolean.valueOf(cfg.getProperty("jcifs.http.enableBasic")).booleanValue();
-            this.insecureBasic = Boolean.valueOf(cfg.getProperty("jcifs.http.insecureBasic")).booleanValue();
-            this.realm = cfg.getProperty("jcifs.http.basicRealm");
-            this.netbiosLookupRespLimit = cfg.getInt("jcifs.netbios.lookupRespLimit", 3);
-            this.netbiosCacheTimeout = cfg.getInt("jcifs.netbios.cachePolicy", 60 * 10) * 60; /* 10 hours */
+            this.enableBasic = Boolean.valueOf(p.getProperty("jcifs.http.enableBasic")).booleanValue();
+            this.insecureBasic = Boolean.valueOf(p.getProperty("jcifs.http.insecureBasic")).booleanValue();
+            this.realm = p.getProperty("jcifs.http.basicRealm");
+            this.netbiosLookupRespLimit = Config.getInt(p, "jcifs.netbios.lookupRespLimit", 3);
+            this.netbiosCacheTimeout = Config.getInt(p, "jcifs.netbios.cachePolicy", 60 * 10) * 60; /* 10 hours */
 
             if ( this.realm == null )
                 this.realm = "jCIFS";
@@ -194,14 +193,14 @@ public class NtlmHttpFilter implements Filter {
                 if ( this.loadBalance ) {
                     NtlmChallenge chal = (NtlmChallenge) ssn.getAttribute("NtlmHttpChal");
                     if ( chal == null ) {
-                        chal = getChallengeForDomain(getTransportContext(), this.defaultDomain);
+                        chal = getChallengeForDomain(this.defaultDomain);
                         ssn.setAttribute("NtlmHttpChal", chal);
                     }
                     dc = chal.dc;
                     challenge = chal.challenge;
                 }
                 else {
-                    dc = UniAddress.getByName(this.domainController, true, getTransportContext());
+                    dc = getTransportContext().getNameServiceClient().getByName(this.domainController, true);
                     challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
                 }
 
@@ -222,7 +221,7 @@ public class NtlmHttpFilter implements Filter {
                 String domain = ( index != -1 ) ? user.substring(0, index) : this.defaultDomain;
                 user = ( index != -1 ) ? user.substring(index + 1) : user;
                 ntlm = new NtlmPasswordAuthentication(getTransportContext(), domain, user, password);
-                dc = UniAddress.getByName(this.domainController, true, getTransportContext());
+                dc = getTransportContext().getNameServiceClient().getByName(this.domainController, true);
             }
             try {
                 getTransportContext().getTransportPool().logon(dc, getTransportContext());
@@ -274,7 +273,7 @@ public class NtlmHttpFilter implements Filter {
     }
 
 
-    private synchronized NtlmChallenge getChallengeForDomain ( CIFSContext tc, String domain ) throws UnknownHostException, ServletException {
+    private synchronized NtlmChallenge getChallengeForDomain ( String domain ) throws UnknownHostException, ServletException {
         if ( domain == null ) {
             throw new ServletException("A domain was not specified");
         }
@@ -283,7 +282,7 @@ public class NtlmHttpFilter implements Filter {
 
         do {
             if ( this.dcListExpiration < now ) {
-                NbtAddress[] list = NbtAddress.getAllByName(domain, 0x1C, null, null, tc);
+                NbtAddress[] list = getTransportContext().getNameServiceClient().getNbtAllByName(domain, 0x1C, null, null);
                 this.dcListExpiration = now + this.netbiosCacheTimeout * 1000L;
                 if ( list != null && list.length > 0 ) {
                     this.dcList = list;
@@ -299,7 +298,7 @@ public class NtlmHttpFilter implements Filter {
                 int i = dcListCounter++ % max;
                 if ( this.dcList[ i ] != null ) {
                     try {
-                        return interrogate(tc, this.dcList[ i ]);
+                        return interrogate(getTransportContext(), this.dcList[ i ]);
                     }
                     catch ( SmbException se ) {
                         log.warn("Failed validate DC: " + this.dcList[ i ], se);

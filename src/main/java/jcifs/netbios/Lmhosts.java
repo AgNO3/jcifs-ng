@@ -48,7 +48,7 @@ public class Lmhosts {
 
 
     /**
-     * This is really just for {@link jcifs.UniAddress}. It does
+     * This is really just for {@link jcifs.netbios.UniAddress}. It does
      * not throw an {@link java.net.UnknownHostException} because this
      * is queried frequently and exceptions would be rather costly to
      * throw on a regular basis here.

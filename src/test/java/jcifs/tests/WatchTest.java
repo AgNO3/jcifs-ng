@@ -38,12 +38,12 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import jcifs.CIFSException;
 import jcifs.smb.FileNotifyInformation;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -63,16 +63,19 @@ public class WatchTest extends BaseCIFSTest {
     }
 
 
+    @Override
     @Before
-    public void setup () throws CIFSException, MalformedURLException, UnknownHostException {
+    public void setUp () throws Exception {
         super.setUp();
         this.executor = Executors.newSingleThreadExecutor();
         this.base = createTestDirectory();
     }
 
 
+    @Override
     @After
-    public void teardown () throws CIFSException, InterruptedException {
+    public void tearDown () throws Exception {
+        this.base.close();
         if ( this.executor != null ) {
             this.executor.shutdown();
             if ( this.future != null ) {
@@ -98,12 +101,13 @@ public class WatchTest extends BaseCIFSTest {
     @Test
     public void testWatchCreate () throws SmbException, MalformedURLException, UnknownHostException, InterruptedException, ExecutionException {
         try {
-            setupWatch(FileNotifyInformation.FILE_ACTION_ADDED, false);
+            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false);
             SmbFile cr = new SmbFile(this.base, "created");
             cr.createNewFile();
             assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
         }
         catch ( TimeoutException e ) {
+            Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
             fail("Did not recieve notification");
         }
     }
@@ -114,7 +118,7 @@ public class WatchTest extends BaseCIFSTest {
         try {
             SmbFile cr = new SmbFile(this.base, "modified");
             cr.createNewFile();
-            setupWatch(FileNotifyInformation.FILE_ACTION_MODIFIED, false);
+            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES, false);
             try ( OutputStream os = cr.getOutputStream() ) {
                 os.write(new byte[] {
                     1, 2, 3, 4
@@ -123,7 +127,45 @@ public class WatchTest extends BaseCIFSTest {
             assertNotified(FileNotifyInformation.FILE_ACTION_MODIFIED, "modified", null);
         }
         catch ( TimeoutException e ) {
+            Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
             fail("Did not recieve notification");
+        }
+    }
+
+
+    @Test
+    public void testWatchInBetween () throws InterruptedException, ExecutionException, IOException {
+        try {
+            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false);
+            SmbFile cr = new SmbFile(this.base, "created");
+            cr.createNewFile();
+            assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+
+            cr = new SmbFile(this.base, "created2");
+            cr.createNewFile();
+
+            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false);
+            assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created2", null);
+        }
+        catch ( TimeoutException e ) {
+            Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
+            fail("Did not recieve notification");
+        }
+    }
+
+
+    @Test
+    public void testWatchClose () throws InterruptedException, ExecutionException, IOException {
+        try {
+            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES, false);
+            this.base.close();
+            Future<List<FileNotifyInformation>> f = this.future;
+            assertNotNull(f);
+            f.get(1, TimeUnit.SECONDS);
+        }
+        catch ( TimeoutException e ) {
+            // this is not really expected but samba does not seem to properly handle this
+            Assume.assumeTrue("Server did not react to close", false);
         }
     }
 

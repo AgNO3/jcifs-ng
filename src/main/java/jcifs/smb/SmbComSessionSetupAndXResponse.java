@@ -71,6 +71,7 @@ class SmbComSessionSetupAndXResponse extends AndXServerMessageBlock {
             System.arraycopy(buffer, bufferIndex, this.blob, 0, this.blob.length);
             bufferIndex += this.blob.length;
         }
+
         this.nativeOs = readString(buffer, bufferIndex);
         bufferIndex += stringWireLength(this.nativeOs, bufferIndex);
         this.nativeLanMan = readString(buffer, bufferIndex, start + this.byteCount, 255, this.useUnicode);

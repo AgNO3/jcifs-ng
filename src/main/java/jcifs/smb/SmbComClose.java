@@ -48,7 +48,7 @@ class SmbComClose extends ServerMessageBlock {
             this.digest.writeUTime(getConfig(), this.lastWriteTime, dst, dstIndex);
         }
         else {
-            log.debug("SmbComClose without a digest");
+            log.trace("SmbComClose without a digest");
         }
         return 6;
     }

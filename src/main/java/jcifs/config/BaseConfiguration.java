@@ -18,6 +18,7 @@
 package jcifs.config;
 
 
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.SecureRandom;
@@ -30,6 +31,7 @@ import java.util.TimeZone;
 
 import org.apache.log4j.Logger;
 
+import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.ResolverType;
 import jcifs.SmbConstants;
@@ -62,6 +64,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
     protected boolean useNTSmbs = true;
+    protected boolean useLargeReadWrite = true;
     protected int lanmanCompatibility = 3;
     protected boolean disablePlainTextPasswords = true;
     protected String oemEncoding = SmbConstants.DEFAULT_OEM_ENCODING;
@@ -117,9 +120,10 @@ public class BaseConfiguration implements Configuration {
 
 
     /**
+     * @throws CIFSException
      * 
      */
-    protected BaseConfiguration () {
+    protected BaseConfiguration () throws CIFSException {
         this(false);
     }
 
@@ -128,8 +132,9 @@ public class BaseConfiguration implements Configuration {
      * 
      * @param initDefaults
      *            whether to initialize defaults based on other settings
+     * @throws CIFSException
      */
-    public BaseConfiguration ( boolean initDefaults ) {
+    public BaseConfiguration ( boolean initDefaults ) throws CIFSException {
         if ( initDefaults ) {
             this.initDefaults();
         }
@@ -571,7 +576,16 @@ public class BaseConfiguration implements Configuration {
     }
 
 
-    protected void initDefaults () {
+    protected void initDefaults () throws CIFSException {
+
+        try {
+            "".getBytes(SmbConstants.DEFAULT_OEM_ENCODING);
+        }
+        catch ( UnsupportedEncodingException uee ) {
+            throw new CIFSException(
+                "The default OEM encoding " + SmbConstants.DEFAULT_OEM_ENCODING + " does not appear to be supported by this JRE.");
+        }
+
         this.localPid = (int) ( Math.random() * 65536d );
         this.localTimeZone = TimeZone.getDefault();
         this.random = new SecureRandom();
@@ -590,8 +604,9 @@ public class BaseConfiguration implements Configuration {
 
         if ( this.capabilities == 0 ) {
             this.capabilities = ( this.useNTSmbs ? SmbConstants.CAP_NT_SMBS : 0 ) | ( this.useNtStatus ? SmbConstants.CAP_STATUS32 : 0 )
-                    | ( this.useExtendedSecurity ? SmbConstants.CAP_EXTENDED_SECURITY : 0 ) | SmbConstants.CAP_LARGE_READX
-                    | SmbConstants.CAP_LARGE_WRITEX | ( this.useUnicode ? SmbConstants.CAP_UNICODE : 0 );
+                    | ( this.useExtendedSecurity ? SmbConstants.CAP_EXTENDED_SECURITY : 0 )
+                    | ( this.useLargeReadWrite ? SmbConstants.CAP_LARGE_READX : 0 ) | ( this.useLargeReadWrite ? SmbConstants.CAP_LARGE_WRITEX : 0 )
+                    | ( this.useUnicode ? SmbConstants.CAP_UNICODE : 0 );
         }
 
         if ( this.broadcastAddress == null ) {

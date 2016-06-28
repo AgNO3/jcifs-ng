@@ -21,7 +21,7 @@ package jcifs.smb;
 
 import java.io.Serializable;
 
-import jcifs.UniAddress;
+import jcifs.netbios.UniAddress;
 import jcifs.util.Hexdump;
 
 

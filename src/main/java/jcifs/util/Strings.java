@@ -21,6 +21,8 @@ package jcifs.util;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 
+import org.apache.log4j.Logger;
+
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 
@@ -115,6 +117,11 @@ public final class Strings {
         while ( buffer[ bufferIndex + len ] != (byte) 0x00 || buffer[ bufferIndex + len + 1 ] != (byte) 0x00 ) {
             len += 2;
             if ( len > maxLen ) {
+                Logger logger = Logger.getLogger(Strings.class);
+                if ( logger.isDebugEnabled() ) {
+                    logger.warn("Failed to find string termination with max length " + maxLen);
+                    logger.debug(Hexdump.toHexString(buffer, bufferIndex, len));
+                }
                 throw new RuntimeCIFSException("zero termination not found");
             }
         }

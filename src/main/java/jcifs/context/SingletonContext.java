@@ -18,14 +18,21 @@
 package jcifs.context;
 
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
 import org.apache.log4j.Logger;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.RuntimeCIFSException;
 import jcifs.config.PropertyConfiguration;
 
 
 /**
+ * Global singleton context
+ * 
  * @author mbechler
  *
  */
@@ -36,14 +43,34 @@ public class SingletonContext extends BaseContext implements CIFSContext {
 
 
     /**
+     * Get singleton context
+     * 
+     * The singleton context will use system properties for configuration as well as values specified in a file
+     * specified through this <tt>jcifs.properties</tt> system property.
      * 
      * @return a global context, initialized on first call
      */
-    public static final SingletonContext getInstance () {
+    public static synchronized final SingletonContext getInstance () {
         if ( INSTANCE == null ) {
             try {
                 log.debug("Initializing singleton context");
-                INSTANCE = new SingletonContext();
+                Properties p = new Properties();
+                try {
+                    String filename = System.getProperty("jcifs.properties");
+                    if ( filename != null && filename.length() > 1 ) {
+
+                        try ( FileInputStream in = new FileInputStream(filename) ) {
+                            p.load(in);
+                        }
+                    }
+
+                }
+                catch ( IOException ioe ) {
+                    log.error("Failed to load config", ioe); //$NON-NLS-1$
+                }
+
+                p.putAll(System.getProperties());
+                INSTANCE = new SingletonContext(p);
             }
             catch ( CIFSException e ) {
                 log.error("Failed to create singleton JCIFS context", e);
@@ -55,10 +82,48 @@ public class SingletonContext extends BaseContext implements CIFSContext {
 
 
     /**
+     * This static method registers the SMB URL protocol handler which is
+     * required to use SMB URLs with the <tt>java.net.URL</tt> class. If this
+     * method is not called before attempting to create an SMB URL with the
+     * URL class the following exception will occur:
+     * <blockquote>
+     * 
+     * <pre>
+     * Exception MalformedURLException: unknown protocol: smb
+     *     at java.net.URL.&lt;init&gt;(URL.java:480)
+     *     at java.net.URL.&lt;init&gt;(URL.java:376)
+     *     at java.net.URL.&lt;init&gt;(URL.java:330)
+     *     at jcifs.smb.SmbFile.&lt;init&gt;(SmbFile.java:355)
+     *     ...
+     * </pre>
+     * 
+     * <blockquote>
      * 
      */
-    private SingletonContext () throws CIFSException {
-        super(new PropertyConfiguration(System.getProperties()));
+    public static void registerSmbURLHandler () {
+        String pkgs;
+        float ver = Float.parseFloat(Runtime.class.getPackage().getSpecificationVersion());
+        if ( ver < 1.7f ) {
+            throw new RuntimeCIFSException("jcifs-ng requires Java 1.7 or above. You are running " + ver);
+        }
+
+        SingletonContext.getInstance();
+        pkgs = System.getProperty("java.protocol.handler.pkgs");
+        if ( pkgs == null ) {
+            System.setProperty("java.protocol.handler.pkgs", "jcifs");
+        }
+        else if ( pkgs.indexOf("jcifs") == -1 ) {
+            pkgs += "|jcifs";
+            System.setProperty("java.protocol.handler.pkgs", pkgs);
+        }
+    }
+
+
+    /**
+     * 
+     */
+    private SingletonContext ( Properties p ) throws CIFSException {
+        super(new PropertyConfiguration(p));
     }
 
 }

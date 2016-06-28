@@ -11,4 +11,6 @@ A cleaned-up and improved version of the jCIFS library
  * Large ReadX/WriteX support
  * NtTransNotifyChange support
  * Google patches: various bugfixes, lastAccess support, retrying requests
+ * A proper test suite
+ * Various fixes
  

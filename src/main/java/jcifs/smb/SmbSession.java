@@ -36,7 +36,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.SmbConstants;
-import jcifs.UniAddress;
+import jcifs.netbios.UniAddress;
 
 
 /**
@@ -68,6 +68,7 @@ public final class SmbSession {
 
     private SmbCredentials credentials;
     private byte[] sessionKey;
+    private boolean extendedSecurity;
 
 
     SmbSession ( CIFSContext tf, SmbTransport transport, UniAddress address, int port, InetAddress localAddr, int localPort ) {
@@ -150,6 +151,7 @@ public final class SmbSession {
         synchronized ( transport() ) {
             if ( response != null ) {
                 response.received = false;
+                response.extendedSecurity = this.extendedSecurity;
             }
 
             try {
@@ -300,6 +302,7 @@ public final class SmbSession {
 
                 request = new SmbComSessionSetupAndX(this, andx, this.getCredentials());
                 response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), andxResponse);
+                response.extendedSecurity = false;
 
                 /*
                  * Create SMB signature digest if necessary
@@ -344,7 +347,7 @@ public final class SmbSession {
                     this.getTransport().digest = request.digest;
                 }
 
-                this.setSessionSetup(true);
+                this.setSessionSetup(true, response);
                 state = 0;
 
                 break;
@@ -435,6 +438,7 @@ public final class SmbSession {
                 if ( token != null ) {
                     request = new SmbComSessionSetupAndX(this, null, token);
                     response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), null);
+                    response.extendedSecurity = true;
 
                     if ( ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
@@ -509,7 +513,7 @@ public final class SmbSession {
                         }
                         this.sessionKey = signingKey;
                     }
-                    this.setSessionSetup(true);
+                    this.setSessionSetup(true, response);
                     state = 0;
                     break;
                 }
@@ -569,8 +573,9 @@ public final class SmbSession {
     }
 
 
-    void setSessionSetup ( boolean b ) {
+    void setSessionSetup ( boolean b, SmbComSessionSetupAndXResponse response ) {
         if ( b ) {
+            this.extendedSecurity = response.extendedSecurity;
             this.connectionState = 2;
         }
     }

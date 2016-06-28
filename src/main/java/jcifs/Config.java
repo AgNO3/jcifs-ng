@@ -19,9 +19,6 @@
 package jcifs;
 
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
@@ -33,30 +30,20 @@ import jcifs.context.SingletonContext;
 
 
 /**
- * This class uses a static {@link java.util.Properties} to act
- * as a cental repository for all jCIFS configuration properties. It cannot be
- * instantiated. Similar to <code>System</code> properties the namespace
- * is global therefore property names should be unique. Before use,
- * the <code>load</code> method should be called with the name of a
- * <code>Properties</code> file (or <code>null</code> indicating no
- * file) to initialize the <code>Config</code>. The <code>System</code>
- * properties will then populate the <code>Config</code> as well potentially
- * overwriting properties from the file. Thus properties provided on the
- * commandline with the <code>-Dproperty.name=value</code> VM parameter
- * will override properties from the configuration file.
- * <p>
- * There are several ways to set jCIFS properties. See
- * the <a href="../overview-summary.html#scp">overview page of the API
- * documentation</a> for details.
+ * This class now contains only utlities for config parsing.
+ * 
+ * We strongly suggest that you create an explicit {@link jcifs.context.CIFSContext}
+ * with your desired config. It's base implementation {@link jcifs.context.BaseContext}
+ * should be sufficient for most needs.
+ * 
+ * If you want to retain the classic singleton behavior you can use
+ * {@link jcifs.context.SingletonContext#getInstance()}
+ * witch is intialized using system properties.
+ * 
  */
 @SuppressWarnings ( "javadoc" )
 public class Config {
 
-    /**
-     * The static <code>Properties</code>.
-     */
-
-    private Properties prp = new Properties();
     private static final Logger log = Logger.getLogger(Config.class);
 
 
@@ -78,129 +65,8 @@ public class Config {
      * 
      * <blockquote>
      */
-
     public static void registerSmbURLHandler () {
-        String pkgs;
-        float ver = Float.parseFloat(Runtime.class.getPackage().getSpecificationVersion());
-        if ( ver < 1.7f ) {
-            throw new RuntimeCIFSException("jcifs-ng requires Java 1.7 or above. You are running " + ver);
-        }
-
-        SingletonContext.getInstance();
-        pkgs = System.getProperty("java.protocol.handler.pkgs");
-        if ( pkgs == null ) {
-            System.setProperty("java.protocol.handler.pkgs", "jcifs");
-        }
-        else if ( pkgs.indexOf("jcifs") == -1 ) {
-            pkgs += "|jcifs";
-            System.setProperty("java.protocol.handler.pkgs", pkgs);
-        }
-    }
-
-
-    // supress javadoc constructor summary by removing 'protected'
-    public Config () throws CIFSException {
-        Properties p = new Properties();
-        try {
-            String filename = System.getProperty("jcifs.properties");
-            if ( filename != null && filename.length() > 1 ) {
-
-                try ( FileInputStream in = new FileInputStream(filename) ) {
-                    p.load(in);
-                }
-            }
-
-        }
-        catch ( IOException ioe ) {
-            log.error("Failed to load config", ioe); //$NON-NLS-1$
-        }
-
-        p.putAll(System.getProperties());
-        init(p);
-    }
-
-
-    public Config ( Properties p ) throws CIFSException {
-        init(p);
-    }
-
-
-    /**
-     * @param p
-     */
-    private final void init ( Properties p ) throws CIFSException {
-        this.prp = p;
-        try {
-            "".getBytes(SmbConstants.DEFAULT_OEM_ENCODING);
-        }
-        catch ( UnsupportedEncodingException uee ) {
-            throw new CIFSException(
-                "The default OEM encoding " + SmbConstants.DEFAULT_OEM_ENCODING + " does not appear to be supported by this JRE.");
-        }
-    }
-
-
-    /**
-     * Set the default properties of the static Properties used by <tt>Config</tt>. This permits
-     * a different Properties object/file to be used as the source of properties for
-     * use by the jCIFS library. The Properties must be set <i>before jCIFS
-     * classes are accessed</i> as most jCIFS classes load properties statically once.
-     * Using this method will also override properties loaded
-     * using the <tt>-Djcifs.properties=</tt> commandline parameter.
-     */
-    public void setProperties ( Properties prp ) {
-        prp = new Properties(prp);
-        try {
-            prp.putAll(System.getProperties());
-        }
-        catch ( SecurityException se ) {
-            log.error("SecurityException: jcifs will ignore System properties");
-        }
-    }
-
-
-    /**
-     * @return the prp
-     */
-    public Properties getProperties () {
-        return this.prp;
-    }
-
-
-    /**
-     * Add a property.
-     */
-
-    public Object setProperty ( String key, String value ) {
-        return this.prp.setProperty(key, value);
-    }
-
-
-    /**
-     * Retrieve a property as an <code>Object</code>.
-     */
-
-    public Object get ( String key ) {
-        return this.prp.get(key);
-    }
-
-
-    /**
-     * Retrieve a <code>String</code>. If the key cannot be found,
-     * the provided <code>def</code> default parameter will be returned.
-     */
-
-    public String getProperty ( String key, String def ) {
-        return this.prp.getProperty(key, def);
-    }
-
-
-    /**
-     * Retrieve a <code>String</code>. If the property is not found, <code>null</code> is returned.
-     */
-
-    public String getProperty ( String key ) {
-        return this.prp.getProperty(key);
+        SingletonContext.registerSmbURLHandler();
     }
 
 
@@ -209,9 +75,8 @@ public class Config {
      * cannot be converted to an <code>int</code>, the provided default
      * argument will be returned.
      */
-
-    public int getInt ( String key, int def ) {
-        String s = this.prp.getProperty(key);
+    public static int getInt ( Properties props, String key, int def ) {
+        String s = props.getProperty(key);
         if ( s != null ) {
             try {
                 def = Integer.parseInt(s);
@@ -227,9 +92,8 @@ public class Config {
     /**
      * Retrieve an <code>int</code>. If the property is not found, <code>-1</code> is returned.
      */
-
-    public int getInt ( String key ) {
-        String s = this.prp.getProperty(key);
+    public static int getInt ( Properties props, String key ) {
+        String s = props.getProperty(key);
         int result = -1;
         if ( s != null ) {
             try {
@@ -248,9 +112,8 @@ public class Config {
      * cannot be converted to a <code>long</code>, the provided default
      * argument will be returned.
      */
-
-    public long getLong ( String key, long def ) {
-        String s = this.prp.getProperty(key);
+    public static long getLong ( Properties props, String key, long def ) {
+        String s = props.getProperty(key);
         if ( s != null ) {
             try {
                 def = Long.parseLong(s);
@@ -268,9 +131,8 @@ public class Config {
      * an IP address and cannot be resolved <code>null</code> will
      * be returned.
      */
-
-    public InetAddress getInetAddress ( String key, InetAddress def ) {
-        String addr = this.prp.getProperty(key);
+    public static InetAddress getInetAddress ( Properties props, String key, InetAddress def ) {
+        String addr = props.getProperty(key);
         if ( addr != null ) {
             try {
                 def = InetAddress.getByName(addr);
@@ -283,8 +145,8 @@ public class Config {
     }
 
 
-    public InetAddress getLocalHost () {
-        String addr = this.prp.getProperty("jcifs.smb.client.laddr");
+    public static InetAddress getLocalHost ( Properties props ) {
+        String addr = props.getProperty("jcifs.smb.client.laddr");
 
         if ( addr != null ) {
             try {
@@ -302,9 +164,8 @@ public class Config {
     /**
      * Retrieve a boolean value. If the property is not found, the value of <code>def</code> is returned.
      */
-
-    public boolean getBoolean ( String key, boolean def ) {
-        String b = getProperty(key);
+    public static boolean getBoolean ( Properties props, String key, boolean def ) {
+        String b = props.getProperty(key);
         if ( b != null ) {
             def = b.toLowerCase().equals("true");
         }
@@ -317,9 +178,8 @@ public class Config {
      * value containting a <tt>delim</tt> separated list of hostnames and/or
      * ipaddresses.
      */
-
-    public InetAddress[] getInetAddressArray ( String key, String delim, InetAddress[] def ) {
-        String p = getProperty(key);
+    public static InetAddress[] getInetAddressArray ( Properties props, String key, String delim, InetAddress[] def ) {
+        String p = props.getProperty(key);
         if ( p != null ) {
             StringTokenizer tok = new StringTokenizer(p, delim);
             int len = tok.countTokens();

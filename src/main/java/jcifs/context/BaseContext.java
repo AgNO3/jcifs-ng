@@ -25,8 +25,11 @@ import jcifs.Configuration;
 import jcifs.SidResolver;
 import jcifs.SmbTransportPool;
 import jcifs.netbios.NameServiceClient;
+import jcifs.netbios.NameServiceClientImpl;
 import jcifs.smb.BufferCache;
+import jcifs.smb.BufferCacheImpl;
 import jcifs.smb.Dfs;
+import jcifs.smb.DfsImpl;
 import jcifs.smb.Handler;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SIDCacheImpl;
@@ -59,11 +62,11 @@ public class BaseContext extends AbstractCIFSContext {
      */
     public BaseContext ( Configuration config ) {
         this.config = config;
-        this.dfs = new Dfs(this);
+        this.dfs = new DfsImpl(this);
         this.sidResolver = new SIDCacheImpl(this);
         this.urlHandler = new Handler(this);
-        this.nameServiceClient = new NameServiceClient(this);
-        this.bufferCache = new BufferCache(this.config);
+        this.nameServiceClient = new NameServiceClientImpl(this);
+        this.bufferCache = new BufferCacheImpl(this.config);
         this.transportPool = new SmbTransportPoolImpl();
         this.defaultCredentials = new NtlmPasswordAuthentication(this, null, null, null);
     }

@@ -44,8 +44,11 @@ import org.bouncycastle.util.encoders.Base64;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
-import jcifs.UniAddress;
+import jcifs.config.PropertyConfiguration;
+import jcifs.context.BaseContext;
+import jcifs.netbios.NameServiceClient;
 import jcifs.netbios.NbtAddress;
+import jcifs.netbios.UniAddress;
 import jcifs.smb.DfsReferral;
 import jcifs.smb.NtStatus;
 import jcifs.smb.NtlmPasswordAuthentication;
@@ -89,6 +92,7 @@ public class NetworkExplorer extends HttpServlet {
         String name;
 
         Properties p = new Properties();
+        p.putAll(System.getProperties());
         p.setProperty("jcifs.smb.client.soTimeout", "600000");
         p.setProperty("jcifs.smb.client.attrExpirationPeriod", "300000");
 
@@ -101,9 +105,7 @@ public class NetworkExplorer extends HttpServlet {
         }
 
         try {
-            Config cfg = new Config(p);
-
-            if ( cfg.getProperty("jcifs.smb.client.username") == null ) {
+            if ( p.getProperty("jcifs.smb.client.username") == null ) {
                 new NtlmSsp();
             }
             else {
@@ -122,15 +124,13 @@ public class NetworkExplorer extends HttpServlet {
                 throw new ServletException(ioe.getMessage());
             }
 
-            this.enableBasic = cfg.getBoolean("jcifs.http.enableBasic", false);
-            this.insecureBasic = cfg.getBoolean("jcifs.http.insecureBasic", false);
-            this.realm = cfg.getProperty("jcifs.http.basicRealm");
+            this.enableBasic = Config.getBoolean(p, "jcifs.http.enableBasic", false);
+            this.insecureBasic = Config.getBoolean(p, "jcifs.http.insecureBasic", false);
+            this.realm = p.getProperty("jcifs.http.basicRealm");
             if ( this.realm == null )
                 this.realm = "jCIFS";
-            this.defaultDomain = cfg.getProperty("jcifs.smb.client.domain");
-
-            // TODO: initialize
-            this.transportContext = null;
+            this.defaultDomain = p.getProperty("jcifs.smb.client.domain");
+            this.transportContext = new BaseContext(new PropertyConfiguration(p));
         }
         catch ( CIFSException ex ) {
             throw new ServletException("Failed to initialize CIFS context", ex);
@@ -492,13 +492,13 @@ public class NetworkExplorer extends HttpServlet {
 
             if ( msg.startsWith("NTLM ") ) {
                 byte[] challenge;
-
+                NameServiceClient nameServiceClient = getTransportContext().getNameServiceClient();
                 if ( pathInfo == null || server == null ) {
-                    String mb = NbtAddress.getByName(NbtAddress.MASTER_BROWSER_NAME, 0x01, null, getTransportContext()).getHostAddress();
-                    dc = UniAddress.getByName(mb, getTransportContext());
+                    String mb = nameServiceClient.getNbtByName(NbtAddress.MASTER_BROWSER_NAME, 0x01, null).getHostAddress();
+                    dc = nameServiceClient.getByName(mb);
                 }
                 else {
-                    dc = UniAddress.getByName(server, possibleWorkgroup, getTransportContext());
+                    dc = nameServiceClient.getByName(server, possibleWorkgroup);
                 }
 
                 req.getSession(); /* ensure session id is set for cluster env. */

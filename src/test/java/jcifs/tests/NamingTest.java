@@ -150,8 +150,11 @@ public class NamingTest extends BaseCIFSTest {
             Arrays.sort(found);
             Arrays.sort(expect);
 
-            Logger.getLogger(NamingTest.class).info("Expect " + Arrays.toString(expect));
-            Logger.getLogger(NamingTest.class).info("Found " + Arrays.toString(found));
+            Logger logger = Logger.getLogger(NamingTest.class);
+            if ( logger.isDebugEnabled() ) {
+                logger.debug("Expect " + Arrays.toString(expect));
+                logger.debug("Found " + Arrays.toString(found));
+            }
 
             assertArrayEquals(expect, found);
 

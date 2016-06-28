@@ -96,15 +96,20 @@ public class SmbFileOutputStream extends OutputStream {
                 this.fp = 0L;
             }
         }
-        if ( file instanceof SmbNamedPipe && file.unc.startsWith("\\pipe\\") ) {
-            file.unc = file.unc.substring(5);
-            file.send(
-                new TransWaitNamedPipe(getSession().getConfig(), "\\pipe" + file.unc),
-                new TransWaitNamedPipeResponse(getSession().getConfig()));
+        if ( file instanceof SmbNamedPipe ) {
+            file.getUncPath0();
+            if ( file.unc.startsWith("\\pipe\\") ) {
+                file.unc = file.unc.substring(5);
+                file.send(
+                    new TransWaitNamedPipe(getSession().getConfig(), "\\pipe" + file.unc),
+                    new TransWaitNamedPipeResponse(getSession().getConfig()));
+            }
         }
         file.open(openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0);
         this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
         this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
+
+        this.useNTSmbs = file.tree.session.getTransport().hasCapability(SmbConstants.CAP_NT_SMBS);
 
         // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
@@ -113,10 +118,14 @@ public class SmbFileOutputStream extends OutputStream {
             this.writeSizeFile = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
         }
         else {
+            log.debug("No support or SMB signing is enabled, not enabling large writes");
             this.writeSizeFile = this.writeSize;
         }
 
-        this.useNTSmbs = file.tree.session.getTransport().hasCapability(SmbConstants.CAP_NT_SMBS);
+        if ( log.isDebugEnabled() ) {
+            log.debug("Negotiated file write size is " + this.writeSizeFile);
+        }
+
         if ( this.useNTSmbs ) {
             this.reqx = new SmbComWriteAndX(getSession().getConfig());
             this.rspx = new SmbComWriteAndXResponse(getSession().getConfig());
@@ -245,7 +254,6 @@ public class SmbFileOutputStream extends OutputStream {
             int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.writeSizeFile : this.writeSize;
             w = len > blockSize ? blockSize : len;
 
-            w = len > this.writeSize ? this.writeSize : len;
             if ( this.useNTSmbs ) {
                 this.reqx.setParam(this.file.fid, this.fp, len - w, b, off, w);
                 if ( ( flags & 1 ) != 0 ) {
@@ -268,6 +276,7 @@ public class SmbFileOutputStream extends OutputStream {
                 off += this.rsp.count;
                 this.file.send(this.req, this.rsp);
             }
+
         }
         while ( len > 0 );
     }

@@ -34,7 +34,7 @@ import jcifs.util.Encdec;
  * 
  *
  */
-public class SmbRandomAccessFile implements DataOutput, DataInput {
+public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable {
 
     private static final int WRITE_OPTIONS = 0x0842;
 
@@ -306,6 +306,7 @@ public class SmbRandomAccessFile implements DataOutput, DataInput {
      * 
      * @throws SmbException
      */
+    @Override
     public void close () throws SmbException {
         this.file.close();
     }

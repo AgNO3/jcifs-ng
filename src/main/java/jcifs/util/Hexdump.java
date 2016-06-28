@@ -69,14 +69,10 @@ public class Hexdump {
      * @return hex string
      */
     public static String toHexString ( byte[] src, int srcIndex, int size ) {
-        char[] c = new char[size];
-        size = ( size % 2 == 0 ) ? size / 2 : size / 2 + 1;
+        char[] c = new char[2 * size];
         for ( int i = 0, j = 0; i < size; i++ ) {
-            c[ j++ ] = HEX_DIGITS[ ( src[ i ] >> 4 ) & 0x0F ];
-            if ( j == c.length ) {
-                break;
-            }
-            c[ j++ ] = HEX_DIGITS[ src[ i ] & 0x0F ];
+            c[ j++ ] = HEX_DIGITS[ ( src[ srcIndex + i ] >> 4 ) & 0x0F ];
+            c[ j++ ] = HEX_DIGITS[ src[ srcIndex + i ] & 0x0F ];
         }
         return new String(c);
     }

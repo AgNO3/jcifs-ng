@@ -23,7 +23,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 import jcifs.CIFSContext;
-import jcifs.util.Hexdump;
 
 
 /**
@@ -88,12 +87,11 @@ import jcifs.util.Hexdump;
 
 public final class NbtAddress {
 
-    /*
+    /**
      * This is a special name that means all hosts. If you wish to find all hosts
      * on a network querying a workgroup group name is the preferred method.
      */
-
-    static final String ANY_HOSTS_NAME = "*\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000";
+    public static final String ANY_HOSTS_NAME = "*\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000";
 
     /**
      * This is a special name for querying the master browser that serves the
@@ -139,275 +137,12 @@ public final class NbtAddress {
 
     public static final int H_NODE = 3;
 
-    private static int nbnsIndex = 0;
-
-    static final byte[] UNKNOWN_MAC_ADDRESS = new byte[] {
+    /**
+     * Unknown MAC Address
+     */
+    public static final byte[] UNKNOWN_MAC_ADDRESS = new byte[] {
         (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
     };
-
-    static final class CacheEntry {
-
-        Name hostName;
-        NbtAddress address;
-        long expiration;
-
-
-        CacheEntry ( Name hostName, NbtAddress address, long expiration ) {
-            this.hostName = hostName;
-            this.address = address;
-            this.expiration = expiration;
-        }
-    }
-
-
-    /**
-     * Determines the address of a host given it's host name. The name can be a NetBIOS name like
-     * "freto" or an IP address like "192.168.1.15". It cannot be a DNS name;
-     * the analygous {@link jcifs.UniAddress} or {@link java.net.InetAddress}
-     * <code>getByName</code> methods can be used for that.
-     *
-     * @param host
-     *            hostname to resolve
-     * @param tc
-     *            context to use
-     * @return the resolved address
-     * @throws java.net.UnknownHostException
-     *             if there is an error resolving the name
-     */
-
-    public static NbtAddress getByName ( String host, CIFSContext tc ) throws UnknownHostException {
-        return getByName(host, 0x00, null, tc);
-    }
-
-
-    /**
-     * Determines the address of a host given it's host name. NetBIOS
-     * names also have a <code>type</code>. Types(aka Hex Codes)
-     * are used to distiquish the various services on a host. <a
-     * href="../../../nbtcodes.html">Here</a> is
-     * a fairly complete list of NetBIOS hex codes. Scope is not used but is
-     * still functional in other NetBIOS products and so for completeness it has been
-     * implemented. A <code>scope</code> of <code>null</code> or <code>""</code>
-     * signifies no scope.
-     *
-     * @param host
-     *            the name to resolve
-     * @param type
-     *            the hex code of the name
-     * @param scope
-     *            the scope of the name
-     * @param tc
-     *            context to use
-     * @return the resolved address
-     * @throws java.net.UnknownHostException
-     *             if there is an error resolving the name
-     */
-    public static NbtAddress getByName ( String host, int type, String scope, CIFSContext tc ) throws UnknownHostException {
-        return getByName(host, type, scope, null, tc);
-    }
-
-
-    /**
-     * Determines the address of a host given it's host name. NetBIOS
-     * names also have a <code>type</code>. Types(aka Hex Codes)
-     * are used to distiquish the various services on a host. <a
-     * href="../../../nbtcodes.html">Here</a> is
-     * a fairly complete list of NetBIOS hex codes. Scope is not used but is
-     * still functional in other NetBIOS products and so for completeness it has been
-     * implemented. A <code>scope</code> of <code>null</code> or <code>""</code>
-     * signifies no scope.
-     * 
-     * The additional <code>svr</code> parameter specifies the address to
-     * query. This might be the address of a specific host, a name server,
-     * or a broadcast address.
-     *
-     * @param host
-     *            the name to resolve
-     * @param type
-     *            the hex code of the name
-     * @param scope
-     *            the scope of the name
-     * @param svr
-     *            server to query
-     * @param tc
-     *            context to use
-     * @return the resolved address
-     * @throws java.net.UnknownHostException
-     *             if there is an error resolving the name
-     */
-    public static NbtAddress getByName ( String host, int type, String scope, InetAddress svr, CIFSContext tc ) throws UnknownHostException {
-
-        if ( host == null || host.length() == 0 ) {
-            return tc.getNameServiceClient().getLocalHost();
-        }
-        Name name = new Name(tc.getConfig(), host, type, scope);
-        if ( !Character.isDigit(host.charAt(0)) ) {
-            return tc.getNameServiceClient().doNameQuery(name, svr, tc);
-        }
-
-        int IP = 0x00;
-        int hitDots = 0;
-        char[] data = host.toCharArray();
-
-        for ( int i = 0; i < data.length; i++ ) {
-            char c = data[ i ];
-            if ( c < 48 || c > 57 ) {
-                return tc.getNameServiceClient().doNameQuery(name, svr, tc);
-            }
-            int b = 0x00;
-            while ( c != '.' ) {
-                if ( c < 48 || c > 57 ) {
-                    return tc.getNameServiceClient().doNameQuery(name, svr, tc);
-                }
-                b = b * 10 + c - '0';
-
-                if ( ++i >= data.length )
-                    break;
-
-                c = data[ i ];
-            }
-            if ( b > 0xFF ) {
-                return tc.getNameServiceClient().doNameQuery(name, svr, tc);
-            }
-            IP = ( IP << 8 ) + b;
-            hitDots++;
-        }
-        if ( hitDots != 4 || host.endsWith(".") ) {
-            return tc.getNameServiceClient().doNameQuery(name, svr, tc);
-        }
-        return new NbtAddress(tc.getNameServiceClient().getUnknownName(), IP, false, B_NODE);
-    }
-
-
-    /**
-     * Retrieve all addresses of a host by it's name.
-     * 
-     * @param host
-     *            hostname to lookup all addresses for
-     * @param type
-     *            the hexcode of the name
-     * @param scope
-     *            the scope of the name
-     * @param svr
-     *            server to query
-     * @param tc
-     *            context to use
-     * 
-     * @return the resolved addresses
-     * @throws UnknownHostException
-     */
-    public static NbtAddress[] getAllByName ( String host, int type, String scope, InetAddress svr, CIFSContext tc ) throws UnknownHostException {
-        return tc.getNameServiceClient().getAllByName(new Name(tc.getConfig(), host, type, scope), svr);
-    }
-
-
-    /**
-     * Retrieve all addresses of a host by it's address. NetBIOS hosts can
-     * have many names for a given IP address. The name and IP address make the
-     * NetBIOS address. This provides a way to retrieve the other names for a
-     * host with the same IP address.
-     *
-     * @param host
-     *            hostname to lookup all addresses for
-     * @param tc
-     *            context to use
-     * @return resolved addresses
-     * @throws java.net.UnknownHostException
-     *             if there is an error resolving the name
-     */
-
-    public static NbtAddress[] getAllByAddress ( String host, CIFSContext tc ) throws UnknownHostException {
-        return getAllByAddress(getByName(host, 0x00, null, tc), tc);
-    }
-
-
-    /**
-     * Retrieve all addresses of a host by it's address. NetBIOS hosts can
-     * have many names for a given IP address. The name and IP address make
-     * the NetBIOS address. This provides a way to retrieve the other names
-     * for a host with the same IP address. See {@link #getByName}
-     * for a description of <code>type</code>
-     * and <code>scope</code>.
-     *
-     * @param host
-     *            hostname to lookup all addresses for
-     * @param type
-     *            the hexcode of the name
-     * @param scope
-     *            the scope of the name
-     * @param tc
-     *            context to use
-     * @return resolved addresses
-     * @throws java.net.UnknownHostException
-     *             if there is an error resolving the name
-     */
-
-    public static NbtAddress[] getAllByAddress ( String host, int type, String scope, CIFSContext tc ) throws UnknownHostException {
-        return getAllByAddress(getByName(host, type, scope, tc), tc);
-    }
-
-
-    /**
-     * Retrieve all addresses of a host by it's address. NetBIOS hosts can
-     * have many names for a given IP address. The name and IP address make the
-     * NetBIOS address. This provides a way to retrieve the other names for a
-     * host with the same IP address.
-     *
-     * @param addr
-     *            the address to query
-     * @param tc
-     *            context to use
-     * @return resolved addresses
-     * @throws UnknownHostException
-     *             if address cannot be resolved
-     */
-
-    public static NbtAddress[] getAllByAddress ( NbtAddress addr, CIFSContext tc ) throws UnknownHostException {
-        try {
-            NbtAddress[] addrs = tc.getNameServiceClient().getNodeStatus(addr);
-            tc.getNameServiceClient().cacheAddressArray(addrs);
-            return addrs;
-        }
-        catch ( UnknownHostException uhe ) {
-            throw new UnknownHostException(
-                "no name with type 0x" + Hexdump.toHexString(addr.hostName.hexCode, 2)
-                        + ( ( ( addr.hostName.scope == null ) || ( addr.hostName.scope.length() == 0 ) ) ? " with no scope"
-                                : " with scope " + addr.hostName.scope )
-                        + " for host " + addr.getHostAddress());
-        }
-    }
-
-
-    /**
-     * 
-     * @param tc
-     * @return address of active WINS server
-     */
-    public static InetAddress getWINSAddress ( CIFSContext tc ) {
-        return tc.getConfig().getWinsServers().length == 0 ? null : tc.getConfig().getWinsServers()[ nbnsIndex ];
-    }
-
-
-    /**
-     * 
-     * @param tc
-     * @param svr
-     * @return whether the given address is a WINS server
-     */
-    public static boolean isWINS ( CIFSContext tc, InetAddress svr ) {
-        for ( int i = 0; svr != null && i < tc.getConfig().getWinsServers().length; i++ ) {
-            if ( svr.hashCode() == tc.getConfig().getWinsServers()[ i ].hashCode() ) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-
-    static InetAddress switchWINS ( CIFSContext tc ) {
-        nbnsIndex = ( nbnsIndex + 1 ) < tc.getConfig().getWinsServers().length ? nbnsIndex + 1 : 0;
-        return tc.getConfig().getWinsServers().length == 0 ? null : tc.getConfig().getWinsServers()[ nbnsIndex ];
-    }
 
     Name hostName;
     int address, nodeType;
@@ -561,14 +296,14 @@ public final class NbtAddress {
 
     void checkData ( CIFSContext tc ) throws UnknownHostException {
         if ( this.hostName.isUnknown() ) {
-            getAllByAddress(this, tc);
+            tc.getNameServiceClient().getNbtAllByAddress(this);
         }
     }
 
 
     void checkNodeStatusData ( CIFSContext tc ) throws UnknownHostException {
         if ( this.isDataFromNodeStatus == false ) {
-            getAllByAddress(this, tc);
+            tc.getNameServiceClient().getNbtAllByAddress(this);
         }
     }
 

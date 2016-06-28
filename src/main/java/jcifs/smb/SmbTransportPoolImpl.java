@@ -29,7 +29,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTransportPool;
-import jcifs.UniAddress;
+import jcifs.netbios.UniAddress;
 
 
 /**

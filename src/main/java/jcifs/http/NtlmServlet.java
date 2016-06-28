@@ -36,8 +36,9 @@ import org.bouncycastle.util.encoders.Base64;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
-import jcifs.UniAddress;
-import jcifs.netbios.NbtAddress;
+import jcifs.config.PropertyConfiguration;
+import jcifs.context.BaseContext;
+import jcifs.netbios.UniAddress;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
 
@@ -83,7 +84,7 @@ public abstract class NtlmServlet extends HttpServlet {
         super.init(config);
 
         Properties p = new Properties();
-
+        p.putAll(System.getProperties());
         /*
          * Set jcifs properties we know we want; soTimeout and cachePolicy to 10min.
          */
@@ -99,23 +100,20 @@ public abstract class NtlmServlet extends HttpServlet {
             }
         }
 
-        Config cfg;
         try {
-            cfg = new Config(p);
-            this.defaultDomain = cfg.getProperty("jcifs.smb.client.domain");
-            this.domainController = cfg.getProperty("jcifs.http.domainController");
+            this.defaultDomain = p.getProperty("jcifs.smb.client.domain");
+            this.domainController = p.getProperty("jcifs.http.domainController");
             if ( this.domainController == null ) {
                 this.domainController = this.defaultDomain;
-                this.loadBalance = cfg.getBoolean("jcifs.http.loadBalance", true);
+                this.loadBalance = Config.getBoolean(p, "jcifs.http.loadBalance", true);
             }
-            this.enableBasic = Boolean.valueOf(cfg.getProperty("jcifs.http.enableBasic")).booleanValue();
-            this.insecureBasic = Boolean.valueOf(cfg.getProperty("jcifs.http.insecureBasic")).booleanValue();
-            this.realm = cfg.getProperty("jcifs.http.basicRealm");
+            this.enableBasic = Boolean.valueOf(p.getProperty("jcifs.http.enableBasic")).booleanValue();
+            this.insecureBasic = Boolean.valueOf(p.getProperty("jcifs.http.insecureBasic")).booleanValue();
+            this.realm = p.getProperty("jcifs.http.basicRealm");
             if ( this.realm == null )
                 this.realm = "jCIFS";
 
-            // TODO: initialize
-            this.transportContext = null;
+            this.transportContext = new BaseContext(new PropertyConfiguration(p));;
         }
         catch ( CIFSException ex ) {
             throw new ServletException("Failed to initialize config", ex);
@@ -130,10 +128,10 @@ public abstract class NtlmServlet extends HttpServlet {
         String msg = request.getHeader("Authorization");
         if ( msg != null && ( msg.startsWith("NTLM ") || ( offerBasic && msg.startsWith("Basic ") ) ) ) {
             if ( this.loadBalance ) {
-                dc = new UniAddress(NbtAddress.getByName(this.domainController, 0x1C, null, getTransportContext()));
+                dc = new UniAddress(getTransportContext().getNameServiceClient().getNbtByName(this.domainController, 0x1C, null));
             }
             else {
-                dc = UniAddress.getByName(this.domainController, true, getTransportContext());
+                dc = getTransportContext().getNameServiceClient().getByName(this.domainController, true);
             }
             NtlmPasswordAuthentication ntlm;
             if ( msg.startsWith("NTLM ") ) {

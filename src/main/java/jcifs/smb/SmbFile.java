@@ -37,12 +37,12 @@ import org.apache.log4j.Logger;
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
-import jcifs.UniAddress;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcDfsRootEnum;
 import jcifs.dcerpc.msrpc.MsrpcShareEnum;
 import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
 import jcifs.netbios.NbtAddress;
+import jcifs.netbios.UniAddress;
 
 
 /**
@@ -786,7 +786,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                         log.trace("DFS redirect: " + dr);
                     }
 
-                    UniAddress addr = UniAddress.getByName(dr.server, getTransportContext());
+                    UniAddress addr = getTransportContext().getNameServiceClient().getByName(dr.server);
                     SmbTransport trans = getTransportContext().getTransportPool()
                             .getSmbTransport(getTransportContext(), addr, this.url.getPort(), false);
                     /*
@@ -988,7 +988,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             String server = queryLookup(query, "server");
             if ( server != null && server.length() > 0 ) {
                 this.addresses = new UniAddress[1];
-                this.addresses[ 0 ] = UniAddress.getByName(server, getTransportContext());
+                this.addresses[ 0 ] = getTransportContext().getNameServiceClient().getByName(server);
                 return getNextAddress();
             }
             String address = queryLookup(query, "address");
@@ -1002,23 +1002,24 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
         if ( host.length() == 0 ) {
             try {
-                NbtAddress addr = NbtAddress.getByName(NbtAddress.MASTER_BROWSER_NAME, 0x01, null, getTransportContext());
+                NbtAddress addr = getTransportContext().getNameServiceClient().getNbtByName(NbtAddress.MASTER_BROWSER_NAME, 0x01, null);
                 this.addresses = new UniAddress[1];
-                this.addresses[ 0 ] = UniAddress.getByName(addr.getHostAddress(), getTransportContext());
+                this.addresses[ 0 ] = getTransportContext().getNameServiceClient().getByName(addr.getHostAddress());
             }
             catch ( UnknownHostException uhe ) {
                 log.debug("Unknown host", uhe);
                 if ( getTransportContext().getConfig().getDefaultDomain() == null ) {
                     throw uhe;
                 }
-                this.addresses = UniAddress.getAllByName(getTransportContext().getConfig().getDefaultDomain(), true, getTransportContext());
+                this.addresses = getTransportContext().getNameServiceClient()
+                        .getAllByName(getTransportContext().getConfig().getDefaultDomain(), true);
             }
         }
         else if ( path.length() == 0 || path.equals("/") ) {
-            this.addresses = UniAddress.getAllByName(host, true, getTransportContext());
+            this.addresses = getTransportContext().getNameServiceClient().getAllByName(host, true);
         }
         else {
-            this.addresses = UniAddress.getAllByName(host, false, getTransportContext());
+            this.addresses = getTransportContext().getNameServiceClient().getAllByName(host, false);
         }
 
         return getNextAddress();
@@ -1222,8 +1223,9 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
     void close ( int f, long lastWriteTime ) throws SmbException {
 
-        if ( log.isDebugEnabled() )
+        if ( log.isDebugEnabled() ) {
             log.debug("close: " + f);
+        }
 
         /*
          * Close Request / Response
@@ -1666,10 +1668,10 @@ public class SmbFile extends URLConnection implements SmbConstants {
             if ( this.url.getHost().length() == 0 ) {}
             else if ( this.share == null ) {
                 if ( getType() == TYPE_WORKGROUP ) {
-                    UniAddress.getByName(this.url.getHost(), true, getTransportContext());
+                    getTransportContext().getNameServiceClient().getByName(this.url.getHost(), true);
                 }
                 else {
-                    UniAddress.getByName(this.url.getHost(), getTransportContext()).getHostName();
+                    getTransportContext().getNameServiceClient().getByName(this.url.getHost()).getHostName();
                 }
             }
             else if ( getUncPath0().length() == 1 || this.share.equalsIgnoreCase("IPC$") ) {
@@ -1715,14 +1717,33 @@ public class SmbFile extends URLConnection implements SmbConstants {
     /**
      * Watches a directory for changes
      * 
+     * Will block until the server returns a set of changes that match the given filter. The file will be automatically
+     * opened if it is not and should be closed with {@link #close()} when no longer
+     * needed.
+     * 
+     * Closing the file should cancel a pending notify request, but that does not seem to work reliable in all
+     * implementations.
+     * 
+     * Changes in between these calls (as long as the file is open) are buffered by the server, so iteratively calling
+     * this method should provide all changes (size of that buffer can be adjusted through
+     * {@link jcifs.Configuration#getNotifyBufferSize()}).
+     * If the server cannot fulfill the request because the changes did not fit the buffer
+     * it will return an empty list of changes.
      * 
      * 
      * @param filter
+     *            see constants in {@link FileNotifyInformation}
      * @param recursive
-     * @return list of changes since the last watch call
+     *            whether to also watch subdirectories
+     * @return list of changes since the last watch call, empty if there were more changes than the server could handle.
      * @throws SmbException
      */
     public List<FileNotifyInformation> watch ( int filter, boolean recursive ) throws SmbException {
+
+        if ( filter == 0 ) {
+            throw new IllegalArgumentException("filter must not be 0");
+        }
+
         if ( !isDirectory() ) {
             throw new SmbException("Is not a directory");
         }
@@ -1732,22 +1753,32 @@ public class SmbFile extends URLConnection implements SmbConstants {
             throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
         }
 
-        int f = open0(O_RDONLY, READ_CONTROL, 0, 1);
+        boolean wasOpen = this.opened;
+        if ( !wasOpen ) {
+            open(O_RDONLY, READ_CONTROL, 0, 1);
+            if ( log.isDebugEnabled() ) {
+                log.debug("Opened " + this.fid);
+            }
+        }
+
         /*
          * NtTrans Notify Change Request / Response
          */
-
-        NtTransNotifyChange request = new NtTransNotifyChange(getSession().getConfig(), f, filter, recursive);
+        NtTransNotifyChange request = new NtTransNotifyChange(getSession().getConfig(), this.fid, filter, recursive);
         NtTransNotifyChangeResponse response = new NtTransNotifyChangeResponse(getSession().getConfig());
-        try {
-            log.debug("Sending NtTransNotifyChange");
-            send(request, response, false);
-            log.debug("Got result");
+
+        if ( log.isTraceEnabled() ) {
+            log.trace("Sending NtTransNotifyChange for " + this.fid);
         }
-        finally {
-            if ( !this.tree.session.getTransport().isDisconnected() ) {
-                close(f, 0L);
-            }
+        send(request, response, false);
+        if ( log.isTraceEnabled() ) {
+            log.trace("Returned from NtTransNotifyChange " + response.status);
+        }
+        if ( response.status == 0x0000010B ) {
+            wasOpen = false;
+        }
+        if ( response.status == 0x0000010C ) {
+            response.notifyInformation.clear();
         }
         return response.notifyInformation;
     }

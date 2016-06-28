@@ -31,4 +31,9 @@ public abstract class Response {
      * 
      */
     public boolean isReceived;
+
+    /**
+     * 
+     */
+    public boolean isError;
 }
