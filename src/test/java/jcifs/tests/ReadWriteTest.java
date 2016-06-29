@@ -120,6 +120,8 @@ public class ReadWriteTest extends BaseCIFSTest {
                 writeRandom(bufSize, length, os);
             }
 
+            assertEquals("File size matches", length, f.length());
+
             try ( InputStream is = f.getInputStream() ) {
                 verifyRandom(bufSize, length, is);
             }

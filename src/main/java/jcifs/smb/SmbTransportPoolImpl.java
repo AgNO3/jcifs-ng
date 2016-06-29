@@ -113,6 +113,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     @Override
     public void close () throws CIFSException {
         synchronized ( this.connections ) {
+            log.debug("Closing pool");
             List<SmbTransport> toClose = new LinkedList<>(this.connections);
             toClose.addAll(this.nonPooledConnections);
             for ( SmbTransport conn : toClose ) {

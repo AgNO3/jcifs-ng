@@ -148,7 +148,8 @@ public final class SmbSession {
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException {
-        synchronized ( transport() ) {
+        SmbTransport trans = transport();
+        synchronized ( trans ) {
             if ( response != null ) {
                 response.received = false;
                 response.extendedSecurity = this.extendedSecurity;
@@ -221,7 +222,8 @@ public final class SmbSession {
 
 
     void sessionSetup ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException, GeneralSecurityException {
-        synchronized ( transport() ) {
+        SmbTransport trans = transport();
+        synchronized ( trans ) {
 
             while ( this.connectionState != 0 ) {
                 if ( this.connectionState == 2 || this.connectionState == 3 ) // connected or disconnecting
@@ -236,7 +238,7 @@ public final class SmbSession {
             this.connectionState = 1; // trying ...
 
             try {
-                this.transport.connect();
+                trans.connect();
 
                 /*
                  * Session Setup And X Request / Response
@@ -263,7 +265,7 @@ public final class SmbSession {
                 throw se;
             }
             finally {
-                this.transport.notifyAll();
+                trans.notifyAll();
             }
         }
 
@@ -527,7 +529,8 @@ public final class SmbSession {
 
 
     void logoff ( boolean inError ) {
-        synchronized ( transport() ) {
+        SmbTransport trans = transport();
+        synchronized ( trans ) {
 
             if ( this.connectionState != 2 ) // not-connected
                 return;
@@ -623,6 +626,14 @@ public final class SmbSession {
      */
     public SmbCredentials getCredentials () {
         return this.credentials;
+    }
+
+
+    /**
+     * @return whether the session is connected
+     */
+    public boolean isConnected () {
+        return !this.transport.isDisconnected() && this.connectionState == 2;
     }
 
 }

@@ -80,7 +80,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
         for ( int i = 0; i < 10; i++ ) {
             runnables.add(new MutiThreadTestCase());
         }
-        runMultiTestCase(runnables, 30);
+        runMultiTestCase(runnables, 60);
     }
 
 
@@ -88,6 +88,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
         for ( Runnable r : testcases ) {
             this.executor.submit(r);
         }
+        this.executor.shutdown();
         this.executor.awaitTermination(timeoutSecs, TimeUnit.SECONDS);
         for ( MultiTestCase r : testcases ) {
             assertTrue(r.completed);

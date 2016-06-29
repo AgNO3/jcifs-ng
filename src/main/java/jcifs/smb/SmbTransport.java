@@ -199,7 +199,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         }
         ssn = new SmbSession(tf, this, this.address, this.port, this.localAddr, this.localPort);
         if ( log.isDebugEnabled() ) {
-            log.debug("Establishing new session " + ssn);
+            log.debug("Establishing new session " + ssn + " on " + this.name);
         }
         this.sessions.add(ssn);
         return ssn;
@@ -384,7 +384,9 @@ public class SmbTransport extends Transport implements SmbConstants {
         /*
          * Negotiate Protocol Request / Response
          */
-        log.debug("Connecting in state " + this.state);
+        if ( log.isDebugEnabled() ) {
+            log.debug("Connecting in state " + this.state);
+        }
 
         SmbComNegotiateResponse resp;
         try {
@@ -642,13 +644,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                     /* WordCount thru dataOffset always 27 */
                     readn(this.in, buffer, 4 + off, 27);
                     off += 27;
-                    try {
-                        resp.decode(buffer, 4);
-                    }
-                    catch ( Exception e ) {
-                        resp.isError = true;
-                        throw e;
-                    }
+                    resp.decode(buffer, 4);
                     /* EMC can send pad w/o data */
                     int pad = r.dataOffset - off;
                     if ( r.byteCount > 0 && pad > 0 && pad < 4 )
@@ -762,7 +758,10 @@ public class SmbTransport extends Transport implements SmbConstants {
         connect(); /* must negotiate before we can test flags2, useUnicode, etc */
 
         request.flags2 |= this.flags2;
-        request.useUnicode = this.useUnicode;
+        request.useUnicode = request.forceUnicode || this.useUnicode;
+        if ( request.useUnicode ) {
+            request.flags2 |= SmbConstants.FLAGS2_UNICODE;
+        }
         request.response = response; /* needed by sign */
         if ( request.digest == null )
             request.digest = this.digest; /* for sign called in encode */
@@ -789,7 +788,6 @@ public class SmbTransport extends Transport implements SmbConstants {
                     /*
                      * First request w/ interim response
                      */
-
                     req.nextElement();
                     if ( req.hasMoreElements() ) {
                         SmbComBlankResponse interim = new SmbComBlankResponse(getTransportContext().getConfig());
@@ -893,7 +891,7 @@ public class SmbTransport extends Transport implements SmbConstants {
 
     @Override
     public String toString () {
-        return super.toString() + "[" + this.address + ":" + this.port + "]";
+        return super.toString() + "[" + this.address + ":" + this.port + ",state=" + this.state + "]";
     }
 
 
@@ -904,6 +902,11 @@ public class SmbTransport extends Transport implements SmbConstants {
         }
         SmbSession sess = getSmbSession(ctx);
         SmbTree ipc = sess.getSmbTree("IPC$", null);
+
+        if ( ( sess.getTransport().flags2 & SmbConstants.FLAGS2_UNICODE ) == 0 ) {
+            log.debug("Unicode is disabled");
+        }
+
         Trans2GetDfsReferralResponse resp = new Trans2GetDfsReferralResponse(ctx.getConfig());
 
         ipc.send(new Trans2GetDfsReferral(ctx.getConfig(), path), resp);

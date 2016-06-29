@@ -74,6 +74,15 @@ class SmbTree {
 
 
     /**
+     * 
+     * @return whether the tree is connected
+     */
+    public boolean isConnected () {
+        return this.session.isConnected() && this.connectionState == 2;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see java.lang.Object#hashCode()
@@ -90,7 +99,8 @@ class SmbTree {
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response, boolean timeout ) throws SmbException {
-        synchronized ( this.session.transport() ) {
+        SmbTransport transport = this.session.transport();
+        synchronized ( transport ) {
             if ( response != null ) {
                 response.received = false;
             }
@@ -137,7 +147,7 @@ class SmbTree {
                  * \path\to\file
                  */
                 request.flags2 |= SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
-                request.path = '\\' + this.session.transport().tconHostName + '\\' + this.share + request.path;
+                request.path = '\\' + transport.tconHostName + '\\' + this.share + request.path;
             }
             try {
                 this.session.send(request, response, timeout);
@@ -159,15 +169,16 @@ class SmbTree {
 
 
     void treeConnect ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException {
-
-        synchronized ( this.session.transport() ) {
+        SmbTransport transport = this.session.transport();
+        synchronized ( transport ) {
             String unc;
 
             while ( this.connectionState != 0 ) {
                 if ( this.connectionState == 2 || this.connectionState == 3 ) // connected or disconnecting
                     return;
                 try {
-                    this.session.getTransport().wait();
+                    log.debug("Waiting for transport");
+                    transport.wait();
                 }
                 catch ( InterruptedException ie ) {
                     throw new SmbException(ie.getMessage(), ie);
@@ -182,9 +193,10 @@ class SmbTree {
                  * established.
                  */
 
-                this.session.getTransport().connect();
+                log.debug("Connecting transport");
+                transport.connect();
 
-                unc = "\\\\" + this.session.getTransport().tconHostName + '\\' + this.share;
+                unc = "\\\\" + transport.tconHostName + '\\' + this.share;
 
                 /*
                  * IBM iSeries doesn't like specifying a service. Always reset
@@ -217,7 +229,7 @@ class SmbTree {
                 throw se;
             }
             finally {
-                this.session.transport().notifyAll();
+                transport.notifyAll();
             }
         }
     }

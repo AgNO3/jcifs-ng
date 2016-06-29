@@ -79,7 +79,7 @@ public abstract class Transport implements Runnable {
      */
     protected int state = 0;
 
-    String name = "Transport" + id++;
+    protected String name = "Transport" + id++;
     Thread thread;
     TransportException te;
 
@@ -131,6 +131,7 @@ public abstract class Transport implements Runnable {
     public synchronized void sendrecv ( Request request, Response response, Long timeout ) throws IOException {
         makeKey(request);
         response.isReceived = false;
+        response.isError = false;
         try {
             this.response_map.put(request, response);
             doSend(request);
@@ -276,6 +277,7 @@ public abstract class Transport implements Runnable {
                 this.state = 0;
                 throw new TransportException("Connection in error", this.te);
             case 5:
+                log.debug("Trying to connect a disconnected transport");
                 return;
             default:
                 TransportException tex = new TransportException("Invalid state: " + this.state);

@@ -753,13 +753,15 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
     private void resolveDfs0 ( ServerMessageBlock request ) throws SmbException {
         connect0();
-        DfsReferral dr = getTransportContext().getDfs()
-                .resolve(getSession().getTransport().tconHostName, this.tree.share, this.unc, getTransportContext());
+        SmbSession session = getSession();
+        SmbTransport transport = session.getTransport();
+        DfsReferral dr = getTransportContext().getDfs().resolve(transport.tconHostName, this.tree.share, this.unc, getTransportContext());
+
         if ( dr != null ) {
             if ( log.isDebugEnabled() ) {
-                log.debug("Info " + getSession().getTransport().tconHostName + "\\" + this.tree.share + this.unc + " -> " + dr);
+                log.debug("Info " + transport.tconHostName + "\\" + this.tree.share + this.unc + " -> " + dr);
             }
-            String service = null;
+            String service = this.tree != null ? this.tree.service : null;
 
             if ( request != null ) {
                 switch ( request.command ) {
@@ -789,19 +791,23 @@ public class SmbFile extends URLConnection implements SmbConstants {
                     UniAddress addr = getTransportContext().getNameServiceClient().getByName(dr.server);
                     SmbTransport trans = getTransportContext().getTransportPool()
                             .getSmbTransport(getTransportContext(), addr, this.url.getPort(), false);
-                    /*
-                     * This is a key point. This is where we set the "tree" of this file which
-                     * is like changing the rug out from underneath our feet.
-                     */
-                    /*
-                     * Technically we should also try to authenticate here but that means doing the session setup and
-                     * tree connect separately. For now a simple connect will at least tell us if the host is alive.
-                     * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
-                     */
-                    trans.connect();
-                    this.tree = trans.getSmbSession(getTransportContext()).getSmbTree(dr.share, service);
-                    if ( dr != start && dr.key != null ) {
-                        dr.map.put(dr.key, dr);
+
+                    synchronized ( trans ) {
+                        /*
+                         * This is a key point. This is where we set the "tree" of this file which
+                         * is like changing the rug out from underneath our feet.
+                         */
+                        /*
+                         * Technically we should also try to authenticate here but that means doing the session setup
+                         * and
+                         * tree connect separately. For now a simple connect will at least tell us if the host is alive.
+                         * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
+                         */
+                        trans.connect();
+                        this.tree = trans.getSmbSession(getTransportContext()).getSmbTree(dr.share, service);
+                        if ( dr != start && dr.key != null ) {
+                            dr.map.put(dr.key, dr);
+                        }
                     }
 
                     se = null;
@@ -813,7 +819,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                         se = (SmbException) ioe;
                     }
                     else {
-                        se = new SmbException(dr.server, ioe);
+                        se = new SmbException("Failed to connect to server " + dr.server, ioe);
                     }
                 }
 
@@ -834,19 +840,34 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 dr.pathConsumed = this.unc.length();
             }
 
+            if ( log.isDebugEnabled() ) {
+                log.debug("UNC is '" + this.unc + "'");
+                log.debug("Consumed '" + this.unc.substring(0, dr.pathConsumed) + "'");
+            }
             String dunc = this.unc.substring(dr.pathConsumed);
+            if ( log.isDebugEnabled() ) {
+                log.debug("Remaining '" + dunc + "'");
+            }
+
             if ( dunc.equals("") )
                 dunc = "\\";
             if ( !dr.path.equals("") )
                 dunc = "\\" + dr.path + dunc;
 
-            this.unc = dunc;
-            if ( log.isDebugEnabled() ) {
-                log.debug("Final resolved " + getSession().getTransport().tconHostName + "\\" + this.tree.share + this.unc + " -> " + dr);
+            if ( dunc.charAt(0) != '\\' ) {
+                log.warn("No slash at start of remaining DFS path " + dunc);
             }
+
+            this.unc = dunc;
+
+            if ( log.isDebugEnabled() ) {
+                log.debug("Final resolved " + transport.tconHostName + "\\" + this.tree.share + this.unc + " -> " + dr);
+            }
+
             if ( request != null && request.path != null && request.path.endsWith("\\") && dunc.endsWith("\\") == false ) {
                 dunc += "\\";
             }
+
             if ( request != null ) {
                 request.path = dunc;
                 request.flags2 |= SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
@@ -864,7 +885,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    void disconnect ( boolean inError ) {
+    synchronized void disconnect ( boolean inError ) {
         if ( isConnected() ) {
             this.tree.treeDisconnect(inError);
             this.tree.session.logoff(inError);
@@ -1055,12 +1076,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    void doConnect () throws IOException {
+    synchronized void doConnect () throws IOException {
         SmbTransport trans;
         UniAddress addr = getAddress();
         CIFSContext ctx = getTransportContext();
+        SmbTree t;
         if ( this.tree != null ) {
             trans = getSession().getTransport();
+            t = this.tree;
         }
         else if ( this.nonPooled ) {
             if ( log.isDebugEnabled() ) {
@@ -1069,46 +1092,49 @@ public class SmbFile extends URLConnection implements SmbConstants {
             this.exclusiveTransport = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), true);
             trans = this.exclusiveTransport;
             trans.setDontTimeout(true);
-            this.tree = trans.getSmbSession(ctx).getSmbTree(this.share, null);
+            t = trans.getSmbSession(ctx).getSmbTree(this.share, null);
         }
         else {
             trans = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), false);
-            this.tree = trans.getSmbSession(ctx).getSmbTree(this.share, null);
+            t = trans.getSmbSession(ctx).getSmbTree(this.share, null);
         }
 
         String hostName = getServerWithDfs();
-        this.tree.inDomainDfs = ctx.getDfs().resolve(hostName, this.tree.share, null, ctx) != null;
-        if ( this.tree.inDomainDfs ) {
-            this.tree.connectionState = 2;
+        t.inDomainDfs = ctx.getDfs().resolve(hostName, t.share, null, ctx) != null;
+        if ( t.inDomainDfs ) {
+            // make sure transport is connected
+            trans.connect();
+            t.connectionState = 2;
         }
 
         try {
             if ( log.isTraceEnabled() )
                 log.trace("doConnect: " + addr);
 
-            this.tree.treeConnect(null, null);
+            t.treeConnect(null, null);
         }
         catch ( SmbAuthException sae ) {
             log.debug("Authentication failed", sae);
             SmbSession ssn;
             if ( this.share == null ) { // IPC$ - try "anonymous" credentials
                 ssn = trans.getSmbSession(ctx.withAnonymousCredentials());
-                this.tree = ssn.getSmbTree(null, null);
-                this.tree.treeConnect(null, null);
+                t = ssn.getSmbTree(null, null);
+                t.treeConnect(null, null);
             }
             else if ( ctx.renewCredentials(this.url.toString(), sae) ) {
                 ssn = trans.getSmbSession(ctx);
-                this.tree = ssn.getSmbTree(this.share, null);
-                this.tree.inDomainDfs = ctx.getDfs().resolve(hostName, this.tree.share, null, ctx) != null;
+                t = ssn.getSmbTree(this.share, null);
+                t.inDomainDfs = ctx.getDfs().resolve(hostName, t.share, null, ctx) != null;
                 if ( this.tree.inDomainDfs ) {
                     this.tree.connectionState = 2;
                 }
-                this.tree.treeConnect(null, null);
+                t.treeConnect(null, null);
             }
             else {
                 throw sae;
             }
         }
+        this.tree = t;
     }
 
 
@@ -1117,14 +1143,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
      * <tt>URLConnection</tt> implementation of <tt>connect()</tt>.
      */
     @Override
-    public void connect () throws IOException {
+    public synchronized void connect () throws IOException {
         if ( isConnected() && getSession().getTransport().tconHostName == null ) {
             /*
-             * Tree thinks it is connected but transport disconnected
+             * Tree/session thinks it is connected but transport disconnected
              * under it, reset tree to reflect the truth.
              */
-            log.debug("Disonnecting failed tree");
-            this.tree.treeDisconnect(true);
+            log.debug("Disonnecting failed tree and session");
+            disconnect(true);
         }
 
         if ( isConnected() ) {
@@ -1151,8 +1177,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
     }
 
 
-    boolean isConnected () {
-        return this.tree != null && this.tree.connectionState == 2 && !this.tree.session.getTransport().isDisconnected();
+    synchronized boolean isConnected () {
+        return this.tree != null && this.tree.isConnected();
     }
 
 
@@ -3044,9 +3070,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
         int f, dir;
 
         exists();
+        if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
+            // should implement SMB_COM_SET_INFORMATION?
+            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+        }
         dir = this.attributes & ATTR_DIRECTORY;
         f = open0(O_RDONLY, FILE_WRITE_ATTRIBUTES, dir, dir != 0 ? 0x0001 : 0x0040);
         try {
+
             send(
                 new Trans2SetFileInformation(getSession().getConfig(), f, attrs | dir, ctime, mtime, atime),
                 new Trans2SetFileInformationResponse(getSession().getConfig()));

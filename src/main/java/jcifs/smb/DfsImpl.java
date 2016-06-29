@@ -158,28 +158,29 @@ public class DfsImpl implements Dfs {
         try {
             UniAddress addr = tf.getNameServiceClient().getByName(domain, true);
             SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false);
-            DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
-            if ( dr != null ) {
-                DfsReferral start = dr;
-                IOException e = null;
-
-                do {
-                    try {
-                        if ( dr.server != null && dr.server.length() > 0 ) {
-                            return tf.getTransportPool().getSmbTransport(tf, tf.getNameServiceClient().getByName(dr.server), 0, false);
+            synchronized ( trans ) {
+                DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
+                if ( dr != null ) {
+                    DfsReferral start = dr;
+                    IOException e = null;
+                    do {
+                        try {
+                            if ( dr.server != null && dr.server.length() > 0 ) {
+                                return tf.getTransportPool().getSmbTransport(tf, tf.getNameServiceClient().getByName(dr.server), 0, false);
+                            }
+                            log.debug("No server name in referral");
+                            return null;
                         }
-                        log.debug("No server name in referral");
-                        return null;
-                    }
-                    catch ( IOException ioe ) {
-                        e = ioe;
-                    }
+                        catch ( IOException ioe ) {
+                            e = ioe;
+                        }
 
-                    dr = dr.next;
+                        dr = dr.next;
+                    }
+                    while ( dr != start );
+
+                    throw e;
                 }
-                while ( dr != start );
-
-                throw e;
             }
         }
         catch ( IOException ioe ) {
@@ -235,9 +236,13 @@ public class DfsImpl implements Dfs {
      * @see jcifs.smb.Dfs#resolve(java.lang.String, java.lang.String, java.lang.String, jcifs.CIFSContext)
      */
     @Override
-    public synchronized DfsReferral resolve ( String domain, String root, String path, CIFSContext tf ) throws SmbAuthException {
+    public DfsReferral resolve ( String domain, String root, String path, CIFSContext tf ) throws SmbAuthException {
 
         if ( tf.getConfig().isDfsDisabled() || root.equals("IPC$") ) {
+            return null;
+        }
+
+        if ( domain == null ) {
             return null;
         }
 
@@ -343,18 +348,22 @@ public class DfsImpl implements Dfs {
                                      */
                                     tmp.map = links.map;
                                     tmp.key = "\\";
+                                    len++;
+                                }
+                                else if ( path.length() == 0 ) {
+                                    len++;
                                 }
                                 tmp.pathConsumed -= len;
                                 tmp = tmp.next;
                             }
                             while ( tmp != dr );
 
-                            log.debug("Key is " + dr.key);
+                            if ( log.isDebugEnabled() ) {
+                                log.debug("Have referral " + dr);
+                            }
 
                             if ( dr.key != null )
                                 links.map.put(dr.key, dr);
-
-                            log.debug(links.map);
 
                             roots.put(root, links);
                         }
@@ -388,11 +397,12 @@ public class DfsImpl implements Dfs {
 
                             dr = getReferral(tf, trans, domain, root, path);
                             if ( dr != null ) {
+
+                                dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
+                                dr.link = link;
                                 if ( log.isTraceEnabled() ) {
                                     log.trace("Have referral " + dr);
                                 }
-                                dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
-                                dr.link = link;
                                 links.map.put(link, dr);
                             }
                             else {
@@ -420,7 +430,7 @@ public class DfsImpl implements Dfs {
                 this.referrals = new CacheEntry<>(0);
             }
             String key = "\\" + domain + "\\" + root;
-            if ( path.equals("\\") == false )
+            if ( !path.equals("\\") )
                 key += path;
             key = key.toLowerCase();
 

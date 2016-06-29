@@ -39,6 +39,11 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
+import jcifs.CIFSContext;
+import jcifs.CIFSException;
+import jcifs.config.PropertyConfiguration;
+import jcifs.context.BaseContext;
+
 
 /**
  * @author mbechler
@@ -54,6 +59,8 @@ public class AllTests {
     private static final Logger log = Logger.getLogger(AllTests.class);
 
     private static Map<String, TestMutation> MUTATIONS = new HashMap<>();
+
+    private static Map<String, CIFSContext> CONTEXT_CACHE = new HashMap<>();
 
 
     static {
@@ -153,6 +160,16 @@ public class AllTests {
                 return cfg;
             }
         });
+    }
+
+
+    static CIFSContext getCachedContext ( String context, Properties props ) throws CIFSException {
+        CIFSContext cached = CONTEXT_CACHE.get(context);
+        if ( cached == null ) {
+            cached = new BaseContext(new PropertyConfiguration(props));
+            CONTEXT_CACHE.put(context, cached);
+        }
+        return cached;
     }
 
 

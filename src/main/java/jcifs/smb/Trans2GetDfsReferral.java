@@ -36,6 +36,7 @@ class Trans2GetDfsReferral extends SmbComTransaction {
         this.maxParameterCount = 0;
         this.maxDataCount = 4096;
         this.maxSetupCount = (byte) 0x00;
+        this.forceUnicode = true;
     }
 
 

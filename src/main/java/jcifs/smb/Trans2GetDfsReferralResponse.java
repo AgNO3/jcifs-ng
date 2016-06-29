@@ -23,7 +23,6 @@ import java.util.Arrays;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
-import jcifs.SmbConstants;
 
 
 class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
@@ -97,12 +96,12 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
     int numReferrals;
     int tflags;
     Referral[] referrals;
-    boolean forceUnicode;
 
 
     Trans2GetDfsReferralResponse ( Configuration config ) {
         super(config);
         this.subCommand = SmbComTransaction.TRANS2_GET_DFS_REFERRAL;
+        this.forceUnicode = true;
     }
 
 
@@ -144,13 +143,15 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
         bufferIndex += 2;
 
         /*
+         * old:
          * Samba 2.2.8a will reply with Unicode paths even though
          * ASCII is negotiated so we must use flags2 (probably
          * should anyway).
          * 
-         * That does not help, samba also does not send an unicode flag
+         * No, TRANS2_GET_DFS_REFERRAL just does not seem to allow non unicode requests,
+         * (at least recent) windows servers will reply with incorrect function if unicode flag2 is not set.
          */
-        boolean unicode = this.forceUnicode || ( this.flags2 & SmbConstants.FLAGS2_UNICODE ) != 0;
+        boolean unicode = true;
         if ( unicode ) {
             this.pathConsumed /= 2;
         }

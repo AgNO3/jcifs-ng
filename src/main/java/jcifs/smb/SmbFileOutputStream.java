@@ -110,6 +110,9 @@ public class SmbFileOutputStream extends OutputStream {
         this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
 
         this.useNTSmbs = file.tree.session.getTransport().hasCapability(SmbConstants.CAP_NT_SMBS);
+        if ( !this.useNTSmbs ) {
+            log.debug("No support for NT SMBs");
+        }
 
         // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
         boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
@@ -270,11 +273,17 @@ public class SmbFileOutputStream extends OutputStream {
                 off += this.rspx.count;
             }
             else {
+                if ( log.isTraceEnabled() ) {
+                    log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
+                }
                 this.req.setParam(this.file.fid, this.fp, len - w, b, off, w);
+                this.file.send(this.req, this.rsp);
                 this.fp += this.rsp.count;
                 len -= this.rsp.count;
                 off += this.rsp.count;
-                this.file.send(this.req, this.rsp);
+                if ( log.isTraceEnabled() ) {
+                    log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
+                }
             }
 
         }

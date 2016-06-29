@@ -36,8 +36,6 @@ import org.junit.runners.Parameterized.Parameters;
 import jcifs.CIFSContext;
 import jcifs.Configuration;
 import jcifs.config.DelegatingConfiguration;
-import jcifs.config.PropertyConfiguration;
-import jcifs.context.BaseContext;
 import jcifs.context.CIFSContextWrapper;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbException;
@@ -54,9 +52,11 @@ public abstract class BaseCIFSTest {
     private Map<String, String> properties;
     private CIFSContext context;
     private Random rand = new Random();
+    private String name;
 
 
     protected BaseCIFSTest ( String name, Map<String, String> properties ) {
+        this.name = name;
         this.properties = properties;
     }
 
@@ -101,13 +101,13 @@ public abstract class BaseCIFSTest {
     public void setUp () throws Exception {
         Properties props = new Properties();
         props.putAll(this.properties);
-        this.context = new BaseContext(new PropertyConfiguration(props));
+        this.context = AllTests.getCachedContext(this.name, props);
     }
 
 
     @After
     public void tearDown () throws Exception {
-        this.context.close();
+
     }
 
 
@@ -121,8 +121,8 @@ public abstract class BaseCIFSTest {
     }
 
 
-    protected String getRequiredProperty ( String name ) {
-        String val = this.properties.get(name);
+    protected String getRequiredProperty ( String prop ) {
+        String val = this.properties.get(prop);
         Assume.assumeNotNull(val);
         return val;
     }

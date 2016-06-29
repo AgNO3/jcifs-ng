@@ -49,6 +49,16 @@ import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 
 
+/**
+ * 
+ * 
+ * Compatability notes:
+ * - windows 2k12 will not trigger with FILE_NOTIFY_CHANGE_ATTRIBUTES if the file contents are modified (modtime
+ * changes)
+ * 
+ * @author mbechler
+ *
+ */
 @RunWith ( Parameterized.class )
 @SuppressWarnings ( "javadoc" )
 public class WatchTest extends BaseCIFSTest {
@@ -75,7 +85,9 @@ public class WatchTest extends BaseCIFSTest {
     @Override
     @After
     public void tearDown () throws Exception {
-        this.base.close();
+        if ( this.base != null ) {
+            this.base.close();
+        }
         if ( this.executor != null ) {
             this.executor.shutdown();
             if ( this.future != null ) {
@@ -83,7 +95,9 @@ public class WatchTest extends BaseCIFSTest {
             }
             this.executor.awaitTermination(1, TimeUnit.SECONDS);
         }
-        this.base.delete();
+        if ( this.base != null ) {
+            this.base.delete();
+        }
         super.tearDown();
     }
 
@@ -118,7 +132,7 @@ public class WatchTest extends BaseCIFSTest {
         try {
             SmbFile cr = new SmbFile(this.base, "modified");
             cr.createNewFile();
-            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES, false);
+            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES | FileNotifyInformation.FILE_NOTIFY_CHANGE_LAST_WRITE, false);
             try ( OutputStream os = cr.getOutputStream() ) {
                 os.write(new byte[] {
                     1, 2, 3, 4

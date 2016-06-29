@@ -44,9 +44,6 @@ import jcifs.smb.SmbFile;
 /**
  * 
  * 
- * Compatability Notes:
- * - Samba seems to be really buggy when NT Smbs are not available (random modification times, setting attributes fails
- * with ACCESS_DENIED)
  * 
  * @author mbechler
  */
@@ -109,6 +106,9 @@ public class FileAttributesTest extends BaseCIFSTest {
             f.setLastModified(time);
             assertEquals(time, f.lastModified());
         }
+        catch ( UnsupportedOperationException e ) {
+            Assume.assumeTrue("No Ntsmbs", false);
+        }
         finally {
             f.delete();
         }
@@ -134,6 +134,9 @@ public class FileAttributesTest extends BaseCIFSTest {
             long time = System.currentTimeMillis() - 60 * 60 * 12;
             f.setCreateTime(time);
             assertEquals(time, f.createTime());
+        }
+        catch ( UnsupportedOperationException e ) {
+            Assume.assumeTrue("No Ntsmbs", false);
         }
         finally {
             f.delete();
@@ -161,6 +164,9 @@ public class FileAttributesTest extends BaseCIFSTest {
             f.setLastAccess(time);
             assertEquals(time, f.lastAccess());
         }
+        catch ( UnsupportedOperationException e ) {
+            Assume.assumeTrue("No Ntsmbs", false);
+        }
         finally {
             f.delete();
         }
@@ -174,6 +180,9 @@ public class FileAttributesTest extends BaseCIFSTest {
             int attrs = f.getAttributes() ^ SmbFile.ATTR_ARCHIVE ^ SmbFile.ATTR_HIDDEN ^ SmbFile.ATTR_READONLY;
             f.setAttributes(attrs);
             assertEquals(attrs, f.getAttributes());
+        }
+        catch ( UnsupportedOperationException e ) {
+            Assume.assumeTrue("No Ntsmbs", false);
         }
         finally {
             f.delete();

@@ -83,7 +83,12 @@ class SmbComNegotiateResponse extends ServerMessageBlock {
         bufferIndex += 4;
         this.server.serverTime = SMBUtil.readTime(buffer, bufferIndex);
         bufferIndex += 8;
-        this.server.serverTimeZone = SMBUtil.readInt2(buffer, bufferIndex);
+        int tzOffset = SMBUtil.readInt2(buffer, bufferIndex);
+        // tzOffset is signed!
+        if ( tzOffset > Short.MAX_VALUE ) {
+            tzOffset = -1 * ( 65536 - tzOffset );
+        }
+        this.server.serverTimeZone = tzOffset;
         bufferIndex += 2;
         this.server.encryptionKeyLength = buffer[ bufferIndex++ ] & 0xFF;
 

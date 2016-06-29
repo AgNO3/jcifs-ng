@@ -85,7 +85,7 @@ abstract class ServerMessageBlock extends Response implements Request {
 
     byte command, flags;
     int headerStart, length, batchLevel, errorCode, flags2, tid, pid, uid, mid, wordCount, byteCount;
-    boolean useUnicode, received, extendedSecurity;
+    boolean useUnicode, forceUnicode, received, extendedSecurity;
     long responseTimeout = 1;
     int signSeq;
     boolean verifyFailed;

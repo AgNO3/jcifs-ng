@@ -31,6 +31,12 @@ import jcifs.smb.SmbFile;
 
 
 /**
+ * 
+ * 
+ * 
+ * Compatability Notes:
+ * - Windows (2k8, 2k12) servers do not like extended security + DOS error codes
+ * 
  * @author mbechler
  *
  */
@@ -45,7 +51,7 @@ public class SessionTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noSigning", "forceSigning", "legacyAuth", "noUnicode", "forceUnicode");
+        return getConfigs("noSigning", "forceSigning", "legacyAuth", "noUnicode", "forceUnicode", "noNTStatus");
     }
 
 
