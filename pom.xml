@@ -103,7 +103,7 @@
 						<Bundle-Vendor>AgNO3 GmbH &amp; Co. KG</Bundle-Vendor>
 						<Bundle-SymbolicName>eu.agno3.jcifsng</Bundle-SymbolicName>
 						<Export-Package>
-							jcifs.*;version="1.5.0",
+							jcifs*;version="1.5.0",
 						</Export-Package>
 						<Private-Package />
 						<Import-Package>
