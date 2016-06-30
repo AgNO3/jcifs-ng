@@ -737,7 +737,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             if ( log.isDebugEnabled() ) {
                 log.debug("Got referral " + dr);
             }
-            this.getTransportContext().getDfs().cache(req.path, dr, getTransportContext());
+            this.getTransportContext().getDfs().cache(getTransportContext(), req.path, dr);
             throw dr;
         case 0x80000005: /* STATUS_BUFFER_OVERFLOW */
             break; /* normal for DCERPC named pipes */

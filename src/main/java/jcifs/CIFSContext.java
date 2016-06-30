@@ -27,7 +27,15 @@ import jcifs.smb.SmbCredentials;
 
 
 /**
+ * Encapsulation of client context
  * 
+ * A context holds the client configuration, shared services as well as the active credentials.
+ * 
+ * Usually you will want to create one context per client configuration and then
+ * multiple sub-contexts using different credentials (if neccessary).
+ * 
+ * {@link #withDefaultCredentials()}, {@link #withAnonymousCredentials()}, {@link #withCredentials(SmbCredentials)}
+ * allow to create such sub-contexts.
  * 
  * 
  * @author mbechler
@@ -99,7 +107,7 @@ public interface CIFSContext {
 
 
     /**
-     * @return a child context using the default credentials
+     * @return a child context using the configured default credentials
      */
     CIFSContext withDefaultCredentials ();
 

@@ -91,10 +91,10 @@ public interface SmbTransportPool {
      * See also the <tt>jcifs.smb.client.logonShare</tt> property.
      * 
      * @param dc
-     * @param transportContext
+     * @param tc
      * @throws SmbException
      */
-    void logon ( UniAddress dc, CIFSContext transportContext ) throws SmbException;
+    void logon ( CIFSContext tc, UniAddress dc ) throws SmbException;
 
 
     /**
@@ -110,21 +110,21 @@ public interface SmbTransportPool {
      * 
      * @param dc
      * @param port
-     * @param transportContext
+     * @param tc
      * @throws SmbException
      */
-    void logon ( UniAddress dc, int port, CIFSContext transportContext ) throws SmbException;
+    void logon ( CIFSContext tc, UniAddress dc, int port ) throws SmbException;
 
 
     /**
      * Get NTLM challenge from a server
      * 
      * @param dc
-     * @param transportContext
+     * @param tc
      * @return NTLM challenge
      * @throws SmbException
      */
-    byte[] getChallenge ( UniAddress dc, CIFSContext transportContext ) throws SmbException;
+    byte[] getChallenge ( CIFSContext tc, UniAddress dc ) throws SmbException;
 
 
     /**
@@ -132,10 +132,10 @@ public interface SmbTransportPool {
      * 
      * @param dc
      * @param port
-     * @param transportContext
+     * @param tc
      * @return NTLM challenge
      * @throws SmbException
      */
-    byte[] getChallenge ( UniAddress dc, int port, CIFSContext transportContext ) throws SmbException;
+    byte[] getChallenge ( CIFSContext tc, UniAddress dc, int port ) throws SmbException;
 
 }

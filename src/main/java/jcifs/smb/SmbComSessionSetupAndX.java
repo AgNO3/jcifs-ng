@@ -51,8 +51,16 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
                     this.lmHash = new byte[0];
                     this.ntHash = new byte[0];
                     this.capabilities &= ~SmbConstants.CAP_EXTENDED_SECURITY;
-                    this.accountName = "";
-                    this.primaryDomain = "";
+                    if ( !a.isGuest() ) {
+                        this.accountName = a.getUsername();
+                        if ( this.useUnicode )
+                            this.accountName = this.accountName.toUpperCase();
+                        this.primaryDomain = a.getUserDomain() != null ? a.getUserDomain().toUpperCase() : "?";
+                    }
+                    else {
+                        this.accountName = "";
+                        this.primaryDomain = "";
+                    }
                 }
                 else {
                     this.accountName = a.getUsername();

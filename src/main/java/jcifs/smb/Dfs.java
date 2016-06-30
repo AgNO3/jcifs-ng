@@ -33,7 +33,7 @@ public interface Dfs {
      * @return whether the given domain is trusted
      * @throws SmbAuthException
      */
-    boolean isTrustedDomain ( String domain, CIFSContext tf ) throws SmbAuthException;
+    boolean isTrustedDomain ( CIFSContext tf, String domain ) throws SmbAuthException;
 
 
     /**
@@ -44,7 +44,7 @@ public interface Dfs {
      * @return connection
      * @throws SmbAuthException
      */
-    SmbTransport getDc ( String domain, CIFSContext tf ) throws SmbAuthException;
+    SmbTransport getDc ( CIFSContext tf, String domain ) throws SmbAuthException;
 
 
     /**
@@ -71,7 +71,7 @@ public interface Dfs {
      * @return the final referral for the given DFS path
      * @throws SmbAuthException
      */
-    DfsReferral resolve ( String domain, String root, String path, CIFSContext tf ) throws SmbAuthException;
+    DfsReferral resolve ( CIFSContext tf, String domain, String root, String path ) throws SmbAuthException;
 
 
     /**
@@ -79,8 +79,8 @@ public interface Dfs {
      * 
      * @param path
      * @param dr
-     * @param transportContext
+     * @param tc
      */
-    void cache ( String path, DfsReferral dr, CIFSContext transportContext );
+    void cache ( CIFSContext tc, String path, DfsReferral dr );
 
 }

@@ -93,7 +93,7 @@ public class DfsImpl implements Dfs {
             // https://lists.samba.org/archive/samba-technical/2009-August/066486.html
             // UniAddress addr = UniAddress.getByName(authDomain, true, tf);
             // SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
-            SmbTransport trans = getDc(authDomain, tf);
+            SmbTransport trans = getDc(tf, authDomain);
             CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
             DfsReferral dr = null;
             if ( trans != null ) {
@@ -129,12 +129,13 @@ public class DfsImpl implements Dfs {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.Dfs#isTrustedDomain(java.lang.String, jcifs.CIFSContext)
+     * @see jcifs.smb.Dfs#isTrustedDomain(jcifs.CIFSContext, java.lang.String)
      */
     @Override
-    public boolean isTrustedDomain ( String domain, CIFSContext tf ) throws SmbAuthException {
+    public boolean isTrustedDomain ( CIFSContext tf, String domain ) throws SmbAuthException {
         synchronized ( this.domainsLock ) {
             Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
             if ( domains == null )
@@ -146,12 +147,13 @@ public class DfsImpl implements Dfs {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.Dfs#getDc(java.lang.String, jcifs.CIFSContext)
+     * @see jcifs.smb.Dfs#getDc(jcifs.CIFSContext, java.lang.String)
      */
     @Override
-    public SmbTransport getDc ( String domain, CIFSContext tf ) throws SmbAuthException {
+    public SmbTransport getDc ( CIFSContext tf, String domain ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
 
@@ -231,12 +233,13 @@ public class DfsImpl implements Dfs {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.Dfs#resolve(java.lang.String, java.lang.String, java.lang.String, jcifs.CIFSContext)
+     * @see jcifs.smb.Dfs#resolve(jcifs.CIFSContext, java.lang.String, java.lang.String, java.lang.String)
      */
     @Override
-    public DfsReferral resolve ( String domain, String root, String path, CIFSContext tf ) throws SmbAuthException {
+    public DfsReferral resolve ( CIFSContext tf, String domain, String root, String path ) throws SmbAuthException {
 
         if ( tf.getConfig().isDfsDisabled() || root.equals("IPC$") ) {
             return null;
@@ -307,7 +310,7 @@ public class DfsImpl implements Dfs {
 
                     if ( links == null ) {
                         log.trace("Loadings links");
-                        if ( ( trans = getDc(domain, tf) ) == null )
+                        if ( ( trans = getDc(tf, domain) ) == null )
                             return null;
 
                         dr = getReferral(tf, trans, domain, root, path);
@@ -334,10 +337,10 @@ public class DfsImpl implements Dfs {
 
                             DfsReferral tmp = dr;
                             do {
-                                if ( path == null ) {
+                                if ( path == null || path.length() == 0 ) {
 
                                     if ( log.isTraceEnabled() ) {
-                                        log.trace("Path is null, insert root " + tmp);
+                                        log.trace("Path is empty, insert root " + tmp);
                                     }
                                     /*
                                      * Store references to the map and key so that
@@ -348,9 +351,6 @@ public class DfsImpl implements Dfs {
                                      */
                                     tmp.map = links.map;
                                     tmp.key = "\\";
-                                    len++;
-                                }
-                                else if ( path.length() == 0 ) {
                                     len++;
                                 }
                                 tmp.pathConsumed -= len;
@@ -392,7 +392,7 @@ public class DfsImpl implements Dfs {
                         if ( dr == null ) {
 
                             if ( trans == null )
-                                if ( ( trans = getDc(domain, tf) ) == null )
+                                if ( ( trans = getDc(tf, domain) ) == null )
                                     return null;
 
                             dr = getReferral(tf, trans, domain, root, path);
@@ -457,7 +457,7 @@ public class DfsImpl implements Dfs {
 
 
     @Override
-    public synchronized void cache ( String path, DfsReferral dr, CIFSContext tc ) {
+    public synchronized void cache ( CIFSContext tc, String path, DfsReferral dr ) {
         int s1, s2;
         String server, share, key;
 

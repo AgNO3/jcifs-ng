@@ -135,7 +135,7 @@ public abstract class NtlmServlet extends HttpServlet {
             }
             NtlmPasswordAuthentication ntlm;
             if ( msg.startsWith("NTLM ") ) {
-                byte[] challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
+                byte[] challenge = getTransportContext().getTransportPool().getChallenge(getTransportContext(), dc);
                 ntlm = NtlmSsp.authenticate(getTransportContext(), request, response, challenge);
                 if ( ntlm == null )
                     return;
@@ -153,7 +153,7 @@ public abstract class NtlmServlet extends HttpServlet {
                 ntlm = new NtlmPasswordAuthentication(getTransportContext(), domain, user, password);
             }
             try {
-                getTransportContext().getTransportPool().logon(dc, getTransportContext());
+                getTransportContext().getTransportPool().logon(getTransportContext(), dc);
             }
             catch ( SmbAuthException sae ) {
                 response.setHeader("WWW-Authenticate", "NTLM");

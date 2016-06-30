@@ -201,7 +201,7 @@ public class NtlmHttpFilter implements Filter {
                 }
                 else {
                     dc = getTransportContext().getNameServiceClient().getByName(this.domainController, true);
-                    challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
+                    challenge = getTransportContext().getTransportPool().getChallenge(getTransportContext(), dc);
                 }
 
                 if ( ( ntlm = NtlmSsp.authenticate(getTransportContext(), req, resp, challenge) ) == null ) {
@@ -224,7 +224,7 @@ public class NtlmHttpFilter implements Filter {
                 dc = getTransportContext().getNameServiceClient().getByName(this.domainController, true);
             }
             try {
-                getTransportContext().getTransportPool().logon(dc, getTransportContext());
+                getTransportContext().getTransportPool().logon(getTransportContext(), dc);
 
                 if ( log.isDebugEnabled() ) {
                     log.debug("NtlmHttpFilter: " + ntlm + " successfully authenticated against " + dc);

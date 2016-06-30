@@ -18,55 +18,31 @@
 package jcifs.smb;
 
 
-import javax.security.auth.Subject;
-
-import jcifs.CIFSContext;
-
-
 /**
  * @author mbechler
  *
  */
-public interface SmbCredentials extends Cloneable {
+public class SmbUnsupportedOperationException extends SmbException {
 
     /**
-     * @return the domain the user account is in
+     * 
      */
-    String getUserDomain ();
-
-
-    /**
-     * @return whether these are anonymous credentials
-     */
-    boolean isAnonymous ();
-
-
-    /**
-     * @return whether these are guest credentials
-     */
-    boolean isGuest ();
+    private static final long serialVersionUID = -5576981906065713710L;
 
 
     /**
      * 
-     * @return a copy of the credentials
      */
-    SmbCredentials clone ();
+    public SmbUnsupportedOperationException () {
+        super("Operation is not supported with the negotiated capabilities");
+    }
 
 
     /**
-     * @param tc
-     * @param host
-     * @param initialToken
-     * @param doSigning
-     * @return a new context
-     * @throws SmbException
+     * 
+     * @param msg
      */
-    SSPContext createContext ( CIFSContext tc, String host, byte[] initialToken, boolean doSigning ) throws SmbException;
-
-
-    /**
-     * @return subject associated with the credentials
-     */
-    Subject getSubject ();
+    public SmbUnsupportedOperationException ( String msg ) {
+        super(msg);
+    }
 }

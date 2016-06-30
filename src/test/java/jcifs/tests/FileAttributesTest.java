@@ -39,6 +39,7 @@ import jcifs.smb.ACE;
 import jcifs.smb.SID;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbUnsupportedOperationException;
 
 
 /**
@@ -106,7 +107,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             f.setLastModified(time);
             assertEquals(time, f.lastModified());
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
         finally {
@@ -135,7 +136,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             f.setCreateTime(time);
             assertEquals(time, f.createTime());
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
         finally {
@@ -164,7 +165,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             f.setLastAccess(time);
             assertEquals(time, f.lastAccess());
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
         finally {
@@ -181,7 +182,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             f.setAttributes(attrs);
             assertEquals(attrs, f.getAttributes());
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
         finally {
@@ -197,7 +198,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             ACE[] security = f.getSecurity();
             assertNotNull(security);
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
     }
@@ -210,7 +211,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             SID security = f.getOwnerUser();
             assertNotNull(security);
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
     }
@@ -223,7 +224,7 @@ public class FileAttributesTest extends BaseCIFSTest {
             SID security = f.getOwnerGroup();
             assertNotNull(security);
         }
-        catch ( UnsupportedOperationException e ) {
+        catch ( SmbUnsupportedOperationException e ) {
             Assume.assumeTrue("No Ntsmbs", false);
         }
 

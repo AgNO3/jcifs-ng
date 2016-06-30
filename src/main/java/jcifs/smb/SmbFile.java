@@ -37,6 +37,7 @@ import org.apache.log4j.Logger;
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.context.SingletonContext;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcDfsRootEnum;
 import jcifs.dcerpc.msrpc.MsrpcShareEnum;
@@ -522,6 +523,35 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
 
     /**
+     * Constructs an SmbFile representing a resource on an SMB network such as
+     * a file or directory. See the description and examples of smb URLs above.
+     *
+     * @param url
+     *            A URL string
+     * @throws MalformedURLException
+     *             If the <code>parent</code> and <code>child</code> parameters
+     *             do not follow the prescribed syntax
+     */
+    @Deprecated
+    public SmbFile ( String url ) throws MalformedURLException {
+        this(url, SingletonContext.getInstance());
+    }
+
+
+    /**
+     * Constructs an SmbFile representing a resource on an SMB network such
+     * as a file or directory from a <tt>URL</tt> object.
+     *
+     * @param url
+     *            The URL of the target resource
+     */
+    @Deprecated
+    public SmbFile ( URL url ) {
+        this(url, SingletonContext.getInstance().withCredentials(new NtlmPasswordAuthentication(SingletonContext.getInstance(), url.getUserInfo())));
+    }
+
+
+    /**
      * Constructs an SmbFile representing a resource on an SMB network such
      * as a file or directory. The second parameter is a relative path from
      * the <code>parent SmbFile</code>. See the description above for examples
@@ -539,8 +569,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
      */
     public SmbFile ( SmbFile context, String name ) throws MalformedURLException, UnknownHostException {
         this(
-            context.isWorkgroup0() ? new URL(null, "smb://" + name, context.transportContext.getUrlHandler())
-                    : new URL(context.getURL(), name, context.transportContext.getUrlHandler()),
+            context.isWorkgroup0() ? new URL(null, "smb://" + checkName(name), context.transportContext.getUrlHandler())
+                    : new URL(context.getURL(), checkName(name), context.transportContext.getUrlHandler()),
             context.transportContext);
         setupContext(context, name);
     }
@@ -570,8 +600,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
      */
     public SmbFile ( SmbFile context, String name, int shareAccess ) throws MalformedURLException, UnknownHostException {
         this(
-            context.isWorkgroup0() ? new URL(null, "smb://" + name, context.getTransportContext().getUrlHandler())
-                    : new URL(context.getURL(), name, context.getTransportContext().getUrlHandler()),
+            context.isWorkgroup0() ? new URL(null, "smb://" + checkName(name), context.getTransportContext().getUrlHandler())
+                    : new URL(context.getURL(), checkName(name), context.getTransportContext().getUrlHandler()),
             context.transportContext);
         if ( ( shareAccess & ~ ( FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE ) ) != 0 ) {
             throw new RuntimeCIFSException("Illegal shareAccess parameter");
@@ -627,8 +657,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
     SmbFile ( SmbFile context, String name, boolean loadedAttributes, int type, int attributes, long createTime, long lastModified, long lastAccess,
             long size ) throws MalformedURLException, UnknownHostException {
         this(
-            context.isWorkgroup0() ? new URL(null, "smb://" + name + "/", Handler.SMB_HANDLER)
-                    : new URL(context.url, name + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
+            context.isWorkgroup0() ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
+                    : new URL(context.url, checkName(name) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
             context.transportContext);
 
         setupContext(context, name);
@@ -647,6 +677,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
         if ( loadedAttributes ) {
             this.attrExpiration = this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
         }
+    }
+
+
+    private static String checkName ( String name ) throws MalformedURLException {
+        if ( name == null || name.length() == 0 ) {
+            throw new MalformedURLException("Name must not be empty");
+        }
+        return name;
     }
 
 
@@ -755,7 +793,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         connect0();
         SmbSession session = getSession();
         SmbTransport transport = session.getTransport();
-        DfsReferral dr = getTransportContext().getDfs().resolve(transport.tconHostName, this.tree.share, this.unc, getTransportContext());
+        DfsReferral dr = getTransportContext().getDfs().resolve(getTransportContext(), transport.tconHostName, this.tree.share, this.unc);
 
         if ( dr != null ) {
             if ( log.isDebugEnabled() ) {
@@ -1100,7 +1138,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         }
 
         String hostName = getServerWithDfs();
-        t.inDomainDfs = ctx.getDfs().resolve(hostName, t.share, null, ctx) != null;
+        t.inDomainDfs = ctx.getDfs().resolve(ctx, hostName, t.share, null) != null;
         if ( t.inDomainDfs ) {
             // make sure transport is connected
             trans.connect();
@@ -1124,7 +1162,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             else if ( ctx.renewCredentials(this.url.toString(), sae) ) {
                 ssn = trans.getSmbSession(ctx);
                 t = ssn.getSmbTree(this.share, null);
-                t.inDomainDfs = ctx.getDfs().resolve(hostName, t.share, null, ctx) != null;
+                t.inDomainDfs = ctx.getDfs().resolve(ctx, hostName, t.share, null) != null;
                 if ( this.tree.inDomainDfs ) {
                     this.tree.connectionState = 2;
                 }
@@ -1776,7 +1814,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
         connect0();
         if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
-            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+            throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
         }
 
         boolean wasOpen = this.opened;
@@ -2183,7 +2221,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
         set = new HashSet<>();
 
-        if ( getTransportContext().getDfs().isTrustedDomain(getServer(), getTransportContext()) ) {
+        if ( getTransportContext().getDfs().isTrustedDomain(getTransportContext(), getServer()) ) {
             /*
              * The server name is actually the name of a trusted
              * domain. Add DFS roots to the list.
@@ -3072,7 +3110,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
         exists();
         if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
             // should implement SMB_COM_SET_INFORMATION?
-            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+            throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
         }
         dir = this.attributes & ATTR_DIRECTORY;
         f = open0(O_RDONLY, FILE_WRITE_ATTRIBUTES, dir, dir != 0 ? 0x0001 : 0x0040);
@@ -3495,7 +3533,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
         connect0();
         if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
-            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+            throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
         }
 
         int f;
@@ -3548,7 +3586,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
         connect0();
         if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
-            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+            throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
         }
         NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getTransportContext().getConfig());
         int f = open0(O_RDONLY, READ_CONTROL, 0, isDirectory() ? 1 : 0);
@@ -3597,7 +3635,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
         connect0();
         if ( !this.getSession().getTransport().hasCapability(SmbConstants.CAP_NT_SMBS) ) {
-            throw new UnsupportedOperationException("Not supported without CAP_NT_SMBS");
+            throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
         }
         int f = open0(O_RDONLY, READ_CONTROL, 0, isDirectory() ? 1 : 0);
         NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getTransportContext().getConfig());

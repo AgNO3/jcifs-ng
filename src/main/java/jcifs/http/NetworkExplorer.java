@@ -502,7 +502,7 @@ public class NetworkExplorer extends HttpServlet {
                 }
 
                 req.getSession(); /* ensure session id is set for cluster env. */
-                challenge = getTransportContext().getTransportPool().getChallenge(dc, getTransportContext());
+                challenge = getTransportContext().getTransportPool().getChallenge(getTransportContext(), dc);
                 if ( ( ntlm = NtlmSsp.authenticate(getTransportContext(), req, resp, challenge) ) == null ) {
                     return;
                 }

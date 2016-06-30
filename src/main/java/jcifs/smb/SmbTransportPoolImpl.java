@@ -131,13 +131,13 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
 
     @Override
-    public byte[] getChallenge ( UniAddress dc, CIFSContext tf ) throws SmbException {
-        return getChallenge(dc, 0, tf);
+    public byte[] getChallenge ( CIFSContext tf, UniAddress dc ) throws SmbException {
+        return getChallenge(tf, dc, 0);
     }
 
 
     @Override
-    public byte[] getChallenge ( UniAddress dc, int port, CIFSContext tf ) throws SmbException {
+    public byte[] getChallenge ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
         SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, port, false);
         trans.connect();
         return trans.server.encryptionKey;
@@ -145,13 +145,13 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
 
     @Override
-    public void logon ( UniAddress dc, CIFSContext tf ) throws SmbException {
-        logon(dc, 0, tf);
+    public void logon ( CIFSContext tf, UniAddress dc ) throws SmbException {
+        logon(tf, dc, 0);
     }
 
 
     @Override
-    public void logon ( UniAddress dc, int port, CIFSContext tf ) throws SmbException {
+    public void logon ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
         SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false);
         SmbSession smbSession = smbTransport.getSmbSession(tf);
         SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null);
