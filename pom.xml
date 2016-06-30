@@ -166,6 +166,19 @@
 						</goals>
 					</execution>
 				</executions>
+				<configuration>
+					<ignored>
+						<!-- seems to be a clirr bug that it cannot handle 
+						     the different inherited return types -->
+						<difference>
+							<className>**</className>
+							<differenceType>7006</differenceType>
+							<method>* clone()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+					</ignored>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
