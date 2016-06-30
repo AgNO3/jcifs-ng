@@ -101,7 +101,7 @@
 						<Bundle-Version>1.5.0.${osgi-version-qualifier}</Bundle-Version>
 						<Bundle-License>LGPL</Bundle-License>
 						<Bundle-Vendor>AgNO3 GmbH &amp; Co. KG</Bundle-Vendor>
-						<Bundle-Symbolic-Name>eu.agno3.jcifsng</Bundle-Symbolic-Name>
+						<Bundle-SymbolicName>eu.agno3.jcifsng</Bundle-SymbolicName>
 						<Export-Package>
 							jcifs.*;version="1.5.0",
 						</Export-Package>
