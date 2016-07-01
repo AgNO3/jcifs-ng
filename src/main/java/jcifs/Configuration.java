@@ -198,7 +198,7 @@ public interface Configuration {
      * <td>NTLMv2 only</td>
      * </table>
      * 
-     * @return lanman compatibility level, defaults to 3
+     * @return lanman compatibility level, defaults to 3 i.e. NTLMv2 only
      */
     int getLanManCompatibility ();
 
@@ -297,6 +297,12 @@ public interface Configuration {
      * @return whether to enable SMB signing, if available
      */
     boolean isSigningEnabled ();
+
+
+    /**
+     * @return whether to enforce SMB signing for IPC connections
+     */
+    boolean isIpcSigningEnforced ();
 
 
     /**

@@ -1,0 +1,8 @@
+
+
+jcifs-ng 1.5.1
+- Fix bundle manifest errors
+- Dont wait for response timeout when the transport connection is closed. 
+- Fallback to secondary port on any io error during negotiation.
+- Security hardening:
+ - enforce SMB signing by default for IPC connections

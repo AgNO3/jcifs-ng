@@ -48,8 +48,20 @@ public class SigningDigest {
      * @param bypass
      */
     public SigningDigest ( byte[] macSigningKey, boolean bypass ) {
+        this(macSigningKey, bypass, 0);
+    }
+
+
+    /**
+     * 
+     * @param macSigningKey
+     * @param bypass
+     * @param initialSequence
+     */
+    public SigningDigest ( byte[] macSigningKey, boolean bypass, int initialSequence ) {
         this.digest = Crypto.getMD5();
         this.macSigningKey = macSigningKey;
+        this.signSequence = initialSequence;
         this.bypass = bypass;
 
         if ( log.isTraceEnabled() ) {

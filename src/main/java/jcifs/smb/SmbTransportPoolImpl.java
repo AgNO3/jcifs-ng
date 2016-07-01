@@ -38,7 +38,7 @@ import jcifs.netbios.UniAddress;
  */
 public class SmbTransportPoolImpl implements SmbTransportPool {
 
-    private static final Logger log = Logger.getLogger(SmbTransportPool.class);
+    private static final Logger log = Logger.getLogger(SmbTransportPoolImpl.class);
 
     private final List<SmbTransport> connections = new LinkedList<>();
     private final List<SmbTransport> nonPooledConnections = new LinkedList<>();
@@ -51,34 +51,64 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
 
     @Override
+    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean nonPooled, boolean forceSigning ) {
+        return getSmbTransport(tc, address, port, tc.getConfig().getLocalAddr(), tc.getConfig().getLocalPort(), null, nonPooled, forceSigning);
+    }
+
+
+    @Override
     public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
             boolean nonPooled ) {
+        return getSmbTransport(tc, address, port, localAddr, localPort, hostName, nonPooled, false);
+    }
+
+
+    @Override
+    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+            boolean nonPooled, boolean forceSigning ) {
         if ( port <= 0 ) {
             port = SmbConstants.DEFAULT_PORT;
         }
         synchronized ( this.connections ) {
             SmbComNegotiate negotiate = new SmbComNegotiate(tc.getConfig());
+            if ( log.isDebugEnabled() ) {
+                log.debug("Exclusive " + nonPooled + " enforced signing " + forceSigning);
+            }
             if ( nonPooled || tc.getConfig().getSessionLimit() != 1 ) {
                 for ( SmbTransport conn : this.connections ) {
                     if ( conn.matches(address, port, localAddr, localPort, hostName)
                             && ( tc.getConfig().getSessionLimit() == 0 || conn.sessions.size() < tc.getConfig().getSessionLimit() ) ) {
+
+                        if ( forceSigning && !conn.signingEnforced ) {
+                            // if signing is enforced and was not on the connection, skip
+                            continue;
+                        }
+
+                        if ( !forceSigning && !tc.getConfig().isSigningEnforced() && conn.signingEnforced ) {
+                            // if signing is not enforced, dont use connections that have signing enforced
+                            // for purposes that dont require it.
+                            continue;
+                        }
+
                         /*
                          * Compare the flags2 field in SMB block to decide
-                         * // whether the authentication method is changed. Because one
-                         * // tranport can only negotiate only once, if authentication
-                         * // method is changed, we need to re-create the transport to
+                         * whether the authentication method is changed. Because one
+                         * tranport can only negotiate only once, if authentication
+                         * method is changed, we need to re-create the transport to
                          * re-negotiate with server.
                          */
-                        if ( conn.getNegotiateRequest().flags2 == negotiate.flags2 ) {
-                            if ( log.isDebugEnabled() ) {
-                                log.debug("Reusing transport connection " + conn);
-                            }
-                            return conn;
+                        if ( conn.getNegotiateRequest().flags2 != negotiate.flags2 ) {
+                            continue;
                         }
+
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Reusing transport connection " + conn);
+                        }
+                        return conn;
                     }
                 }
             }
-            SmbTransport conn = new SmbTransport(tc, negotiate, address, port, localAddr, localPort);
+            SmbTransport conn = new SmbTransport(tc, negotiate, address, port, localAddr, localPort, forceSigning);
             if ( log.isDebugEnabled() ) {
                 log.debug("New transport connection " + conn);
             }
@@ -138,7 +168,8 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     @Override
     public byte[] getChallenge ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
-        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, port, false);
+        SmbTransport trans = tf.getTransportPool()
+                .getSmbTransport(tf, dc, port, false, !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
         trans.connect();
         return trans.server.encryptionKey;
     }
@@ -152,7 +183,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     @Override
     public void logon ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
-        SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false);
+        SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced());
         SmbSession smbSession = smbTransport.getSmbSession(tf);
         SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null);
         if ( tf.getConfig().getLogonShare() == null ) {

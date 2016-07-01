@@ -24,10 +24,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NoRouteToHostException;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
@@ -107,15 +105,17 @@ public class SmbTransport extends Transport implements SmbConstants {
     String tconHostName = null;
 
     private CIFSContext transportContext;
+    boolean signingEnforced;
 
     private Object socketLock = new Object();
 
 
-    SmbTransport ( CIFSContext tc, SmbComNegotiate nego, UniAddress address, int port, InetAddress localAddr, int localPort ) {
+    SmbTransport ( CIFSContext tc, SmbComNegotiate nego, UniAddress address, int port, InetAddress localAddr, int localPort, boolean forceSigning ) {
         this.transportContext = tc;
         this.key = new SmbComBlankResponse(tc.getConfig());
         this.NEGOTIATE_REQUEST = nego;
         this.flags2 = this.NEGOTIATE_REQUEST.flags2;
+        this.signingEnforced = forceSigning || this.getTransportContext().getConfig().isSigningEnforced();
         this.sessionExpiration = System.currentTimeMillis() + tc.getConfig().getSessionTimeout();
         this.capabilities = tc.getConfig().getCapabilities();
         this.address = address;
@@ -234,8 +234,7 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     boolean isSignatureSetupRequired () {
-        return ( this.transportContext.getConfig().isSigningEnforced() || ( this.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 )
-                && this.digest == null;
+        return ( this.signingEnforced || ( this.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 ) && this.digest == null;
     }
 
 
@@ -392,11 +391,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         try {
             resp = negotiate(this.port);
         }
-        catch ( ConnectException ce ) {
-            this.port = ( this.port == 0 || this.port == DEFAULT_PORT ) ? 139 : DEFAULT_PORT;
-            resp = negotiate(this.port);
-        }
-        catch ( NoRouteToHostException nr ) {
+        catch ( IOException ce ) {
             this.port = ( this.port == 0 || this.port == DEFAULT_PORT ) ? 139 : DEFAULT_PORT;
             resp = negotiate(this.port);
         }
@@ -409,20 +404,35 @@ public class SmbTransport extends Transport implements SmbConstants {
             throw new SmbException("Unexpected encryption key length: " + this.server.encryptionKeyLength);
         }
 
+        boolean serverRequireSig = this.server.signaturesRequired;
+        boolean serverEnableSig = this.server.signaturesEnabled;
+        if ( log.isDebugEnabled() ) {
+            log.debug(
+                "Signature negotiation enforced " + this.signingEnforced + " (server " + serverRequireSig + ") enabled "
+                        + this.getTransportContext().getConfig().isSigningEnabled() + " (server " + serverEnableSig + ")");
+        }
+
         /* Adjust negotiated values */
         this.tconHostName = this.address.getHostName();
-        if ( this.getTransportContext().getConfig().isSigningEnforced() && !this.server.signaturesEnabled ) {
-            throw new SmbException("Signatures are requried but the server does not support them");
+        if ( this.signingEnforced && !serverEnableSig ) {
+            throw new SmbException("Signatures are required but the server does not support them");
         }
-        else if ( this.getTransportContext().getConfig().isSigningEnforced() || this.server.signaturesRequired
-                || ( this.server.signaturesEnabled && this.getTransportContext().getConfig().isSigningEnabled() ) ) {
+        else if ( this.server.signaturesRequired || this.signingEnforced || serverRequireSig
+                || ( serverEnableSig && this.getTransportContext().getConfig().isSigningEnabled() ) ) {
             this.flags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
-            if ( this.getTransportContext().getConfig().isSigningEnforced() ) {
+            if ( this.signingEnforced || this.server.signaturesRequired ) {
                 this.flags2 |= SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;
             }
         }
         else {
             this.flags2 &= 0xFFFF ^ SmbConstants.FLAGS2_SECURITY_SIGNATURES;
+            this.flags2 &= 0xFFFF ^ SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug(
+                "Signing " + ( ( this.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 ? "enabled " : "not-enabled " )
+                        + ( ( this.flags2 & SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES ) != 0 ? "required" : "not-required" ));
         }
 
         this.maxMpxCount = Math.min(this.maxMpxCount, this.server.smaxMpxCount);
@@ -670,6 +680,9 @@ public class SmbTransport extends Transport implements SmbConstants {
              */
             if ( this.digest != null && resp.errorCode == 0 ) {
                 this.digest.verify(buffer, 4, resp);
+                if ( resp.verifyFailed ) {
+                    throw new TransportException("Signature verification failed");
+                }
             }
 
             if ( log.isTraceEnabled() ) {
@@ -891,7 +904,7 @@ public class SmbTransport extends Transport implements SmbConstants {
 
     @Override
     public String toString () {
-        return super.toString() + "[" + this.address + ":" + this.port + ",state=" + this.state + "]";
+        return super.toString() + "[" + this.address + ":" + this.port + ",state=" + this.state + ",signingEnforced=" + this.signingEnforced + "]";
     }
 
 

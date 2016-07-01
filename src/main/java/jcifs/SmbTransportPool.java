@@ -46,6 +46,22 @@ public interface SmbTransportPool {
 
 
     /**
+     * Get transport connection
+     * 
+     * @param tc
+     *            context to use
+     * @param address
+     * @param port
+     * @param exclusive
+     *            whether to acquire an unshared connection
+     * @param forceSigning
+     *            whether to enforce SMB signing on this connection
+     * @return a transport connection to the target
+     */
+    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean exclusive, boolean forceSigning );
+
+
+    /**
      * Get transport connection, with local binding
      * 
      * @param tc
@@ -61,6 +77,24 @@ public interface SmbTransportPool {
      */
     SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
             boolean exclusive );
+
+
+    /**
+     * @param tc
+     *            context to use
+     * @param address
+     * @param port
+     * @param localAddr
+     * @param localPort
+     * @param hostName
+     * @param exclusive
+     *            whether to acquire an unshared connection
+     * @param forceSigning
+     *            whether to enforce SMB signing on this connection
+     * @return a transport connection to the target
+     */
+    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+            boolean exclusive, boolean forceSigning );
 
 
     /**

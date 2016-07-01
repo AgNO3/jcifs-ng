@@ -321,7 +321,8 @@ public class NtlmHttpFilter implements Filter {
 
     private static NtlmChallenge interrogate ( CIFSContext tf, NbtAddress addr ) throws SmbException {
         UniAddress dc = new UniAddress(addr);
-        SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, dc, 0, false);
+        SmbTransport trans = tf.getTransportPool()
+                .getSmbTransport(tf, dc, 0, false, tf.hasDefaultCredentials() && tf.getConfig().isIpcSigningEnforced());
         if ( !tf.hasDefaultCredentials() ) {
             trans.connect();
             log.warn(

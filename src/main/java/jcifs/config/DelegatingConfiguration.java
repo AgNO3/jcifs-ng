@@ -487,6 +487,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isIpcSigningEnforced()
+     */
+    @Override
+    public boolean isIpcSigningEnforced () {
+        return this.delegate.isIpcSigningEnforced();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getLmHostsFileName()
      */

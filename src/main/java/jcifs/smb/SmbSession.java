@@ -320,6 +320,7 @@ public final class SmbSession {
                                 .getSmbTree(this.getTransportContext().getConfig().getLogonShare(), null).treeConnect(null, null);
                     }
                     else {
+                        log.debug("Initialize signing");
                         byte[] signingKey = npa.getSigningKey(this.getTransportContext(), this.getTransport().server.encryptionKey);
                         request.digest = new SigningDigest(signingKey, false);
                     }
@@ -355,9 +356,9 @@ public final class SmbSession {
                 break;
             case 20: /* NTLMSSP */
                 Subject s = this.credentials.getSubject();
+                final boolean doSigning = ( this.getTransport().flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
                 final byte[] curToken = token;
                 if ( ctx == null ) {
-                    final boolean doSigning = ( this.getTransport().flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
                     String host = this.getTransport().address.getHostAddress();
                     try {
                         host = this.getTransport().address.getHostName();
@@ -439,26 +440,26 @@ public final class SmbSession {
 
                 if ( token != null ) {
                     request = new SmbComSessionSetupAndX(this, null, token);
-                    response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), null);
-                    response.extendedSecurity = true;
-
-                    if ( ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
+                    if ( doSigning && ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
-                        if ( signingKey != null )
-                            request.digest = new SigningDigest(signingKey);
-
+                        if ( signingKey != null ) {
+                            request.digest = new SigningDigest(signingKey, signSequence);
+                        }
                         this.sessionKey = signingKey;
                     }
                     else {
                         log.trace("Not yet initializing signing");
                     }
 
+                    response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), null);
+                    response.extendedSecurity = true;
+
                     request.uid = this.getUid();
                     this.setUid(0);
 
                     try {
                         this.getTransport().send(request, response, true);
-                        signSequence += 2;
+                        // signSequence += 2;
                     }
                     catch ( SmbAuthException sae ) {
                         throw sae;

@@ -61,6 +61,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean forceUnicode = false;
     protected boolean signingPreferred = false;
     protected boolean signingEnforced = false;
+    protected boolean ipcSigningEnforced = true;
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
     protected boolean useNTSmbs = true;
@@ -423,14 +424,15 @@ public class BaseConfiguration implements Configuration {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#isSigningEnforced()
-     */
     @Override
     public boolean isSigningEnforced () {
         return this.signingEnforced;
+    }
+
+
+    @Override
+    public boolean isIpcSigningEnforced () {
+        return this.ipcSigningEnforced;
     }
 
 

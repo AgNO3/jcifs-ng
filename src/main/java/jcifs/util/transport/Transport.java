@@ -185,8 +185,14 @@ public abstract class Transport implements Runnable {
         while ( this.thread == Thread.currentThread() ) {
             try {
                 Request key = peekKey();
-                if ( key == null )
+                if ( key == null ) {
+                    synchronized ( this ) {
+                        for ( Response response : this.response_map.values() ) {
+                            response.isError = true;
+                        }
+                    }
                     throw new IOException("end of stream");
+                }
                 synchronized ( this ) {
                     Response response = this.response_map.get(key);
                     if ( response == null ) {

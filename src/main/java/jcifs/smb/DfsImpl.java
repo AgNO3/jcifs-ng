@@ -168,7 +168,12 @@ public class DfsImpl implements Dfs {
                     do {
                         try {
                             if ( dr.server != null && dr.server.length() > 0 ) {
-                                return tf.getTransportPool().getSmbTransport(tf, tf.getNameServiceClient().getByName(dr.server), 0, false);
+                                return tf.getTransportPool().getSmbTransport(
+                                    tf,
+                                    tf.getNameServiceClient().getByName(dr.server),
+                                    0,
+                                    false,
+                                    !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
                             }
                             log.debug("No server name in referral");
                             return null;

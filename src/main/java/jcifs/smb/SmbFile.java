@@ -793,7 +793,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
         connect0();
         SmbSession session = getSession();
         SmbTransport transport = session.getTransport();
-        DfsReferral dr = getTransportContext().getDfs().resolve(getTransportContext(), transport.tconHostName, this.tree.share, this.unc);
+        CIFSContext tc = getTransportContext();
+        DfsReferral dr = tc.getDfs().resolve(tc, transport.tconHostName, this.tree.share, this.unc);
 
         if ( dr != null ) {
             if ( log.isDebugEnabled() ) {
@@ -826,9 +827,8 @@ public class SmbFile extends URLConnection implements SmbConstants {
                         log.trace("DFS redirect: " + dr);
                     }
 
-                    UniAddress addr = getTransportContext().getNameServiceClient().getByName(dr.server);
-                    SmbTransport trans = getTransportContext().getTransportPool()
-                            .getSmbTransport(getTransportContext(), addr, this.url.getPort(), false);
+                    UniAddress addr = tc.getNameServiceClient().getByName(dr.server);
+                    SmbTransport trans = tc.getTransportPool().getSmbTransport(tc, addr, this.url.getPort(), false, shouldForceSigning(tc, dr.share));
 
                     synchronized ( trans ) {
                         /*
@@ -842,7 +842,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                          * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
                          */
                         trans.connect();
-                        this.tree = trans.getSmbSession(getTransportContext()).getSmbTree(dr.share, service);
+                        this.tree = trans.getSmbSession(tc).getSmbTree(dr.share, service);
                         if ( dr != start && dr.key != null ) {
                             dr.map.put(dr.key, dr);
                         }
@@ -920,6 +920,28 @@ public class SmbFile extends URLConnection implements SmbConstants {
             if ( request != null )
                 request.flags2 &= ~SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
         }
+    }
+
+
+    private static boolean shouldForceSigning ( CIFSContext tc, String share ) {
+        return tc.getConfig().isIpcSigningEnforced() && !tc.getCredentials().isAnonymous() && isIPC(share);
+    }
+
+
+    /**
+     * @param service
+     * @param share
+     * @return whether this is a IPC
+     */
+    private static boolean isIPC ( String share ) {
+        log.debug("Check " + share);
+        if ( share == null || "IPC$".equals(share) ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug("Share is " + share + " enforcing signing");
+            }
+            return true;
+        }
+        return false;
     }
 
 
@@ -1119,6 +1141,9 @@ public class SmbFile extends URLConnection implements SmbConstants {
         UniAddress addr = getAddress();
         CIFSContext ctx = getTransportContext();
         SmbTree t;
+        if ( log.isDebugEnabled() ) {
+            log.debug("Tree is " + this.tree);
+        }
         if ( this.tree != null ) {
             trans = getSession().getTransport();
             t = this.tree;
@@ -1127,14 +1152,20 @@ public class SmbFile extends URLConnection implements SmbConstants {
             if ( log.isDebugEnabled() ) {
                 log.debug("Using exclusive transport for " + this);
             }
-            this.exclusiveTransport = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), true);
+            this.exclusiveTransport = ctx.getTransportPool()
+                    .getSmbTransport(ctx, addr, this.url.getPort(), true, shouldForceSigning(ctx, this.share));
             trans = this.exclusiveTransport;
             trans.setDontTimeout(true);
             t = trans.getSmbSession(ctx).getSmbTree(this.share, null);
         }
         else {
-            trans = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), false);
+            trans = ctx.getTransportPool().getSmbTransport(ctx, addr, this.url.getPort(), false, shouldForceSigning(ctx, this.share));
             t = trans.getSmbSession(ctx).getSmbTree(this.share, null);
+        }
+
+        if ( ( trans.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 && !trans.server.signaturesRequired && !isIPC(this.share)
+                && !ctx.getConfig().isSigningEnforced() ) {
+            log.warn("Signatures for file enabled but not required " + this);
         }
 
         String hostName = getServerWithDfs();
