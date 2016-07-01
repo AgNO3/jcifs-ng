@@ -38,6 +38,9 @@ import jcifs.smb.SmbCredentials;
  * allow to create such sub-contexts.
  * 
  * 
+ * Implementors of this interface should extend {@link jcifs.context.BaseContext} or
+ * {@link jcifs.context.CIFSContextWrapper} to get forward compatability.
+ * 
  * @author mbechler
  *
  */
@@ -128,7 +131,7 @@ public interface CIFSContext {
     /**
      * 
      * @param creds
-     * @return a child using using the given credentials
+     * @return a child context using using the given credentials
      */
     CIFSContext withCredentials ( SmbCredentials creds );
 

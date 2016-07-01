@@ -64,6 +64,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean ipcSigningEnforced = true;
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
+    protected boolean forceExtendedSecurity = false;
     protected boolean useNTSmbs = true;
     protected boolean useLargeReadWrite = true;
     protected int lanmanCompatibility = 3;
@@ -433,6 +434,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isIpcSigningEnforced () {
         return this.ipcSigningEnforced;
+    }
+
+
+    @Override
+    public boolean isForceExtendedSecurity () {
+        return this.forceExtendedSecurity;
     }
 
 

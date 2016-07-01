@@ -26,6 +26,10 @@ import jcifs.smb.SmbTransport;
 
 
 /**
+ * 
+ * 
+ * This is an internal interface that may require changes, even in minor versions.
+ * 
  * @author mbechler
  *
  */

@@ -25,6 +25,11 @@ import java.util.TimeZone;
 
 
 /**
+ * 
+ * 
+ * Implementors of this interface should extend {@link jcifs.config.BaseConfiguration} or
+ * {@link jcifs.config.DelegatingConfiguration} to get forward compatability.
+ * 
  * @author mbechler
  *
  */
@@ -294,7 +299,7 @@ public interface Configuration {
 
 
     /**
-     * @return whether to enable SMB signing, if available
+     * @return whether to enable SMB signing (for everything), if available
      */
     boolean isSigningEnabled ();
 
@@ -306,9 +311,15 @@ public interface Configuration {
 
 
     /**
-     * @return whether to enforce SMB signing
+     * @return whether to enforce SMB signing (for everything)
      */
     boolean isSigningEnforced ();
+
+
+    /**
+     * @return whether to force extended security usage
+     */
+    boolean isForceExtendedSecurity ();
 
 
     /**

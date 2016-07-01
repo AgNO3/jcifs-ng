@@ -311,6 +311,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isForceExtendedSecurity()
+     */
+    @Override
+    public boolean isForceExtendedSecurity () {
+        return this.delegate.isForceExtendedSecurity();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getLanManCompatibility()
      */

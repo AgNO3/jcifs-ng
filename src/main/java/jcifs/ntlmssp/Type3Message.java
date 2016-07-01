@@ -138,6 +138,13 @@ public class Type3Message extends NtlmMessage {
         setDomain(domain);
         setUser(user);
 
+        if ( password == null || password.length() == 0 ) {
+            setLMResponse(null);
+            setNTResponse(null);
+            setUser(null);
+            return;
+        }
+
         switch ( tc.getConfig().getLanManCompatibility() ) {
         case 0:
         case 1:
@@ -202,7 +209,6 @@ public class Type3Message extends NtlmMessage {
             byte[] clientChallenge = new byte[8];
             tc.getConfig().getRandom().nextBytes(clientChallenge);
             setLMResponse(getLMv2Response(tc, type2, domain, user, password, clientChallenge));
-
             byte[] clientChallenge2 = new byte[8];
             tc.getConfig().getRandom().nextBytes(clientChallenge2);
             setNTResponse(getNTLMv2Response(tc, type2, responseKeyNT, clientChallenge2));

@@ -3,6 +3,8 @@
 jcifs-ng 1.5.1
 - Fix bundle manifest errors
 - Dont wait for response timeout when the transport connection is closed. 
-- Fallback to secondary port on any io error during negotiation.
+- Fallback to secondary port on any IOException during negotiation.
+- Fix NTLMSSP anonymous auth, by default use Extended Security for everything.
 - Security hardening:
- - enforce SMB signing by default for IPC connections
+ - enforce SMB signing by default for IPC connections, relates to CVE-2016-2115 (jcifs.smb.client.ipcSigningEnforced=false to disable)
+ - Allow enforcement of Extended Security (SPNEGO) (jcifs.smb.client.forceExtendedSecurity=true to enable)

@@ -284,15 +284,19 @@ public final class SmbSession {
         byte[] token = new byte[0];
         int state = 10;
         int signSequence = 0;
+        boolean anonymous = this.credentials.isAnonymous();
 
         do {
             switch ( state ) {
             case 10: /* NTLM */
-                boolean anonymous = this.credentials.isAnonymous();
-                if ( !anonymous && this.getTransport().hasCapability(SmbConstants.CAP_EXTENDED_SECURITY) ) {
+
+                if ( this.getTransport().hasCapability(SmbConstants.CAP_EXTENDED_SECURITY) ) {
                     log.debug("Extended security negotiated");
                     state = 20; /* NTLMSSP */
                     break;
+                }
+                else if ( this.getTransportContext().getConfig().isForceExtendedSecurity() ) {
+                    throw new SmbException("Server does not supported extended security");
                 }
 
                 log.debug("Performing legacy session setup");
@@ -322,6 +326,9 @@ public final class SmbSession {
                     else {
                         log.debug("Initialize signing");
                         byte[] signingKey = npa.getSigningKey(this.getTransportContext(), this.getTransport().server.encryptionKey);
+                        if ( signingKey == null ) {
+                            throw new SmbException("Need a signature key but the server did not provide one");
+                        }
                         request.digest = new SigningDigest(signingKey, false);
                     }
                 }
@@ -349,14 +356,16 @@ public final class SmbSession {
                     /* success - install the signing digest */
                     this.getTransport().digest = request.digest;
                 }
+                else if ( !anonymous && this.getTransport().isSignatureSetupRequired() ) {
+                    throw new SmbException("Signing required but no session key available");
+                }
 
-                this.setSessionSetup(true, response);
+                this.setSessionSetup(response);
                 state = 0;
-
                 break;
             case 20: /* NTLMSSP */
                 Subject s = this.credentials.getSubject();
-                final boolean doSigning = ( this.getTransport().flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
+                final boolean doSigning = !anonymous && ( this.getTransport().flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
                 final byte[] curToken = token;
                 if ( ctx == null ) {
                     String host = this.getTransport().address.getHostAddress();
@@ -459,7 +468,6 @@ public final class SmbSession {
 
                     try {
                         this.getTransport().send(request, response, true);
-                        // signSequence += 2;
                     }
                     catch ( SmbAuthException sae ) {
                         throw sae;
@@ -507,7 +515,7 @@ public final class SmbSession {
                         /* success - install the signing digest */
                         this.getTransport().digest = request.digest;
                     }
-                    else if ( this.getTransport().isSignatureSetupRequired() ) {
+                    else if ( !anonymous && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null && response != null )
                             this.getTransport().digest = new SigningDigest(signingKey, signSequence);
@@ -516,7 +524,7 @@ public final class SmbSession {
                         }
                         this.sessionKey = signingKey;
                     }
-                    this.setSessionSetup(true, response);
+                    this.setSessionSetup(response);
                     state = 0;
                     break;
                 }
@@ -577,11 +585,9 @@ public final class SmbSession {
     }
 
 
-    void setSessionSetup ( boolean b, SmbComSessionSetupAndXResponse response ) {
-        if ( b ) {
-            this.extendedSecurity = response.extendedSecurity;
-            this.connectionState = 2;
-        }
+    void setSessionSetup ( SmbComSessionSetupAndXResponse response ) {
+        this.extendedSecurity = response.extendedSecurity;
+        this.connectionState = 2;
     }
 
 

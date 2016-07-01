@@ -57,6 +57,8 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
 
         this.useNtStatus = Config.getBoolean(p, "jcifs.smb.client.useNtStatus", true);
         this.useExtendedSecurity = Config.getBoolean(p, "jcifs.smb.client.useExtendedSecurity", true);
+        this.forceExtendedSecurity = Config.getBoolean(p, "jcifs.smb.client.forceExtendedSecurity", false);
+
         this.useNTSmbs = Config.getBoolean(p, "jcifs.smb.client.useNTSmbs", true);
 
         this.flags2 = Config.getInt(p, "jcifs.smb.client.flags2", 0);

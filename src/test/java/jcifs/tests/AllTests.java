@@ -90,6 +90,7 @@ public class AllTests {
             public Map<String, String> mutate ( Map<String, String> cfg ) {
                 cfg.put("jcifs.smb.lmCompatibility", "2");
                 cfg.put("jcifs.smb.client.useExtendedSecurity", "false");
+                cfg.put("jcifs.smb.client.forceExtendedSecurity", "false");
                 return cfg;
             }
         });

@@ -168,12 +168,20 @@
 				</executions>
 				<configuration>
 					<ignored>
-						<!-- seems to be a clirr bug that it cannot handle 
-						     the different inherited return types -->
 						<difference>
+							<!-- seems to be a clirr bug that it cannot handle 
+						     	     the different inherited return types -->
 							<className>**</className>
 							<differenceType>7006</differenceType>
 							<method>* clone()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+						<difference>
+							<!-- these either have a base class or are internal -->
+							<className>jcifs/*</className>
+							<differenceType>7012</differenceType>
+							<method>*</method>
 							<from>*</from>
 							<to>*</to>
 						</difference>
