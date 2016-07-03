@@ -232,7 +232,7 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * @param to
      * @param from
      */
-    static void cloneInternal ( NtlmPasswordAuthentication to, NtlmPasswordAuthentication from ) {
+    protected static void cloneInternal ( NtlmPasswordAuthentication to, NtlmPasswordAuthentication from ) {
         to.domain = from.domain;
         to.username = from.username;
         to.password = from.password;
@@ -265,6 +265,15 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      */
     @Override
     public String getUserDomain () {
+        return this.domain;
+    }
+
+
+    /**
+     * 
+     * @return the original specified user domain
+     */
+    public String getSpecifiedUserDomain () {
         return this.domain;
     }
 

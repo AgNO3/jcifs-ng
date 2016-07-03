@@ -22,6 +22,7 @@ import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -39,15 +40,14 @@ import jcifs.spnego.NegTokenInit;
 
 
 /**
+ * Base kerberos authenticator
  * 
- * @author Shun
- *
+ * Uses a subject that contains kerberos credentials for use in GSSAPI context establishment.
+ * 
+ * Be advised that short/NetBIOS name usage is not supported with this authenticator. Always specify full FQDNs.
+ * This can be a problem if using DFS in it's default configuration as they still return referrals in short form.
  */
 public class Kerb5Authenticator extends NtlmPasswordAuthentication {
-
-    /**
-     * 
-     */
 
     private static final long serialVersionUID = 1999400043787454432L;
     private static final Logger log = Logger.getLogger(Kerb5Authenticator.class);
@@ -59,6 +59,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     private String service = DEFAULT_SERVICE;
     private int userLifetime = GSSCredential.DEFAULT_LIFETIME;
     private int contextLifetime = GSSContext.DEFAULT_LIFETIME;
+    private boolean canFallback = false;
 
 
     /**
@@ -79,13 +80,43 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
 
     /**
+     * Contruct a <code>Kerb5Authenticator</code> object with <code>Subject</code> and
+     * potential NTLM fallback (if the server does not support kerberos).
+     * 
+     * @param tc
+     *            context to use
+     * @param subject
+     *            represents the user who perform Kerberos authentication. Should at least contain a TGT for the user.
+     * @param domain
+     *            domain for NTLM fallback
+     * @param username
+     *            user for NTLM fallback
+     * @param password
+     *            password for NTLM fallback
+     */
+    public Kerb5Authenticator ( CIFSContext tc, Subject subject, String domain, String username, String password ) {
+        super(tc, domain, username, password);
+        this.canFallback = true;
+        this.subject = subject;
+    }
+
+
+    /**
      * 
      * {@inheritDoc}
      *
      * @see jcifs.smb.NtlmPasswordAuthentication#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
      */
     @Override
-    public SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+    public SSPContext createContext ( CIFSContext tc, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+        if ( host.indexOf('.') < 0 && host.toUpperCase(Locale.ROOT).equals(host) ) {
+            // this is not too good, propably should better pass the address and check that it is a netbios one.
+            // While we could look up the domain controller/KDC we cannot really make the java kerberos implementation
+            // use a KDC of our choice.
+            // A potential workaround would be to try to get the server FQDN by reverse lookup, but this might have
+            // security implications and also is not how Microsoft does it.
+            throw new SmbUnsupportedOperationException("Cannot use netbios/short names with kerberos authentication, have " + host);
+        }
         try {
             NegTokenInit tok = new NegTokenInit(initialToken);
             if ( log.isDebugEnabled() ) {
@@ -97,9 +128,12 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
                 for ( Oid mech : Kerb5Context.SUPPORTED_MECHS ) {
                     foundKerberos |= mechs.contains(mech);
                 }
-                if ( !foundKerberos ) {
+                if ( !foundKerberos && this.canFallback && tc.getConfig().isAllowNTLMFallback() ) {
                     log.debug("Falling back to NTLM authentication");
-                    return super.createContext(transportContext, host, initialToken, doSigning);
+                    return super.createContext(tc, host, initialToken, doSigning);
+                }
+                else if ( !foundKerberos ) {
+                    throw new SmbUnsupportedOperationException("Server does not support kerberos authentication");
                 }
             }
         }
@@ -290,10 +324,11 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     }
 
 
-    /*
-     * (non-Javadoc)
+    /**
      * 
-     * @see java.lang.Object#equals(java.lang.Object)
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.NtlmPasswordAuthentication#equals(java.lang.Object)
      */
     @Override
     public boolean equals ( Object other ) {

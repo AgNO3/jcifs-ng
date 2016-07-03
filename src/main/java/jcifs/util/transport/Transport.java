@@ -146,7 +146,7 @@ public abstract class Transport implements Runnable {
                     wait(timeout);
                     timeout = response.expiration - System.currentTimeMillis();
                     if ( response.isError ) {
-                        throw new TransportException(this.name + " error reading response to " + request);
+                        throw new TransportException(this.name + " error reading response to " + request, response.exception);
                     }
                     if ( timeout <= 0 ) {
                         throw new TransportException(this.name + " timedout waiting for response to " + request);

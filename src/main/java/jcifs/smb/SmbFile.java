@@ -1163,13 +1163,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
             t = trans.getSmbSession(ctx).getSmbTree(this.share, null);
         }
 
-        if ( ( trans.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 && !trans.server.signaturesRequired && !isIPC(this.share)
-                && !ctx.getConfig().isSigningEnforced() ) {
-            log.warn("Signatures for file enabled but not required " + this);
+        if ( log.isDebugEnabled() && ( trans.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 && !trans.server.signaturesRequired
+                && !isIPC(this.share) && !ctx.getConfig().isSigningEnforced() ) {
+            log.debug("Signatures for file enabled but not required " + this);
         }
 
         String hostName = getServerWithDfs();
-        t.inDomainDfs = ctx.getDfs().resolve(ctx, hostName, t.share, null) != null;
+        DfsReferral referral = ctx.getDfs().resolve(ctx, hostName, t.share, null);
+        t.inDomainDfs = referral != null;
         if ( t.inDomainDfs ) {
             // make sure transport is connected
             trans.connect();
@@ -1193,7 +1194,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
             else if ( ctx.renewCredentials(this.url.toString(), sae) ) {
                 ssn = trans.getSmbSession(ctx);
                 t = ssn.getSmbTree(this.share, null);
-                t.inDomainDfs = ctx.getDfs().resolve(ctx, hostName, t.share, null) != null;
+                t.inDomainDfs = referral != null;
                 if ( this.tree.inDomainDfs ) {
                     this.tree.connectionState = 2;
                 }

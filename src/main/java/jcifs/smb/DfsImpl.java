@@ -323,16 +323,26 @@ public class DfsImpl implements Dfs {
                             log.trace("Have referral " + dr);
                         }
 
+                        // This is most certainly not the correct behaviour
+                        //
+                        // I guess what needs to be done here is properly handle name list referrals so that
+                        // the target name will have already been replaced with a domain controller name.
                         if ( path == null && domain.equals(dr.server) && root.equals(dr.share) ) {
-                            // not 100% sure that this is the correct behaviour
-                            // these seem to be errors (samba), and I don't think they have any value
-                            //
-                            // If we do cache these we never get to the properly cached
-                            // standalone referral we might have.
-                            if ( log.isDebugEnabled() ) {
-                                log.debug("Dropping self-referential referral " + dr);
+                            if ( !dr.server.equals(trans.tconHostName) ) {
+                                // this is a hack
+                                dr.server = trans.tconHostName;
+                                if ( log.isDebugEnabled() ) {
+                                    log.debug("Adjusting self-referential domain referral to domain controller " + dr.server);
+                                }
                             }
-                            dr = null;
+                            else {
+                                // If we do cache these we never get to the properly cached
+                                // standalone referral we might have.
+                                if ( log.isDebugEnabled() ) {
+                                    log.debug("Adjusting self-referential referral " + dr);
+                                }
+                                dr = null;
+                            }
                         }
 
                         if ( dr != null ) {

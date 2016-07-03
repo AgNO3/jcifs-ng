@@ -333,6 +333,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isAllowNTLMFallback()
+     */
+    @Override
+    public boolean isAllowNTLMFallback () {
+        return this.delegate.isAllowNTLMFallback();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getResolveOrder()
      */

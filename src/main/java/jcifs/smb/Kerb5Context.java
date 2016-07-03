@@ -84,6 +84,10 @@ class Kerb5Context implements SSPContext {
             this.serviceName = manager.createName(service + "@" + host, GSSName.NT_HOSTBASED_SERVICE, KRB5_MECH_OID);
         }
 
+        if ( log.isDebugEnabled() ) {
+            log.debug("Service name is " + this.serviceName);
+        }
+
         if ( name != null ) {
             this.clientName = manager.createName(name, GSSName.NT_USER_NAME, KRB5_MECH_OID);
             clientCreds = manager.createCredential(this.clientName, userLifetime, KRB5_MECH_OID, GSSCredential.INITIATE_ONLY);

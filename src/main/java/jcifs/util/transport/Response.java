@@ -36,4 +36,9 @@ public abstract class Response {
      * 
      */
     public boolean isError;
+
+    /**
+     * 
+     */
+    public Exception exception;
 }

@@ -417,8 +417,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( this.signingEnforced && !serverEnableSig ) {
             throw new SmbException("Signatures are required but the server does not support them");
         }
-        else if ( this.server.signaturesRequired || this.signingEnforced || serverRequireSig
-                || ( serverEnableSig && this.getTransportContext().getConfig().isSigningEnabled() ) ) {
+        else if ( this.signingEnforced || serverRequireSig || ( serverEnableSig && this.getTransportContext().getConfig().isSigningEnabled() ) ) {
             this.flags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
             if ( this.signingEnforced || this.server.signaturesRequired ) {
                 this.flags2 |= SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;
@@ -692,6 +691,8 @@ public class SmbTransport extends Transport implements SmbConstants {
         }
         catch ( Exception e ) {
             resp.isError = true;
+            resp.exception = e;
+            this.notifyAll();
             throw e;
         }
         finally {

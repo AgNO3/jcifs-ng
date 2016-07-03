@@ -283,7 +283,6 @@ public final class SmbSession {
         SSPContext ctx = null;
         byte[] token = new byte[0];
         int state = 10;
-        int signSequence = 0;
         boolean anonymous = this.credentials.isAnonymous();
 
         do {
@@ -376,6 +375,10 @@ public final class SmbSession {
                         log.debug("Failed to resolve host name", e);
                     }
 
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Remote host is " + host);
+                    }
+
                     if ( s == null ) {
                         ctx = this.credentials.createContext(this.getTransportContext(), host, this.transport.server.encryptionKey, doSigning);
                     }
@@ -452,7 +455,7 @@ public final class SmbSession {
                     if ( doSigning && ctx.isEstablished() && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null ) {
-                            request.digest = new SigningDigest(signingKey, signSequence);
+                            request.digest = new SigningDigest(signingKey);
                         }
                         this.sessionKey = signingKey;
                     }
@@ -518,7 +521,7 @@ public final class SmbSession {
                     else if ( !anonymous && this.getTransport().isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null && response != null )
-                            this.getTransport().digest = new SigningDigest(signingKey, signSequence);
+                            this.getTransport().digest = new SigningDigest(signingKey, 2);
                         else {
                             throw new SmbException("Signing required but no session key available");
                         }

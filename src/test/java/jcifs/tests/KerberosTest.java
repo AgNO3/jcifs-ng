@@ -19,6 +19,7 @@ package jcifs.tests;
 
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,12 +32,17 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.kerberos.KeyTab;
 
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import jcifs.CIFSContext;
+import jcifs.smb.JAASAuthenticator;
 import jcifs.smb.Kerb5Authenticator;
+import jcifs.smb.SmbException;
+import jcifs.smb.SmbFile;
+import jcifs.smb.SmbUnsupportedOperationException;
 import sun.security.jgss.krb5.Krb5Util;
 import sun.security.krb5.Asn1Exception;
 import sun.security.krb5.Credentials;
@@ -67,8 +73,29 @@ public class KerberosTest extends BaseCIFSTest {
     @Test
     public void testKRB () throws IOException, Asn1Exception, KrbException {
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired());
-        CIFSContext ctx = getContext().withCredentials(new Kerb5Authenticator(getContext(), s));
-        getDefaultShareRoot(ctx).exists();
+        CIFSContext ctx = getContext()
+                .withCredentials(new Kerb5Authenticator(getContext(), s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
+        try {
+            SmbFile f = new SmbFile(getTestShareURL(), ctx);
+            f.exists();
+        }
+        catch ( SmbUnsupportedOperationException e ) {
+            Assume.assumeTrue("Using short names", false);
+        }
+    }
+
+
+    @Test
+    public void testJAAS () throws SmbException, MalformedURLException {
+        CIFSContext ctx = getContext()
+                .withCredentials(new JAASAuthenticator(getContext(), getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
+        try {
+            SmbFile f = new SmbFile(getTestShareURL(), ctx);
+            f.exists();
+        }
+        catch ( SmbUnsupportedOperationException e ) {
+            Assume.assumeTrue("Using short names", false);
+        }
     }
 
 

@@ -235,6 +235,12 @@ public class SigningDigest {
      *            The length of the SMB data starting at offset.
      */
     boolean verify ( byte[] data, int offset, ServerMessageBlock response ) {
+
+        if ( ( response.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) == 0 ) {
+            log.warn("Expected signed response, but is not signed");
+            return response.verifyFailed = false;
+        }
+
         update(this.macSigningKey, 0, this.macSigningKey.length);
         int index = offset;
         update(data, index, SmbConstants.SIGNATURE_OFFSET);
@@ -260,8 +266,8 @@ public class SigningDigest {
             if ( signature[ i ] != data[ offset + SmbConstants.SIGNATURE_OFFSET + i ] ) {
                 if ( log.isDebugEnabled() ) {
                     log.debug("signature verification failure"); //$NON-NLS-1$
-                    log.debug(Hexdump.toHexString(signature, 0, 8));
-                    log.debug(Hexdump.toHexString(data, offset + SmbConstants.SIGNATURE_OFFSET, 8));
+                    log.debug("Expect: " + Hexdump.toHexString(signature, 0, 8));
+                    log.debug("Have: " + Hexdump.toHexString(data, offset + SmbConstants.SIGNATURE_OFFSET, 8));
                 }
                 return response.verifyFailed = true;
             }

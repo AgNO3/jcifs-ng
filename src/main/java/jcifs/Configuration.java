@@ -209,6 +209,12 @@ public interface Configuration {
 
 
     /**
+     * @return whether to allow fallback from kerberos to NTLM
+     */
+    boolean isAllowNTLMFallback ();
+
+
+    /**
      * @return whether the usage of plaintext passwords is prohibited, defaults to false
      */
     boolean isDisablePlainTextPasswords ();
