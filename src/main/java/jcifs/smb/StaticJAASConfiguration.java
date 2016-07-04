@@ -30,7 +30,7 @@ import javax.security.auth.login.Configuration;
  * @author mbechler
  *
  */
-public class StaticJAASConfiguration extends Configuration {
+class StaticJAASConfiguration extends Configuration {
 
     private Map<String, ?> options;
 

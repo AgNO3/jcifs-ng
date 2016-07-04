@@ -19,9 +19,12 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
+
 import org.apache.log4j.Logger;
 
 import jcifs.SmbConstants;
+import jcifs.util.transport.TransportException;
 
 
 class SmbTree {
@@ -214,8 +217,26 @@ class SmbTree {
 
                 SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(this.session.getConfig(), andxResponse);
                 SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(this.session, unc, this.service, andx);
-                this.session.send(request, response, true);
 
+                for ( int retries = 0; retries < 1 + this.session.getTransportContext().getConfig().getMaxRequestRetries(); retries++ ) {
+                    try {
+                        this.session.send(request, response, true);
+                        break;
+                    }
+                    catch ( SmbException se ) {
+                        if ( se.getCause() instanceof TransportException ) {
+                            log.debug("Retrying tree connect");
+                            try {
+                                transport.disconnect(true);
+                            }
+                            catch ( IOException e ) {
+                                se.addSuppressed(e);
+                            }
+                            continue;
+                        }
+                        throw se;
+                    }
+                }
                 this.tid = response.tid;
                 this.service = response.service;
                 this.inDfs = response.shareIsInDfs;

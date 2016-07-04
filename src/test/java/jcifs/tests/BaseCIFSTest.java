@@ -18,6 +18,8 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertNotNull;
+
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -217,6 +219,7 @@ public abstract class BaseCIFSTest {
 
 
     protected void checkConnection ( SmbFile f ) throws SmbException {
+        assertNotNull(f);
         f.exists();
     }
 

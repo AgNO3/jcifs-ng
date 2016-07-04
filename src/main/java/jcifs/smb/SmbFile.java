@@ -1192,6 +1192,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
                 t.treeConnect(null, null);
             }
             else if ( ctx.renewCredentials(this.url.toString(), sae) ) {
+                log.debug("Trying to renew credentials after auth error");
                 ssn = trans.getSmbSession(ctx);
                 t = ssn.getSmbTree(this.share, null);
                 t.inDomainDfs = referral != null;
@@ -1219,7 +1220,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
              * Tree/session thinks it is connected but transport disconnected
              * under it, reset tree to reflect the truth.
              */
-            log.debug("Disonnecting failed tree and session");
+            log.debug("Disconnecting failed tree and session");
             disconnect(true);
         }
 

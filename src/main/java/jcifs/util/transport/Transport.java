@@ -148,7 +148,11 @@ public abstract class Transport implements Runnable {
                     if ( response.isError ) {
                         throw new TransportException(this.name + " error reading response to " + request, response.exception);
                     }
+                    if ( isDisconnected() ) {
+                        throw new InterruptedException("Transport was disconnected while waiting for a response");
+                    }
                     if ( timeout <= 0 ) {
+                        log.info("State is " + this.state);
                         throw new TransportException(this.name + " timedout waiting for response to " + request);
                     }
                 }
@@ -156,7 +160,7 @@ public abstract class Transport implements Runnable {
                     wait();
                     log.debug("Wait returned state is " + this.state);
                     if ( isDisconnected() ) {
-                        throw new InterruptedException("Connection failed");
+                        throw new InterruptedException("Transport was disconnected while waiting for a response");
                     }
                 }
             }
@@ -229,16 +233,17 @@ public abstract class Transport implements Runnable {
                         continue;
                     }
                 }
-
-                try {
-                    disconnect(hard);
-                }
-                catch ( IOException ioe ) {
-                    ex.addSuppressed(ioe);
-                    log.warn("Failed to disconnect", ioe);
-                }
-                log.debug("Disconnected");
                 synchronized ( this ) {
+                    try {
+
+                        disconnect(hard);
+                    }
+                    catch ( IOException ioe ) {
+                        ex.addSuppressed(ioe);
+                        log.warn("Failed to disconnect", ioe);
+                    }
+                    log.debug("Disconnected");
+
                     notifyAll();
                     log.debug("Notified clients");
                 }
@@ -356,8 +361,10 @@ public abstract class Transport implements Runnable {
             try {
                 this.state = 5;
                 doDisconnect(hard);
+                this.state = 0;
             }
             catch ( IOException ioe0 ) {
+                this.state = 0;
                 ioe = ioe0;
             }
         case 4: /* in error - reset the transport */

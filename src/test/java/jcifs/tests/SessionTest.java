@@ -75,4 +75,14 @@ public class SessionTest extends BaseCIFSTest {
         checkConnection(f);
     }
 
+
+    @Test
+    public void transportReconnects () throws IOException {
+        // transport disconnects can happen pretty much any time
+        SmbFile f = getDefaultShareRoot();
+        f.connect();
+        f.getSession().getTransport().disconnect(true);
+        checkConnection(f);
+    }
+
 }

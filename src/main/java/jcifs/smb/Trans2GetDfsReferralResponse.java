@@ -19,7 +19,9 @@
 package jcifs.smb;
 
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
@@ -27,21 +29,26 @@ import jcifs.RuntimeCIFSException;
 
 class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
 
+    public static final int FLAGS_NAME_LIST_REFERRAL = 0x0002;
+    public static final int FLAGS_TARGET_SET_BOUNDARY = 0x0004;
+    public static final int TYPE_ROOT_TARGETS = 0x0;
+    public static final int TYPE_NON_ROOT_TARGETS = 0x1;
+
     class Referral {
 
-        private int version;
-        private int size;
-        private int serverType;
-        private int rflags;
-        private int proximity;
-        private int pathOffset;
-        private int altPathOffset;
-        private int nodeOffset;
-        private String altPath;
+        int version;
+        int size;
+        int serverType;
+        int rflags;
+        int proximity;
+        String altPath;
 
         int ttl;
         String rpath = null;
         String node = null;
+        String specialName = null;
+
+        String[] expandedNames = new String[0];
 
 
         int readWireFormat ( byte[] buffer, int bufferIndex, int len, boolean unicode ) {
@@ -63,16 +70,48 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
                 bufferIndex += 2;
                 this.ttl = SMBUtil.readInt2(buffer, bufferIndex);
                 bufferIndex += 2;
-                this.pathOffset = SMBUtil.readInt2(buffer, bufferIndex);
-                bufferIndex += 2;
-                this.altPathOffset = SMBUtil.readInt2(buffer, bufferIndex);
-                bufferIndex += 2;
-                this.nodeOffset = SMBUtil.readInt2(buffer, bufferIndex);
-                bufferIndex += 2;
 
-                this.rpath = readString(buffer, start + this.pathOffset, len, unicode);
-                if ( this.nodeOffset > 0 )
-                    this.node = readString(buffer, start + this.nodeOffset, len, unicode);
+                if ( ( this.rflags & FLAGS_NAME_LIST_REFERRAL ) == 0 ) {
+                    int pathOffset = SMBUtil.readInt2(buffer, bufferIndex);
+                    bufferIndex += 2;
+                    int altPathOffset = SMBUtil.readInt2(buffer, bufferIndex);
+                    bufferIndex += 2;
+                    int nodeOffset = SMBUtil.readInt2(buffer, bufferIndex);
+                    bufferIndex += 2;
+
+                    if ( pathOffset > 0 ) {
+                        this.rpath = readString(buffer, start + pathOffset, len, unicode);
+                    }
+                    if ( nodeOffset > 0 ) {
+                        this.node = readString(buffer, start + nodeOffset, len, unicode);
+                    }
+                    if ( altPathOffset > 0 ) {
+                        this.altPath = readString(buffer, start + altPathOffset, len, unicode);
+                    }
+                }
+                else {
+                    int specialNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
+                    bufferIndex += 2;
+                    int numExpanded = SMBUtil.readInt2(buffer, bufferIndex);
+                    bufferIndex += 2;
+                    int expandedNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
+                    bufferIndex += 2;
+
+                    if ( specialNameOffset > 0 ) {
+                        this.specialName = readString(buffer, start + specialNameOffset, len, unicode);
+                    }
+
+                    if ( expandedNameOffset > 0 ) {
+                        List<String> names = new ArrayList<>();
+                        for ( int i = 0; i < numExpanded; i++ ) {
+                            String en = readString(buffer, start + expandedNameOffset, len, unicode);
+                            names.add(en);
+                            expandedNameOffset += stringWireLength(en, start + expandedNameOffset);
+                        }
+                        this.expandedNames = names.toArray(new String[names.size()]);
+                    }
+
+                }
             }
             else if ( this.version == 1 ) {
                 this.node = readString(buffer, bufferIndex, len, unicode);
@@ -86,8 +125,7 @@ class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
         public String toString () {
             return new String(
                 "Referral[" + "version=" + this.version + ",size=" + this.size + ",serverType=" + this.serverType + ",flags=" + this.rflags
-                        + ",proximity=" + this.proximity + ",ttl=" + this.ttl + ",pathOffset=" + this.pathOffset + ",altPathOffset="
-                        + this.altPathOffset + ",nodeOffset=" + this.nodeOffset + ",path=" + this.rpath + ",altPath=" + this.altPath + ",node="
+                        + ",proximity=" + this.proximity + ",ttl=" + this.ttl + ",path=" + this.rpath + ",altPath=" + this.altPath + ",node="
                         + this.node + "]");
         }
     }

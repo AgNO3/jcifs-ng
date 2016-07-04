@@ -38,6 +38,7 @@ public class DfsReferral extends SmbException {
     public String path; // Path relative to tree from which this referral was thrown
     public boolean resolveHashes;
     public long expiration;
+    public int rflags;
 
     DfsReferral next;
     Map<String, DfsReferral> map;

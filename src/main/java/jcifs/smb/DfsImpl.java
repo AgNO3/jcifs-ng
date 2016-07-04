@@ -22,6 +22,7 @@ package jcifs.smb;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -61,9 +62,13 @@ public class DfsImpl implements Dfs {
     }
 
     private static final Logger log = Logger.getLogger(DfsImpl.class);
+    private static final String DC_ENTRY = "dc";
 
     private CacheEntry<Map<String, CacheEntry<DfsReferral>>> _domains = null; /* aka trusted domains cache */
     private final Object domainsLock = new Object();
+
+    private Map<String, CacheEntry<DfsReferral>> _dcs = new HashMap<>();
+    private final Object dcLock = new Object();
 
     private CacheEntry<DfsReferral> referrals = null;
     private final Object referralsLock = new Object();
@@ -97,6 +102,7 @@ public class DfsImpl implements Dfs {
             CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
             DfsReferral dr = null;
             if ( trans != null ) {
+                // get domain referral
                 dr = trans.getDfsReferrals(tf, "", 0);
             }
             if ( dr != null ) {
@@ -146,6 +152,49 @@ public class DfsImpl implements Dfs {
     }
 
 
+    private DfsReferral getDcReferrals ( CIFSContext tf, String domain ) throws SmbAuthException {
+        if ( tf.getConfig().isDfsDisabled() )
+            return null;
+        String dom = domain.toLowerCase(Locale.ROOT);
+        synchronized ( this.dcLock ) {
+            CacheEntry<DfsReferral> ce = this._dcs.get(dom);
+            if ( ce != null && System.currentTimeMillis() > ce.expiration ) {
+                ce = null;
+            }
+            if ( ce != null ) {
+                return ce.map.get(DC_ENTRY);
+            }
+            ce = new CacheEntry<>(tf.getConfig().getDfsTtl());
+            try {
+
+                UniAddress addr = tf.getNameServiceClient().getByName(domain, true);
+                SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false);
+                synchronized ( trans ) {
+                    DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Got DC referral " + dr);
+                    }
+                    ce.map.put(DC_ENTRY, dr);
+                    return dr;
+                }
+
+            }
+            catch ( IOException ioe ) {
+                if ( log.isDebugEnabled() ) {
+                    log.debug(String.format("Getting domain controller for %s failed", domain), ioe);
+                }
+                ce.map.put(DC_ENTRY, null);
+                if ( tf.getConfig().isDfsStrictView() && ioe instanceof SmbAuthException ) {
+                    throw (SmbAuthException) ioe;
+                }
+            }
+            ce.map.put(DC_ENTRY, null);
+            this._dcs.put(dom, ce);
+            return null;
+        }
+    }
+
+
     /**
      * 
      * {@inheritDoc}
@@ -156,43 +205,38 @@ public class DfsImpl implements Dfs {
     public SmbTransport getDc ( CIFSContext tf, String domain ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
-
         try {
-            UniAddress addr = tf.getNameServiceClient().getByName(domain, true);
-            SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false);
-            synchronized ( trans ) {
-                DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
-                if ( dr != null ) {
-                    DfsReferral start = dr;
-                    IOException e = null;
-                    do {
-                        try {
-                            if ( dr.server != null && dr.server.length() > 0 ) {
-                                return tf.getTransportPool().getSmbTransport(
-                                    tf,
-                                    tf.getNameServiceClient().getByName(dr.server),
-                                    0,
-                                    false,
-                                    !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
-                            }
-                            log.debug("No server name in referral");
-                            return null;
+            DfsReferral dr = getDcReferrals(tf, domain);
+            if ( dr != null ) {
+                DfsReferral start = dr;
+                IOException e = null;
+                do {
+                    try {
+                        if ( dr.server != null && dr.server.length() > 0 ) {
+                            return tf.getTransportPool().getSmbTransport(
+                                tf,
+                                tf.getNameServiceClient().getByName(dr.server),
+                                0,
+                                false,
+                                !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
                         }
-                        catch ( IOException ioe ) {
-                            e = ioe;
-                        }
-
-                        dr = dr.next;
+                        log.debug("No server name in referral");
+                        return null;
                     }
-                    while ( dr != start );
+                    catch ( IOException ioe ) {
+                        e = ioe;
+                    }
 
-                    throw e;
+                    dr = dr.next;
                 }
+                while ( dr != start );
+
+                throw e;
             }
         }
         catch ( IOException ioe ) {
             if ( log.isDebugEnabled() ) {
-                log.debug(String.format("Getting domain controller for %s failed", domain), ioe);
+                log.debug(String.format("Failed to connect to domain controller for %s", domain), ioe);
             }
             if ( tf.getConfig().isDfsStrictView() && ioe instanceof SmbAuthException ) {
                 throw (SmbAuthException) ioe;
@@ -213,7 +257,7 @@ public class DfsImpl implements Dfs {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
 
-        String p = "\\\\" + domain + "\\" + root;
+        String p = "\\" + domain + "\\" + root;
         if ( path != null )
             p += path;
         try {
@@ -293,6 +337,9 @@ public class DfsImpl implements Dfs {
                  */
                 Map<String, CacheEntry<DfsReferral>> roots = domains.get(domain);
                 if ( roots != null ) {
+                    if ( log.isTraceEnabled() ) {
+                        log.trace("Is a domain referral for " + domain);
+                    }
                     SmbTransport trans = null;
 
                     root = root.toLowerCase();
@@ -317,42 +364,41 @@ public class DfsImpl implements Dfs {
                         log.trace("Loadings links");
                         if ( ( trans = getDc(tf, domain) ) == null )
                             return null;
+                        // the tconHostName is from the DC referral, that referral must be resolved
+                        // before following deeper ones. Otherwise e.g. samba will return a broken
+                        // referral.
+                        String refServerName = domain;
+                        synchronized ( trans ) {
+                            try {
+                                // ensure connected
+                                trans.connect();
+                                refServerName = trans.tconHostName;
+                            }
+                            catch ( SmbException e ) {
+                                log.warn("Failed to connect to domain controller", e);
+                            }
+                            dr = getReferral(tf, trans, refServerName, root, path);
+                        }
 
-                        dr = getReferral(tf, trans, domain, root, path);
                         if ( log.isTraceEnabled() ) {
                             log.trace("Have referral " + dr);
                         }
 
-                        // This is most certainly not the correct behaviour
-                        //
-                        // I guess what needs to be done here is properly handle name list referrals so that
-                        // the target name will have already been replaced with a domain controller name.
                         if ( path == null && domain.equals(dr.server) && root.equals(dr.share) ) {
-                            if ( !dr.server.equals(trans.tconHostName) ) {
-                                // this is a hack
-                                dr.server = trans.tconHostName;
-                                if ( log.isDebugEnabled() ) {
-                                    log.debug("Adjusting self-referential domain referral to domain controller " + dr.server);
-                                }
-                            }
-                            else {
-                                // If we do cache these we never get to the properly cached
-                                // standalone referral we might have.
-                                if ( log.isDebugEnabled() ) {
-                                    log.debug("Adjusting self-referential referral " + dr);
-                                }
-                                dr = null;
-                            }
+                            // If we do cache these we never get to the properly cached
+                            // standalone referral we might have.
+                            log.warn("Dropping self-referential referral " + dr);
+                            dr = null;
                         }
 
                         if ( dr != null ) {
-                            int len = 1 + domain.length() + 1 + root.length();
+                            int len = 1 + refServerName.length() + 1 + root.length();
 
                             links = new CacheEntry<>(tf.getConfig().getDfsTtl());
 
                             DfsReferral tmp = dr;
                             do {
-                                if ( path == null || path.length() == 0 ) {
+                                if ( path == null ) {
 
                                     if ( log.isTraceEnabled() ) {
                                         log.trace("Path is empty, insert root " + tmp);
@@ -366,7 +412,6 @@ public class DfsImpl implements Dfs {
                                      */
                                     tmp.map = links.map;
                                     tmp.key = "\\";
-                                    len++;
                                 }
                                 tmp.pathConsumed -= len;
                                 tmp = tmp.next;
@@ -429,11 +474,21 @@ public class DfsImpl implements Dfs {
                         }
                     }
                 }
+
+                if ( tf.getConfig().isDfsConvertToFQDN() && dr != null ) {
+                    if ( dr.server.indexOf('.') < 0 && dr.server.toUpperCase(Locale.ROOT).equals(dr.server) ) {
+                        String fqdn = dr.server + "." + domain;
+                        if ( log.isDebugEnabled() ) {
+                            log.debug(String.format("Applying DFS netbios name hack %s -> %s ", dr.server, fqdn));
+                        }
+                        dr.server = fqdn;
+                    }
+                }
             }
         }
 
         if ( dr == null && path != null ) {
-            log.trace("No match for domain based root, checking standalone");
+            log.debug("No match for domain based root, checking standalone " + domain);
             /*
              * We did not match a domain based root. Now try to match the
              * longest path in the list of stand-alone referrals.
@@ -483,10 +538,10 @@ public class DfsImpl implements Dfs {
 
         s1 = path.indexOf('\\', 1);
         s2 = path.indexOf('\\', s1 + 1);
-        server = path.substring(1, s1);
+        server = path.substring(1, s1).toLowerCase(Locale.ROOT);
         share = path.substring(s1 + 1, s2);
 
-        key = path.substring(0, dr.pathConsumed).toLowerCase();
+        key = path.substring(0, dr.pathConsumed).toLowerCase(Locale.ROOT);
 
         /*
          * Samba has a tendency to return referral paths and pathConsumed values
@@ -501,6 +556,20 @@ public class DfsImpl implements Dfs {
         }
         if ( ki < key.length() ) {
             key = key.substring(0, ki);
+        }
+
+        if ( tc.getConfig().isDfsConvertToFQDN() ) {
+            if ( dr.server.indexOf('.') < 0 && dr.server.toUpperCase(Locale.ROOT).equals(dr.server) ) {
+                if ( server.startsWith(dr.server.toLowerCase(Locale.ROOT) + ".") ) {
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Adjusting server name " + dr.server + " to " + server);
+                    }
+                    dr.server = server;
+                }
+                else {
+                    log.warn("Have unmappable netbios name " + dr.server);
+                }
+            }
         }
 
         if ( log.isDebugEnabled() ) {

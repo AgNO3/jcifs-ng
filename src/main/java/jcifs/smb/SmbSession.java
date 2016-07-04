@@ -441,6 +441,7 @@ public final class SmbSession {
                      * "Invalid parameter".
                      */
                     try {
+                        log.warn("SE", se);
                         this.getTransport().disconnect(true);
                     }
                     catch ( IOException ioe ) {

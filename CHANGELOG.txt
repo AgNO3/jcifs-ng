@@ -5,6 +5,11 @@ jcifs-ng 1.5.1
 - Dont wait for response timeout when the transport connection is closed. 
 - Fallback to secondary port on any IOException during negotiation.
 - Fix NTLMSSP anonymous auth, by default use Extended Security for everything.
+- Fix SPNEGO NTLM fallback, add option to disable (jcifs.smb.allowNTLMFallback)
+- Yet anther signing sequence fix.
+- Work-around DFS+kerberos problems, add option to heuristically convert NetBIOS names to FQDN (set jcifs.smb.client.dfs.convertToFQDN=true to enable)  
+- Properly fix domain referrals. Cache DC referrals.
+- Some more reliablility with random disconnects.
 - Security hardening:
  - enforce SMB signing by default for IPC connections, relates to CVE-2016-2115 (jcifs.smb.client.ipcSigningEnforced=false to disable)
  - Allow enforcement of Extended Security (SPNEGO) (jcifs.smb.client.forceExtendedSecurity=true to enable)

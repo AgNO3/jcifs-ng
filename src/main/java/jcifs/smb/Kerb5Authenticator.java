@@ -46,6 +46,8 @@ import jcifs.spnego.NegTokenInit;
  * 
  * Be advised that short/NetBIOS name usage is not supported with this authenticator. Always specify full FQDNs.
  * This can be a problem if using DFS in it's default configuration as they still return referrals in short form.
+ * See <a href="https://support.microsoft.com/en-us/kb/244380">KB-244380</a> for compatible server configuration.
+ * See {@link jcifs.Configuration#isDfsConvertToFQDN()} for a workaround.
  */
 public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 

@@ -23,6 +23,7 @@ import jcifs.smb.NtlmAuthenticator;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbCredentials;
+import jcifs.smb.SmbRenewableCredentials;
 
 
 /**
@@ -66,6 +67,14 @@ public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements 
      */
     @Override
     public boolean renewCredentials ( String locationHint, Throwable error ) {
+        SmbCredentials cred = getCredentials();
+        if ( cred instanceof SmbRenewableCredentials ) {
+            SmbRenewableCredentials renewable = (SmbRenewableCredentials) cred;
+            SmbCredentials renewed = renewable.renew();
+            if ( renewed != null ) {
+                this.creds = renewed;
+            }
+        }
         NtlmAuthenticator auth = NtlmAuthenticator.getDefault();
         if ( auth != null ) {
             NtlmPasswordAuthentication newAuth = NtlmAuthenticator

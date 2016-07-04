@@ -69,6 +69,8 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
 
         this.sessionLimit = Config.getInt(p, "jcifs.smb.client.ssnLimit", SmbConstants.DEFAULT_SSN_LIMIT);
 
+        this.maxRequestRetries = Config.getInt(p, "jcifs.smb.client.maxRequestRetries", 2);
+
         this.smbTcpNoDelay = Config.getBoolean(p, "jcifs.smb.client.tcpNoDelay", false);
         this.smbResponseTimeout = Config.getInt(p, "jcifs.smb.client.responseTimeout", SmbConstants.DEFAULT_RESPONSE_TIMEOUT);
         this.smbSocketTimeout = Config.getInt(p, "jcifs.smb.client.soTimeout", SmbConstants.DEFAULT_SO_TIMEOUT);
@@ -87,6 +89,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.dfsDisabled = Config.getBoolean(p, "jcifs.smb.client.dfs.disabled", false);
         this.dfsTTL = Config.getLong(p, "jcifs.smb.client.dfs.ttl", 300);
         this.dfsStrictView = Config.getBoolean(p, "jcifs.smb.client.dfs.strictView", false);
+        this.dfsConvertToFqdn = Config.getBoolean(p, "jcifs.smb.client.dfs.convertToFQDN", false);
 
         this.logonShare = p.getProperty("jcifs.smb.client.logonShare", null);
 

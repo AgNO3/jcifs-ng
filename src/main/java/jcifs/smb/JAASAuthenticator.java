@@ -45,11 +45,12 @@ import jcifs.CIFSContext;
  * 
  * Be advised that short/NetBIOS name usage is not supported with this authenticator. Always specify full FQDNs/Realm.
  * This can be a problem if using DFS in it's default configuration as that still returns referrals in short form.
- * See {@href https://support.microsoft.com/en-us/kb/244380}.
+ * See <a href="https://support.microsoft.com/en-us/kb/244380">KB-244380</a> for compatible server configuration.
+ * See {@link jcifs.Configuration#isDfsConvertToFQDN()} for a workaround.
  * 
  * @author mbechler
  */
-public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHandler {
+public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHandler, SmbRenewableCredentials {
 
     private static final Logger log = Logger.getLogger(JAASAuthenticator.class);
 
@@ -215,7 +216,10 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
 
             Subject s = lc.getSubject();
             if ( log.isDebugEnabled() ) {
-                log.debug("Got subject " + s);
+                log.debug("Got subject: " + s.getPrincipals());
+            }
+            if ( log.isTraceEnabled() ) {
+                log.trace("Got subject " + s);
             }
 
             this.cachedSubject = s;
@@ -226,6 +230,20 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
             this.cachedSubject = new Subject();
             return null;
         }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbRenewableCredentials#renew()
+     */
+    @Override
+    public SmbCredentials renew () {
+        log.debug("Renewing credentials");
+        this.cachedSubject = null;
+        getSubject();
+        return this;
     }
 
 

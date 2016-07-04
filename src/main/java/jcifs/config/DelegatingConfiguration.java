@@ -92,6 +92,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isDfsConvertToFQDN()
+     */
+    @Override
+    public boolean isDfsConvertToFQDN () {
+        return this.delegate.isDfsConvertToFQDN();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#isForceUnicode()
      */

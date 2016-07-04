@@ -91,6 +91,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean dfsDisabled = false;
     protected long dfsTTL = 300;
     protected boolean dfsStrictView = false;
+    protected boolean dfsConvertToFqdn;
     protected String logonShare;
     protected String defaultDomain;
     protected String defaultUserName;
@@ -115,8 +116,8 @@ public class BaseConfiguration implements Configuration {
     protected int smbListCount = 200;
     protected long smbAttributeExpiration = 5000L;
     protected boolean ignoreCopyToException = true;
-    private int maxRequestRetries = 2;
-    private String[] supportedDialects = new String[] {
+    protected int maxRequestRetries = 2;
+    protected String[] supportedDialects = new String[] {
         "NT LM 0.12"
             // , "SMB 2.???",
     };
@@ -273,6 +274,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public long getDfsTtl () {
         return this.dfsTTL;
+    }
+
+
+    @Override
+    public boolean isDfsConvertToFQDN () {
+        return this.dfsConvertToFqdn;
     }
 
 

@@ -165,8 +165,8 @@ public class SmbTransport extends Transport implements SmbConstants {
         SmbSession ssn;
         long now;
 
-        if ( log.isTraceEnabled() ) {
-            log.trace("Currently " + this.sessions.size() + " session(s) active for " + this);
+        if ( log.isDebugEnabled() ) {
+            log.debug("Currently " + this.sessions.size() + " session(s) active for " + this);
         }
 
         ListIterator<SmbSession> iter = this.sessions.listIterator();
@@ -914,6 +914,11 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( log.isDebugEnabled() ) {
             log.debug("Resolving DFS path " + path);
         }
+
+        if ( path.length() >= 2 && path.charAt(0) == '\\' && path.charAt(1) == '\\' ) {
+            throw new SmbException("Path must not start with double slash: " + path);
+        }
+
         SmbSession sess = getSmbSession(ctx);
         SmbTree ipc = sess.getSmbTree("IPC$", null);
 
@@ -947,11 +952,27 @@ public class SmbTransport extends Transport implements SmbConstants {
                 dr.resolveHashes = ( (NtlmPasswordAuthentication) ctx.getCredentials() ).areHashesExternal();
             }
             dr.ttl = resp.referrals[ di ].ttl;
+            dr.rflags = resp.referrals[ di ].rflags;
             dr.expiration = expiration;
-            if ( path.equals("") ) {
-                dr.server = resp.referrals[ di ].rpath.substring(1).toLowerCase();
+            if ( ( dr.rflags & Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) == Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) {
+                if ( resp.referrals[ di ].expandedNames.length > 0 ) {
+                    dr.server = resp.referrals[ di ].expandedNames[ 0 ].substring(1).toLowerCase();
+                }
+                else {
+                    dr.server = resp.referrals[ di ].specialName.substring(1).toLowerCase();
+                }
+                if ( log.isDebugEnabled() ) {
+                    log.debug(
+                        "Server " + dr.server + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
+                                + resp.pathConsumed);
+                }
             }
             else {
+                if ( log.isDebugEnabled() ) {
+                    log.debug(
+                        "Node " + resp.referrals[ di ].node + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
+                                + resp.pathConsumed);
+                }
                 dfsPathSplit(resp.referrals[ di ].node, arr);
                 dr.server = arr[ 1 ];
                 dr.share = arr[ 2 ];
@@ -982,17 +1003,19 @@ public class SmbTransport extends Transport implements SmbConstants {
      * result[2] = "root5"
      * result[3] = "link2\foo\bar.txt"
      */
-    void dfsPathSplit ( String path, String[] result ) {
+    int dfsPathSplit ( String path, String[] result ) {
         int ri = 0, rlast = result.length - 1;
         int i = 0, b = 0, len = path.length();
+        int strip = 0;
 
         do {
             if ( ri == rlast ) {
                 result[ rlast ] = path.substring(b);
-                return;
+                return strip;
             }
             if ( i == len || path.charAt(i) == '\\' ) {
                 result[ ri++ ] = path.substring(b, i);
+                strip++;
                 b = i + 1;
             }
         }
@@ -1001,6 +1024,8 @@ public class SmbTransport extends Transport implements SmbConstants {
         while ( ri < result.length ) {
             result[ ri++ ] = "";
         }
+
+        return strip;
     }
 
 }
