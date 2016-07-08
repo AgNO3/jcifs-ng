@@ -18,16 +18,21 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertNotNull;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbSession;
+import jcifs.smb.SmbTransport;
 
 
 /**
@@ -78,11 +83,24 @@ public class SessionTest extends BaseCIFSTest {
 
     @Test
     public void transportReconnects () throws IOException {
-        // transport disconnects can happen pretty much any time
-        SmbFile f = getDefaultShareRoot();
-        f.connect();
-        f.getSession().getTransport().disconnect(true);
-        checkConnection(f);
+        try {
+            // transport disconnects can happen pretty much any time
+            SmbFile f = getDefaultShareRoot();
+            assertNotNull(f);
+            f.connect();
+            assertNotNull(f);
+            SmbSession session = f.getSession();
+            assertNotNull(session);
+            SmbTransport transport = session.getTransport();
+            assertNotNull(transport);
+            transport.disconnect(true);
+            assertNotNull(f);
+            checkConnection(f);
+        }
+        catch ( Exception e ) {
+            Logger.getLogger(SessionTest.class).error("Exception", e);
+            throw e;
+        }
     }
 
 }

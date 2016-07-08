@@ -9,7 +9,7 @@ jcifs-ng 1.5.1
 - Yet anther signing sequence fix.
 - Work-around DFS+kerberos problems, add option to heuristically convert NetBIOS names to FQDN (set jcifs.smb.client.dfs.convertToFQDN=true to enable)  
 - Properly fix domain referrals. Cache DC referrals.
-- Some more reliablility with random disconnects.
+- Some more reliability with random disconnects.
 - Security hardening:
  - enforce SMB signing by default for IPC connections, relates to CVE-2016-2115 (jcifs.smb.client.ipcSigningEnforced=false to disable)
  - Allow enforcement of Extended Security (SPNEGO) (jcifs.smb.client.forceExtendedSecurity=true to enable)

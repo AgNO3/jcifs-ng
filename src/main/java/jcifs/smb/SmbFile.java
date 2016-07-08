@@ -741,7 +741,11 @@ public class SmbFile extends URLConnection implements SmbConstants {
      * @return session that this file has been loaded through
      */
     public SmbSession getSession () {
-        return this.tree.session;
+        SmbTree t = this.tree;
+        if ( t != null ) {
+            return t.session;
+        }
+        return null;
     }
 
 
@@ -946,10 +950,14 @@ public class SmbFile extends URLConnection implements SmbConstants {
 
 
     synchronized void disconnect ( boolean inError ) {
-        if ( isConnected() ) {
-            this.tree.treeDisconnect(inError);
-            this.tree.session.logoff(inError);
-            this.tree = null;
+        SmbTransport transport = this.getSession().transport();
+        synchronized ( transport ) {
+            SmbTree t = this.tree;
+            if ( t != null ) {
+                t.treeDisconnect(inError);
+                t.session.logoff(inError);
+                this.tree = null;
+            }
         }
     }
 
@@ -1806,7 +1814,6 @@ public class SmbFile extends URLConnection implements SmbConstants {
         }
 
         this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
-
         return this.isExists;
     }
 

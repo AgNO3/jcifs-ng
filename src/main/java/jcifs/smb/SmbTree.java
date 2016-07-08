@@ -53,7 +53,7 @@ class SmbTree {
     SmbTree ( SmbSession session, String share, String service ) {
         this.session = session;
         this.share = share.toUpperCase();
-        if ( service != null && service.startsWith("??") == false ) {
+        if ( service != null && !service.startsWith("??") ) {
             this.service = service;
         }
         this.service0 = this.service;
@@ -111,7 +111,7 @@ class SmbTree {
             if ( request == null || ( response != null && response.received ) ) {
                 return;
             }
-            if ( !this.service.equals("A:") ) {
+            if ( !"A:".equals(this.service) ) {
                 switch ( request.command ) {
                 case ServerMessageBlock.SMB_COM_OPEN_ANDX:
                 case ServerMessageBlock.SMB_COM_NT_CREATE_ANDX:
@@ -133,7 +133,7 @@ class SmbTree {
                     case SmbComTransaction.TRANS2_GET_DFS_REFERRAL:
                         break;
                     default:
-                        throw new SmbException("Invalid operation for " + this.service + " service");
+                        throw new SmbException("Invalid operation for " + this.service + " service: " + request);
                     }
                     break;
                 default:
@@ -257,7 +257,8 @@ class SmbTree {
 
 
     void treeDisconnect ( boolean inError ) {
-        synchronized ( this.session.transport() ) {
+        SmbTransport transport = this.session.transport();
+        synchronized ( transport ) {
 
             if ( this.connectionState != 2 ) // not-connected
                 return;
@@ -276,7 +277,7 @@ class SmbTree {
 
             this.connectionState = 0;
 
-            this.session.getTransport().notifyAll();
+            transport.notifyAll();
         }
     }
 
