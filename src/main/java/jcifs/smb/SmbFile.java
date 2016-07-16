@@ -534,7 +534,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
      */
     @Deprecated
     public SmbFile ( String url ) throws MalformedURLException {
-        this(url, SingletonContext.getInstance());
+        this(new URL(null, url, SingletonContext.getInstance().getUrlHandler()));
     }
 
 
