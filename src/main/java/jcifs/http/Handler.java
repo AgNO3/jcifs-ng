@@ -40,7 +40,10 @@ import jcifs.CIFSContext;
  * capabilities to the default HTTP handler. This acts as a wrapper,
  * handling authentication and passing control to the underlying
  * stream handler.
+ * 
+ * @deprecated {@link NtlmHttpURLConnection} is broken by design.
  */
+@Deprecated
 public class Handler extends URLStreamHandler {
 
     private static final Logger log = Logger.getLogger(Handler.class);

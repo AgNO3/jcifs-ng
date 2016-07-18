@@ -55,8 +55,10 @@ import jcifs.smb.SmbAuthException;
  * <p>
  * Read <a href="../../../ntlmhttpauth.html">jCIFS NTLM HTTP Authentication and the Network Explorer Servlet</a> related
  * information.
+ * 
+ * @deprecated NTLMv1 only
  */
-
+@Deprecated
 public abstract class NtlmServlet extends HttpServlet {
 
     /**

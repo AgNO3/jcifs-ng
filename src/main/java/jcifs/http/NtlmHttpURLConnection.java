@@ -40,6 +40,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
+
 import org.apache.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64;
 
@@ -50,6 +54,7 @@ import jcifs.ntlmssp.NtlmMessage;
 import jcifs.ntlmssp.Type1Message;
 import jcifs.ntlmssp.Type2Message;
 import jcifs.ntlmssp.Type3Message;
+import jcifs.smb.NtlmPasswordAuthentication;
 
 
 /**
@@ -57,7 +62,15 @@ import jcifs.ntlmssp.Type3Message;
  * services.
  *
  * Please read <a href="../../../httpclient.html">Using jCIFS NTLM Authentication for HTTP Connections</a>.
+ * 
+ * Warning: Do not use this if there is a chance that you might have multiple connections (even plain
+ * HttpURLConnections, for the complete JRE) to the same host with different or mixed anonymous/authenticated
+ * credentials. Authenticated connections can/will be reused.
+ * 
+ * @deprecated This is broken by design, even a possible vulnerability. Deprecation is conditional on whether future JDK
+ *             versions will allow to do this safely.
  */
+@Deprecated
 public class NtlmHttpURLConnection extends HttpURLConnection {
 
     private static final Logger log = Logger.getLogger(NtlmHttpURLConnection.class);
@@ -92,6 +105,41 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
         this.connection = connection;
         this.transportContext = tc;
         this.requestProperties = new HashMap<>();
+        copySettings();
+    }
+
+
+    /**
+     * 
+     */
+    private final void copySettings () {
+        try {
+            this.setRequestMethod(this.connection.getRequestMethod());
+        }
+        catch ( ProtocolException e ) {
+            throw new RuntimeCIFSException("Failed to set request method", e);
+        }
+        this.headerFields = null;
+        for ( Entry<String, List<String>> property : this.connection.getRequestProperties().entrySet() ) {
+            String key = property.getKey();
+            StringBuffer value = new StringBuffer();
+            Iterator<String> values = property.getValue().iterator();
+            while ( values.hasNext() ) {
+                value.append(values.next());
+                if ( values.hasNext() )
+                    value.append(", ");
+            }
+            this.setRequestProperty(key, value.toString());
+        }
+
+        this.setAllowUserInteraction(this.connection.getAllowUserInteraction());
+        this.setDoInput(this.connection.getDoInput());
+        this.setDoOutput(this.connection.getDoOutput());
+        this.setIfModifiedSince(this.connection.getIfModifiedSince());
+        this.setUseCaches(this.connection.getUseCaches());
+        this.setReadTimeout(this.connection.getReadTimeout());
+        this.setConnectTimeout(this.connection.getConnectTimeout());
+        this.setInstanceFollowRedirects(this.connection.getInstanceFollowRedirects());
     }
 
 
@@ -355,6 +403,30 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
 
 
     @Override
+    public int getConnectTimeout () {
+        return this.connection.getConnectTimeout();
+    }
+
+
+    @Override
+    public void setConnectTimeout ( int timeout ) {
+        this.connection.setConnectTimeout(timeout);
+    }
+
+
+    @Override
+    public int getReadTimeout () {
+        return this.connection.getReadTimeout();
+    }
+
+
+    @Override
+    public void setReadTimeout ( int timeout ) {
+        this.connection.setReadTimeout(timeout);
+    }
+
+
+    @Override
     public void setRequestProperty ( String key, String value ) {
         if ( key == null )
             throw new NullPointerException();
@@ -503,21 +575,21 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
             if ( response != HTTP_UNAUTHORIZED && response != HTTP_PROXY_AUTH ) {
                 return;
             }
-            Type1Message type1 = (Type1Message) attemptNegotiation(response);
+            NtlmMessage type1 = attemptNegotiation(response);
             if ( type1 == null )
                 return; // no NTLM
             int attempt = 0;
             while ( attempt < MAX_REDIRECTS ) {
-                this.connection.setRequestProperty(this.authProperty, this.authMethod + ' ' + Base64.encode(type1.toByteArray()));
+                this.connection.setRequestProperty(this.authProperty, this.authMethod + ' ' + Base64.toBase64String(type1.toByteArray()));
                 this.connection.connect(); // send type 1
                 response = parseResponseCode();
                 if ( response != HTTP_UNAUTHORIZED && response != HTTP_PROXY_AUTH ) {
                     return;
                 }
-                Type3Message type3 = (Type3Message) attemptNegotiation(response);
+                NtlmMessage type3 = attemptNegotiation(response);
                 if ( type3 == null )
                     return;
-                this.connection.setRequestProperty(this.authProperty, this.authMethod + ' ' + Base64.encode(type3.toByteArray()));
+                this.connection.setRequestProperty(this.authProperty, this.authMethod + ' ' + Base64.toBase64String(type3.toByteArray()));
                 this.connection.connect(); // send type 3
                 if ( this.cachedOutput != null && this.doOutput ) {
                     @SuppressWarnings ( "resource" )
@@ -545,117 +617,138 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
     }
 
 
-    @SuppressWarnings ( "resource" )
     private NtlmMessage attemptNegotiation ( int response ) throws IOException, GeneralSecurityException {
         this.authProperty = null;
         this.authMethod = null;
-        InputStream errorStream = this.connection.getErrorStream();
-        if ( errorStream != null && errorStream.available() != 0 ) {
-            byte[] buf = new byte[1024];
-            while ( ( errorStream.read(buf, 0, 1024) ) != -1 );
-        }
-        String authHeader;
-        if ( response == HTTP_UNAUTHORIZED ) {
-            authHeader = "WWW-Authenticate";
-            this.authProperty = "Authorization";
-        }
-        else {
-            authHeader = "Proxy-Authenticate";
-            this.authProperty = "Proxy-Authorization";
-        }
-        String authorization = null;
-        List<String> methods = getHeaderFields0().get(authHeader);
-        if ( methods == null )
-            return null;
-        Iterator<String> iterator = methods.iterator();
-        while ( iterator.hasNext() ) {
-            String currentAuthMethod = iterator.next();
-            if ( currentAuthMethod.startsWith("NTLM") ) {
-                if ( currentAuthMethod.length() == 4 ) {
-                    this.authMethod = "NTLM";
-                    break;
-                }
-                if ( currentAuthMethod.indexOf(' ') != 4 )
-                    continue;
-                this.authMethod = "NTLM";
-                authorization = currentAuthMethod.substring(5).trim();
-                break;
+        try ( InputStream errorStream = this.connection.getErrorStream() ) {
+            if ( errorStream != null && errorStream.available() != 0 ) {
+                byte[] buf = new byte[1024];
+                while ( ( errorStream.read(buf, 0, 1024) ) != -1 );
             }
-            else if ( currentAuthMethod.startsWith("Negotiate") ) {
-                if ( currentAuthMethod.length() == 9 ) {
-                    this.authMethod = "Negotiate";
-                    break;
-                }
-                if ( currentAuthMethod.indexOf(' ') != 9 )
-                    continue;
-                this.authMethod = "Negotiate";
-                authorization = currentAuthMethod.substring(10).trim();
-                break;
+            String authHeader;
+            if ( response == HTTP_UNAUTHORIZED ) {
+                authHeader = "WWW-Authenticate";
+                this.authProperty = "Authorization";
             }
-        }
-        if ( this.authMethod == null )
-            return null;
-        NtlmMessage message = ( authorization != null ) ? new Type2Message(Base64.decode(authorization)) : null;
-        reconnect();
-        if ( message == null ) {
-            message = new Type1Message(this.transportContext);
-            if ( this.transportContext.getConfig().getLanManCompatibility() > 2 ) {
-                message.setFlag(NtlmFlags.NTLMSSP_REQUEST_TARGET, true);
+            else {
+                authHeader = "Proxy-Authenticate";
+                this.authProperty = "Proxy-Authorization";
             }
-        }
-        else {
-            String domain = this.transportContext.getConfig().getDefaultDomain();
-            String user = this.transportContext.getConfig().getDefaultUsername();
-            String password = this.transportContext.getConfig().getDefaultPassword();
-            String userInfo = this.url.getUserInfo();
-            if ( userInfo != null ) {
-                userInfo = URLDecoder.decode(userInfo, "UTF-8");
-                int index = userInfo.indexOf(':');
-                user = ( index != -1 ) ? userInfo.substring(0, index) : userInfo;
-                if ( index != -1 )
-                    password = userInfo.substring(index + 1);
-                index = user.indexOf('\\');
-                if ( index == -1 )
-                    index = user.indexOf('/');
-                domain = ( index != -1 ) ? user.substring(0, index) : domain;
-                user = ( index != -1 ) ? user.substring(index + 1) : user;
-            }
-            if ( user == null ) {
-                if ( !this.allowUserInteraction )
-                    return null;
-                try {
-                    URL u = getURL();
-                    String protocol = u.getProtocol();
-                    int port = u.getPort();
-                    if ( port == -1 ) {
-                        port = "https".equalsIgnoreCase(protocol) ? 443 : 80;
+            String authorization = null;
+            List<String> methods = getHeaderFields0().get(authHeader);
+            if ( methods == null )
+                return null;
+            Iterator<String> iterator = methods.iterator();
+            while ( iterator.hasNext() ) {
+                String currentAuthMethod = iterator.next();
+                if ( currentAuthMethod.startsWith("NTLM") ) {
+                    if ( currentAuthMethod.length() == 4 ) {
+                        this.authMethod = "NTLM";
+                        break;
                     }
-                    PasswordAuthentication auth = Authenticator.requestPasswordAuthentication(null, port, protocol, "", this.authMethod);
-                    if ( auth == null )
-                        return null;
-                    user = auth.getUserName();
-                    password = new String(auth.getPassword());
+                    if ( currentAuthMethod.indexOf(' ') != 4 )
+                        continue;
+                    this.authMethod = "NTLM";
+                    authorization = currentAuthMethod.substring(5).trim();
+                    break;
                 }
-                catch ( Exception ex ) {
-                    log.debug("Interactive authentication failed", ex);
+                else if ( currentAuthMethod.startsWith("Negotiate") ) {
+                    if ( currentAuthMethod.length() == 9 ) {
+                        this.authMethod = "Negotiate";
+                        break;
+                    }
+                    if ( currentAuthMethod.indexOf(' ') != 9 )
+                        continue;
+                    this.authMethod = "Negotiate";
+                    authorization = currentAuthMethod.substring(10).trim();
+                    break;
                 }
             }
-            Type2Message type2 = (Type2Message) message;
-            message = new Type3Message(
-                this.transportContext,
-                type2,
-                password,
-                domain,
-                user,
-                this.transportContext.getNameServiceClient().getLocalHost().getHostName(),
-                0);
+            if ( this.authMethod == null )
+                return null;
+            NtlmMessage message = ( authorization != null ) ? new Type2Message(Base64.decode(authorization)) : null;
+            reconnect();
+            if ( message == null ) {
+                message = new Type1Message(this.transportContext);
+                if ( this.transportContext.getConfig().getLanManCompatibility() > 2 ) {
+                    message.setFlag(NtlmFlags.NTLMSSP_REQUEST_TARGET, true);
+                }
+            }
+            else if ( this.transportContext.getCredentials() instanceof NtlmPasswordAuthentication ) {
+                NtlmPasswordAuthentication npa = (NtlmPasswordAuthentication) this.transportContext.getCredentials();
+                String domain = npa.getUserDomain();
+                String user = !npa.isAnonymous() ? npa.getUsername() : null;
+                String password = npa.getPassword();
+                String userInfo = this.url.getUserInfo();
+                if ( userInfo != null ) {
+                    userInfo = URLDecoder.decode(userInfo, "UTF-8");
+                    int index = userInfo.indexOf(':');
+                    user = ( index != -1 ) ? userInfo.substring(0, index) : userInfo;
+                    if ( index != -1 )
+                        password = userInfo.substring(index + 1);
+                    index = user.indexOf('\\');
+                    if ( index == -1 )
+                        index = user.indexOf('/');
+                    domain = ( index != -1 ) ? user.substring(0, index) : domain;
+                    user = ( index != -1 ) ? user.substring(index + 1) : user;
+                }
+                if ( user == null ) {
+                    if ( !this.allowUserInteraction )
+                        return null;
+                    try {
+                        URL u = getURL();
+                        String protocol = u.getProtocol();
+                        int port = u.getPort();
+                        if ( port == -1 ) {
+                            port = "https".equalsIgnoreCase(protocol) ? 443 : 80;
+                        }
+                        PasswordAuthentication auth = Authenticator.requestPasswordAuthentication(null, port, protocol, "", this.authMethod);
+                        if ( auth == null )
+                            return null;
+                        user = auth.getUserName();
+                        password = new String(auth.getPassword());
+                    }
+                    catch ( Exception ex ) {
+                        log.debug("Interactive authentication failed", ex);
+                    }
+                }
+                Type2Message type2 = (Type2Message) message;
+                message = new Type3Message(
+                    this.transportContext,
+                    type2,
+                    password,
+                    domain,
+                    user,
+                    this.transportContext.getNameServiceClient().getLocalHost().getHostName(),
+                    0);
+            }
+            return message;
         }
-        return message;
     }
 
 
     private void reconnect () throws IOException {
+        int readTimeout = getReadTimeout();
+        int connectTimeout = getConnectTimeout();
+
+        HostnameVerifier hv = null;
+        SSLSocketFactory ssf = null;
+        if ( this.connection instanceof HttpsURLConnection ) {
+            hv = ( (HttpsURLConnection) this.connection ).getHostnameVerifier();
+            ssf = ( (HttpsURLConnection) this.connection ).getSSLSocketFactory();
+        }
+
         this.connection = (HttpURLConnection) this.connection.getURL().openConnection();
+
+        if ( this.connection instanceof HttpsURLConnection ) {
+            if ( hv != null ) {
+                ( (HttpsURLConnection) this.connection ).setHostnameVerifier(hv);
+            }
+            if ( ssf != null ) {
+                ( (HttpsURLConnection) this.connection ).setSSLSocketFactory(ssf);
+            }
+        }
+
         this.connection.setRequestMethod(this.method);
         this.headerFields = null;
         for ( Entry<String, List<String>> property : this.requestProperties.entrySet() ) {
@@ -674,7 +767,10 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
         this.connection.setDoInput(this.doInput);
         this.connection.setDoOutput(this.doOutput);
         this.connection.setIfModifiedSince(this.ifModifiedSince);
+        this.connection.setInstanceFollowRedirects(this.instanceFollowRedirects);
         this.connection.setUseCaches(this.useCaches);
+        this.connection.setReadTimeout(readTimeout);
+        this.connection.setConnectTimeout(connectTimeout);
     }
 
     private static class CacheStream extends OutputStream {

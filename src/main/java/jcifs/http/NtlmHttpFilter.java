@@ -65,8 +65,10 @@ import jcifs.smb.SmbTransport;
  * <p>
  * Read <a href="../../../ntlmhttpauth.html">jCIFS NTLM HTTP Authentication and the Network Explorer Servlet</a> for
  * complete details.
+ * 
+ * @deprecated NTLMv1 only
  */
-
+@Deprecated
 public class NtlmHttpFilter implements Filter {
 
     private static final Logger log = Logger.getLogger(NtlmHttpFilter.class);

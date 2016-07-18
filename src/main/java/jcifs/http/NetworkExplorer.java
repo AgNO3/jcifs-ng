@@ -63,8 +63,10 @@ import jcifs.smb.SmbFileInputStream;
  * on an SMB network like one might with Network Neighborhood or Windows
  * Explorer. The users credentials with be negotiated using NTLM SSP if
  * the client is Microsoft Internet Explorer.
+ * 
+ * @deprecated Unsupported
  */
-
+@Deprecated
 public class NetworkExplorer extends HttpServlet {
 
     /**

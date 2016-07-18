@@ -21,6 +21,7 @@ package jcifs.https;
 
 
 import jcifs.CIFSContext;
+import jcifs.http.NtlmHttpURLConnection;
 
 
 /**
@@ -28,7 +29,10 @@ import jcifs.CIFSContext;
  * capabilities to the default HTTPS handler. This acts as a wrapper,
  * handling authentication and passing control to the underlying
  * stream handler.
+ * 
+ * @deprecated {@link NtlmHttpURLConnection} is broken by design.
  */
+@Deprecated
 public class Handler extends jcifs.http.Handler {
 
     /**

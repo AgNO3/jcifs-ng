@@ -1,4 +1,10 @@
-
+jcifs-ng 1.5.2
+- Fix SmbFile(String) constructor to allow passing credentials in URL.
+- Mark already deprecated NTLM filter/servlets @Deprecated
+- Fix some porting errors in NtlmHttpURLConnection, pass through a couple of
+  more HttpURLConnection settings.
+- Mark NtlmHttpURLConnection @Deprecated for it's inherent design and security 
+  issues. Add a warning to the documentation.
 
 jcifs-ng 1.5.1
 - Fix bundle manifest errors
