@@ -18,6 +18,7 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.junit.After;
@@ -42,6 +44,7 @@ import org.junit.runners.Parameterized;
 import jcifs.smb.NtStatus;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbFileOutputStream;
 
 
 /**
@@ -214,6 +217,78 @@ public class ConcurrencyTest extends BaseCIFSTest {
             }
         }
 
+    }
+
+
+    @Test
+    public void lockedWrites () throws InterruptedException, IOException {
+        int n = 45;
+        String fname = makeRandomName();
+        SmbFile f = new SmbFile(getDefaultShareRoot(), fname);
+        try {
+            f.createNewFile();
+            final AtomicInteger failCount = new AtomicInteger();
+            final AtomicInteger writeCount = new AtomicInteger();
+            List<MultiTestCase> runnables = new ArrayList<>();
+            for ( int i = 0; i < n; i++ ) {
+                runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE)));
+            }
+            runMultiTestCase(runnables, 20);
+
+            int readCnt = 0;
+            try ( InputStream is = f.getInputStream() ) {
+                while ( is.read() >= 0 ) {
+                    readCnt++;
+                }
+            }
+            log.debug("Failures " + failCount.get() + " wrote " + writeCount.get() + " read " + readCnt);
+            assertEquals(writeCount.get(), readCnt);
+            assertEquals(n, failCount.get() + writeCount.get());
+        }
+        finally {
+            f.delete();
+        }
+    }
+
+    private static class LockedWritesTest extends MultiTestCase {
+
+        private final AtomicInteger failCount;
+        private final SmbFile file;
+        private AtomicInteger writeCount;
+
+
+        /**
+         * @param failCount
+         * @param smbFile
+         */
+        public LockedWritesTest ( AtomicInteger failCount, AtomicInteger writeCount, SmbFile smbFile ) {
+            this.failCount = failCount;
+            this.writeCount = writeCount;
+            this.file = smbFile;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see java.lang.Runnable#run()
+         */
+        @Override
+        public void run () {
+            try ( SmbFileOutputStream out = new SmbFileOutputStream(this.file, true) ) {
+                out.write(0xAA);
+                this.writeCount.incrementAndGet();
+                this.completed = true;
+            }
+            catch ( IOException e ) {
+                if ( e instanceof SmbException && ( (SmbException) e ).getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
+                    this.failCount.incrementAndGet();
+                    this.completed = true;
+                    return;
+                }
+                log.error("Unexpected error", e);
+            }
+        }
     }
 
 

@@ -85,17 +85,6 @@ public class SmbFileOutputStream extends OutputStream {
         this.append = append;
         this.openFlags = openFlags;
         this.access = ( openFlags >>> 16 ) & 0xFFFF;
-        if ( append ) {
-            try {
-                this.fp = file.length();
-            }
-            catch ( SmbAuthException sae ) {
-                throw sae;
-            }
-            catch ( SmbException se ) {
-                this.fp = 0L;
-            }
-        }
         if ( file instanceof SmbNamedPipe ) {
             file.getUncPath0();
             if ( file.unc.startsWith("\\pipe\\") ) {
@@ -106,6 +95,19 @@ public class SmbFileOutputStream extends OutputStream {
             }
         }
         file.open(openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0);
+        if ( append ) {
+            // do this after file.open so we get the actual position (and also don't waste another call)
+            try {
+                this.fp = file.length();
+            }
+            catch ( SmbAuthException sae ) {
+                throw sae;
+            }
+            catch ( SmbException se ) {
+                log.warn("Error determining length in append mode", se);
+                this.fp = 0L;
+            }
+        }
         this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
         this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
 
@@ -197,13 +199,16 @@ public class SmbFileOutputStream extends OutputStream {
     }
 
 
-    void ensureOpen () throws IOException {
+    synchronized void ensureOpen () throws IOException {
         // ensure file is open
-        if ( this.file.isOpen() == false ) {
+        if ( !isOpen() ) {
             this.file.open(this.openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0);
             if ( this.append ) {
                 this.fp = this.file.length();
             }
+        }
+        else {
+            log.debug("File already open");
         }
     }
 
