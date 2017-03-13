@@ -88,12 +88,12 @@ public abstract class BaseCIFSTest {
     }
 
 
-    protected static CIFSContext withConfig ( CIFSContext ctx, final DelegatingConfiguration delegatingConfiguration ) {
+    protected static CIFSContext withConfig ( CIFSContext ctx, final DelegatingConfiguration cfg ) {
         return new CIFSContextWrapper(ctx) {
 
             @Override
             public Configuration getConfig () {
-                return delegatingConfiguration;
+                return cfg;
             }
         };
     }
@@ -200,11 +200,18 @@ public abstract class BaseCIFSTest {
             return testShare;
         }
 
+        testShare = getTestShare();
+        return "smb://" + getTestServer() + "/" + testShare + "/";
+    }
+
+
+    protected String getTestShare () {
+        String testShare;
         testShare = getProperties().get(TestProperties.TEST_SHARE_MAIN);
         if ( testShare == null ) {
             testShare = "test";
         }
-        return "smb://" + getTestServer() + "/" + testShare + "/";
+        return testShare;
     }
 
 

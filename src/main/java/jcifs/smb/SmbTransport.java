@@ -185,7 +185,7 @@ public class SmbTransport extends Transport implements SmbConstants {
 
         /* logoff old sessions */
         if ( tf.getConfig().getSessionTimeout() > 0 && this.sessionExpiration < ( now = System.currentTimeMillis() ) ) {
-            this.sessionExpiration = now + tf.getConfig().getSoTimeout();
+            this.sessionExpiration = now + tf.getConfig().getSessionTimeout();
             iter = this.sessions.listIterator();
             while ( iter.hasNext() ) {
                 ssn = iter.next();
@@ -334,8 +334,14 @@ public class SmbTransport extends Transport implements SmbConstants {
              * Note the Transport thread isn't running yet so we can
              * read from the socket here.
              */
-            if ( peekKey() == null ) /* try to read header */
-                throw new IOException("transport closed in negotiate");
+            try {
+                this.socket.setSoTimeout(this.transportContext.getConfig().getConnTimeout());
+                if ( peekKey() == null ) /* try to read header */
+                    throw new IOException("transport closed in negotiate");
+            }
+            finally {
+                this.socket.setSoTimeout(this.transportContext.getConfig().getSoTimeout());
+            }
             int size = Encdec.dec_uint16be(this.sbuf, 2) & 0xFFFF;
             if ( size < 33 || ( 4 + size ) > this.sbuf.length ) {
                 throw new IOException("Invalid payload size: " + size);

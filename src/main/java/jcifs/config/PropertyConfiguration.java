@@ -75,6 +75,8 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.smbResponseTimeout = Config.getInt(p, "jcifs.smb.client.responseTimeout", SmbConstants.DEFAULT_RESPONSE_TIMEOUT);
         this.smbSocketTimeout = Config.getInt(p, "jcifs.smb.client.soTimeout", SmbConstants.DEFAULT_SO_TIMEOUT);
         this.smbConnectionTimeout = Config.getInt(p, "jcifs.smb.client.connTimeout", SmbConstants.DEFAULT_CONN_TIMEOUT);
+        this.smbSessionTimeout = Config.getInt(p, "jcifs.smb.client.sessionTimeout", SmbConstants.DEFAULT_CONN_TIMEOUT);
+
         this.smbLocalAddress = Config.getLocalHost(p);
         this.smbLocalPort = Config.getInt(p, "jcifs.smb.client.lport", 0);
         this.maxMpxCount = Config.getInt(p, "jcifs.smb.client.maxMpxCount", SmbConstants.DEFAULT_MAX_MPX_COUNT);

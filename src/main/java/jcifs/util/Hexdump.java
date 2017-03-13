@@ -79,6 +79,15 @@ public class Hexdump {
 
 
     /**
+     * @param data
+     * @return hex string
+     */
+    public static String toHexString ( byte[] data ) {
+        return toHexString(data, 0, data.length);
+    }
+
+
+    /**
      * This is the same as {@link jcifs.util.Hexdump#toHexString(int val, int
      * size)} but provides a more practical form when trying to avoid {@link
      * java.lang.String} concatenation and {@link java.lang.StringBuffer}.
@@ -117,4 +126,5 @@ public class Hexdump {
             size--;
         }
     }
+
 }

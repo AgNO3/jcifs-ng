@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<name>jCIFS NG</name>
@@ -31,8 +32,8 @@
 		<connection>scm:git:https://github.com/AgNO3/jcifs-ng.git</connection>
 		<developerConnection>scm:git:https://github.com/AgNO3/jcifs-ng.git</developerConnection>
 		<url>git@github.com:AgNO3/jcifs-ng.git</url>
-	  <tag>HEAD</tag>
-  </scm>
+		<tag>HEAD</tag>
+	</scm>
 
 	<distributionManagement>
 		<snapshotRepository>
@@ -98,12 +99,12 @@
 
 				<configuration>
 					<instructions>
-						<Bundle-Version>1.5.0.${osgi-version-qualifier}</Bundle-Version>
+						<Bundle-Version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</Bundle-Version>
 						<Bundle-License>LGPL</Bundle-License>
 						<Bundle-Vendor>AgNO3 GmbH &amp; Co. KG</Bundle-Vendor>
 						<Bundle-SymbolicName>eu.agno3.jcifsng</Bundle-SymbolicName>
 						<Export-Package>
-							jcifs*;version="1.5.0",
+							jcifs*;version="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}",
 						</Export-Package>
 						<Private-Package />
 						<Import-Package>
@@ -169,8 +170,8 @@
 				<configuration>
 					<ignored>
 						<difference>
-							<!-- seems to be a clirr bug that it cannot handle 
-						     	     the different inherited return types -->
+							<!-- seems to be a clirr bug that it cannot handle the different inherited 
+								return types -->
 							<className>**</className>
 							<differenceType>7006</differenceType>
 							<method>* clone()</method>
@@ -228,6 +229,7 @@
 						<exclude>src/test/resources/**</exclude>
 						<exclude>**/*.idl</exclude>
 						<exclude>**/*.css</exclude>
+						<exclude>META-INF/**</exclude>
 						<exclude>src/main/java/jcifs/dcerpc/msrpc/netdfs.java</exclude>
 						<exclude>src/main/java/jcifs/dcerpc/msrpc/srvsvc.java</exclude>
 						<exclude>src/main/java/jcifs/dcerpc/msrpc/samr.java</exclude>
@@ -235,7 +237,8 @@
 						<exclude>src/main/java/jcifs/dcerpc/rpc.java</exclude>
 					</excludes>
 					<licenses>
-						<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+						<license
+							implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
 							<licenseFamilyCategory>LGPL</licenseFamilyCategory>
 							<licenseFamilyName>GNU Lesser General Public License</licenseFamilyName>
 							<notes />
@@ -282,6 +285,20 @@
 						<phase>verify</phase>
 						<goals>
 							<goal>sign</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>1.8</version>
+				<executions>
+					<execution>
+						<id>parse-version</id>
+						<goals>
+							<goal>parse-version</goal>
 						</goals>
 					</execution>
 				</executions>

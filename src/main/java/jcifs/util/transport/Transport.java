@@ -19,8 +19,9 @@ package jcifs.util.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
+import java.net.SocketTimeoutException;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
@@ -77,13 +78,13 @@ public abstract class Transport implements Runnable {
      * 4 - error
      * 5 - disconnecting
      */
-    protected int state = 0;
+    protected volatile int state = 0;
 
     protected String name = "Transport" + id++;
-    Thread thread;
-    TransportException te;
+    volatile Thread thread;
+    volatile TransportException te;
 
-    protected Map<Request, Response> response_map = new HashMap<>(4);
+    protected Map<Request, Response> response_map = new ConcurrentHashMap<>(4);
     private boolean dontTimeout;
 
 
@@ -298,22 +299,24 @@ public abstract class Transport implements Runnable {
 
             this.state = 1;
             this.te = null;
-            this.thread = new Thread(this, this.name);
-            this.thread.setDaemon(true);
+
+            Thread t = new Thread(this, this.name);
+            t.setDaemon(true);
+            this.thread = t;
 
             synchronized ( this.thread ) {
-                this.thread.start();
-                this.thread.wait(timeout); /* wait for doConnect */
+                t.start();
+                t.wait(timeout); /* wait for doConnect */
 
                 switch ( this.state ) {
                 case 1: /* doConnect never returned */
                     this.state = 0;
-                    this.thread = null;
-                    throw new TransportException("Connection timeout");
+                    cleanupThread();
+                    throw new ConnectionTimeoutException("Connection timeout");
                 case 2:
                     if ( this.te != null ) { /* doConnect throw Exception */
                         this.state = 4; /* error */
-                        this.thread = null;
+                        cleanupThread();
                         throw this.te;
                     }
                     this.state = 3; /* Success! */
@@ -323,7 +326,7 @@ public abstract class Transport implements Runnable {
         }
         catch ( InterruptedException ie ) {
             this.state = 0;
-            this.thread = null;
+            cleanupThread();
             throw new TransportException(ie);
         }
         finally {
@@ -333,8 +336,33 @@ public abstract class Transport implements Runnable {
             if ( this.state != 0 && this.state != 3 && this.state != 4 && this.state != 5 ) {
                 log.error("Invalid state: " + this.state);
                 this.state = 0;
-                this.thread = null;
+                cleanupThread();
             }
+        }
+    }
+
+
+    /**
+     * @throws TransportException
+     * 
+     */
+    private synchronized void cleanupThread () throws TransportException {
+        Thread t = this.thread;
+        if ( t != null && Thread.currentThread() != t ) {
+            this.thread = null;
+            try {
+                log.debug("Interrupting transport thread");
+                t.interrupt();
+                log.debug("Joining transport thread");
+                t.join();
+                log.debug("Joined transport thread");
+            }
+            catch ( InterruptedException e ) {
+                throw new TransportException("Failed to join transport thread", e);
+            }
+        }
+        else if ( t != null ) {
+            this.thread = null;
         }
     }
 
@@ -367,7 +395,8 @@ public abstract class Transport implements Runnable {
                 this.state = 0;
                 ioe = ioe0;
             }
-        case 4: /* in error - reset the transport */
+        case 4: /* failed to connect - reset the transport */
+            // thread is cleaned up by connect routing, joining it here causes a deadlock
             this.thread = null;
             this.state = 0;
             break;
@@ -409,7 +438,10 @@ public abstract class Transport implements Runnable {
                      * Thread no longer the one setup for this transport --
                      * doConnect returned too late, just ignore.
                      */
-                    if ( ex0 != null ) {
+                    if ( ex0 instanceof SocketTimeoutException ) {
+                        log.debug("Timeout connecting", ex0);
+                    }
+                    else if ( ex0 != null ) {
                         log.warn("Exception in transport thread", ex0); //$NON-NLS-1$
                     }
                     return;
