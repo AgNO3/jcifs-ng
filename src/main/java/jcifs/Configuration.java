@@ -165,7 +165,7 @@ public interface Configuration {
 
 
     /**
-     * 
+     * Property <tt>jcifs.smb.client.sessionTimeout</tt> (int, default 35000)
      * 
      * 
      * @return timeout for SMB sessions, in milliseconds
