@@ -36,8 +36,11 @@ import org.junit.Before;
 import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.config.DelegatingConfiguration;
+import jcifs.config.PropertyConfiguration;
+import jcifs.context.BaseContext;
 import jcifs.context.CIFSContextWrapper;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbException;
@@ -115,6 +118,13 @@ public abstract class BaseCIFSTest {
 
     protected CIFSContext getContext () {
         return this.context;
+    }
+
+
+    protected CIFSContext getNewContext () throws CIFSException {
+        Properties props = new Properties();
+        props.putAll(this.properties);
+        return new BaseContext(new PropertyConfiguration(props));
     }
 
 

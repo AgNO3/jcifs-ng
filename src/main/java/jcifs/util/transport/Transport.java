@@ -20,6 +20,7 @@ package jcifs.util.transport;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -85,15 +86,26 @@ public abstract class Transport implements Runnable {
     volatile TransportException te;
 
     protected Map<Request, Response> response_map = new ConcurrentHashMap<>(4);
-    private boolean dontTimeout;
+    private boolean noTimeout;
+    private boolean noIdleTimeout;
 
 
     /**
      * @param dontTimeout
-     *            the dontTimeout to set
+     *            disable all timeouts, including when there are inflight requests (needed for watch)
      */
     public void setDontTimeout ( boolean dontTimeout ) {
-        this.dontTimeout = dontTimeout;
+        this.noTimeout = dontTimeout;
+    }
+
+
+    /**
+     * 
+     * @param noIdleTimeout
+     *            diable idle timeouts in cases where the are no currently inflight requests
+     */
+    public void setNoIdleTimeout ( boolean noIdleTimeout ) {
+        this.noIdleTimeout = noIdleTimeout;
     }
 
 
@@ -134,14 +146,14 @@ public abstract class Transport implements Runnable {
         response.isReceived = false;
         response.isError = false;
         try {
-            this.response_map.put(request, response);
-            doSend(request);
             if ( timeout != null ) {
                 response.expiration = System.currentTimeMillis() + timeout;
             }
             else {
                 response.expiration = null;
             }
+            this.response_map.put(request, response);
+            doSend(request);
             while ( !response.isReceived ) {
                 if ( timeout != null ) {
                     wait(timeout);
@@ -153,13 +165,17 @@ public abstract class Transport implements Runnable {
                         throw new InterruptedException("Transport was disconnected while waiting for a response");
                     }
                     if ( timeout <= 0 ) {
-                        log.info("State is " + this.state);
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("State is " + this.state);
+                        }
                         throw new TransportException(this.name + " timedout waiting for response to " + request);
                     }
                 }
                 else {
                     wait();
-                    log.debug("Wait returned state is " + this.state);
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Wait returned state is " + this.state);
+                    }
                     if ( isDisconnected() ) {
                         throw new InterruptedException("Transport was disconnected while waiting for a response");
                     }
@@ -189,7 +205,70 @@ public abstract class Transport implements Runnable {
     private void loop () {
         while ( this.thread == Thread.currentThread() ) {
             try {
-                Request key = peekKey();
+                Request key;
+                int waitingFor = this.response_map.size();
+                try {
+                    key = peekKey();
+                }
+                catch ( SocketTimeoutException e ) {
+                    log.trace("Socket timeout during peekKey", e);
+                    if ( this.noTimeout ) {
+                        continue;
+                    }
+
+                    int remaining = this.response_map.size();
+                    if ( this.noIdleTimeout && waitingFor == 0 && remaining == 0 && this.state == 3 ) {
+                        // if we were neither waiting for a response nor
+                        // a new one has been added this is the classic idle condition
+                        continue;
+                    }
+
+                    boolean haveUnexpired = false;
+                    boolean haveRequest = false;
+                    long now = System.currentTimeMillis();
+
+                    // only disconnect if all responses are expired
+                    Collection<Response> inflight = this.response_map.values();
+                    for ( Response r : inflight ) {
+                        haveRequest = true;
+                        if ( r.expiration != null && r.expiration > now ) {
+                            if ( log.isTraceEnabled() ) {
+                                log.trace("Have non-expired in flight request " + r);
+                            }
+                            haveUnexpired = true;
+                            break;
+                        }
+                        else if ( r.expiration == null && log.isTraceEnabled() ) {
+                            log.debug("Have response without expiration " + r);
+                        }
+                        else if ( log.isTraceEnabled() ) {
+                            log.trace("Response already expired " + r);
+                        }
+                    }
+
+                    if ( haveUnexpired || ( this.noIdleTimeout && !haveRequest ) ) {
+                        if ( log.isTraceEnabled() ) {
+                            log.trace(
+                                String.format(
+                                    "Prevented idle timeout (haveUnexpired: %s, haveRequest: %s idleDisabled: %s)",
+                                    haveUnexpired,
+                                    haveRequest,
+                                    this.noIdleTimeout));
+                        }
+                        // notify threads that may have expired requests
+                        if ( haveRequest ) {
+                            synchronized ( this ) {
+                                notifyAll();
+                            }
+                        }
+                        continue;
+                    }
+
+                    if ( log.isDebugEnabled() ) {
+                        log.debug(String.format("Idle timeout on %s inflight %d", this.name, inflight.size()));
+                    }
+                    throw e;
+                }
                 if ( key == null ) {
                     synchronized ( this ) {
                         for ( Response response : this.response_map.values() ) {
@@ -213,14 +292,9 @@ public abstract class Transport implements Runnable {
                 }
             }
             catch ( Exception ex ) {
-
                 String msg = ex.getMessage();
-                boolean timeout = msg != null && msg.equals("Read timed out");
+                boolean timeout = ( ex instanceof SocketTimeoutException ) || msg != null && msg.equals("Read timed out");
                 boolean closed = msg != null && msg.equals("Socket closed");
-                /*
-                 * If just a timeout, try to disconnect gracefully
-                 */
-                boolean hard = timeout == false;
 
                 if ( closed ) {
                     log.trace("Remote closed connection");
@@ -228,16 +302,11 @@ public abstract class Transport implements Runnable {
                 else if ( !timeout ) {
                     log.debug("recv failed", ex);
                 }
-                else {
-                    log.trace("transport read time out", ex);
-                    if ( this.dontTimeout ) {
-                        continue;
-                    }
-                }
+
                 synchronized ( this ) {
                     try {
 
-                        disconnect(hard);
+                        disconnect(!timeout);
                     }
                     catch ( IOException ioe ) {
                         ex.addSuppressed(ioe);
@@ -250,6 +319,7 @@ public abstract class Transport implements Runnable {
                 }
             }
         }
+
     }
 
 
@@ -295,6 +365,10 @@ public abstract class Transport implements Runnable {
                 TransportException tex = new TransportException("Invalid state: " + this.state);
                 this.state = 0;
                 throw tex;
+            }
+
+            if ( log.isDebugEnabled() ) {
+                log.debug("Connecting " + this.name);
             }
 
             this.state = 1;

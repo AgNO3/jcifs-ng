@@ -604,4 +604,22 @@ public interface Configuration {
      */
     int getMaxRequestRetries ();
 
+
+    /**
+     * Property <tt>jcifs.smb.client.noIdleTimeout</tt> (bool, default false)
+     * 
+     * For complete coverage you also need to disable session timeouts by setting {@link #getSessionTimeout()} to 0.
+     * 
+     * Idle timeouts can cause nasty race-conditions and do break file locking. Future versions will try to fix this
+     * more generally by tracking resoure usage on connections/sessions and prevent the idle timeout while there are
+     * open resources.
+     * 
+     * If this setting is enabled, connection lifecycle management has to be taken care of by the user.
+     * If leaking connections is a concern you will have to manually clean up by calling
+     * {@link jcifs.CIFSContext#close()} and possibly using individual contexts for the individual connections.
+     * 
+     * @return whether idle timeouts are disabled
+     */
+    boolean isIdleTimeoutDisabled ();
+
 }

@@ -545,6 +545,10 @@ public final class SmbSession {
         SmbTransport trans = transport();
         synchronized ( trans ) {
 
+            if ( log.isDebugEnabled() ) {
+                log.debug("Logging off session");
+            }
+
             if ( this.connectionState != 2 ) // not-connected
                 return;
             this.connectionState = 3; // disconnecting

@@ -123,6 +123,18 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     }
 
 
+    /**
+     * 
+     * @param trans
+     * @return whether (non-exclusive) connection is in the pool
+     */
+    public boolean contains ( SmbTransport trans ) {
+        synchronized ( this.connections ) {
+            return this.connections.contains(trans);
+        }
+    }
+
+
     @Override
     public void removeTransport ( SmbTransport trans ) {
         synchronized ( this.connections ) {

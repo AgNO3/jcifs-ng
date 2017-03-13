@@ -235,6 +235,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isIdleTimeoutDisabled()
+     */
+    @Override
+    public boolean isIdleTimeoutDisabled () {
+        return this.delegate.isIdleTimeoutDisabled();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getLocalPort()
      */

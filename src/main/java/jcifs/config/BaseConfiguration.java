@@ -79,6 +79,7 @@ public class BaseConfiguration implements Configuration {
     protected int smbSocketTimeout = SmbConstants.DEFAULT_SO_TIMEOUT;
     protected int smbConnectionTimeout = SmbConstants.DEFAULT_CONN_TIMEOUT;
     protected int smbSessionTimeout = SmbConstants.DEFAULT_SO_TIMEOUT;
+    protected boolean idleTimeoutDisabled = false;
     protected InetAddress smbLocalAddress;
     protected int smbLocalPort = 0;
     protected int maxMpxCount = SmbConstants.DEFAULT_MAX_MPX_COUNT;
@@ -190,6 +191,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getSessionTimeout () {
         return this.smbSessionTimeout;
+    }
+
+
+    @Override
+    public boolean isIdleTimeoutDisabled () {
+        return this.idleTimeoutDisabled;
     }
 
 

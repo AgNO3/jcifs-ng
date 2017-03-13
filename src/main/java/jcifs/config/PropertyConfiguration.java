@@ -76,6 +76,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.smbSocketTimeout = Config.getInt(p, "jcifs.smb.client.soTimeout", SmbConstants.DEFAULT_SO_TIMEOUT);
         this.smbConnectionTimeout = Config.getInt(p, "jcifs.smb.client.connTimeout", SmbConstants.DEFAULT_CONN_TIMEOUT);
         this.smbSessionTimeout = Config.getInt(p, "jcifs.smb.client.sessionTimeout", SmbConstants.DEFAULT_CONN_TIMEOUT);
+        this.idleTimeoutDisabled = Config.getBoolean(p, "jcifs.smb.client.disableIdleTimeout", false);
 
         this.smbLocalAddress = Config.getLocalHost(p);
         this.smbLocalPort = Config.getInt(p, "jcifs.smb.client.lport", 0);

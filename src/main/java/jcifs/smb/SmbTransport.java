@@ -127,7 +127,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         this.snd_buf_size = tc.getConfig().getSendBufferSize();
         this.rcv_buf_size = tc.getConfig().getRecieveBufferSize();
         this.useUnicode = tc.getConfig().isUseUnicode();
-
+        setNoIdleTimeout(tc.getConfig().isIdleTimeoutDisabled());
     }
 
 
@@ -825,6 +825,13 @@ public class SmbTransport extends Transport implements SmbConstants {
                         response.received = false;
                         resp.isReceived = false;
                         try {
+                            long timeout = this.transportContext.getConfig().getResponseTimeout();
+                            if ( doTimeout ) {
+                                resp.expiration = System.currentTimeMillis() + timeout;
+                            }
+                            else {
+                                resp.expiration = null;
+                            }
                             this.response_map.put(req, resp);
 
                             /*
@@ -840,13 +847,6 @@ public class SmbTransport extends Transport implements SmbConstants {
                              * Receive multiple fragments
                              */
 
-                            long timeout = this.transportContext.getConfig().getResponseTimeout();
-                            if ( doTimeout ) {
-                                resp.expiration = System.currentTimeMillis() + timeout;
-                            }
-                            else {
-                                resp.expiration = null;
-                            }
                             while ( resp.hasMoreElements() ) {
                                 if ( doTimeout ) {
                                     wait(timeout);

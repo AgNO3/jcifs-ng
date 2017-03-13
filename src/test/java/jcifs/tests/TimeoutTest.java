@@ -18,6 +18,7 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -40,6 +41,9 @@ import jcifs.CIFSContext;
 import jcifs.config.DelegatingConfiguration;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbSession;
+import jcifs.smb.SmbTransport;
+import jcifs.smb.SmbTransportPoolImpl;
 import jcifs.util.transport.ConnectionTimeoutException;
 
 
@@ -63,6 +67,42 @@ public class TimeoutTest extends BaseCIFSTest {
             public int getSoTimeout () {
                 return 100;
             }
+
+
+            @Override
+            public boolean isIdleTimeoutDisabled () {
+                return true;
+            }
+        });
+
+    }
+
+
+    protected CIFSContext fastIdle ( CIFSContext ctx ) {
+        return withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public int getSoTimeout () {
+                return 1000;
+            }
+
+
+            @Override
+            public int getConnTimeout () {
+                return 1000;
+            }
+
+
+            @Override
+            public int getSessionTimeout () {
+                return 1000;
+            }
+
+
+            @Override
+            public boolean isIdleTimeoutDisabled () {
+                return false;
+            }
         });
 
     }
@@ -71,11 +111,6 @@ public class TimeoutTest extends BaseCIFSTest {
     protected CIFSContext lowConnectTimeout ( CIFSContext ctx ) {
         return withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
 
-            /**
-             * {@inheritDoc}
-             *
-             * @see jcifs.config.DelegatingConfiguration#getResponseTimeout()
-             */
             @Override
             public int getResponseTimeout () {
                 return 100;
@@ -92,25 +127,47 @@ public class TimeoutTest extends BaseCIFSTest {
 
     @Test
     public void testTimeoutOpenFile () throws IOException, InterruptedException {
-        SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), lowTimeout(withTestNTLMCredentials(getContext()))), makeRandomName());
+        // use separate context here as the settings stick to the transport
+        CIFSContext ctx = lowTimeout(withTestNTLMCredentials(getNewContext()));
+        SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), ctx), makeRandomName());
+        int soTimeout = ctx.getConfig().getSoTimeout();
         f.createNewFile();
         try {
             try ( OutputStream os = f.getOutputStream() ) {
                 os.write(new byte[] {
-                    1, 2, 3, 4
+                    1, 2, 3, 4, 5, 6, 7, 8
                 });
             }
 
             try ( InputStream is = f.getInputStream() ) {
-                is.read();
-                Thread.sleep(100);
-                is.read();
-                Thread.sleep(100);
-                is.read();
-                Thread.sleep(100);
-                is.read();
-                Thread.sleep(100);
+                for ( int i = 0; i < 8; i++ ) {
+                    is.read();
+                    Thread.sleep(soTimeout);
+                }
             }
+        }
+        finally {
+            f.delete();
+        }
+    }
+
+
+    @Test
+    public void testIdleTimeout () throws IOException, InterruptedException {
+        // use separate context here as the settings stick to the transport
+        CIFSContext ctx = fastIdle(withTestNTLMCredentials(getNewContext()));
+        SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), ctx), makeRandomName());
+        int soTimeout = ctx.getConfig().getSoTimeout();
+        f.createNewFile();
+
+        try {
+            Thread.sleep(2 * soTimeout);
+
+            // connection should be closed by now
+            SmbSession session = f.getSession();
+            SmbTransport trans = session.getTransport();
+            assertTrue("Transport is still connected", trans.isDisconnected());
+            assertFalse("Connection is still in the pool", ( (SmbTransportPoolImpl) ctx.getTransportPool() ).contains(trans));
         }
         finally {
             f.delete();
