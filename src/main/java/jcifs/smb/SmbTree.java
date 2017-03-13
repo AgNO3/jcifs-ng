@@ -21,7 +21,8 @@ package jcifs.smb;
 
 import java.io.IOException;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.SmbConstants;
 import jcifs.util.transport.TransportException;
@@ -29,7 +30,7 @@ import jcifs.util.transport.TransportException;
 
 class SmbTree {
 
-    private static final Logger log = Logger.getLogger(SmbTree.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbTree.class);
 
     private static int tree_conn_counter;
 

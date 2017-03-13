@@ -20,7 +20,8 @@ package jcifs.smb;
 import java.security.MessageDigest;
 import java.util.Date;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 import jcifs.SmbConstants;
@@ -33,7 +34,7 @@ import jcifs.util.Hexdump;
  */
 public class SigningDigest {
 
-    private static final Logger log = Logger.getLogger(SigningDigest.class);
+    private static final Logger log = LoggerFactory.getLogger(SigningDigest.class);
 
     private MessageDigest digest;
     private byte[] macSigningKey;

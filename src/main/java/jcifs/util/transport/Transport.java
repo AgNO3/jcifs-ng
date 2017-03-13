@@ -24,7 +24,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,7 +40,7 @@ import org.apache.log4j.Logger;
 public abstract class Transport implements Runnable {
 
     static int id = 0;
-    private static final Logger log = Logger.getLogger(Transport.class);
+    private static final Logger log = LoggerFactory.getLogger(Transport.class);
 
 
     /**

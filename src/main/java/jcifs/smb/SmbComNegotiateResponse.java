@@ -21,7 +21,8 @@ package jcifs.smb;
 
 import java.util.Date;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 import jcifs.SmbConstants;
@@ -31,7 +32,7 @@ import jcifs.util.Strings;
 
 class SmbComNegotiateResponse extends ServerMessageBlock {
 
-    private static final Logger log = Logger.getLogger(SmbComNegotiateResponse.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbComNegotiateResponse.class);
 
     int dialectIndex;
     SmbTransport.ServerData server;

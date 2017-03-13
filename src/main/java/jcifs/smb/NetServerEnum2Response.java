@@ -20,7 +20,8 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 import jcifs.util.Hexdump;
@@ -28,7 +29,7 @@ import jcifs.util.Hexdump;
 
 class NetServerEnum2Response extends SmbComTransactionResponse {
 
-    private static final Logger log = Logger.getLogger(NetServerEnum2Response.class);
+    private static final Logger log = LoggerFactory.getLogger(NetServerEnum2Response.class);
 
     class ServerInfo1 implements FileEntry {
 
@@ -161,7 +162,7 @@ class NetServerEnum2Response extends SmbComTransactionResponse {
             e.commentOrMasterBrowser = readString(buffer, off, 48, false);
 
             if ( log.isTraceEnabled() ) {
-                log.trace(e);
+                log.trace(e.toString());
             }
         }
         this.lastName = e == null ? null : e.name;

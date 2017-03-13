@@ -33,12 +33,13 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -51,6 +52,9 @@ import jcifs.smb.SmbFile;
 @RunWith ( Parameterized.class )
 @SuppressWarnings ( "javadoc" )
 public class NamingTest extends BaseCIFSTest {
+
+    private static final Logger log = LoggerFactory.getLogger(NamingTest.class);
+
 
     public NamingTest ( String name, Map<String, String> properties ) {
         super(name, properties);
@@ -150,10 +154,9 @@ public class NamingTest extends BaseCIFSTest {
             Arrays.sort(found);
             Arrays.sort(expect);
 
-            Logger logger = Logger.getLogger(NamingTest.class);
-            if ( logger.isDebugEnabled() ) {
-                logger.debug("Expect " + Arrays.toString(expect));
-                logger.debug("Found " + Arrays.toString(found));
+            if ( log.isDebugEnabled() ) {
+                log.debug("Expect " + Arrays.toString(expect));
+                log.debug("Found " + Arrays.toString(found));
             }
 
             assertArrayEquals(expect, found);

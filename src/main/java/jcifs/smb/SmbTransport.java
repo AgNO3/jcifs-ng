@@ -31,7 +31,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
@@ -54,7 +55,7 @@ import jcifs.util.transport.TransportException;
  */
 public class SmbTransport extends Transport implements SmbConstants {
 
-    private static Logger log = Logger.getLogger(SmbTransport.class);
+    private static Logger log = LoggerFactory.getLogger(SmbTransport.class);
 
     class ServerData {
 
@@ -324,7 +325,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             Encdec.enc_uint32be(n & 0xFFFF, this.sbuf, 0); /* 4 byte ssn msg header */
 
             if ( log.isTraceEnabled() ) {
-                log.trace(this.NEGOTIATE_REQUEST);
+                log.trace(this.NEGOTIATE_REQUEST.toString());
                 log.trace(Hexdump.toHexString(this.sbuf, 4, n));
             }
 
@@ -360,7 +361,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             resp.decode(this.sbuf, 4);
 
             if ( log.isTraceEnabled() ) {
-                log.trace(resp);
+                log.trace(resp.toString());
                 log.trace(Hexdump.toHexString(this.sbuf, 4, n));
             }
 
@@ -599,7 +600,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             Encdec.enc_uint32be(n & 0xFFFF, buffer, 0); /* 4 byte session message header */
             if ( log.isTraceEnabled() ) {
                 do {
-                    log.trace(smb);
+                    log.trace(smb.toString());
                 }
                 while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).andx ) != null );
                 log.trace(Hexdump.toHexString(buffer, 4, n));
@@ -691,7 +692,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             }
 
             if ( log.isTraceEnabled() ) {
-                log.trace(response);
+                log.trace(response.toString());
                 log.trace(Hexdump.toHexString(buffer, 4, size));
             }
         }

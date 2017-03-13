@@ -34,10 +34,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -56,7 +57,7 @@ import jcifs.context.BaseContext;
 } )
 public class AllTests {
 
-    private static final Logger log = Logger.getLogger(AllTests.class);
+    private static final Logger log = LoggerFactory.getLogger(AllTests.class);
 
     private static Map<String, TestMutation> MUTATIONS = new HashMap<>();
 

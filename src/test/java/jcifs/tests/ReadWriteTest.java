@@ -31,13 +31,14 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Random;
 
-import org.apache.log4j.Logger;
 import org.bouncycastle.util.Arrays;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -53,7 +54,7 @@ import jcifs.smb.SmbRandomAccessFile;
 @SuppressWarnings ( "javadoc" )
 public class ReadWriteTest extends BaseCIFSTest {
 
-    private static final Logger log = Logger.getLogger(ReadWriteTest.class);
+    private static final Logger log = LoggerFactory.getLogger(ReadWriteTest.class);
 
 
     public ReadWriteTest ( String name, Map<String, String> properties ) {
@@ -72,7 +73,7 @@ public class ReadWriteTest extends BaseCIFSTest {
 
 
     private Random getRandom () {
-        Logger.getLogger(ReadWriteTest.class).debug("Seed is " + this.seed);
+        log.debug("Seed is " + this.seed);
         return new Random(this.seed);
     }
 

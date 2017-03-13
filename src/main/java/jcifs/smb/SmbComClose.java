@@ -19,14 +19,15 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 
 
 class SmbComClose extends ServerMessageBlock {
 
-    private static final Logger log = Logger.getLogger(SmbComClose.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbComClose.class);
 
     private int fid;
     private long lastWriteTime;

@@ -24,7 +24,8 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.MalformedURLException;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.SmbConstants;
@@ -36,7 +37,7 @@ import jcifs.util.transport.TransportException;
  */
 public class SmbFileInputStream extends InputStream {
 
-    private static final Logger log = Logger.getLogger(SmbFileInputStream.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbFileInputStream.class);
 
     private long fp;
     private int readSize, readSizeFile, openFlags, access;

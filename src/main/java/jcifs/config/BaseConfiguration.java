@@ -29,7 +29,8 @@ import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.Configuration;
@@ -43,7 +44,7 @@ import jcifs.SmbConstants;
  */
 public class BaseConfiguration implements Configuration {
 
-    private static final Logger log = Logger.getLogger(PropertyConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(PropertyConfiguration.class);
     private static final Map<String, Integer> DEFAULT_BATCH_LIMITS = new HashMap<>();
 
 

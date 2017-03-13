@@ -30,7 +30,8 @@ import java.util.Objects;
 
 import javax.security.auth.Subject;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -44,7 +45,7 @@ import jcifs.netbios.UniAddress;
  */
 public final class SmbSession {
 
-    private static final Logger log = Logger.getLogger(SmbSession.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbSession.class);
 
     /*
      * 0 - not connected
@@ -407,7 +408,7 @@ public final class SmbSession {
                 final SSPContext curCtx = ctx;
 
                 if ( log.isTraceEnabled() ) {
-                    log.trace(ctx);
+                    log.trace(ctx.toString());
                 }
 
                 try {

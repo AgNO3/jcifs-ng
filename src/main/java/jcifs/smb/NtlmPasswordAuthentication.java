@@ -30,7 +30,8 @@ import java.util.Objects;
 
 import javax.security.auth.Subject;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
@@ -55,7 +56,7 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      */
     private static final long serialVersionUID = -2832037191318016836L;
 
-    private static final Logger log = Logger.getLogger(NtlmPasswordAuthentication.class);
+    private static final Logger log = LoggerFactory.getLogger(NtlmPasswordAuthentication.class);
 
     private String domain;
     private String username;

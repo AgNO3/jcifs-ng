@@ -19,9 +19,10 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.ntlmssp.NtlmFlags;
@@ -38,7 +39,7 @@ import jcifs.util.Hexdump;
  */
 public class NtlmContext implements SSPContext {
 
-    private static final Logger log = Logger.getLogger(NtlmContext.class);
+    private static final Logger log = LoggerFactory.getLogger(NtlmContext.class);
 
     private static Oid NTLMSSP_OID;
 
@@ -176,7 +177,7 @@ public class NtlmContext implements SSPContext {
             token = msg1.toByteArray();
 
             if ( log.isTraceEnabled() ) {
-                log.trace(msg1);
+                log.trace(msg1.toString());
                 log.trace(Hexdump.toHexString(token, 0, token.length));
             }
 
@@ -187,7 +188,7 @@ public class NtlmContext implements SSPContext {
                 Type2Message msg2 = new Type2Message(token);
 
                 if ( log.isTraceEnabled() ) {
-                    log.trace(msg2);
+                    log.trace(msg2.toString());
                     log.trace(Hexdump.toHexString(token, 0, token.length));
                 }
 
@@ -206,7 +207,7 @@ public class NtlmContext implements SSPContext {
                 token = msg3.toByteArray();
 
                 if ( log.isTraceEnabled() ) {
-                    log.trace(msg3);
+                    log.trace(msg3.toString());
                     log.trace(Hexdump.toHexString(token, 0, token.length));
                 }
                 if ( ( this.ntlmsspFlags & NtlmFlags.NTLMSSP_NEGOTIATE_SIGN ) != 0 )

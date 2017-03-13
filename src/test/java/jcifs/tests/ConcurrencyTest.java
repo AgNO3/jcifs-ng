@@ -34,12 +34,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.smb.NtStatus;
 import jcifs.smb.SmbException;
@@ -55,7 +56,7 @@ import jcifs.smb.SmbFileOutputStream;
 @SuppressWarnings ( "javadoc" )
 public class ConcurrencyTest extends BaseCIFSTest {
 
-    static final Logger log = Logger.getLogger(ConcurrencyTest.class);
+    static final Logger log = LoggerFactory.getLogger(ConcurrencyTest.class);
     private ExecutorService executor;
 
 

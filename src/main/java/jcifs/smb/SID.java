@@ -23,7 +23,8 @@ package jcifs.smb;
 import java.io.IOException;
 import java.util.StringTokenizer;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
@@ -53,7 +54,7 @@ import jcifs.util.Hexdump;
 
 public class SID extends rpc.sid_t {
 
-    private static final Logger log = Logger.getLogger(SID.class);
+    private static final Logger log = LoggerFactory.getLogger(SID.class);
 
     /**
      * 

@@ -19,14 +19,15 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 
 
 class NetShareEnumResponse extends SmbComTransactionResponse {
 
-    private static final Logger log = Logger.getLogger(NetShareEnumResponse.class);
+    private static final Logger log = LoggerFactory.getLogger(NetShareEnumResponse.class);
 
     private int converter, totalAvailableEntries;
 
@@ -98,7 +99,7 @@ class NetShareEnumResponse extends SmbComTransactionResponse {
             e.remark = readString(buffer, off, 128, false);
 
             if ( log.isTraceEnabled() ) {
-                log.trace(e);
+                log.trace(e.toString());
             }
         }
 

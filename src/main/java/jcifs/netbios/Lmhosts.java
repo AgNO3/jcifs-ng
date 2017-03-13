@@ -28,7 +28,8 @@ import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.smb.SmbFileInputStream;
@@ -40,7 +41,7 @@ import jcifs.smb.SmbFileInputStream;
  */
 public class Lmhosts {
 
-    private static final Logger log = Logger.getLogger(Lmhosts.class);
+    private static final Logger log = LoggerFactory.getLogger(Lmhosts.class);
 
     private final Map<Name, NbtAddress> table = new HashMap<>();
     private long lastModified = 1L;

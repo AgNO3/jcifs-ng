@@ -22,7 +22,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -38,7 +39,7 @@ import jcifs.config.PropertyConfiguration;
  */
 public class SingletonContext extends BaseContext implements CIFSContext {
 
-    private static final Logger log = Logger.getLogger(SingletonContext.class);
+    private static final Logger log = LoggerFactory.getLogger(SingletonContext.class);
     private static SingletonContext INSTANCE;
 
 
