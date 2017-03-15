@@ -148,7 +148,7 @@ public class NetworkExplorer extends HttpServlet {
         String url;
         int n;
         try ( SmbFileInputStream in = new SmbFileInputStream(file) ) {
-            url = file.getPath();
+            url = file.getFileLocator().getPath();
             resp.setContentType("text/plain");
             resp.setContentType(URLConnection.guessContentTypeFromName(url));
             resp.setHeader("Content-Length", file.length() + "");
@@ -342,7 +342,7 @@ public class NetworkExplorer extends HttpServlet {
         out.println("<a class=\"sort\" href=\"?fmt=detail&sort=type\">Type</a>");
         out.println("<a class=\"sort\" style=\"width: 180\" href=\"?fmt=detail&sort=date\">Modified</a><br clear='all'><p>");
 
-        path = dir.getCanonicalPath();
+        path = dir.getFileLocator().getCanonicalPath();
 
         if ( path.length() < 7 ) {
             out.println("<b><big>smb://</big></b><br>");

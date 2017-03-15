@@ -44,6 +44,7 @@ import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSession;
 import jcifs.smb.SmbTransport;
 import jcifs.smb.SmbTransportPoolImpl;
+import jcifs.smb.SmbTreeHandleImpl;
 import jcifs.util.transport.ConnectionTimeoutException;
 
 
@@ -159,12 +160,11 @@ public class TimeoutTest extends BaseCIFSTest {
         SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), ctx), makeRandomName());
         int soTimeout = ctx.getConfig().getSoTimeout();
         f.createNewFile();
-
-        try {
+        try ( SmbTreeHandleImpl th = (SmbTreeHandleImpl) f.getTreeHandle() ) {
             Thread.sleep(2 * soTimeout);
 
             // connection should be closed by now
-            SmbSession session = f.getSession();
+            SmbSession session = th.getSession();
             SmbTransport trans = session.getTransport();
             assertTrue("Transport is still connected", trans.isDisconnected());
             assertFalse("Connection is still in the pool", ( (SmbTransportPoolImpl) ctx.getTransportPool() ).contains(trans));

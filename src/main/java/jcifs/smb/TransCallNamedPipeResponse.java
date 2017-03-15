@@ -25,11 +25,13 @@ import jcifs.Configuration;
 class TransCallNamedPipeResponse extends SmbComTransactionResponse {
 
     private SmbNamedPipe pipe;
+    private TransactNamedPipeInputStream pipeIn;
 
 
-    TransCallNamedPipeResponse ( Configuration config, SmbNamedPipe pipe ) {
+    TransCallNamedPipeResponse ( Configuration config, SmbNamedPipe pipe, TransactNamedPipeInputStream pipeIn ) {
         super(config);
         this.pipe = pipe;
+        this.pipeIn = pipeIn;
     }
 
 
@@ -65,8 +67,8 @@ class TransCallNamedPipeResponse extends SmbComTransactionResponse {
 
     @Override
     int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        if ( this.pipe.pipeIn != null ) {
-            TransactNamedPipeInputStream in = (TransactNamedPipeInputStream) this.pipe.pipeIn;
+        if ( this.pipeIn != null ) {
+            TransactNamedPipeInputStream in = this.pipeIn;
             synchronized ( in.lock ) {
                 in.receive(buffer, bufferIndex, len);
                 in.lock.notify();

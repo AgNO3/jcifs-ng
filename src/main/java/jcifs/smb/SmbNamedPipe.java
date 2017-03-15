@@ -147,9 +147,7 @@ public class SmbNamedPipe extends SmbFile {
      */
     public static final int PIPE_TYPE_DCE_TRANSACT = 0x0200 | 0x0400;
 
-    InputStream pipeIn;
-    OutputStream pipeOut;
-    int pipeType;
+    private int pipeType;
 
 
     /**
@@ -167,7 +165,26 @@ public class SmbNamedPipe extends SmbFile {
     public SmbNamedPipe ( String url, int pipeType, CIFSContext tc ) throws MalformedURLException {
         super(url, tc);
         this.pipeType = pipeType;
-        this.type = TYPE_NAMED_PIPE;
+        this.getFileLocator().updateType(TYPE_NAMED_PIPE);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbFile#getType()
+     */
+    @Override
+    public int getType () throws SmbException {
+        return TYPE_NAMED_PIPE;
+    }
+
+
+    /**
+     * @return the pipe type
+     */
+    public int getPipeType () {
+        return this.pipeType;
     }
 
 
@@ -186,15 +203,11 @@ public class SmbNamedPipe extends SmbFile {
      */
 
     public InputStream getNamedPipeInputStream () throws IOException {
-        if ( this.pipeIn == null ) {
-            if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {
-                this.pipeIn = new TransactNamedPipeInputStream(this);
-            }
-            else {
-                this.pipeIn = new SmbFileInputStream(this, ( this.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
-            }
+        if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {
+            return new TransactNamedPipeInputStream(this);
         }
-        return this.pipeIn;
+
+        return new SmbFileInputStream(this, ( this.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
     }
 
 
@@ -209,14 +222,11 @@ public class SmbNamedPipe extends SmbFile {
      * @throws IOException
      */
     public OutputStream getNamedPipeOutputStream () throws IOException {
-        if ( this.pipeOut == null ) {
-            if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {
-                this.pipeOut = new TransactNamedPipeOutputStream(this);
-            }
-            else {
-                this.pipeOut = new SmbFileOutputStream(this, false, ( this.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
-            }
+        if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {
+            return new TransactNamedPipeOutputStream(this);
         }
-        return this.pipeOut;
+
+        return new SmbFileOutputStream(this, false, ( this.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
     }
+
 }

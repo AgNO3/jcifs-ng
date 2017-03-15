@@ -151,23 +151,20 @@ public class ReadWriteTest extends BaseCIFSTest {
     public void testPipeOneHandle () throws IOException {
         SmbFile pn = new SmbFile(getDefaultShareRoot(), makeRandomName());
         SmbNamedPipe f = new SmbNamedPipe(pn.getURL().toString(), SmbNamedPipe.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext()));
+
+        f.createNewFile();
         try {
-            f.createNewFile();
-            try {
-                try ( OutputStream os = f.getNamedPipeOutputStream() ) {
-                    writeRandom(1024, 1024, os);
-                    try ( InputStream is = f.getNamedPipeInputStream() ) {
-                        verifyRandom(1024, 1024, is);
-                    }
+            try ( OutputStream os = f.getNamedPipeOutputStream() ) {
+                writeRandom(1024, 1024, os);
+                try ( InputStream is = f.getNamedPipeInputStream() ) {
+                    verifyRandom(1024, 1024, is);
                 }
-            }
-            finally {
-                f.delete();
             }
         }
         finally {
-            f.close();
+            f.delete();
         }
+
     }
 
 
@@ -176,23 +173,18 @@ public class ReadWriteTest extends BaseCIFSTest {
         SmbFile pn = new SmbFile(getDefaultShareRoot(), makeRandomName());
         SmbNamedPipe s = new SmbNamedPipe(pn.getURL().toString(), SmbNamedPipe.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext()));
         SmbNamedPipe t = new SmbNamedPipe(pn.getURL().toString(), SmbNamedPipe.PIPE_TYPE_RDONLY, withTestNTLMCredentials(getContext()));
+
+        s.createNewFile();
         try {
-            s.createNewFile();
-            try {
-                try ( OutputStream os = s.getNamedPipeOutputStream() ) {
-                    writeRandom(1024, 1024, os);
-                }
-                try ( InputStream is = t.getNamedPipeInputStream() ) {
-                    verifyRandom(1024, 1024, is);
-                }
+            try ( OutputStream os = s.getNamedPipeOutputStream() ) {
+                writeRandom(1024, 1024, os);
             }
-            finally {
-                s.delete();
+            try ( InputStream is = t.getNamedPipeInputStream() ) {
+                verifyRandom(1024, 1024, is);
             }
         }
         finally {
-            s.close();
-            t.close();
+            s.delete();
         }
     }
 

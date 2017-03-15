@@ -128,9 +128,5 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         super.close();
         if ( this.out != null )
             this.out.close();
-
-        if ( this.pipe != null ) {
-            this.pipe.close();
-        }
     }
 }

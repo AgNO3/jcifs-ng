@@ -488,7 +488,7 @@ public class DfsImpl implements Dfs {
         }
 
         if ( dr == null && path != null ) {
-            log.debug("No match for domain based root, checking standalone " + domain);
+            log.trace("No match for domain based root, checking standalone " + domain);
             /*
              * We did not match a domain based root. Now try to match the
              * longest path in the list of stand-alone referrals.

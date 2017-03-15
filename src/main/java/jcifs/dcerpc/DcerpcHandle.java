@@ -25,7 +25,6 @@ import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
 import jcifs.dcerpc.ndr.NdrBuffer;
-import jcifs.smb.SmbSession;
 
 
 /**
@@ -364,7 +363,7 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      */
     public String getServer () {
         if ( this instanceof DcerpcPipeHandle )
-            return ( (DcerpcPipeHandle) this ).pipe.getServer();
+            return ( (DcerpcPipeHandle) this ).pipe.getFileLocator().getServer();
         return null;
     }
 
@@ -376,17 +375,6 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
         if ( this instanceof DcerpcPipeHandle ) {
             return ( (DcerpcPipeHandle) this ).pipe.getTransportContext();
         }
-        return null;
-    }
-
-
-    /**
-     * 
-     * @return the session attached to
-     */
-    public SmbSession getSession () {
-        if ( this instanceof DcerpcPipeHandle )
-            return ( (DcerpcPipeHandle) this ).pipe.getSession();
         return null;
     }
 

@@ -33,6 +33,7 @@ import org.junit.runners.Parameterized.Parameters;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSession;
 import jcifs.smb.SmbTransport;
+import jcifs.smb.SmbTreeHandleImpl;
 
 
 /**
@@ -89,7 +90,7 @@ public class SessionTest extends BaseCIFSTest {
             assertNotNull(f);
             f.connect();
             assertNotNull(f);
-            SmbSession session = f.getSession();
+            SmbSession session = ( (SmbTreeHandleImpl) f.getTreeHandle() ).getSession();
             assertNotNull(session);
             SmbTransport transport = session.getTransport();
             assertNotNull(transport);

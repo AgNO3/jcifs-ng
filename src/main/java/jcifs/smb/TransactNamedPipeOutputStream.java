@@ -21,8 +21,6 @@ package jcifs.smb;
 
 import java.io.IOException;
 
-import jcifs.Configuration;
-
 
 class TransactNamedPipeOutputStream extends SmbFileOutputStream {
 
@@ -30,21 +28,19 @@ class TransactNamedPipeOutputStream extends SmbFileOutputStream {
     private SmbNamedPipe pipe;
     private byte[] tmp = new byte[1];
     private boolean dcePipe;
-    private Configuration config;
 
 
     TransactNamedPipeOutputStream ( SmbNamedPipe pipe ) throws IOException {
-        super(pipe, false, ( pipe.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
-        this.config = pipe.getTransportContext().getConfig();
+        super(pipe, false, ( pipe.getPipeType() & 0xFFFF00FF ) | SmbFile.O_EXCL);
         this.pipe = pipe;
-        this.dcePipe = ( pipe.pipeType & SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT;
-        this.path = pipe.unc;
+        this.dcePipe = ( pipe.getPipeType() & SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT;
+        this.path = pipe.getFileLocator().getUncPath();
     }
 
 
     @Override
     public void close () throws IOException {
-        this.pipe.close();
+        super.close();
     }
 
 
@@ -67,17 +63,20 @@ class TransactNamedPipeOutputStream extends SmbFileOutputStream {
             len = 0;
         }
 
-        if ( ( this.pipe.pipeType & SmbNamedPipe.PIPE_TYPE_CALL ) == SmbNamedPipe.PIPE_TYPE_CALL ) {
-            this.pipe.send(new TransWaitNamedPipe(this.config, this.path), new TransWaitNamedPipeResponse(this.config));
-            this.pipe.send(new TransCallNamedPipe(this.config, this.path, b, off, len), new TransCallNamedPipeResponse(this.config, this.pipe));
-        }
-        else if ( ( this.pipe.pipeType & SmbNamedPipe.PIPE_TYPE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_TRANSACT ) {
-            ensureOpen();
-            TransTransactNamedPipe req = new TransTransactNamedPipe(this.config, this.pipe.fid, b, off, len);
-            if ( this.dcePipe ) {
-                req.maxDataCount = 1024;
+        try ( SmbTreeHandleImpl th = this.pipe.ensureTreeConnected() ) {
+            if ( ( this.pipe.getPipeType() & SmbNamedPipe.PIPE_TYPE_CALL ) == SmbNamedPipe.PIPE_TYPE_CALL ) {
+                th.send(new TransWaitNamedPipe(th.getConfig(), this.path), new TransWaitNamedPipeResponse(th.getConfig()));
+                th.send(new TransCallNamedPipe(th.getConfig(), this.path, b, off, len), new TransCallNamedPipeResponse(th.getConfig(), this.pipe));
             }
-            this.pipe.send(req, new TransTransactNamedPipeResponse(this.config, this.pipe));
+            else if ( ( this.pipe.getPipeType() & SmbNamedPipe.PIPE_TYPE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_TRANSACT ) {
+                try ( SmbFileHandleImpl fh = ensureOpen() ) {
+                    TransTransactNamedPipe req = new TransTransactNamedPipe(th.getConfig(), fh.getFid(), b, off, len);
+                    if ( this.dcePipe ) {
+                        req.maxDataCount = 1024;
+                    }
+                    th.send(req, new TransTransactNamedPipeResponse(th.getConfig(), this.pipe));
+                }
+            }
         }
     }
 }

@@ -36,7 +36,7 @@ class TransactNamedPipeInputStream extends SmbFileInputStream {
 
 
     TransactNamedPipeInputStream ( SmbNamedPipe pipe ) throws SmbException {
-        super(pipe, ( pipe.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
+        super(pipe, ( pipe.getPipeType() & 0xFFFF00FF ) | SmbFile.O_EXCL);
         this.lock = new Object();
     }
 

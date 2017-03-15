@@ -28,7 +28,6 @@ import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,6 +46,7 @@ import org.junit.runners.Parameterized;
 import jcifs.smb.FileNotifyInformation;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbWatchContext;
 
 
 /**
@@ -85,9 +85,6 @@ public class WatchTest extends BaseCIFSTest {
     @Override
     @After
     public void tearDown () throws Exception {
-        if ( this.base != null ) {
-            this.base.close();
-        }
         if ( this.executor != null ) {
             this.executor.shutdown();
             if ( this.future != null ) {
@@ -102,23 +99,22 @@ public class WatchTest extends BaseCIFSTest {
     }
 
 
-    private void setupWatch ( int filter, boolean recursive ) throws InterruptedException {
+    private void setupWatch ( SmbWatchContext w ) throws InterruptedException {
         if ( this.future != null ) {
             this.future.cancel(true);
         }
-        WatchRunnable task = new WatchRunnable(this.base, filter, recursive);
-        this.future = this.executor.submit(task);
+        this.future = this.executor.submit(w);
         Thread.sleep(1000);
     }
 
 
     @Test
     public void testWatchCreate () throws SmbException, MalformedURLException, UnknownHostException, InterruptedException, ExecutionException {
-        try {
-            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false);
+        try ( SmbWatchContext w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false) ) {
+            setupWatch(w);
             SmbFile cr = new SmbFile(this.base, "created");
             cr.createNewFile();
-            assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+            assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
         }
         catch ( TimeoutException e ) {
             Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
@@ -129,16 +125,17 @@ public class WatchTest extends BaseCIFSTest {
 
     @Test
     public void testWatchModified () throws InterruptedException, ExecutionException, IOException {
-        try {
+        try ( SmbWatchContext w = this.base
+                .watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES | FileNotifyInformation.FILE_NOTIFY_CHANGE_LAST_WRITE, false) ) {
             SmbFile cr = new SmbFile(this.base, "modified");
             cr.createNewFile();
-            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES | FileNotifyInformation.FILE_NOTIFY_CHANGE_LAST_WRITE, false);
+            setupWatch(w);
             try ( OutputStream os = cr.getOutputStream() ) {
                 os.write(new byte[] {
                     1, 2, 3, 4
                 });
             }
-            assertNotified(FileNotifyInformation.FILE_ACTION_MODIFIED, "modified", null);
+            assertNotified(w, FileNotifyInformation.FILE_ACTION_MODIFIED, "modified", null);
         }
         catch ( TimeoutException e ) {
             Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
@@ -149,17 +146,17 @@ public class WatchTest extends BaseCIFSTest {
 
     @Test
     public void testWatchInBetween () throws InterruptedException, ExecutionException, IOException {
-        try {
-            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false);
+        try ( SmbWatchContext w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false) ) {
+            setupWatch(w);
             SmbFile cr = new SmbFile(this.base, "created");
             cr.createNewFile();
-            assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+            assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
 
             cr = new SmbFile(this.base, "created2");
             cr.createNewFile();
 
-            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false);
-            assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created2", null);
+            setupWatch(w);
+            assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created2", null);
         }
         catch ( TimeoutException e ) {
             Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
@@ -170,9 +167,9 @@ public class WatchTest extends BaseCIFSTest {
 
     @Test
     public void testWatchClose () throws InterruptedException, ExecutionException, IOException {
-        try {
-            setupWatch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES, false);
-            this.base.close();
+        try ( SmbWatchContext w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES, false) ) {
+            setupWatch(w);
+            w.close();
             Future<List<FileNotifyInformation>> f = this.future;
             assertNotNull(f);
             f.get(1, TimeUnit.SECONDS);
@@ -184,13 +181,13 @@ public class WatchTest extends BaseCIFSTest {
     }
 
 
-    private void assertNotified ( int action, String name, List<FileNotifyInformation> infos )
+    private void assertNotified ( SmbWatchContext w, int action, String name, List<FileNotifyInformation> infos )
             throws InterruptedException, ExecutionException, TimeoutException {
         boolean found = checkInResult(action, name, infos);
         if ( !found ) {
             // retry, the first watch may have already come back before the triggered change was active
             try {
-                setupWatch(action, name.indexOf('/') > 0);
+                setupWatch(w);
                 found = checkInResult(action, name, infos);
             }
             catch ( TimeoutException e ) {
@@ -220,24 +217,4 @@ public class WatchTest extends BaseCIFSTest {
         return found;
     }
 
-    private static class WatchRunnable implements Callable<List<FileNotifyInformation>> {
-
-        private SmbFile file;
-        private int filter;
-        private boolean recursive;
-
-
-        public WatchRunnable ( SmbFile f, int filter, boolean recursive ) {
-            this.file = f;
-            this.filter = filter;
-            this.recursive = recursive;
-        }
-
-
-        @Override
-        public List<FileNotifyInformation> call () throws Exception {
-            return this.file.watch(this.filter, this.recursive);
-        }
-
-    }
 }
