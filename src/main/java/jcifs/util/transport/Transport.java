@@ -290,7 +290,9 @@ public abstract class Transport implements Runnable, AutoCloseable {
                     }
 
                     if ( getUsageCount() > 0 ) {
-                        log.debug("Transport still in use, no idle timeout");
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Transport still in use, no idle timeout " + this);
+                        }
                         continue;
                     }
 

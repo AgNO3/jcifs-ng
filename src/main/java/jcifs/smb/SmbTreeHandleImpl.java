@@ -1,13 +1,29 @@
-/**
+/*
  * © 2017 AgNO3 Gmbh & Co. KG
- * All right reserved.
  * 
- * Created: 14.03.2017 by mbechler
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package jcifs.smb;
 
 
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.log4j.Logger;
+
 import jcifs.Configuration;
+import jcifs.RuntimeCIFSException;
 import jcifs.smb.SmbTransport.ServerData;
 
 
@@ -17,8 +33,12 @@ import jcifs.smb.SmbTransport.ServerData;
  */
 public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
 
+    private static final Logger log = Logger.getLogger(SmbTreeHandleImpl.class);
+
     private final SmbFileLocator resourceLoc;
     private final SmbTreeConnection treeConnection;
+
+    private final AtomicLong usageCount = new AtomicLong(1);
 
 
     /**
@@ -130,7 +150,9 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      * @return tree handle with increased usage count
      */
     public SmbTreeHandleImpl acquire () {
-        this.treeConnection.acquire();
+        if ( this.usageCount.incrementAndGet() == 1 ) {
+            this.treeConnection.acquire();
+        }
         return this;
     }
 
@@ -142,7 +164,26 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     @Override
     public void release () {
-        this.treeConnection.release();
+        long us = this.usageCount.decrementAndGet();
+        if ( us == 0 ) {
+            this.treeConnection.release();
+        }
+        else if ( us < 0 ) {
+            throw new RuntimeCIFSException("Usage count dropped below zero");
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize () throws Throwable {
+        if ( this.usageCount.get() != 0 ) {
+            log.warn("Tree handle was not properly released " + this.resourceLoc.getURL());
+        }
     }
 
 

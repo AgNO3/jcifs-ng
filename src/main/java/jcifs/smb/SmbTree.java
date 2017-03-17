@@ -98,16 +98,22 @@ class SmbTree implements AutoCloseable {
     }
 
 
+    public SmbTree acquire () {
+        return acquire(true);
+    }
+
+
     /**
+     * @param track
      * @return tree with increased usage count
      */
-    public SmbTree acquire () {
+    public SmbTree acquire ( boolean track ) {
         long usage = this.usageCount.incrementAndGet();
         if ( log.isTraceEnabled() ) {
             log.trace("Acquire tree " + usage + " " + this);
         }
 
-        if ( this.traceResource ) {
+        if ( track && this.traceResource ) {
             synchronized ( this.acquires ) {
                 this.acquires.add(truncateTrace(Thread.currentThread().getStackTrace()));
             }
@@ -133,20 +139,25 @@ class SmbTree implements AutoCloseable {
      */
     @Override
     public void close () {
-        release();
+        release(false);
+    }
+
+
+    public void release () {
+        release(true);
     }
 
 
     /**
-     * 
+     * @param track
      */
-    public void release () {
+    public void release ( boolean track ) {
         long usage = this.usageCount.decrementAndGet();
         if ( log.isTraceEnabled() ) {
             log.trace("Release tree " + usage + " " + this);
         }
 
-        if ( this.traceResource ) {
+        if ( track && this.traceResource ) {
             synchronized ( this.releases ) {
                 this.releases.add(truncateTrace(Thread.currentThread().getStackTrace()));
             }
@@ -471,6 +482,15 @@ class SmbTree implements AutoCloseable {
                     return;
                 this.connectionState = 3; // disconnecting
 
+                long l = this.usageCount.get();
+                if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
+                    log.warn("Disconnected tree while still in use " + this);
+                    dumpResource();
+                    if ( sess.getConfig().isTraceResourceUsage() ) {
+                        throw new RuntimeCIFSException("Disconnected tree while still in use");
+                    }
+                }
+
                 if ( !inError && this.tid != 0 ) {
                     try {
                         send(new SmbComTreeDisconnect(sess.getConfig()), null);
@@ -485,14 +505,6 @@ class SmbTree implements AutoCloseable {
                 transport.notifyAll();
             }
 
-            long l = this.usageCount.get();
-            if ( ( inUse && l != 2 ) || ( !inUse && l > 1 ) ) {
-                log.warn("Disconnecting tree while still in use " + this);
-                dumpResource();
-                if ( sess.getConfig().isTraceResourceUsage() ) {
-                    throw new RuntimeCIFSException("Disconnecting tree while still in use");
-                }
-            }
         }
     }
 

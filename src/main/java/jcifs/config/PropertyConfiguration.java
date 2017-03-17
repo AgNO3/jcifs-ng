@@ -128,6 +128,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.broadcastAddress = Config.getInetAddress(p, "jcifs.netbios.baddr", null);
 
         this.traceResourceUsage = Config.getBoolean(p, "jcifs.traceResources", false);
+        this.strictResourceLifecycle = Config.getBoolean(p, "jcifs.smb.client.strictResourceLifecycle", false);
 
         initResolverOrder(p.getProperty("jcifs.resolveOrder"));
         initDefaults();

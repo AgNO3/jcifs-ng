@@ -487,6 +487,11 @@ public class SmbTransport extends Transport implements SmbConstants {
     }
 
 
+    protected synchronized void doDisconnect ( boolean hard ) throws IOException {
+        doDisconnect(hard, false);
+    }
+
+
     @Override
     protected synchronized void doDisconnect ( boolean hard, boolean inUse ) throws IOException {
         ListIterator<SmbSession> iter = this.sessions.listIterator();

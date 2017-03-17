@@ -123,6 +123,7 @@ public class BaseConfiguration implements Configuration {
             // , "SMB 2.???",
     };
     protected boolean traceResourceUsage;
+    protected boolean strictResourceLifecycle;
 
 
     /**
@@ -531,6 +532,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isTraceResourceUsage () {
         return this.traceResourceUsage;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isStrictResourceLifecycle()
+     */
+    @Override
+    public boolean isStrictResourceLifecycle () {
+        return this.strictResourceLifecycle;
     }
 
 

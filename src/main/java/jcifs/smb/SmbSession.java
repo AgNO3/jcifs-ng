@@ -620,6 +620,11 @@ public final class SmbSession implements AutoCloseable {
 
                 this.netbiosName = null;
 
+                long us = this.usageCount.get();
+                if ( ( inUse && us != 1 ) || ( !inUse && us > 0 ) ) {
+                    log.warn("Logging off session while still " + us + " in use " + this + ":" + this.trees);
+                }
+
                 for ( SmbTree t : this.trees ) {
                     try {
                         t.treeDisconnect(inError, false);
@@ -649,13 +654,6 @@ public final class SmbSession implements AutoCloseable {
                 this.transport.notifyAll();
             }
 
-            long us = this.usageCount.get();
-            if ( ( inUse && us != 1 ) || ( !inUse && us > 0 ) ) {
-                log.warn("Logging off session while still " + us + " in use " + this + ":" + this.trees);
-                if ( this.transportContext.getConfig().isTraceResourceUsage() ) {
-                    throw new RuntimeCIFSException("Logging off session while still in use");
-                }
-            }
         }
     }
 

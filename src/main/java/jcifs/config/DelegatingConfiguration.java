@@ -718,6 +718,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isStrictResourceLifecycle()
+     */
+    @Override
+    public boolean isStrictResourceLifecycle () {
+        return this.delegate.isStrictResourceLifecycle();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getSupportedDialects()
      */

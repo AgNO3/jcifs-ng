@@ -1,8 +1,19 @@
-/**
+/*
  * © 2017 AgNO3 Gmbh & Co. KG
- * All right reserved.
  * 
- * Created: 14.03.2017 by mbechler
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package jcifs.smb;
 
@@ -23,6 +34,11 @@ import jcifs.smb.SmbTransport.ServerData;
 
 
 /**
+ * This class encapsulates the logic for switching tree connections
+ * 
+ * Switching trees can occur either when the tree has been disconnected by failure or idle-timeout - as well as on
+ * DFS referrals.
+ * 
  * @author mbechler
  *
  */
@@ -59,8 +75,7 @@ public class SmbTreeConnection {
      */
     public SmbTreeConnection ( SmbTreeConnection treeConnection ) {
         this.ctx = treeConnection.ctx;
-        this.delegate = treeConnection.acquire();
-        this.delegateAcquired = true;
+        this.delegate = treeConnection;
     }
 
 
@@ -75,10 +90,11 @@ public class SmbTreeConnection {
     private synchronized SmbTree getTree () {
         SmbTree t = this.tree;
         if ( t != null ) {
-            return t.acquire();
+            return t.acquire(false);
         }
         else if ( this.delegate != null ) {
-            return this.delegate.getTree();
+            this.tree = this.delegate.getTree();
+            return this.tree;
         }
         return t;
     }
@@ -122,7 +138,7 @@ public class SmbTreeConnection {
             if ( old != null ) {
                 if ( wasAcquired ) {
                     // release
-                    old.release();
+                    old.release(true);
                 }
             }
             if ( this.delegate != null && this.delegateAcquired ) {
@@ -185,6 +201,7 @@ public class SmbTreeConnection {
                         if ( log.isDebugEnabled() ) {
                             log.debug("Tree connection no longer in use, release tree " + t);
                         }
+                        this.treeAcquired = false;
                         t.release();
                     }
                 }
@@ -211,7 +228,6 @@ public class SmbTreeConnection {
             log.error("Usage count dropped below zero " + this);
             throw new RuntimeCIFSException("Usage count dropped below zero");
         }
-
     }
 
 
@@ -223,7 +239,7 @@ public class SmbTreeConnection {
     @Override
     protected void finalize () throws Throwable {
         if ( isConnected() && this.usageCount.get() != 0 ) {
-            log.warn("Tree connection was not properly released");
+            log.warn("Tree connection was not properly released " + this);
         }
     }
 
@@ -283,7 +299,8 @@ public class SmbTreeConnection {
             }
             if ( response != null )
                 response.reset();
-            connectWrapException(loc);
+
+            try ( SmbTreeHandle th = connectWrapException(loc) ) {}
         }
     }
 

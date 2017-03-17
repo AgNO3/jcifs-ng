@@ -361,17 +361,13 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      * 
      * @return the server connected to
      */
-    public String getServer () {
-        return null;
-    }
+    public abstract String getServer ();
 
 
     /**
      * @return the transport context used
      */
-    public CIFSContext getTransportContext () {
-        return null;
-    }
+    public abstract CIFSContext getTransportContext ();
 
 
     @Override

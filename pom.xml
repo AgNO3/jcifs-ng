@@ -6,7 +6,7 @@
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
-	<version>1.5.3-SNAPSHOT</version>
+	<version>1.6.0-SNAPSHOT</version>
 
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>

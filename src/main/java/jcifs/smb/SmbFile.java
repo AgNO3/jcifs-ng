@@ -677,7 +677,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      */
     @Override
     public void connect () throws IOException {
-        ensureTreeConnected();
+        try ( SmbTreeHandle th = ensureTreeConnected() ) {}
     }
 
 
@@ -687,7 +687,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @throws SmbException
      */
     public SmbTreeHandle getTreeHandle () throws SmbException {
-        return ensureTreeConnected().acquire();
+        return ensureTreeConnected();
     }
 
 
@@ -701,7 +701,9 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
         SmbTreeHandleImpl th = this.treeHandle;
         if ( th != null ) {
             this.treeHandle = null;
-            th.close();
+            if ( this.transportContext.getConfig().isStrictResourceLifecycle() ) {
+                th.close();
+            }
         }
     }
 
@@ -713,7 +715,11 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      */
     synchronized SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
         if ( this.treeHandle == null ) {
-            this.treeHandle = this.treeConnection.connectWrapException(getFileLocator()).acquire();
+            this.treeHandle = this.treeConnection.connectWrapException(getFileLocator());
+            if ( this.transportContext.getConfig().isStrictResourceLifecycle() ) {
+                // one extra share to keep the tree alive
+                return this.treeHandle.acquire();
+            }
             return this.treeHandle;
         }
         return this.treeHandle.acquire();
@@ -807,7 +813,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     /**
      * @return this file's unc path
      */
-    protected String getUncPath () {
+    public String getUncPath () {
         return this.fileLocator.getUncPath();
     }
 
@@ -2041,7 +2047,12 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                     files[ i ].lastAccess,
                     files[ i ].size) ) {
 
-                    files[ i ].copyRecursive(ndest, b, bsize, w, sh, dh, req, resp);
+                    try {
+                        files[ i ].copyRecursive(ndest, b, bsize, w, sh, dh, req, resp);
+                    }
+                    finally {
+                        files[ i ].close();
+                    }
                 }
             }
         }
@@ -2156,6 +2167,19 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
         this.fileLocator.canonicalizePath();
         delete(getUncPath());
         close();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize () throws Throwable {
+        if ( this.treeHandle != null ) {
+            log.debug("File was not properly released " + this);
+        }
     }
 
 

@@ -196,5 +196,10 @@ public class FileOperationsTest extends BaseCIFSTest {
                 f.delete();
             }
         }
+
+        System.gc();
+        System.gc();
+        System.runFinalization();
+
     }
 }

@@ -624,7 +624,22 @@ public interface Configuration {
 
 
     /**
-     * This is purely for debugging
+     * Property <tt>jcifs.smb.client.strictResourceLifecycle</tt> (bool, default false)
+     * 
+     * If enabled, SmbFile instances starting with their first use will hold a reference to their tree.
+     * This means that trees/sessions/connections won't be idle-disconnected even if there are no other active
+     * references (currently executing code, file descriptors).
+     * 
+     * Depending on the usage scenario, this may have some benefit as there won't be any delays for restablishing these
+     * resources, however comes at the cost of having to properly release all SmbFile instances you no longer need.
+     * 
+     * @return whether to use strict resource lifecycle
+     */
+    boolean isStrictResourceLifecycle ();
+
+
+    /**
+     * This is solely intended for debugging
      * 
      * @return whether to track the locations from which resources were created
      */
