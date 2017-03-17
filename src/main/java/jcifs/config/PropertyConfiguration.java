@@ -127,6 +127,8 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.ignoreCopyToException = Config.getBoolean(p, "jcifs.smb.client.ignoreCopyToException", true);
         this.broadcastAddress = Config.getInetAddress(p, "jcifs.netbios.baddr", null);
 
+        this.traceResourceUsage = Config.getBoolean(p, "jcifs.traceResources", false);
+
         initResolverOrder(p.getProperty("jcifs.resolveOrder"));
         initDefaults();
     }

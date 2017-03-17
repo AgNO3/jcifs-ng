@@ -45,6 +45,7 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
     private SmbComWriteAndXResponse write_andx_resp = null;
 
     private boolean largeReadX;
+    private final boolean unsharedFile;
 
     private SmbFileHandleImpl handle;
 
@@ -59,8 +60,9 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @throws SmbException
      * @throws MalformedURLException
      */
+    @SuppressWarnings ( "resource" )
     public SmbRandomAccessFile ( String url, String mode, int shareAccess, CIFSContext tc ) throws SmbException, MalformedURLException {
-        this(new SmbFile(url, tc, shareAccess), mode);
+        this(new SmbFile(url, tc, shareAccess), mode, true);
     }
 
 
@@ -72,7 +74,20 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @throws SmbException
      */
     public SmbRandomAccessFile ( SmbFile file, String mode ) throws SmbException {
+        this(file, mode, false);
+    }
+
+
+    /**
+     * Instantiate a random access file from a {@link SmbFile}
+     * 
+     * @param file
+     * @param mode
+     * @throws SmbException
+     */
+    private SmbRandomAccessFile ( SmbFile file, String mode, boolean unshared ) throws SmbException {
         this.file = file;
+        this.unsharedFile = unshared;
 
         try ( SmbTreeHandle th = this.file.ensureTreeConnected() ) {
             if ( mode.equals("r") ) {
@@ -158,9 +173,16 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      */
     @Override
     public synchronized void close () throws SmbException {
-        if ( this.handle != null ) {
-            this.handle.close();
-            this.handle = null;
+        try {
+            if ( this.handle != null ) {
+                this.handle.close();
+                this.handle = null;
+            }
+        }
+        finally {
+            if ( this.unsharedFile ) {
+                this.file.close();
+            }
         }
     }
 

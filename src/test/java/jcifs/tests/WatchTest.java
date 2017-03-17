@@ -112,9 +112,10 @@ public class WatchTest extends BaseCIFSTest {
     public void testWatchCreate () throws SmbException, MalformedURLException, UnknownHostException, InterruptedException, ExecutionException {
         try ( SmbWatchContext w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false) ) {
             setupWatch(w);
-            SmbFile cr = new SmbFile(this.base, "created");
-            cr.createNewFile();
-            assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+            try ( SmbFile cr = new SmbFile(this.base, "created") ) {
+                cr.createNewFile();
+                assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+            }
         }
         catch ( TimeoutException e ) {
             Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
@@ -127,15 +128,16 @@ public class WatchTest extends BaseCIFSTest {
     public void testWatchModified () throws InterruptedException, ExecutionException, IOException {
         try ( SmbWatchContext w = this.base
                 .watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES | FileNotifyInformation.FILE_NOTIFY_CHANGE_LAST_WRITE, false) ) {
-            SmbFile cr = new SmbFile(this.base, "modified");
-            cr.createNewFile();
-            setupWatch(w);
-            try ( OutputStream os = cr.getOutputStream() ) {
-                os.write(new byte[] {
-                    1, 2, 3, 4
-                });
+            try ( SmbFile cr = new SmbFile(this.base, "modified") ) {
+                cr.createNewFile();
+                setupWatch(w);
+                try ( OutputStream os = cr.getOutputStream() ) {
+                    os.write(new byte[] {
+                        1, 2, 3, 4
+                    });
+                }
+                assertNotified(w, FileNotifyInformation.FILE_ACTION_MODIFIED, "modified", null);
             }
-            assertNotified(w, FileNotifyInformation.FILE_ACTION_MODIFIED, "modified", null);
         }
         catch ( TimeoutException e ) {
             Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
@@ -148,12 +150,14 @@ public class WatchTest extends BaseCIFSTest {
     public void testWatchInBetween () throws InterruptedException, ExecutionException, IOException {
         try ( SmbWatchContext w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false) ) {
             setupWatch(w);
-            SmbFile cr = new SmbFile(this.base, "created");
-            cr.createNewFile();
-            assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+            try ( SmbFile cr = new SmbFile(this.base, "created") ) {
+                cr.createNewFile();
+                assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
+            }
 
-            cr = new SmbFile(this.base, "created2");
-            cr.createNewFile();
+            try ( SmbFile cr = new SmbFile(this.base, "created2") ) {
+                cr.createNewFile();
+            }
 
             setupWatch(w);
             assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created2", null);
@@ -162,6 +166,7 @@ public class WatchTest extends BaseCIFSTest {
             Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
             fail("Did not recieve notification");
         }
+
     }
 
 

@@ -89,59 +89,67 @@ public class SmbFileOutputStream extends OutputStream {
         this.access = ( openFlags >>> 16 ) & 0xFFFF;
 
         try ( SmbTreeHandleImpl th = file.ensureTreeConnected() ) {
-
-            if ( file instanceof SmbNamedPipe ) {
-                file.getFileLocator().canonicalizePath();
-                String uncPath = file.getFileLocator().getUncPath();
-                if ( uncPath.startsWith("\\pipe\\") ) {
-                    // TODO: this used to strip the \pipe prefix from the file's UNC path inplace ?!?!
-                    th.send(new TransWaitNamedPipe(th.getConfig(), uncPath), new TransWaitNamedPipeResponse(th.getConfig()));
+            try ( SmbFileHandle h = ensureOpen() ) {
+                if ( append ) {
+                    // do this after file.open so we get the actual position (and also don't waste another call)
+                    try {
+                        this.fp = file.length();
+                    }
+                    catch ( SmbAuthException sae ) {
+                        throw sae;
+                    }
+                    catch ( SmbException se ) {
+                        log.warn("Error determining length in append mode", se);
+                        this.fp = 0L;
+                    }
                 }
+                init(th);
             }
-            try ( SmbFileHandle h = ensureOpen() ) {}
-            if ( append ) {
-                // do this after file.open so we get the actual position (and also don't waste another call)
-                try {
-                    this.fp = file.length();
-                }
-                catch ( SmbAuthException sae ) {
-                    throw sae;
-                }
-                catch ( SmbException se ) {
-                    log.warn("Error determining length in append mode", se);
-                    this.fp = 0L;
-                }
-            }
-            this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
-            this.writeSize = th.getSendBufferSize() - 70;
+        }
+    }
 
-            this.useNTSmbs = th.hasCapability(SmbConstants.CAP_NT_SMBS);
-            if ( !this.useNTSmbs ) {
-                log.debug("No support for NT SMBs");
-            }
 
-            // there seems to be a bug with some servers that causes corruption if using signatures +
-            // CAP_LARGE_WRITE
-            if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
-                this.writeSizeFile = Math.min(th.getSendBufferSize() - 70, 0xFFFF - 70);
-            }
-            else {
-                log.debug("No support or SMB signing is enabled, not enabling large writes");
-                this.writeSizeFile = this.writeSize;
-            }
+    SmbFileOutputStream ( SmbFile file, SmbTreeHandleImpl th ) throws SmbException {
+        this.file = file;
+        this.append = false;
+        init(th);
+    }
 
-            if ( log.isDebugEnabled() ) {
-                log.debug("Negotiated file write size is " + this.writeSizeFile);
-            }
 
-            if ( this.useNTSmbs ) {
-                this.reqx = new SmbComWriteAndX(th.getConfig());
-                this.rspx = new SmbComWriteAndXResponse(th.getConfig());
-            }
-            else {
-                this.req = new SmbComWrite(th.getConfig());
-                this.rsp = new SmbComWriteResponse(th.getConfig());
-            }
+    /**
+     * @param th
+     * @throws SmbException
+     */
+    protected final void init ( SmbTreeHandleImpl th ) throws SmbException {
+        this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
+        this.writeSize = th.getSendBufferSize() - 70;
+
+        this.useNTSmbs = th.hasCapability(SmbConstants.CAP_NT_SMBS);
+        if ( !this.useNTSmbs ) {
+            log.debug("No support for NT SMBs");
+        }
+
+        // there seems to be a bug with some servers that causes corruption if using signatures +
+        // CAP_LARGE_WRITE
+        if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
+            this.writeSizeFile = Math.min(th.getSendBufferSize() - 70, 0xFFFF - 70);
+        }
+        else {
+            log.debug("No support or SMB signing is enabled, not enabling large writes");
+            this.writeSizeFile = this.writeSize;
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug("Negotiated file write size is " + this.writeSizeFile);
+        }
+
+        if ( this.useNTSmbs ) {
+            this.reqx = new SmbComWriteAndX(th.getConfig());
+            this.rspx = new SmbComWriteAndXResponse(th.getConfig());
+        }
+        else {
+            this.req = new SmbComWrite(th.getConfig());
+            this.rsp = new SmbComWriteResponse(th.getConfig());
         }
     }
 
@@ -203,8 +211,8 @@ public class SmbFileOutputStream extends OutputStream {
     }
 
 
-    synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
-        if ( this.handle == null || !this.handle.isValid() ) {
+    protected synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+        if ( !isOpen() ) {
             // one extra acquire to keep this open till the stream is released
             this.handle = this.file.openUnshared(this.openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0).acquire();
             if ( this.append ) {
@@ -215,6 +223,11 @@ public class SmbFileOutputStream extends OutputStream {
 
         log.trace("File already open");
         return this.handle.acquire();
+    }
+
+
+    protected SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
+        return this.file.ensureTreeConnected();
     }
 
 
@@ -230,13 +243,6 @@ public class SmbFileOutputStream extends OutputStream {
 
     @Override
     public void write ( byte[] b, int off, int len ) throws IOException {
-        if ( !this.isOpen() && this.file instanceof SmbNamedPipe ) {
-            try ( SmbTreeHandleImpl th = this.file.ensureTreeConnected() ) {
-                th.send(
-                    new TransWaitNamedPipe(th.getConfig(), this.file.getFileLocator().getUncPath()),
-                    new TransWaitNamedPipeResponse(th.getConfig()));
-            }
-        }
         writeDirect(b, off, len, 0);
     }
 

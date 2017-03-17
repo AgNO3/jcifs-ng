@@ -24,7 +24,7 @@ import java.io.IOException;
 import org.apache.log4j.Logger;
 
 
-class TransactNamedPipeInputStream extends SmbFileInputStream {
+class TransactNamedPipeInputStream extends SmbPipeInputStream {
 
     private static final Logger log = Logger.getLogger(TransactNamedPipeInputStream.class);
 
@@ -35,8 +35,8 @@ class TransactNamedPipeInputStream extends SmbFileInputStream {
     Object lock;
 
 
-    TransactNamedPipeInputStream ( SmbNamedPipe pipe ) throws SmbException {
-        super(pipe, ( pipe.getPipeType() & 0xFFFF00FF ) | SmbFile.O_EXCL);
+    TransactNamedPipeInputStream ( SmbPipeHandle pipe, SmbTreeHandleImpl th ) throws SmbException {
+        super(pipe, th);
         this.lock = new Object();
     }
 

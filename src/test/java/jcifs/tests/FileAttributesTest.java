@@ -65,18 +65,20 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Test
     public void testBaseFile () throws MalformedURLException, SmbException {
-        SmbFile f = getDefaultShareRoot();
-        checkConnection(f);
-        if ( f.getType() != SmbFile.TYPE_FILESYSTEM ) {
-            assertEquals(SmbFile.TYPE_SHARE, f.getType());
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            checkConnection(f);
+            if ( f.getType() != SmbFile.TYPE_FILESYSTEM ) {
+                assertEquals(SmbFile.TYPE_SHARE, f.getType());
+            }
         }
     }
 
 
     @Test
     public void testGetFreeSpace () throws SmbException, MalformedURLException {
-        SmbFile f = getDefaultShareRoot();
-        f.getDiskFreeSpace();
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            f.getDiskFreeSpace();
+        }
     }
 
 
@@ -89,145 +91,154 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Test
     public void testLastModified () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            assertCloseTime(f.lastModified());
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                assertCloseTime(f.lastModified());
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testSetLastModified () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            long time = System.currentTimeMillis() - 60 * 60 * 12;
-            f.setLastModified(time);
-            assertEquals(time, f.lastModified());
-        }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                long time = System.currentTimeMillis() - 60 * 60 * 12;
+                f.setLastModified(time);
+                assertEquals(time, f.lastModified());
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testCreated () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            assertCloseTime(f.createTime());
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                assertCloseTime(f.createTime());
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testSetCreated () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            long time = System.currentTimeMillis() - 60 * 60 * 12;
-            f.setCreateTime(time);
-            assertEquals(time, f.createTime());
-        }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                long time = System.currentTimeMillis() - 60 * 60 * 12;
+                f.setCreateTime(time);
+                assertEquals(time, f.createTime());
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testLastAccessed () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            assertCloseTime(f.lastAccess());
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                assertCloseTime(f.lastAccess());
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testSetLastAccessed () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            long time = System.currentTimeMillis() - 60 * 60 * 12;
-            f.setLastAccess(time);
-            assertEquals(time, f.lastAccess());
-        }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                long time = System.currentTimeMillis() - 60 * 60 * 12;
+                f.setLastAccess(time);
+                assertEquals(time, f.lastAccess());
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testSetAttributes () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            int attrs = f.getAttributes() ^ SmbFile.ATTR_ARCHIVE ^ SmbFile.ATTR_HIDDEN ^ SmbFile.ATTR_READONLY;
-            f.setAttributes(attrs);
-            assertEquals(attrs, f.getAttributes());
-        }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
-        }
-        finally {
-            f.delete();
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                int attrs = f.getAttributes() ^ SmbFile.ATTR_ARCHIVE ^ SmbFile.ATTR_HIDDEN ^ SmbFile.ATTR_READONLY;
+                f.setAttributes(attrs);
+                assertEquals(attrs, f.getAttributes());
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testGetACL () throws IOException {
-        SmbFile f = getDefaultShareRoot();
-        try {
-            ACE[] security = f.getSecurity();
-            assertNotNull(security);
-        }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            try {
+                ACE[] security = f.getSecurity();
+                assertNotNull(security);
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
         }
     }
 
 
     @Test
     public void testGetOwner () throws IOException {
-        SmbFile f = getDefaultShareRoot();
-        try {
-            SID security = f.getOwnerUser();
-            assertNotNull(security);
-        }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            try {
+                SID security = f.getOwnerUser();
+                assertNotNull(security);
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
         }
     }
 
 
     @Test
     public void testGetGroup () throws IOException {
-        SmbFile f = getDefaultShareRoot();
-        try {
-            SID security = f.getOwnerGroup();
-            assertNotNull(security);
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            try {
+                SID security = f.getOwnerGroup();
+                assertNotNull(security);
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
         }
-        catch ( SmbUnsupportedOperationException e ) {
-            Assume.assumeTrue("No Ntsmbs", false);
-        }
-
     }
 
 }

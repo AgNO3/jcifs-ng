@@ -362,8 +362,6 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      * @return the server connected to
      */
     public String getServer () {
-        if ( this instanceof DcerpcPipeHandle )
-            return ( (DcerpcPipeHandle) this ).pipe.getFileLocator().getServer();
         return null;
     }
 
@@ -372,9 +370,6 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      * @return the transport context used
      */
     public CIFSContext getTransportContext () {
-        if ( this instanceof DcerpcPipeHandle ) {
-            return ( (DcerpcPipeHandle) this ).pipe.getTransportContext();
-        }
         return null;
     }
 

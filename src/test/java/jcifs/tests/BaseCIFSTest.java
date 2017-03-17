@@ -242,16 +242,20 @@ public abstract class BaseCIFSTest {
 
 
     protected SmbFile createTestFile () throws MalformedURLException, UnknownHostException, SmbException {
-        SmbFile f = new SmbFile(getDefaultShareRoot(), makeRandomName());
-        f.createNewFile();
-        return f;
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot() ) {
+            SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+            f.createNewFile();
+            return f;
+        }
     }
 
 
     protected SmbFile createTestDirectory () throws MalformedURLException, UnknownHostException, SmbException {
-        SmbFile f = new SmbFile(getDefaultShareRoot(), makeRandomDirectoryName());
-        f.mkdir();
-        return f;
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot() ) {
+            SmbFile f = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+            f.mkdir();
+            return f;
+        }
     }
 
 

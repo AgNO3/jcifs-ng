@@ -622,4 +622,12 @@ public interface Configuration {
      */
     boolean isIdleTimeoutDisabled ();
 
+
+    /**
+     * This is purely for debugging
+     * 
+     * @return whether to track the locations from which resources were created
+     */
+    boolean isTraceResourceUsage ();
+
 }

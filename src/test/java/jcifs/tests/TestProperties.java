@@ -53,4 +53,8 @@ public final class TestProperties {
 
     static final String EXCLUDE_TEST_MUTATIONS = "test.mutations.exclude";
 
+    static final Object TEST_FIFO_PIPE = "test.pipe.fifo";
+    static final Object TEST_TRANSACT_PIPE = "test.pipe.transact";
+    static final Object TEST_CALL_PIPE = "test.pipe.call";
+
 }

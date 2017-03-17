@@ -71,10 +71,10 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
         }
         synchronized ( this.connections ) {
             SmbComNegotiate negotiate = new SmbComNegotiate(tc.getConfig());
-            if ( log.isDebugEnabled() ) {
-                log.debug("Exclusive " + nonPooled + " enforced signing " + forceSigning);
+            if ( log.isTraceEnabled() ) {
+                log.trace("Exclusive " + nonPooled + " enforced signing " + forceSigning);
             }
-            if ( nonPooled || tc.getConfig().getSessionLimit() != 1 ) {
+            if ( !nonPooled && tc.getConfig().getSessionLimit() != 1 ) {
                 for ( SmbTransport conn : this.connections ) {
                     if ( conn.matches(address, port, localAddr, localPort, hostName)
                             && ( tc.getConfig().getSessionLimit() == 0 || conn.sessions.size() < tc.getConfig().getSessionLimit() ) ) {
@@ -101,10 +101,10 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                             continue;
                         }
 
-                        if ( log.isDebugEnabled() ) {
-                            log.debug("Reusing transport connection " + conn);
+                        if ( log.isTraceEnabled() ) {
+                            log.trace("Reusing transport connection " + conn);
                         }
-                        return conn;
+                        return conn.acquire();
                     }
                 }
             }
@@ -160,7 +160,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             toClose.addAll(this.nonPooledConnections);
             for ( SmbTransport conn : toClose ) {
                 try {
-                    conn.disconnect(false);
+                    conn.disconnect(false, false);
                 }
                 catch ( IOException e ) {
                     log.warn("Failed to close connection", e);
@@ -180,10 +180,11 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     @Override
     public byte[] getChallenge ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
-        SmbTransport trans = tf.getTransportPool()
-                .getSmbTransport(tf, dc, port, false, !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
-        trans.connect();
-        return trans.server.encryptionKey;
+        try ( SmbTransport trans = tf.getTransportPool()
+                .getSmbTransport(tf, dc, port, false, !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced()) ) {
+            trans.connect();
+            return trans.server.encryptionKey;
+        }
     }
 
 
@@ -195,16 +196,17 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     @Override
     public void logon ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
-        SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced());
-        SmbSession smbSession = smbTransport.getSmbSession(tf);
-        SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null);
-        if ( tf.getConfig().getLogonShare() == null ) {
-            tree.treeConnect(null, null);
-        }
-        else {
-            Trans2FindFirst2 req = new Trans2FindFirst2(tree.session.getConfig(), "\\", "*", SmbFile.ATTR_DIRECTORY);
-            Trans2FindFirst2Response resp = new Trans2FindFirst2Response(tree.session.getConfig());
-            tree.send(req, resp);
+        try ( SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced());
+              SmbSession smbSession = smbTransport.getSmbSession(tf);
+              SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null) ) {
+            if ( tf.getConfig().getLogonShare() == null ) {
+                tree.treeConnect(null, null);
+            }
+            else {
+                Trans2FindFirst2 req = new Trans2FindFirst2(smbSession.getConfig(), "\\", "*", SmbFile.ATTR_DIRECTORY);
+                Trans2FindFirst2Response resp = new Trans2FindFirst2Response(smbSession.getConfig());
+                tree.send(req, resp);
+            }
         }
     }
 

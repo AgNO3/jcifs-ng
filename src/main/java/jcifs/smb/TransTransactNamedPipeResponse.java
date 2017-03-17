@@ -19,19 +19,21 @@
 package jcifs.smb;
 
 
+import org.apache.log4j.Logger;
+
 import jcifs.Configuration;
 
 
 class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
 
-    private SmbNamedPipe pipe;
-    private TransactNamedPipeInputStream pipeIn;
+    private static final Logger log = Logger.getLogger(TransTransactNamedPipeResponse.class);
+
+    private SmbPipeHandle pipe;
 
 
-    TransTransactNamedPipeResponse ( Configuration config, SmbNamedPipe pipe, TransactNamedPipeInputStream pipeIn ) {
+    TransTransactNamedPipeResponse ( Configuration config, SmbPipeHandle pipe ) {
         super(config);
         this.pipe = pipe;
-        this.pipeIn = pipeIn;
     }
 
 
@@ -65,10 +67,19 @@ class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
     }
 
 
+    @SuppressWarnings ( "resource" )
     @Override
     int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        if ( this.pipeIn != null ) {
-            TransactNamedPipeInputStream in = this.pipeIn;
+        SmbPipeInputStream input;
+        try {
+            input = this.pipe.getInput();
+        }
+        catch ( SmbException e ) {
+            log.error("Failed to get pipe input stream", e);
+            input = null;
+        }
+        if ( input instanceof TransactNamedPipeInputStream ) {
+            TransactNamedPipeInputStream in = (TransactNamedPipeInputStream) input;
             synchronized ( in.lock ) {
                 in.receive(buffer, bufferIndex, len);
                 in.lock.notify();

@@ -23,12 +23,10 @@ public class SmbFileHandleImpl implements SmbFileHandle {
 
     private static final Logger log = Logger.getLogger(SmbFileHandleImpl.class);
 
-    private static final boolean TRACE_CREATION = true;
-
     private final Configuration cfg;
     private final int fid;
     private boolean open = true;
-    private final int tree_num; // for checking whether the tree changed
+    private final long tree_num; // for checking whether the tree changed
     private SmbTreeHandleImpl tree;
 
     private final AtomicLong usageCount = new AtomicLong(1);
@@ -62,7 +60,7 @@ public class SmbFileHandleImpl implements SmbFileHandle {
         this.tree = tree.acquire();
         this.tree_num = tree.getTreeId();
 
-        if ( TRACE_CREATION ) {
+        if ( cfg.isTraceResourceUsage() ) {
             this.creationBacktrace = Thread.currentThread().getStackTrace();
         }
         else {
@@ -233,7 +231,7 @@ public class SmbFileHandleImpl implements SmbFileHandle {
      */
     @Override
     public int hashCode () {
-        return this.fid + 3 * this.tree_num;
+        return (int) ( this.fid + 3 * this.tree_num );
     }
 
 

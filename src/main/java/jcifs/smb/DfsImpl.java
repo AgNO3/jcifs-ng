@@ -98,27 +98,28 @@ public class DfsImpl implements Dfs {
             // https://lists.samba.org/archive/samba-technical/2009-August/066486.html
             // UniAddress addr = UniAddress.getByName(authDomain, true, tf);
             // SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
-            SmbTransport trans = getDc(tf, authDomain);
-            CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
-            DfsReferral dr = null;
-            if ( trans != null ) {
-                // get domain referral
-                dr = trans.getDfsReferrals(tf, "", 0);
-            }
-            if ( dr != null ) {
-                DfsReferral start = dr;
-                do {
-                    String domain = dr.server.toLowerCase();
-                    entry.map.put(domain, new HashMap<String, CacheEntry<DfsReferral>>());
-                    if ( log.isTraceEnabled() ) {
-                        log.trace("Inserting cache entry for domain " + domain + ": " + dr);
-                    }
-                    dr = dr.next;
+            try ( SmbTransport trans = getDc(tf, authDomain) ) {
+                CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
+                DfsReferral dr = null;
+                if ( trans != null ) {
+                    // get domain referral
+                    dr = trans.getDfsReferrals(tf, "", 0);
                 }
-                while ( dr != start );
+                if ( dr != null ) {
+                    DfsReferral start = dr;
+                    do {
+                        String domain = dr.server.toLowerCase();
+                        entry.map.put(domain, new HashMap<String, CacheEntry<DfsReferral>>());
+                        if ( log.isTraceEnabled() ) {
+                            log.trace("Inserting cache entry for domain " + domain + ": " + dr);
+                        }
+                        dr = dr.next;
+                    }
+                    while ( dr != start );
 
-                this._domains = entry;
-                return this._domains.map;
+                    this._domains = entry;
+                    return this._domains.map;
+                }
             }
         }
         catch ( IOException ioe ) {
@@ -168,16 +169,16 @@ public class DfsImpl implements Dfs {
             try {
 
                 UniAddress addr = tf.getNameServiceClient().getByName(domain, true);
-                SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false);
-                synchronized ( trans ) {
-                    DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
-                    if ( log.isDebugEnabled() ) {
-                        log.debug("Got DC referral " + dr);
+                try ( SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false) ) {
+                    synchronized ( trans ) {
+                        DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Got DC referral " + dr);
+                        }
+                        ce.map.put(DC_ENTRY, dr);
+                        return dr;
                     }
-                    ce.map.put(DC_ENTRY, dr);
-                    return dr;
                 }
-
             }
             catch ( IOException ioe ) {
                 if ( log.isDebugEnabled() ) {
@@ -340,7 +341,6 @@ public class DfsImpl implements Dfs {
                     if ( log.isTraceEnabled() ) {
                         log.trace("Is a domain referral for " + domain);
                     }
-                    SmbTransport trans = null;
 
                     root = root.toLowerCase();
 
@@ -362,22 +362,25 @@ public class DfsImpl implements Dfs {
 
                     if ( links == null ) {
                         log.trace("Loadings links");
-                        if ( ( trans = getDc(tf, domain) ) == null )
-                            return null;
-                        // the tconHostName is from the DC referral, that referral must be resolved
-                        // before following deeper ones. Otherwise e.g. samba will return a broken
-                        // referral.
                         String refServerName = domain;
-                        synchronized ( trans ) {
-                            try {
-                                // ensure connected
-                                trans.connect();
-                                refServerName = trans.tconHostName;
+                        try ( SmbTransport trans = getDc(tf, domain) ) {
+                            if ( trans == null ) {
+                                return null;
                             }
-                            catch ( SmbException e ) {
-                                log.warn("Failed to connect to domain controller", e);
+                            // the tconHostName is from the DC referral, that referral must be resolved
+                            // before following deeper ones. Otherwise e.g. samba will return a broken
+                            // referral.
+                            synchronized ( trans ) {
+                                try {
+                                    // ensure connected
+                                    trans.connect();
+                                    refServerName = trans.tconHostName;
+                                }
+                                catch ( SmbException e ) {
+                                    log.warn("Failed to connect to domain controller", e);
+                                }
+                                dr = getReferral(tf, trans, refServerName, root, path);
                             }
-                            dr = getReferral(tf, trans, refServerName, root, path);
                         }
 
                         if ( log.isTraceEnabled() ) {
@@ -450,23 +453,23 @@ public class DfsImpl implements Dfs {
                         }
 
                         if ( dr == null ) {
-
-                            if ( trans == null )
-                                if ( ( trans = getDc(tf, domain) ) == null )
+                            try ( SmbTransport trans = getDc(tf, domain) ) {
+                                if ( trans == null )
                                     return null;
 
-                            dr = getReferral(tf, trans, domain, root, path);
-                            if ( dr != null ) {
+                                dr = getReferral(tf, trans, domain, root, path);
+                                if ( dr != null ) {
 
-                                dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
-                                dr.link = link;
-                                if ( log.isTraceEnabled() ) {
-                                    log.trace("Have referral " + dr);
+                                    dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
+                                    dr.link = link;
+                                    if ( log.isTraceEnabled() ) {
+                                        log.trace("Have referral " + dr);
+                                    }
+                                    links.map.put(link, dr);
                                 }
-                                links.map.put(link, dr);
-                            }
-                            else {
-                                log.trace("No referral found for " + link);
+                                else {
+                                    log.trace("No referral found for " + link);
+                                }
                             }
                         }
                         else {

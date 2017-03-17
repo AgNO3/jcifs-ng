@@ -122,6 +122,7 @@ public class BaseConfiguration implements Configuration {
         "NT LM 0.12"
             // , "SMB 2.???",
     };
+    protected boolean traceResourceUsage;
 
 
     /**
@@ -519,6 +520,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getMaxRequestRetries () {
         return this.maxRequestRetries;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isTraceResourceUsage()
+     */
+    @Override
+    public boolean isTraceResourceUsage () {
+        return this.traceResourceUsage;
     }
 
 

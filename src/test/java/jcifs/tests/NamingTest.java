@@ -134,41 +134,44 @@ public class NamingTest extends BaseCIFSTest {
 
 
     private void runFilenameTest ( String... names ) throws MalformedURLException, UnknownHostException, SmbException {
-        SmbFile d = createTestDirectory();
-        try {
+        try ( SmbFile d = createTestDirectory() ) {
+            try {
 
-            for ( String name : names ) {
-                SmbFile tf = new SmbFile(d, name);
-                tf.createNewFile();
+                for ( String name : names ) {
+                    try ( SmbFile tf = new SmbFile(d, name) ) {
+                        tf.createNewFile();
+                    }
+                }
+
+                // check that the expected name is returned from listing
+
+                String[] found = d.list();
+                String[] expect = names;
+
+                Arrays.sort(found);
+                Arrays.sort(expect);
+
+                Logger logger = Logger.getLogger(NamingTest.class);
+                if ( logger.isDebugEnabled() ) {
+                    logger.debug("Expect " + Arrays.toString(expect));
+                    logger.debug("Found " + Arrays.toString(found));
+                }
+
+                assertArrayEquals(expect, found);
+
+                // check that the name can be resolved via URL
+                URL purl = d.getURL();
+                for ( String name : names ) {
+                    URL u = new URL(purl, name);
+                    try ( SmbFile tf = new SmbFile(u, d.getTransportContext()) ) {
+                        assertTrue("File exists " + u, tf.exists());
+                        assertEquals(name, tf.getName());
+                    }
+                }
             }
-
-            // check that the expected name is returned from listing
-
-            String[] found = d.list();
-            String[] expect = names;
-
-            Arrays.sort(found);
-            Arrays.sort(expect);
-
-            Logger logger = Logger.getLogger(NamingTest.class);
-            if ( logger.isDebugEnabled() ) {
-                logger.debug("Expect " + Arrays.toString(expect));
-                logger.debug("Found " + Arrays.toString(found));
+            finally {
+                d.delete();
             }
-
-            assertArrayEquals(expect, found);
-
-            // check that the name can be resolved via URL
-            URL purl = d.getURL();
-            for ( String name : names ) {
-                URL u = new URL(purl, name);
-                SmbFile tf = new SmbFile(u, d.getTransportContext());
-                assertTrue("File exists " + u, tf.exists());
-                assertEquals(name, tf.getName());
-            }
-        }
-        finally {
-            d.delete();
         }
     }
 

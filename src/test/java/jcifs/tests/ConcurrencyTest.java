@@ -83,16 +83,17 @@ public class ConcurrencyTest extends BaseCIFSTest {
 
     @Test
     public void testExclusiveLock () throws InterruptedException, MalformedURLException, UnknownHostException {
-
         String fname = makeRandomName();
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+            ExclusiveLockFirst f = new ExclusiveLockFirst(exclFile);
+            ExclusiveLockSecond s = new ExclusiveLockSecond(f, exclFile);
 
-        ExclusiveLockFirst f = new ExclusiveLockFirst(new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE));
-        ExclusiveLockSecond s = new ExclusiveLockSecond(f, new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE));
-
-        List<MultiTestCase> runnables = new ArrayList<>();
-        runnables.add(f);
-        runnables.add(s);
-        runMultiTestCase(runnables, 5);
+            List<MultiTestCase> runnables = new ArrayList<>();
+            runnables.add(f);
+            runnables.add(s);
+            runMultiTestCase(runnables, 5);
+        }
     }
 
     private class ExclusiveLockFirst extends MultiTestCase {
@@ -224,29 +225,32 @@ public class ConcurrencyTest extends BaseCIFSTest {
     public void lockedWrites () throws InterruptedException, IOException {
         int n = 45;
         String fname = makeRandomName();
-        SmbFile f = new SmbFile(getDefaultShareRoot(), fname);
-        try {
-            f.createNewFile();
-            final AtomicInteger failCount = new AtomicInteger();
-            final AtomicInteger writeCount = new AtomicInteger();
-            List<MultiTestCase> runnables = new ArrayList<>();
-            for ( int i = 0; i < n; i++ ) {
-                runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE)));
-            }
-            runMultiTestCase(runnables, 20);
 
-            int readCnt = 0;
-            try ( InputStream is = f.getInputStream() ) {
-                while ( is.read() >= 0 ) {
-                    readCnt++;
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbFile f = new SmbFile(sr, fname) ) {
+            try {
+                f.createNewFile();
+                final AtomicInteger failCount = new AtomicInteger();
+                final AtomicInteger writeCount = new AtomicInteger();
+                List<MultiTestCase> runnables = new ArrayList<>();
+                for ( int i = 0; i < n; i++ ) {
+                    runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE)));
                 }
+                runMultiTestCase(runnables, 20);
+
+                int readCnt = 0;
+                try ( InputStream is = f.getInputStream() ) {
+                    while ( is.read() >= 0 ) {
+                        readCnt++;
+                    }
+                }
+                log.debug("Failures " + failCount.get() + " wrote " + writeCount.get() + " read " + readCnt);
+                assertEquals(writeCount.get(), readCnt);
+                assertEquals(n, failCount.get() + writeCount.get());
             }
-            log.debug("Failures " + failCount.get() + " wrote " + writeCount.get() + " read " + readCnt);
-            assertEquals(writeCount.get(), readCnt);
-            assertEquals(n, failCount.get() + writeCount.get());
-        }
-        finally {
-            f.delete();
+            finally {
+                f.delete();
+            }
         }
     }
 
@@ -287,6 +291,9 @@ public class ConcurrencyTest extends BaseCIFSTest {
                     return;
                 }
                 log.error("Unexpected error", e);
+            }
+            finally {
+                this.file.close();
             }
         }
     }
@@ -329,22 +336,23 @@ public class ConcurrencyTest extends BaseCIFSTest {
         public void run () {
 
             try {
-                SmbFile f = createTestFile();
-                try {
-                    f.exists();
-                    try ( OutputStream os = f.getOutputStream() ) {
-                        os.write(new byte[] {
-                            1, 2, 3, 4, 5, 6, 7, 8
-                        });
-                    }
+                try ( SmbFile f = createTestFile() ) {
+                    try {
+                        f.exists();
+                        try ( OutputStream os = f.getOutputStream() ) {
+                            os.write(new byte[] {
+                                1, 2, 3, 4, 5, 6, 7, 8
+                            });
+                        }
 
-                    try ( InputStream is = f.getInputStream() ) {
-                        byte data[] = new byte[8];
-                        is.read(data);
+                        try ( InputStream is = f.getInputStream() ) {
+                            byte data[] = new byte[8];
+                            is.read(data);
+                        }
                     }
-                }
-                finally {
-                    f.delete();
+                    finally {
+                        f.delete();
+                    }
                 }
                 this.completed = true;
             }

@@ -962,8 +962,8 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             return addrs;
         }
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("Resolver order is " + this.transportContext.getConfig().getResolveOrder());
+        if ( log.isTraceEnabled() ) {
+            log.trace("Resolver order is " + this.transportContext.getConfig().getResolveOrder());
         }
 
         for ( ResolverType resolver : this.transportContext.getConfig().getResolveOrder() ) {

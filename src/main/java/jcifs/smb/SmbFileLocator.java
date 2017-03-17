@@ -199,7 +199,6 @@ public class SmbFileLocator {
      *
      * @return The canonicalized URL of this SMB resource.
      */
-
     public String getCanonicalPath () {
         String str = this.url.getAuthority();
         canonicalizePath();
@@ -218,7 +217,6 @@ public class SmbFileLocator {
      *
      * @return The share component or <code>null</code> if there is no share
      */
-
     public String getShare () {
         return this.share;
     }
@@ -257,22 +255,6 @@ public class SmbFileLocator {
 
 
     /**
-     * @return the transport port, if specified
-     */
-    public int getPort () {
-        return this.url.getPort();
-    }
-
-
-    /**
-     * @return the original URL
-     */
-    public URL getURL () {
-        return this.url;
-    }
-
-
-    /**
      * If the path of this <code>SmbFile</code> falls within a DFS volume,
      * this method will return the referral path to which it maps. Otherwise
      * <code>null</code> is returned.
@@ -290,6 +272,22 @@ public class SmbFileLocator {
 
 
     /**
+     * @return the transport port, if specified
+     */
+    public int getPort () {
+        return this.url.getPort();
+    }
+
+
+    /**
+     * @return the original URL
+     */
+    public URL getURL () {
+        return this.url;
+    }
+
+
+    /**
      * @return whether to enforce the use of signing on connection to this resource
      */
     public boolean shouldForceSigning () {
@@ -298,15 +296,12 @@ public class SmbFileLocator {
 
 
     /**
-     * @return whether this is a IPC
+     * @return whether this is a IPC connection
      */
     public boolean isIPC () {
-        if ( log.isDebugEnabled() ) {
-            log.debug("Check " + this.share);
-        }
         if ( this.share == null || "IPC$".equals(this.share) ) {
             if ( log.isDebugEnabled() ) {
-                log.debug("Share is " + this.share + " enforcing signing");
+                log.debug("Share is IPC " + this.share);
             }
             return true;
         }

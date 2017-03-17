@@ -707,6 +707,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isTraceResourceUsage()
+     */
+    @Override
+    public boolean isTraceResourceUsage () {
+        return this.delegate.isTraceResourceUsage();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getSupportedDialects()
      */

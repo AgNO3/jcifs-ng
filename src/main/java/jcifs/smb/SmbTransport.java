@@ -145,6 +145,17 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Transport#acquire()
+     */
+    @Override
+    public SmbTransport acquire () {
+        return (SmbTransport) super.acquire();
+    }
+
+
+    /**
      * @return the server's encryption key
      */
     public byte[] getServerEncryptionKey () {
@@ -161,22 +172,22 @@ public class SmbTransport extends Transport implements SmbConstants {
      *            context to use
      * @return a session for the context
      */
+    @SuppressWarnings ( "resource" )
     public synchronized SmbSession getSmbSession ( CIFSContext tf ) {
-        SmbSession ssn;
         long now;
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("Currently " + this.sessions.size() + " session(s) active for " + this);
+        if ( log.isTraceEnabled() ) {
+            log.trace("Currently " + this.sessions.size() + " session(s) active for " + this);
         }
 
         ListIterator<SmbSession> iter = this.sessions.listIterator();
         while ( iter.hasNext() ) {
-            ssn = iter.next();
+            SmbSession ssn = iter.next();
             if ( ssn.matches(tf) ) {
                 if ( log.isTraceEnabled() ) {
                     log.trace("Reusing existing session " + ssn);
                 }
-                return ssn;
+                return ssn.acquire();
             }
             else if ( log.isTraceEnabled() ) {
                 log.trace("Existing session " + ssn + " does not match " + tf.getCredentials());
@@ -188,16 +199,16 @@ public class SmbTransport extends Transport implements SmbConstants {
             this.sessionExpiration = now + tf.getConfig().getSessionTimeout();
             iter = this.sessions.listIterator();
             while ( iter.hasNext() ) {
-                ssn = iter.next();
+                SmbSession ssn = iter.next();
                 if ( ssn.getExpiration() != null && ssn.getExpiration() < now ) {
                     if ( log.isDebugEnabled() ) {
                         log.debug("Closing session after timeout " + ssn);
                     }
-                    ssn.logoff(false);
+                    ssn.logoff(false, false);
                 }
             }
         }
-        ssn = new SmbSession(tf, this, this.address, this.port, this.localAddr, this.localPort);
+        SmbSession ssn = new SmbSession(tf, this);
         if ( log.isDebugEnabled() ) {
             log.debug("Establishing new session " + ssn + " on " + this.name);
         }
@@ -477,8 +488,13 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     @Override
-    protected synchronized void doDisconnect ( boolean hard ) throws IOException {
+    protected synchronized void doDisconnect ( boolean hard, boolean inUse ) throws IOException {
         ListIterator<SmbSession> iter = this.sessions.listIterator();
+
+        long l = getUsageCount();
+        if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
+            log.warn("Disconnecting transport while still in use " + this + ": " + this.sessions);
+        }
 
         if ( log.isDebugEnabled() ) {
             log.debug("Disconnecting transport " + this);
@@ -489,9 +505,10 @@ public class SmbTransport extends Transport implements SmbConstants {
                 log.trace("Currently " + this.sessions.size() + " session(s) active for " + this);
             }
             while ( iter.hasNext() ) {
+                @SuppressWarnings ( "resource" )
                 SmbSession ssn = iter.next();
                 try {
-                    ssn.logoff(hard);
+                    ssn.logoff(hard, false);
                 }
                 catch ( Exception e ) {
                     log.debug("Failed to close session", e);
@@ -750,7 +767,9 @@ public class SmbTransport extends Transport implements SmbConstants {
                 dr = getDfsReferrals(getTransportContext(), req.path, 1);
             }
             if ( dr == null ) {
-                log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8));
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8));
+                }
                 throw new SmbException(resp.errorCode, null);
             }
 
@@ -764,7 +783,9 @@ public class SmbTransport extends Transport implements SmbConstants {
         case NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED:
             break; /* normal for NTLMSSP */
         default:
-            log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8) + " for " + req.getClass().getSimpleName());
+            if ( log.isDebugEnabled() ) {
+                log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8) + " for " + req.getClass().getSimpleName());
+            }
             throw new SmbException(resp.errorCode, null);
         }
         if ( resp.verifyFailed ) {
@@ -911,7 +932,8 @@ public class SmbTransport extends Transport implements SmbConstants {
 
     @Override
     public String toString () {
-        return super.toString() + "[" + this.address + ":" + this.port + ",state=" + this.state + ",signingEnforced=" + this.signingEnforced + "]";
+        return super.toString() + "[" + this.address + ":" + this.port + ",state=" + this.state + ",signingEnforced=" + this.signingEnforced
+                + ",usage=" + this.getUsageCount() + "]";
     }
 
 
@@ -925,79 +947,82 @@ public class SmbTransport extends Transport implements SmbConstants {
             throw new SmbException("Path must not start with double slash: " + path);
         }
 
-        SmbSession sess = getSmbSession(ctx);
-        SmbTree ipc = sess.getSmbTree("IPC$", null);
+        try ( SmbSession sess = getSmbSession(ctx);
+              SmbTransport transport = sess.getTransport();
+              SmbTree ipc = sess.getSmbTree("IPC$", null) ) {
 
-        if ( ( sess.getTransport().flags2 & SmbConstants.FLAGS2_UNICODE ) == 0 ) {
-            log.debug("Unicode is disabled");
-        }
-
-        Trans2GetDfsReferralResponse resp = new Trans2GetDfsReferralResponse(ctx.getConfig());
-
-        ipc.send(new Trans2GetDfsReferral(ctx.getConfig(), path), resp);
-
-        if ( resp.numReferrals == 0 ) {
-            return null;
-        }
-        else if ( rn == 0 || resp.numReferrals < rn ) {
-            rn = resp.numReferrals;
-        }
-
-        DfsReferral dr = new DfsReferral();
-
-        String[] arr = new String[4];
-        long expiration = System.currentTimeMillis() + ( ctx.getConfig().getDfsTtl() * 1000 );
-
-        int di = 0;
-        for ( ;; ) {
-            /*
-             * NTLM HTTP Authentication must be re-negotiated
-             * with challenge from 'server' to access DFS vol.
-             */
-            if ( ctx.getCredentials() instanceof NtlmPasswordAuthentication ) {
-                dr.resolveHashes = ( (NtlmPasswordAuthentication) ctx.getCredentials() ).areHashesExternal();
+            if ( ( transport.flags2 & SmbConstants.FLAGS2_UNICODE ) == 0 ) {
+                log.debug("Unicode is disabled");
             }
-            dr.ttl = resp.referrals[ di ].ttl;
-            dr.rflags = resp.referrals[ di ].rflags;
-            dr.expiration = expiration;
-            if ( ( dr.rflags & Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) == Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) {
-                if ( resp.referrals[ di ].expandedNames.length > 0 ) {
-                    dr.server = resp.referrals[ di ].expandedNames[ 0 ].substring(1).toLowerCase();
+
+            Trans2GetDfsReferralResponse resp = new Trans2GetDfsReferralResponse(ctx.getConfig());
+
+            ipc.send(new Trans2GetDfsReferral(ctx.getConfig(), path), resp);
+
+            if ( resp.numReferrals == 0 ) {
+                return null;
+            }
+            else if ( rn == 0 || resp.numReferrals < rn ) {
+                rn = resp.numReferrals;
+            }
+
+            DfsReferral dr = new DfsReferral();
+
+            String[] arr = new String[4];
+            long expiration = System.currentTimeMillis() + ( ctx.getConfig().getDfsTtl() * 1000 );
+
+            int di = 0;
+            for ( ;; ) {
+                /*
+                 * NTLM HTTP Authentication must be re-negotiated
+                 * with challenge from 'server' to access DFS vol.
+                 */
+                if ( ctx.getCredentials() instanceof NtlmPasswordAuthentication ) {
+                    dr.resolveHashes = ( (NtlmPasswordAuthentication) ctx.getCredentials() ).areHashesExternal();
+                }
+                dr.ttl = resp.referrals[ di ].ttl;
+                dr.rflags = resp.referrals[ di ].rflags;
+                dr.expiration = expiration;
+                if ( ( dr.rflags
+                        & Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) == Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) {
+                    if ( resp.referrals[ di ].expandedNames.length > 0 ) {
+                        dr.server = resp.referrals[ di ].expandedNames[ 0 ].substring(1).toLowerCase();
+                    }
+                    else {
+                        dr.server = resp.referrals[ di ].specialName.substring(1).toLowerCase();
+                    }
+                    if ( log.isDebugEnabled() ) {
+                        log.debug(
+                            "Server " + dr.server + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
+                                    + resp.pathConsumed);
+                    }
                 }
                 else {
-                    dr.server = resp.referrals[ di ].specialName.substring(1).toLowerCase();
+                    if ( log.isDebugEnabled() ) {
+                        log.debug(
+                            "Node " + resp.referrals[ di ].node + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
+                                    + resp.pathConsumed);
+                    }
+                    dfsPathSplit(resp.referrals[ di ].node, arr);
+                    dr.server = arr[ 1 ];
+                    dr.share = arr[ 2 ];
+                    dr.path = arr[ 3 ];
                 }
-                if ( log.isDebugEnabled() ) {
-                    log.debug(
-                        "Server " + dr.server + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
-                                + resp.pathConsumed);
-                }
+                dr.pathConsumed = resp.pathConsumed;
+
+                di++;
+                if ( di == rn )
+                    break;
+
+                dr.append(new DfsReferral());
+                dr = dr.next;
             }
-            else {
-                if ( log.isDebugEnabled() ) {
-                    log.debug(
-                        "Node " + resp.referrals[ di ].node + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
-                                + resp.pathConsumed);
-                }
-                dfsPathSplit(resp.referrals[ di ].node, arr);
-                dr.server = arr[ 1 ];
-                dr.share = arr[ 2 ];
-                dr.path = arr[ 3 ];
+
+            if ( log.isDebugEnabled() ) {
+                log.debug("Got referral " + dr);
             }
-            dr.pathConsumed = resp.pathConsumed;
-
-            di++;
-            if ( di == rn )
-                break;
-
-            dr.append(new DfsReferral());
-            dr = dr.next;
+            return dr.next;
         }
-
-        if ( log.isDebugEnabled() ) {
-            log.debug("Got referral " + dr);
-        }
-        return dr.next;
     }
 
 

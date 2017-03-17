@@ -23,8 +23,11 @@ import java.net.SocketTimeoutException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+
+import jcifs.RuntimeCIFSException;
 
 
 /**
@@ -36,9 +39,9 @@ import org.apache.log4j.Logger;
  * concurrently.
  */
 
-public abstract class Transport implements Runnable {
+public abstract class Transport implements Runnable, AutoCloseable {
 
-    static int id = 0;
+    private static int id = 0;
     private static final Logger log = Logger.getLogger(Transport.class);
 
 
@@ -88,6 +91,69 @@ public abstract class Transport implements Runnable {
     protected Map<Request, Response> response_map = new ConcurrentHashMap<>(4);
     private boolean noTimeout;
     private boolean noIdleTimeout;
+    private final AtomicLong usageCount = new AtomicLong(1);
+
+
+    /**
+     * @return session increased usage count
+     */
+    public Transport acquire () {
+        long usage = this.usageCount.incrementAndGet();
+        if ( log.isTraceEnabled() ) {
+            log.trace("Acquire transport " + usage + " " + this);
+        }
+        return this;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.AutoCloseable#close()
+     */
+    @Override
+    public void close () {
+        release();
+    }
+
+
+    /**
+     * 
+     */
+    public void release () {
+        long usage = this.usageCount.decrementAndGet();
+        if ( log.isTraceEnabled() ) {
+            log.trace("Release transport " + usage + " " + this);
+        }
+
+        if ( usage == 0 ) {
+            log.debug("Transport usage dropped to zero " + this);
+        }
+        else if ( usage < 0 ) {
+            throw new RuntimeCIFSException("Usage count dropped below zero");
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize () throws Throwable {
+        if ( !isDisconnected() && this.usageCount.get() != 0 ) {
+            log.warn("Session was not properly released");
+        }
+    }
+
+
+    /**
+     * @return the number of known usages
+     */
+    protected long getUsageCount () {
+        return this.usageCount.get();
+    }
 
 
     /**
@@ -223,6 +289,11 @@ public abstract class Transport implements Runnable {
                         continue;
                     }
 
+                    if ( getUsageCount() > 0 ) {
+                        log.debug("Transport still in use, no idle timeout");
+                        continue;
+                    }
+
                     boolean haveUnexpired = false;
                     boolean haveRequest = false;
                     long now = System.currentTimeMillis();
@@ -280,8 +351,9 @@ public abstract class Transport implements Runnable {
                 synchronized ( this ) {
                     Response response = this.response_map.get(key);
                     if ( response == null ) {
-                        if ( log.isTraceEnabled() )
+                        if ( log.isTraceEnabled() ) {
                             log.trace("Invalid key, skipping message");
+                        }
                         doSkip();
                     }
                     else {
@@ -305,8 +377,7 @@ public abstract class Transport implements Runnable {
 
                 synchronized ( this ) {
                     try {
-
-                        disconnect(!timeout);
+                        disconnect(!timeout, false);
                     }
                     catch ( IOException ioe ) {
                         ex.addSuppressed(ioe);
@@ -339,7 +410,7 @@ public abstract class Transport implements Runnable {
      * this transport.
      */
 
-    protected abstract void doDisconnect ( boolean hard ) throws IOException;
+    protected abstract void doDisconnect ( boolean hard, boolean inUse ) throws IOException;
 
 
     /**
@@ -448,6 +519,19 @@ public abstract class Transport implements Runnable {
      * @throws IOException
      */
     public synchronized void disconnect ( boolean hard ) throws IOException {
+        disconnect(hard, true);
+    }
+
+
+    /**
+     * Disconnect the transport
+     * 
+     * @param hard
+     * @param inUse
+     *            whether the caller is holding a usage reference on the transport
+     * @throws IOException
+     */
+    public synchronized void disconnect ( boolean hard, boolean inUse ) throws IOException {
         IOException ioe = null;
 
         switch ( this.state ) {
@@ -462,7 +546,7 @@ public abstract class Transport implements Runnable {
             }
             try {
                 this.state = 5;
-                doDisconnect(hard);
+                doDisconnect(hard, inUse);
                 this.state = 0;
             }
             catch ( IOException ioe0 ) {
@@ -470,7 +554,7 @@ public abstract class Transport implements Runnable {
                 ioe = ioe0;
             }
         case 4: /* failed to connect - reset the transport */
-            // thread is cleaned up by connect routing, joining it here causes a deadlock
+            // thread is cleaned up by connect routine, joining it here causes a deadlock
             this.thread = null;
             this.state = 0;
             break;

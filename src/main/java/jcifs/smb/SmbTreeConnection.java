@@ -10,10 +10,13 @@ package jcifs.smb;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
 import jcifs.CIFSContext;
+import jcifs.Configuration;
+import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.netbios.UniAddress;
 import jcifs.smb.SmbTransport.ServerData;
@@ -28,9 +31,15 @@ public class SmbTreeConnection {
     private static final Logger log = Logger.getLogger(SmbTreeConnection.class);
 
     private final CIFSContext ctx;
+    private final SmbTreeConnection delegate;
     private SmbTree tree;
+    private volatile boolean treeAcquired;
+    private volatile boolean delegateAcquired;
+
     private SmbTransport exclusiveTransport;
     private boolean nonPooled;
+
+    private final AtomicLong usageCount = new AtomicLong();
 
     private static final Random RAND = new Random();
 
@@ -41,43 +50,196 @@ public class SmbTreeConnection {
      */
     public SmbTreeConnection ( CIFSContext ctx ) {
         this.ctx = ctx;
+        this.delegate = null;
     }
 
 
     /**
-     * @return session that this file has been loaded through
+     * @param treeConnection
      */
-    public SmbSession getSession () {
+    public SmbTreeConnection ( SmbTreeConnection treeConnection ) {
+        this.ctx = treeConnection.ctx;
+        this.delegate = treeConnection.acquire();
+        this.delegateAcquired = true;
+    }
+
+
+    /**
+     * @return the active configuration
+     */
+    public Configuration getConfig () {
+        return this.ctx.getConfig();
+    }
+
+
+    private synchronized SmbTree getTree () {
         SmbTree t = this.tree;
         if ( t != null ) {
-            return t.session;
+            return t.acquire();
+        }
+        else if ( this.delegate != null ) {
+            return this.delegate.getTree();
+        }
+        return t;
+    }
+
+
+    /**
+     * @return
+     */
+    private synchronized SmbTree getTreeInternal () {
+        SmbTree t = this.tree;
+        if ( t != null ) {
+            return t;
+        }
+        if ( this.delegate != null ) {
+            return this.delegate.getTreeInternal();
         }
         return null;
     }
 
 
     /**
-     * @param cap
-     * @return whether the capability is available
-     * @throws SmbException
+     * @param connectTree
      */
-    public boolean hasCapability ( int cap ) throws SmbException {
-        SmbSession s = this.getSession();
-        if ( s != null ) {
-            return s.getTransport().hasCapability(cap);
+    private synchronized void switchTree ( SmbTree t ) {
+        try ( SmbTree old = getTree() ) {
+            if ( old == t ) {
+                return;
+            }
+            boolean wasAcquired = this.treeAcquired;
+            log.debug("Switching tree");
+            if ( t != null ) {
+                log.debug("Acquired tree on switch " + t);
+                t.acquire();
+                this.treeAcquired = true;
+            }
+            else {
+                this.treeAcquired = false;
+            }
+
+            this.tree = t;
+            if ( old != null ) {
+                if ( wasAcquired ) {
+                    // release
+                    old.release();
+                }
+            }
+            if ( this.delegate != null && this.delegateAcquired ) {
+                log.debug("Releasing delegate");
+                this.delegateAcquired = false;
+                this.delegate.release();
+            }
         }
-        throw new SmbException("Not connected");
+    }
+
+
+    /**
+     * @return tree connection with increased usage count
+     */
+    public SmbTreeConnection acquire () {
+        long usage = this.usageCount.incrementAndGet();
+        if ( log.isTraceEnabled() ) {
+            log.trace("Acquire tree connection " + usage + " " + this);
+        }
+
+        if ( usage == 1 ) {
+            synchronized ( this ) {
+                try ( SmbTree t = getTree() ) {
+                    if ( t != null ) {
+                        if ( !this.treeAcquired ) {
+                            if ( log.isDebugEnabled() ) {
+                                log.debug("Acquire tree on first usage " + t);
+                            }
+                            t.acquire();
+                            this.treeAcquired = true;
+                        }
+                    }
+                }
+                if ( this.delegate != null && !this.delegateAcquired ) {
+                    log.debug("Acquire delegate on first usage");
+                    this.delegate.acquire();
+                    this.delegateAcquired = true;
+                }
+            }
+        }
+
+        return this;
+
+    }
+
+
+    /**
+     * 
+     */
+    public void release () {
+        long usage = this.usageCount.decrementAndGet();
+        if ( log.isTraceEnabled() ) {
+            log.trace("Release tree connection " + usage + " " + this);
+        }
+
+        if ( usage == 0 ) {
+            synchronized ( this ) {
+                try ( SmbTree t = getTree() ) {
+                    if ( this.treeAcquired && t != null ) {
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Tree connection no longer in use, release tree " + t);
+                        }
+                        t.release();
+                    }
+                }
+                if ( this.delegate != null && this.delegateAcquired ) {
+                    this.delegateAcquired = false;
+                    this.delegate.release();
+                }
+            }
+
+            SmbTransport et = this.exclusiveTransport;
+            if ( et != null ) {
+                try {
+                    log.debug("Disconnecting exclusive transport");
+                    this.exclusiveTransport = null;
+                    et.release();
+                    et.doDisconnect(false, false);
+                }
+                catch ( IOException e ) {
+                    log.error("Failed to close exclusive transport", e);
+                }
+            }
+        }
+        else if ( usage < 0 ) {
+            log.error("Usage count dropped below zero " + this);
+            throw new RuntimeCIFSException("Usage count dropped below zero");
+        }
+
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize () throws Throwable {
+        if ( isConnected() && this.usageCount.get() != 0 ) {
+            log.warn("Tree connection was not properly released");
+        }
     }
 
 
     synchronized void disconnect ( boolean inError ) {
-        SmbTransport transport = this.getSession().transport();
-        synchronized ( transport ) {
-            SmbTree t = this.tree;
-            if ( t != null ) {
-                t.treeDisconnect(inError);
-                t.session.logoff(inError);
-                this.tree = null;
+        try ( SmbSession session = getSession();
+              SmbTransport transport = session.getTransport() ) {
+            synchronized ( transport ) {
+                SmbTree t = getTreeInternal();
+                if ( t != null ) {
+                    t.treeDisconnect(inError, true);
+                    if ( inError ) {
+                        session.logoff(inError, true);
+                    }
+                    this.tree = null;
+                }
             }
         }
     }
@@ -131,7 +293,8 @@ public class SmbTreeConnection {
         for ( ;; ) {
             ensureDFSResolved(loc, request);
             try {
-                this.tree.send(request, response, timeout);
+                SmbTree t = getTreeInternal();
+                t.send(request, response, timeout);
                 break;
             }
             catch ( DfsReferral dre ) {
@@ -172,43 +335,52 @@ public class SmbTreeConnection {
      * @throws IOException
      */
     public synchronized SmbTreeHandleImpl connect ( SmbFileLocator loc ) throws IOException {
-        if ( isConnected() && getSession().getTransport().tconHostName == null ) {
-            /*
-             * Tree/session thinks it is connected but transport disconnected
-             * under it, reset tree to reflect the truth.
-             */
-            log.debug("Disconnecting failed tree and session");
-            disconnect(true);
+        try ( SmbSession session = getSession() ) {
+            if ( isConnected() ) {
+                try ( SmbTransport transport = session.getTransport() ) {
+                    if ( transport.tconHostName == null ) {
+                        /*
+                         * Tree/session thinks it is connected but transport disconnected
+                         * under it, reset tree to reflect the truth.
+                         */
+                        log.debug("Disconnecting failed tree and session");
+                        disconnect(true);
+                    }
+                }
+            }
+
+            if ( isConnected() ) {
+                log.trace("Already connected");
+                return new SmbTreeHandleImpl(loc, this);
+            }
+
+            loc.canonicalizePath();
+            UniAddress addr = loc.getFirstAddress();
+            for ( ;; ) {
+                try {
+                    return connectHost(loc, addr);
+                }
+                catch ( SmbAuthException sae ) {
+                    throw sae; // Prevents account lockout on servers with multiple IPs
+                }
+                catch ( SmbException se ) {
+                    if ( ( addr = loc.getNextAddress() ) == null )
+                        throw se;
+                    log.debug("Connect failed", se);
+                }
+            }
         }
 
-        if ( isConnected() ) {
-            log.trace("Already connected");
-            return new SmbTreeHandleImpl(loc, this);
-        }
-
-        loc.canonicalizePath();
-        UniAddress addr = loc.getFirstAddress();
-        for ( ;; ) {
-            try {
-                return connectHost(loc, addr);
-            }
-            catch ( SmbAuthException sae ) {
-                throw sae; // Prevents account lockout on servers with multiple IPs
-            }
-            catch ( SmbException se ) {
-                if ( ( addr = loc.getNextAddress() ) == null )
-                    throw se;
-                log.debug("Connect failed", se);
-            }
-        }
     }
 
 
     /**
      * @return whether we have a valid tree connection
      */
+    @SuppressWarnings ( "resource" )
     public synchronized boolean isConnected () {
-        return this.tree != null && this.tree.isConnected();
+        SmbTree t = getTreeInternal();
+        return t != null && t.isConnected();
     }
 
 
@@ -220,31 +392,42 @@ public class SmbTreeConnection {
      * @throws IOException
      */
     public synchronized SmbTreeHandleImpl connectHost ( SmbFileLocator loc, UniAddress addr ) throws IOException {
-        SmbTransport trans;
-        SmbTree t;
-        if ( log.isDebugEnabled() ) {
-            log.debug("Tree is " + this.tree);
+        try ( SmbTree t = getTree() ) {
+            if ( t != null ) {
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Tree is " + t);
+                }
+                try ( SmbSession session = t.getSession();
+                      SmbTransport trans = session.getTransport();
+                      SmbTree ct = connectTree(loc, addr, trans, t) ) {
+                    switchTree(ct);
+                    return new SmbTreeHandleImpl(loc, this);
+                }
+            }
         }
-        if ( this.tree != null ) {
-            trans = getSession().getTransport();
-            t = this.tree;
-        }
-        else if ( this.nonPooled ) {
+
+        if ( this.nonPooled ) {
             if ( log.isDebugEnabled() ) {
                 log.debug("Using exclusive transport for " + this);
             }
             this.exclusiveTransport = this.ctx.getTransportPool().getSmbTransport(this.ctx, addr, loc.getPort(), true, loc.shouldForceSigning());
-            trans = this.exclusiveTransport;
+            SmbTransport trans = this.exclusiveTransport;
             trans.setDontTimeout(true);
-            t = trans.getSmbSession(this.ctx).getSmbTree(loc.getShare(), null);
-        }
-        else {
-            trans = this.ctx.getTransportPool().getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning());
-            t = trans.getSmbSession(this.ctx).getSmbTree(loc.getShare(), null);
+            try ( SmbSession smbSession = trans.getSmbSession(this.ctx);
+                  SmbTree uct = smbSession.getSmbTree(loc.getShare(), null);
+                  SmbTree ct = connectTree(loc, addr, trans, uct) ) {
+                switchTree(ct);
+                return new SmbTreeHandleImpl(loc, this);
+            }
         }
 
-        this.tree = connectTree(loc, addr, trans, t);
-        return new SmbTreeHandleImpl(loc, this);
+        try ( SmbTransport trans = this.ctx.getTransportPool().getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning());
+              SmbSession smbSession = trans.getSmbSession(this.ctx);
+              SmbTree uct = smbSession.getSmbTree(loc.getShare(), null);
+              SmbTree ct = connectTree(loc, addr, trans, uct) ) {
+            switchTree(ct);
+            return new SmbTreeHandleImpl(loc, this);
+        }
     }
 
 
@@ -263,57 +446,44 @@ public class SmbTreeConnection {
         }
 
         String hostName = loc.getServerWithDfs();
-        DfsReferral referral = this.ctx.getDfs().resolve(this.ctx, hostName, t.share, null);
-        t.inDomainDfs = referral != null;
-        if ( t.inDomainDfs ) {
+        DfsReferral referral = this.ctx.getDfs().resolve(this.ctx, hostName, t.getShare(), null);
+        if ( referral != null ) {
+            t.markDomainDfs();
             // make sure transport is connected
             trans.connect();
-            t.connectionState = 2;
+            t.markConnected();
         }
 
         try {
-            if ( log.isTraceEnabled() )
+            if ( log.isTraceEnabled() ) {
                 log.trace("doConnect: " + addr);
-
+            }
             t.treeConnect(null, null);
+            return t.acquire();
         }
         catch ( SmbAuthException sae ) {
             log.debug("Authentication failed", sae);
-            SmbSession ssn;
             if ( loc.isIPC() ) { // IPC$ - try "anonymous" credentials
-                ssn = trans.getSmbSession(this.ctx.withAnonymousCredentials());
-                t = ssn.getSmbTree(null, null);
-                t.treeConnect(null, null);
+                try ( SmbSession s = trans.getSmbSession(this.ctx.withAnonymousCredentials());
+                      SmbTree tr = s.getSmbTree(null, null) ) {
+                    tr.treeConnect(null, null);
+                    return tr.acquire();
+                }
             }
             else if ( this.ctx.renewCredentials(loc.getURL().toString(), sae) ) {
                 log.debug("Trying to renew credentials after auth error");
-                ssn = trans.getSmbSession(this.ctx);
-                t = ssn.getSmbTree(loc.getShare(), null);
-                t.inDomainDfs = referral != null;
-                if ( this.tree.inDomainDfs ) {
-                    this.tree.connectionState = 2;
+                try ( SmbSession s = trans.getSmbSession(this.ctx);
+                      SmbTree tr = s.getSmbTree(loc.getShare(), null) ) {
+                    if ( referral != null ) {
+                        tr.markDomainDfs();
+                        tr.markConnected();
+                    }
+                    tr.treeConnect(null, null);
+                    return tr.acquire();
                 }
-                t.treeConnect(null, null);
             }
             else {
                 throw sae;
-            }
-        }
-        return t;
-    }
-
-
-    /**
-     * @throws SmbException
-     */
-    public void close () throws SmbException {
-        if ( this.exclusiveTransport != null ) {
-            try {
-                log.debug("Disconnecting exclusive transport");
-                this.exclusiveTransport.doDisconnect(false);
-            }
-            catch ( IOException e ) {
-                throw new SmbException("Failed to close exclusive transport");
             }
         }
     }
@@ -362,16 +532,16 @@ public class SmbTreeConnection {
 
 
     private SmbFileLocator resolveDfs0 ( SmbFileLocator loc, ServerMessageBlock request ) throws SmbException {
-        try ( SmbTreeHandle connectWrapException = connectWrapException(loc) ) {
-            SmbSession session = getSession();
-            SmbTransport transport = session.getTransport();
-            DfsReferral dr = this.ctx.getDfs().resolve(this.ctx, transport.tconHostName, this.tree.share, loc.getUncPath());
-
+        try ( SmbTreeHandleImpl th = connectWrapException(loc);
+              SmbSession session = th.getSession();
+              SmbTransport transport = session.getTransport();
+              SmbTree t = getTree() ) {
+            DfsReferral dr = this.ctx.getDfs().resolve(this.ctx, transport.tconHostName, loc.getShare(), loc.getUncPath());
             if ( dr != null ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Info " + transport.tconHostName + "\\" + this.tree.share + loc.getUncPath() + " -> " + dr);
+                    log.debug("Info " + transport.tconHostName + "\\" + loc.getShare() + loc.getUncPath() + " -> " + dr);
                 }
-                String service = this.tree != null ? this.tree.service : null;
+                String service = t != null ? t.getService() : null;
 
                 if ( request != null ) {
                     switch ( request.command ) {
@@ -398,7 +568,7 @@ public class SmbTreeConnection {
 
                 return loc;
             }
-            else if ( this.tree.inDomainDfs && ! ( request instanceof NtTransQuerySecurityDesc ) && ! ( request instanceof SmbComClose )
+            else if ( t.isInDomainDfs() && ! ( request instanceof NtTransQuerySecurityDesc ) && ! ( request instanceof SmbComClose )
                     && ! ( request instanceof SmbComFindClose2 ) ) {
                 throw new SmbException(NtStatus.NT_STATUS_NOT_FOUND, false);
             }
@@ -430,28 +600,32 @@ public class SmbTreeConnection {
                 }
 
                 UniAddress addr = this.ctx.getNameServiceClient().getByName(dr.server);
-                SmbTransport trans = this.ctx.getTransportPool().getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning());
+                try ( SmbTransport trans = this.ctx.getTransportPool()
+                        .getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning()) ) {
 
-                synchronized ( trans ) {
-                    /*
-                     * This is a key point. This is where we set the "tree" of this file which
-                     * is like changing the rug out from underneath our feet.
-                     */
-                    /*
-                     * Technically we should also try to authenticate here but that means doing the session
-                     * setup
-                     * and
-                     * tree connect separately. For now a simple connect will at least tell us if the host is
-                     * alive.
-                     * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
-                     */
-                    trans.connect();
-                    this.tree = trans.getSmbSession(this.ctx).getSmbTree(dr.share, service);
-                    if ( dr != start && dr.key != null ) {
-                        dr.map.put(dr.key, dr);
+                    synchronized ( trans ) {
+                        /*
+                         * This is a key point. This is where we set the "tree" of this file which
+                         * is like changing the rug out from underneath our feet.
+                         */
+                        /*
+                         * Technically we should also try to authenticate here but that means doing the session
+                         * setup
+                         * and
+                         * tree connect separately. For now a simple connect will at least tell us if the host is
+                         * alive.
+                         * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
+                         */
+                        trans.connect();
+                        try ( SmbSession smbSession = trans.getSmbSession(this.ctx);
+                              SmbTree t = smbSession.getSmbTree(dr.share, service) ) {
+                            switchTree(t);
+                        }
+                        if ( dr != start && dr.key != null ) {
+                            dr.map.put(dr.key, dr);
+                        }
                     }
                 }
-
                 se = null;
                 break;
             }
@@ -479,53 +653,111 @@ public class SmbTreeConnection {
      * @param np
      */
     public void setNonPool ( boolean np ) {
-        this.nonPooled = true;
+        this.nonPooled = np;
     }
 
 
     /**
      * @return the currently connected tid
      */
-    public int getTreeId () {
-        SmbTree t = this.tree;
+    @SuppressWarnings ( "resource" )
+    public long getTreeId () {
+        SmbTree t = getTreeInternal();
         if ( t == null ) {
             return -1;
         }
-        return t.tree_num;
+        return t.getTreeNum();
     }
 
 
     /**
      * 
+     * Only call this method while holding a tree handle
+     * 
+     * @return session that this file has been loaded through
+     */
+    @SuppressWarnings ( "resource" )
+    public SmbSession getSession () {
+        SmbTree t = getTreeInternal();
+        if ( t != null ) {
+            return t.getSession();
+        }
+        return null;
+    }
+
+
+    /**
+     * 
+     * Only call this method while holding a tree handle
+     * 
+     * @param cap
+     * @return whether the capability is available
+     * @throws SmbException
+     */
+    public boolean hasCapability ( int cap ) throws SmbException {
+        try ( SmbSession s = getSession() ) {
+            if ( s != null ) {
+                try ( SmbTransport transport = s.getTransport() ) {
+                    return transport.hasCapability(cap);
+                }
+            }
+            throw new SmbException("Not connected");
+        }
+    }
+
+
+    /**
+     * 
+     * Only call this method while holding a tree handle
+     * 
      * @return server data provided during negotiation
      */
     public ServerData getServerData () {
-        return getSession().getTransport().server;
+        try ( SmbSession session = getSession();
+              SmbTransport transport = session.getTransport() ) {
+            return transport.server;
+        }
     }
 
 
     /**
+     * 
+     * Only call this method while holding a tree handle
+     * 
      * @return the service we are connected to
      */
     public String getConnectedService () {
-        return this.tree.service;
+        try ( SmbTree t = getTree() ) {
+            return t.getService();
+        }
     }
 
 
     /**
+     * 
+     * Only call this method while holding a tree handle
+     * 
      * @return the share we are connected to
      */
     public String getConnectedShare () {
-        return this.tree.share;
+        try ( SmbTree t = getTree() ) {
+            return t.getShare();
+        }
     }
 
 
     /**
+     * 
+     * Only call this method while holding a tree handle
+     * 
      * @param other
      * @return whether the connection refers to the same tree
      */
     public boolean isSame ( SmbTreeConnection other ) {
-        return this.tree.equals(other.tree);
+        try ( SmbTree t1 = getTree();
+              SmbTree t2 = other.getTree() ) {
+            return t1.equals(t2);
+        }
     }
 
 }

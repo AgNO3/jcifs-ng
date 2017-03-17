@@ -47,6 +47,8 @@ public class SmbFileInputStream extends InputStream {
 
     private boolean largeReadX;
 
+    private final boolean unsharedFile;
+
 
     /**
      * @param url
@@ -55,8 +57,9 @@ public class SmbFileInputStream extends InputStream {
      * @throws SmbException
      * @throws MalformedURLException
      */
+    @SuppressWarnings ( "resource" )
     public SmbFileInputStream ( String url, CIFSContext tc ) throws SmbException, MalformedURLException {
-        this(new SmbFile(url, tc));
+        this(new SmbFile(url, tc), SmbFile.O_RDONLY, true);
     }
 
 
@@ -71,12 +74,13 @@ public class SmbFileInputStream extends InputStream {
      * @throws SmbException
      */
     public SmbFileInputStream ( SmbFile file ) throws SmbException {
-        this(file, SmbFile.O_RDONLY);
+        this(file, SmbFile.O_RDONLY, false);
     }
 
 
-    SmbFileInputStream ( SmbFile file, int openFlags ) throws SmbException {
+    private SmbFileInputStream ( SmbFile file, int openFlags, boolean unshared ) throws SmbException {
         this.file = file;
+        this.unsharedFile = unshared;
         this.openFlags = openFlags & 0xFFFF;
         this.access = ( openFlags >>> 16 ) & 0xFFFF;
 
@@ -86,23 +90,42 @@ public class SmbFileInputStream extends InputStream {
                 this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC );
             }
 
-            this.readSize = Math.min(th.getReceiveBufferSize() - 70, th.getMaximumBufferSize() - 70);
+            init(th);
+        }
+    }
 
-            if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
-                this.largeReadX = true;
-                this.readSizeFile = Math.min(
-                    file.getTransportContext().getConfig().getRecieveBufferSize() - 70,
-                    th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
-                log.debug("Enabling LARGE_READX with " + this.readSizeFile);
-            }
-            else {
-                log.debug("LARGE_READX disabled");
-                this.readSizeFile = this.readSize;
-            }
 
-            if ( log.isDebugEnabled() ) {
-                log.debug("Negotiated file read size is " + this.readSizeFile);
-            }
+    /**
+     * @throws SmbException
+     * 
+     */
+    SmbFileInputStream ( SmbFile file, SmbTreeHandleImpl th ) throws SmbException {
+        this.file = file;
+        this.unsharedFile = false;
+        init(th);
+    }
+
+
+    /**
+     * @param f
+     * @param th
+     * @throws SmbException
+     */
+    private void init ( SmbTreeHandle th ) throws SmbException {
+        this.readSize = Math.min(th.getReceiveBufferSize() - 70, th.getMaximumBufferSize() - 70);
+
+        if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
+            this.largeReadX = true;
+            this.readSizeFile = Math.min(th.getConfig().getRecieveBufferSize() - 70, th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
+            log.debug("Enabling LARGE_READX with " + this.readSizeFile);
+        }
+        else {
+            log.debug("LARGE_READX disabled");
+            this.readSizeFile = this.readSize;
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug("Negotiated file read size is " + this.readSizeFile);
         }
     }
 
@@ -164,6 +187,9 @@ public class SmbFileInputStream extends InputStream {
         finally {
             this.tmp = null;
             this.handle = null;
+            if ( this.unsharedFile ) {
+                this.file.close();
+            }
         }
     }
 
@@ -302,28 +328,7 @@ public class SmbFileInputStream extends InputStream {
      */
     @Override
     public int available () throws IOException {
-        if ( ! ( this.file instanceof SmbNamedPipe ) ) {
-            return 0;
-        }
-
-        SmbNamedPipe pipe = (SmbNamedPipe) this.file;
-        try ( SmbFileHandleImpl fd = this.file.openUnshared(SmbFile.O_EXCL, pipe.getPipeType() & 0xFF0000, SmbFile.ATTR_NORMAL, 0);
-              SmbTreeHandleImpl th = fd.getTree() ) {
-
-            TransPeekNamedPipe req = new TransPeekNamedPipe(th.getConfig(), this.file.getFileLocator().getUncPath(), fd.getFid());
-            TransPeekNamedPipeResponse resp = new TransPeekNamedPipeResponse(th.getConfig(), pipe);
-
-            th.send(req, resp);
-            if ( resp.status == TransPeekNamedPipeResponse.STATUS_DISCONNECTED
-                    || resp.status == TransPeekNamedPipeResponse.STATUS_SERVER_END_CLOSED ) {
-                fd.markClosed();
-                return 0;
-            }
-            return resp.available;
-        }
-        catch ( SmbException se ) {
-            throw seToIoe(se);
-        }
+        return 0;
     }
 
 

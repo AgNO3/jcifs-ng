@@ -8,6 +8,7 @@ package jcifs.smb;
 
 
 import jcifs.Configuration;
+import jcifs.smb.SmbTransport.ServerData;
 
 
 /**
@@ -26,7 +27,7 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     public SmbTreeHandleImpl ( SmbFileLocator resourceLoc, SmbTreeConnection treeConnection ) {
         this.resourceLoc = resourceLoc;
-        this.treeConnection = treeConnection;
+        this.treeConnection = treeConnection.acquire();
     }
 
 
@@ -80,14 +81,14 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     @Override
     public Configuration getConfig () {
-        return this.treeConnection.getSession().getConfig();
+        return this.treeConnection.getConfig();
     }
 
 
     /**
      * @return the currently connected tree id
      */
-    public int getTreeId () {
+    public long getTreeId () {
         return this.treeConnection.getTreeId();
     }
 
@@ -120,7 +121,7 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      * @see jcifs.smb.SmbTreeHandle#close()
      */
     @Override
-    public void close () throws SmbException {
+    public synchronized void close () {
         release();
     }
 
@@ -129,6 +130,7 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      * @return tree handle with increased usage count
      */
     public SmbTreeHandleImpl acquire () {
+        this.treeConnection.acquire();
         return this;
     }
 
@@ -140,7 +142,7 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     @Override
     public void release () {
-
+        this.treeConnection.release();
     }
 
 
@@ -206,7 +208,10 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     @Override
     public int getSendBufferSize () {
-        return this.treeConnection.getSession().getTransport().snd_buf_size;
+        try ( SmbSession session = this.treeConnection.getSession();
+              SmbTransport transport = session.getTransport() ) {
+            return transport.snd_buf_size;
+        }
     }
 
 
@@ -217,7 +222,10 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     @Override
     public int getReceiveBufferSize () {
-        return this.treeConnection.getSession().getTransport().rcv_buf_size;
+        try ( SmbSession session = this.treeConnection.getSession();
+              SmbTransport transport = session.getTransport() ) {
+            return transport.rcv_buf_size;
+        }
     }
 
 
@@ -239,9 +247,8 @@ public class SmbTreeHandleImpl implements AutoCloseable, SmbTreeHandle {
      */
     @Override
     public boolean areSignaturesActive () {
-        SmbSession session = this.treeConnection.getSession();
-        return session.getTransport().server.signaturesRequired
-                || ( session.getTransport().server.signaturesEnabled && this.getConfig().isSigningEnabled() );
+        ServerData serverData = this.treeConnection.getServerData();
+        return serverData.signaturesRequired || ( serverData.signaturesEnabled && getConfig().isSigningEnabled() );
     }
 
 }

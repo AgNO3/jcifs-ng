@@ -110,26 +110,28 @@ public class ContextConfigTest {
     public void testLegacyURLConstructor () throws IOException {
         Config.registerSmbURLHandler();
         URL u = new URL("smb://DOMAIN;foo:bar@localhost/test");
-        SmbFile f = new SmbFile(u);
-        SmbCredentials c = f.getTransportContext().getCredentials();
-        assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-        NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) c;
-        assertEquals("foo", ntlm.getUsername());
-        assertEquals("DOMAIN", ntlm.getUserDomain());
-        assertEquals("bar", ntlm.getPassword());
+        try ( SmbFile f = new SmbFile(u) ) {
+            SmbCredentials c = f.getTransportContext().getCredentials();
+            assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
+            NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) c;
+            assertEquals("foo", ntlm.getUsername());
+            assertEquals("DOMAIN", ntlm.getUserDomain());
+            assertEquals("bar", ntlm.getPassword());
+        }
     }
 
 
     @Test
     @SuppressWarnings ( "deprecation" )
     public void testLegacyStringConstructor () throws IOException {
-        SmbFile f = new SmbFile("smb://DOMAIN;foo:bar@localhost/test");
-        SmbCredentials c = f.getTransportContext().getCredentials();
-        assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-        NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) c;
-        assertEquals("foo", ntlm.getUsername());
-        assertEquals("DOMAIN", ntlm.getUserDomain());
-        assertEquals("bar", ntlm.getPassword());
+        try ( SmbFile f = new SmbFile("smb://DOMAIN;foo:bar@localhost/test") ) {
+            SmbCredentials c = f.getTransportContext().getCredentials();
+            assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
+            NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) c;
+            assertEquals("foo", ntlm.getUsername());
+            assertEquals("DOMAIN", ntlm.getUserDomain());
+            assertEquals("bar", ntlm.getPassword());
+        }
     }
 
 }
