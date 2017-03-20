@@ -19,10 +19,11 @@ package jcifs.smb;
 
 import java.io.IOException;
 
-import org.apache.log4j.Logger;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.spnego.NegTokenInit;
 import jcifs.spnego.NegTokenTarg;
@@ -37,7 +38,7 @@ import jcifs.spnego.SpnegoToken;
  */
 class SpnegoContext implements SSPContext {
 
-    private static final Logger log = Logger.getLogger(SpnegoContext.class);
+    private static final Logger log = LoggerFactory.getLogger(SpnegoContext.class);
 
     private static Oid SPNEGO_MECH_OID;
 

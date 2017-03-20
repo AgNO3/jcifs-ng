@@ -24,7 +24,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 
@@ -34,7 +35,7 @@ import jcifs.CIFSContext;
  */
 public class Type2Message extends NtlmMessage {
 
-    private static final Logger log = Logger.getLogger(Type2Message.class);
+    private static final Logger log = LoggerFactory.getLogger(Type2Message.class);
 
     private byte[] challenge;
 

@@ -38,8 +38,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
-import org.apache.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -71,7 +72,7 @@ import jcifs.smb.SmbTransport;
 @Deprecated
 public class NtlmHttpFilter implements Filter {
 
-    private static final Logger log = Logger.getLogger(NtlmHttpFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(NtlmHttpFilter.class);
 
     private String defaultDomain;
     private String domainController;

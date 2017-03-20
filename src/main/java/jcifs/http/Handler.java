@@ -30,7 +30,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 
@@ -46,7 +47,7 @@ import jcifs.CIFSContext;
 @Deprecated
 public class Handler extends URLStreamHandler {
 
-    private static final Logger log = Logger.getLogger(Handler.class);
+    private static final Logger log = LoggerFactory.getLogger(Handler.class);
 
     /**
      * The default HTTP port (<code>80</code>).

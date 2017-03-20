@@ -24,7 +24,8 @@ import java.net.UnknownHostException;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.context.SingletonContext;
 
@@ -44,7 +45,7 @@ import jcifs.context.SingletonContext;
 @SuppressWarnings ( "javadoc" )
 public class Config {
 
-    private static final Logger log = Logger.getLogger(Config.class);
+    private static final Logger log = LoggerFactory.getLogger(Config.class);
 
 
     /**

@@ -22,7 +22,8 @@ package jcifs.smb;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.SmbConstants;
 
@@ -33,7 +34,7 @@ import jcifs.SmbConstants;
 
 public class SmbFileOutputStream extends OutputStream {
 
-    private static final Logger log = Logger.getLogger(SmbFileOutputStream.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbFileOutputStream.class);
 
     private SmbFile file;
     private boolean append, useNTSmbs;

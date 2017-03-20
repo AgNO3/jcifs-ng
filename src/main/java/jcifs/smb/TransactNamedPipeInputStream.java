@@ -21,12 +21,13 @@ package jcifs.smb;
 
 import java.io.IOException;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class TransactNamedPipeInputStream extends SmbFileInputStream {
 
-    private static final Logger log = Logger.getLogger(TransactNamedPipeInputStream.class);
+    private static final Logger log = LoggerFactory.getLogger(TransactNamedPipeInputStream.class);
 
     private static final int INIT_PIPE_SIZE = 4096;
 

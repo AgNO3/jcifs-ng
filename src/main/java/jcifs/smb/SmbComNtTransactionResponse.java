@@ -19,14 +19,15 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 
 
 abstract class SmbComNtTransactionResponse extends SmbComTransactionResponse {
 
-    private static final Logger log = Logger.getLogger(SmbComNtTransactionResponse.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbComNtTransactionResponse.class);
 
 
     SmbComNtTransactionResponse ( Configuration config ) {

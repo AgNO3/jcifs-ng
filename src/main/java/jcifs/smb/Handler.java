@@ -24,7 +24,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.SmbConstants;
@@ -37,7 +38,7 @@ import jcifs.context.SingletonContext;
  */
 public class Handler extends URLStreamHandler {
 
-    private static final Logger log = Logger.getLogger(Handler.class);
+    private static final Logger log = LoggerFactory.getLogger(Handler.class);
     static final URLStreamHandler SMB_HANDLER = new Handler();
     private CIFSContext transportContext;
 

@@ -24,11 +24,12 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSession;
@@ -48,6 +49,9 @@ import jcifs.smb.SmbTransport;
 @RunWith ( Parameterized.class )
 @SuppressWarnings ( "javadoc" )
 public class SessionTest extends BaseCIFSTest {
+
+    private static final Logger log = LoggerFactory.getLogger(SessionTest.class);
+
 
     public SessionTest ( String name, Map<String, String> properties ) {
         super(name, properties);
@@ -98,7 +102,7 @@ public class SessionTest extends BaseCIFSTest {
             checkConnection(f);
         }
         catch ( Exception e ) {
-            Logger.getLogger(SessionTest.class).error("Exception", e);
+            log.error("Exception", e);
             throw e;
         }
     }

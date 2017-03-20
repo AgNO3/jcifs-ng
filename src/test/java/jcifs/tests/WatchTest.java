@@ -36,13 +36,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.smb.FileNotifyInformation;
 import jcifs.smb.SmbException;
@@ -62,6 +63,8 @@ import jcifs.smb.SmbFile;
 @RunWith ( Parameterized.class )
 @SuppressWarnings ( "javadoc" )
 public class WatchTest extends BaseCIFSTest {
+
+    private static final Logger log = LoggerFactory.getLogger(WatchTest.class);
 
     private ExecutorService executor;
     private SmbFile base;
@@ -121,7 +124,7 @@ public class WatchTest extends BaseCIFSTest {
             assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
         }
         catch ( TimeoutException e ) {
-            Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
+            log.info("Timeout waiting", e);
             fail("Did not recieve notification");
         }
     }
@@ -141,7 +144,7 @@ public class WatchTest extends BaseCIFSTest {
             assertNotified(FileNotifyInformation.FILE_ACTION_MODIFIED, "modified", null);
         }
         catch ( TimeoutException e ) {
-            Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
+            log.info("Timeout waiting", e);
             fail("Did not recieve notification");
         }
     }
@@ -162,7 +165,7 @@ public class WatchTest extends BaseCIFSTest {
             assertNotified(FileNotifyInformation.FILE_ACTION_ADDED, "created2", null);
         }
         catch ( TimeoutException e ) {
-            Logger.getLogger(WatchTest.class).info("Timeout waiting", e);
+            log.info("Timeout waiting", e);
             fail("Did not recieve notification");
         }
     }
@@ -198,7 +201,7 @@ public class WatchTest extends BaseCIFSTest {
             }
         }
         if ( !found ) {
-            Logger.getLogger(WatchTest.class).info("Notifications " + infos);
+            log.info("Notifications " + infos);
         }
         assertTrue("Notification found", found);
     }

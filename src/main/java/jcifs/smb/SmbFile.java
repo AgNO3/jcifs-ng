@@ -32,7 +32,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
@@ -456,7 +457,7 @@ public class SmbFile extends URLConnection implements SmbConstants {
     static final int HASH_DOT = ".".hashCode();
     static final int HASH_DOT_DOT = "..".hashCode();
 
-    static Logger log = Logger.getLogger(SmbFile.class);
+    static final Logger log = LoggerFactory.getLogger(SmbFile.class);
 
     /**
      * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>

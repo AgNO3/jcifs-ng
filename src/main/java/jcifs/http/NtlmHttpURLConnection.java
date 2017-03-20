@@ -44,8 +44,9 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 
-import org.apache.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
@@ -73,7 +74,7 @@ import jcifs.smb.NtlmPasswordAuthentication;
 @Deprecated
 public class NtlmHttpURLConnection extends HttpURLConnection {
 
-    private static final Logger log = Logger.getLogger(NtlmHttpURLConnection.class);
+    private static final Logger log = LoggerFactory.getLogger(NtlmHttpURLConnection.class);
     private static final int MAX_REDIRECTS = Integer.parseInt(System.getProperty("http.maxRedirects", "20"));
 
     private HttpURLConnection connection;

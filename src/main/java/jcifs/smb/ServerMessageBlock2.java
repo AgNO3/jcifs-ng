@@ -19,7 +19,8 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
@@ -32,7 +33,7 @@ import jcifs.util.transport.Response;
 
 abstract class ServerMessageBlock2 extends Response implements Request {
 
-    private static final Logger log = Logger.getLogger(ServerMessageBlock2.class);
+    private static final Logger log = LoggerFactory.getLogger(ServerMessageBlock2.class);
 
     /*
      * These are all the smbs supported by this library. This includes requests

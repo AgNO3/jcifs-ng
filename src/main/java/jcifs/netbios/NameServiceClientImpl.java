@@ -32,7 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.Configuration;
@@ -55,7 +56,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
     };
 
-    private static final Logger log = Logger.getLogger(NameServiceClientImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(NameServiceClientImpl.class);
 
     private final Object LOCK = new Object();
 
@@ -396,7 +397,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                     response.received = true;
 
                     if ( log.isTraceEnabled() ) {
-                        log.trace(response);
+                        log.trace(response.toString());
                         log.trace(Hexdump.toHexString(this.rcv_buf, 0, this.in.getLength()));
                     }
 
@@ -439,7 +440,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                         this.socket.send(this.out);
 
                         if ( log.isTraceEnabled() ) {
-                            log.trace(request);
+                            log.trace(request.toString());
                             log.trace(Hexdump.toHexString(this.snd_buf, 0, this.out.getLength()));
                         }
                     }

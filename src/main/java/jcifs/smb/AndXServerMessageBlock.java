@@ -19,7 +19,8 @@
 package jcifs.smb;
 
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
@@ -28,7 +29,7 @@ import jcifs.util.Hexdump;
 
 abstract class AndXServerMessageBlock extends ServerMessageBlock {
 
-    private static final Logger log = Logger.getLogger(AndXServerMessageBlock.class);
+    private static final Logger log = LoggerFactory.getLogger(AndXServerMessageBlock.class);
 
     private static final int ANDX_COMMAND_OFFSET = 1;
     private static final int ANDX_RESERVED_OFFSET = 2;

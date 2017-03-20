@@ -23,7 +23,8 @@ import java.net.InetAddress;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -38,7 +39,7 @@ import jcifs.netbios.UniAddress;
  */
 public class SmbTransportPoolImpl implements SmbTransportPool {
 
-    private static final Logger log = Logger.getLogger(SmbTransportPoolImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbTransportPoolImpl.class);
 
     private final List<SmbTransport> connections = new LinkedList<>();
     private final List<SmbTransport> nonPooledConnections = new LinkedList<>();

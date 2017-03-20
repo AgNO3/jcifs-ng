@@ -38,8 +38,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
-import org.apache.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -74,7 +75,7 @@ public class NetworkExplorer extends HttpServlet {
      */
     private static final long serialVersionUID = -3847521461674504364L;
 
-    private static final Logger log = Logger.getLogger(NetworkExplorer.class);
+    private static final Logger log = LoggerFactory.getLogger(NetworkExplorer.class);
 
     private String style;
     private boolean credentialsSupplied;

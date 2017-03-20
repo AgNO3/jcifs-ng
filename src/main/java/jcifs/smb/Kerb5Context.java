@@ -22,13 +22,14 @@ import java.security.Key;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosTicket;
 
-import org.apache.log4j.Logger;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.sun.security.jgss.ExtendedGSSContext;
 import com.sun.security.jgss.InquireType;
@@ -44,7 +45,7 @@ import jcifs.spnego.NegTokenInit;
 @SuppressWarnings ( "restriction" )
 class Kerb5Context implements SSPContext {
 
-    private static final Logger log = Logger.getLogger(Kerb5Context.class);
+    private static final Logger log = LoggerFactory.getLogger(Kerb5Context.class);
 
     private static Oid KRB5_MECH_OID;
     private static Oid KRB5_MS_MECH_OID;

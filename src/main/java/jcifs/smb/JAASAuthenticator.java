@@ -32,7 +32,8 @@ import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 
@@ -52,7 +53,7 @@ import jcifs.CIFSContext;
  */
 public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHandler, SmbRenewableCredentials {
 
-    private static final Logger log = Logger.getLogger(JAASAuthenticator.class);
+    private static final Logger log = LoggerFactory.getLogger(JAASAuthenticator.class);
 
     /**
      * 

@@ -29,11 +29,12 @@ import java.util.Set;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 
-import org.apache.log4j.Logger;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.spnego.NegTokenInit;
@@ -52,7 +53,7 @@ import jcifs.spnego.NegTokenInit;
 public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
     private static final long serialVersionUID = 1999400043787454432L;
-    private static final Logger log = Logger.getLogger(Kerb5Authenticator.class);
+    private static final Logger log = LoggerFactory.getLogger(Kerb5Authenticator.class);
     private static final String DEFAULT_SERVICE = "cifs";
 
     private Subject subject = null;

@@ -26,7 +26,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.netbios.UniAddress;
@@ -61,7 +62,7 @@ public class DfsImpl implements Dfs {
 
     }
 
-    private static final Logger log = Logger.getLogger(DfsImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(DfsImpl.class);
     private static final String DC_ENTRY = "dc";
 
     private CacheEntry<Map<String, CacheEntry<DfsReferral>>> _domains = null; /* aka trusted domains cache */
