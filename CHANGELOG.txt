@@ -1,3 +1,10 @@
+jcifs-ng 1.5.3
+- Fix thread leak when establishing a connection fails
+- Add mitigation against idle timeout issues that cause serious bugs in some usage scenarios:
+ - Session timeout can be configured (jcifs.smb.client.sessionTimeout, in ms) setting it to 0 disables session timeout
+ - Transport idle timeouts can be disabled (jcifs.smb.client.noIdleTimeout=true)
+- Fix bug that exclusive transport connections could be reused.
+
 jcifs-ng 1.5.2
 - Fix SmbFile(String) constructor to allow passing credentials in URL.
 - Mark already deprecated NTLM filter/servlets @Deprecated

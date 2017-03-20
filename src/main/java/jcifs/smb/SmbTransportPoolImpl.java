@@ -74,7 +74,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             if ( log.isDebugEnabled() ) {
                 log.debug("Exclusive " + nonPooled + " enforced signing " + forceSigning);
             }
-            if ( nonPooled || tc.getConfig().getSessionLimit() != 1 ) {
+            if ( !nonPooled && tc.getConfig().getSessionLimit() != 1 ) {
                 for ( SmbTransport conn : this.connections ) {
                     if ( conn.matches(address, port, localAddr, localPort, hostName)
                             && ( tc.getConfig().getSessionLimit() == 0 || conn.sessions.size() < tc.getConfig().getSessionLimit() ) ) {
