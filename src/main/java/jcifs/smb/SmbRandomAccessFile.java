@@ -45,6 +45,9 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
     private SmbComWriteAndXResponse write_andx_resp = null;
 
     private boolean largeReadX;
+    private final boolean unsharedFile;
+
+    private SmbFileHandleImpl handle;
 
 
     /**
@@ -57,8 +60,9 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @throws SmbException
      * @throws MalformedURLException
      */
+    @SuppressWarnings ( "resource" )
     public SmbRandomAccessFile ( String url, String mode, int shareAccess, CIFSContext tc ) throws SmbException, MalformedURLException {
-        this(new SmbFile(url, tc, shareAccess), mode);
+        this(new SmbFile(url, tc, shareAccess), mode, true);
     }
 
 
@@ -70,42 +74,53 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @throws SmbException
      */
     public SmbRandomAccessFile ( SmbFile file, String mode ) throws SmbException {
-        this.file = file;
-        if ( mode.equals("r") ) {
-            this.openFlags = SmbFile.O_CREAT | SmbFile.O_RDONLY;
-        }
-        else if ( mode.equals("rw") ) {
-            this.openFlags = SmbFile.O_CREAT | SmbFile.O_RDWR | SmbFile.O_APPEND;
-            this.write_andx_resp = new SmbComWriteAndXResponse(getSession().getConfig());
-            this.options = WRITE_OPTIONS;
-            this.access = SmbConstants.FILE_READ_DATA | SmbConstants.FILE_WRITE_DATA;
-        }
-        else {
-            throw new IllegalArgumentException("Invalid mode");
-        }
-        file.open(this.openFlags, this.access, SmbFile.ATTR_NORMAL, this.options);
-        this.readSize = file.tree.session.getTransport().rcv_buf_size - 70;
-        this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
-
-        boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningEnabled() );
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
-            this.largeReadX = true;
-            this.readSize = Math
-                    .min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, isSignatureActive ? 0xFFFF - 70 : 0xFFFFFF - 70);
-        }
-
-        // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !isSignatureActive ) {
-            this.writeSize = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
-        }
-
-        this.fp = 0L;
+        this(file, mode, false);
     }
 
 
-    private SmbSession getSession () {
-        return this.file.tree.session;
+    /**
+     * Instantiate a random access file from a {@link SmbFile}
+     * 
+     * @param file
+     * @param mode
+     * @throws SmbException
+     */
+    private SmbRandomAccessFile ( SmbFile file, String mode, boolean unshared ) throws SmbException {
+        this.file = file;
+        this.unsharedFile = unshared;
+
+        try ( SmbTreeHandle th = this.file.ensureTreeConnected() ) {
+            if ( mode.equals("r") ) {
+                this.openFlags = SmbFile.O_CREAT | SmbFile.O_RDONLY;
+            }
+            else if ( mode.equals("rw") ) {
+                this.openFlags = SmbFile.O_CREAT | SmbFile.O_RDWR | SmbFile.O_APPEND;
+                this.write_andx_resp = new SmbComWriteAndXResponse(th.getConfig());
+                this.options = WRITE_OPTIONS;
+                this.access = SmbConstants.FILE_READ_DATA | SmbConstants.FILE_WRITE_DATA;
+            }
+            else {
+                throw new IllegalArgumentException("Invalid mode");
+            }
+
+            try ( SmbFileHandle h = ensureOpen() ) {}
+            this.readSize = th.getReceiveBufferSize() - 70;
+            this.writeSize = th.getSendBufferSize() - 70;
+
+            if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
+                this.largeReadX = true;
+                this.readSize = Math.min(
+                    file.getTransportContext().getConfig().getRecieveBufferSize() - 70,
+                    th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
+            }
+
+            // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
+            if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
+                this.writeSize = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
+            }
+
+            this.fp = 0L;
+        }
     }
 
 
@@ -137,6 +152,42 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
 
 
     /**
+     * @return
+     * @throws SmbException
+     */
+    synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+        // ensure file is open
+        if ( this.handle == null || !this.handle.isValid() ) {
+            // one extra acquire to keep this open till the stream is released
+            this.handle = this.file.openUnshared(this.openFlags, this.access, SmbFile.ATTR_NORMAL, this.options).acquire();
+            return this.handle;
+        }
+        return this.handle.acquire();
+    }
+
+
+    /**
+     * Close the file
+     * 
+     * @throws SmbException
+     */
+    @Override
+    public synchronized void close () throws SmbException {
+        try {
+            if ( this.handle != null ) {
+                this.handle.close();
+                this.handle = null;
+            }
+        }
+        finally {
+            if ( this.unsharedFile ) {
+                this.file.close();
+            }
+        }
+    }
+
+
+    /**
      * Read into buffer from current position
      * 
      * @param b
@@ -154,32 +205,32 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
         }
         long start = this.fp;
 
-        // ensure file is open
-        if ( this.file.isOpen() == false ) {
-            this.file.open(this.openFlags, 0, SmbFile.ATTR_NORMAL, this.options);
-        }
+        try ( SmbFileHandleImpl fh = ensureOpen();
+              SmbTreeHandleImpl th = fh.getTree() ) {
 
-        int r, n;
-        SmbComReadAndXResponse response = new SmbComReadAndXResponse(getSession().getConfig(), b, off);
-        do {
-            r = len > this.readSize ? this.readSize : len;
-            ServerMessageBlock andX = null;
-            SmbComReadAndX request = new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, andX);
-            if ( this.largeReadX ) {
-                request.maxCount = r & 0xFFFF;
-                request.openTimeout = ( r >> 16 ) & 0xFFFF;
-            }
-            this.file.send(request, response);
-            if ( ( n = response.dataLength ) <= 0 ) {
-                return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
-            }
-            this.fp += n;
-            len -= n;
-            response.off += n;
-        }
-        while ( len > 0 && n == r );
+            int r, n;
+            SmbComReadAndXResponse response = new SmbComReadAndXResponse(th.getConfig(), b, off);
+            do {
+                r = len > this.readSize ? this.readSize : len;
+                ServerMessageBlock andX = null;
+                SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fh.getFid(), this.fp, r, andX);
+                if ( this.largeReadX ) {
+                    request.maxCount = r & 0xFFFF;
+                    request.openTimeout = ( r >> 16 ) & 0xFFFF;
+                }
 
-        return (int) ( this.fp - start );
+                th.send(request, response, RequestParam.NO_RETRY);
+                if ( ( n = response.dataLength ) <= 0 ) {
+                    return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
+                }
+                this.fp += n;
+                len -= n;
+                response.off += n;
+            }
+            while ( len > 0 && n == r );
+
+            return (int) ( this.fp - start );
+        }
     }
 
 
@@ -234,20 +285,19 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
         }
 
         // ensure file is open
-        if ( this.file.isOpen() == false ) {
-            this.file.open(this.openFlags, 0, SmbFile.ATTR_NORMAL, this.options);
+        try ( SmbFileHandleImpl fh = ensureOpen();
+              SmbTreeHandleImpl th = fh.getTree() ) {
+            int w;
+            do {
+                w = len > this.writeSize ? this.writeSize : len;
+                SmbComWriteAndX request = new SmbComWriteAndX(th.getConfig(), fh.getFid(), this.fp, len - w, b, off, w, null);
+                th.send(request, this.write_andx_resp, RequestParam.NO_RETRY);
+                this.fp += this.write_andx_resp.count;
+                len -= this.write_andx_resp.count;
+                off += this.write_andx_resp.count;
+            }
+            while ( len > 0 );
         }
-
-        int w;
-        do {
-            w = len > this.writeSize ? this.writeSize : len;
-            SmbComWriteAndX request = new SmbComWriteAndX(getSession().getConfig(), this.file.fid, this.fp, len - w, b, off, w, null);
-            this.file.send(request, this.write_andx_resp);
-            this.fp += this.write_andx_resp.count;
-            len -= this.write_andx_resp.count;
-            off += this.write_andx_resp.count;
-        }
-        while ( len > 0 );
     }
 
 
@@ -292,23 +342,13 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      */
     public void setLength ( long newLength ) throws SmbException {
         // ensure file is open
-        if ( this.file.isOpen() == false ) {
-            this.file.open(this.openFlags, 0, SmbFile.ATTR_NORMAL, this.options);
+
+        try ( SmbFileHandleImpl fh = ensureOpen();
+              SmbTreeHandleImpl th = fh.getTree() ) {
+            // TODO: is there a way to make this 64-bit safe
+            SmbComWriteResponse rsp = new SmbComWriteResponse(th.getConfig());
+            th.send(new SmbComWrite(th.getConfig(), fh.getFid(), (int) ( newLength & 0xFFFFFFFFL ), 0, this.tmp, 0, 0), rsp, RequestParam.NO_RETRY);
         }
-        // TODO: is there a way to make this 64-bit safe
-        SmbComWriteResponse rsp = new SmbComWriteResponse(getSession().getConfig());
-        this.file.send(new SmbComWrite(getSession().getConfig(), this.file.fid, (int) ( newLength & 0xFFFFFFFFL ), 0, this.tmp, 0, 0), rsp);
-    }
-
-
-    /**
-     * Close the file
-     * 
-     * @throws SmbException
-     */
-    @Override
-    public void close () throws SmbException {
-        this.file.close();
     }
 
 

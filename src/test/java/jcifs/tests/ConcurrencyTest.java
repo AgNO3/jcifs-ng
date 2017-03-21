@@ -20,6 +20,7 @@ package jcifs.tests;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +28,7 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +41,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +68,12 @@ public class ConcurrencyTest extends BaseCIFSTest {
     }
 
 
+    @Parameters ( name = "{0}" )
+    public static Collection<Object> configs () {
+        return getConfigs("noNTStatus", "noNTSmbs");
+    }
+
+
     @Override
     @Before
     public void setUp () throws Exception {
@@ -84,16 +93,63 @@ public class ConcurrencyTest extends BaseCIFSTest {
 
     @Test
     public void testExclusiveLock () throws InterruptedException, MalformedURLException, UnknownHostException {
-
         String fname = makeRandomName();
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+            ExclusiveLockFirst f = new ExclusiveLockFirst(exclFile);
+            ExclusiveLockSecond s = new ExclusiveLockSecond(f, exclFile);
 
-        ExclusiveLockFirst f = new ExclusiveLockFirst(new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE));
-        ExclusiveLockSecond s = new ExclusiveLockSecond(f, new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE));
+            List<MultiTestCase> runnables = new ArrayList<>();
+            runnables.add(f);
+            runnables.add(s);
+            runMultiTestCase(runnables, 5);
+        }
+    }
 
-        List<MultiTestCase> runnables = new ArrayList<>();
-        runnables.add(f);
-        runnables.add(s);
-        runMultiTestCase(runnables, 5);
+
+    @Test
+    public void testDeleteLocked () throws IOException {
+        String fname = makeRandomName();
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+
+            try ( OutputStream s = exclFile.getOutputStream() ) {
+                try {
+                    exclFile.delete();
+                    fail("Could remove locked file");
+                }
+                catch ( SmbException e ) {
+                    if ( e.getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
+                        return;
+                    }
+                    throw e;
+                }
+            }
+            finally {
+                exclFile.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testOpenLocked () throws IOException {
+        String fname = makeRandomName();
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+
+            try ( OutputStream s = exclFile.getOutputStream();
+                  InputStream is = exclFile.getInputStream() ) {}
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
+                    return;
+                }
+                throw e;
+            }
+            finally {
+                exclFile.delete();
+            }
+        }
     }
 
     private class ExclusiveLockFirst extends MultiTestCase {
@@ -145,7 +201,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
                 f.createNewFile();
                 try {
                     try ( OutputStream os = f.getOutputStream() ) {
-                        log.error("Open1");
+                        log.debug("Open1");
                         synchronized ( this.startedLock ) {
                             this.started = true;
                             this.startedLock.notify();
@@ -156,15 +212,17 @@ public class ConcurrencyTest extends BaseCIFSTest {
                             }
                         }
                     }
-                    catch ( InterruptedException e ) {}
-                    log.error("Closed1");
+                    catch ( InterruptedException e ) {
+                        log.debug("Interrupted1", e);
+                    }
+                    log.debug("Closed1");
+                    this.completed = true;
                 }
                 finally {
                     f.delete();
                 }
-                this.completed = true;
             }
-            catch ( IOException e ) {
+            catch ( Exception e ) {
                 log.error("Test case failed", e);
             }
         }
@@ -198,7 +256,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
                 SmbFile f = this.file;
                 this.first.waitForStart();
                 try ( OutputStream os = f.getOutputStream() ) {
-                    log.error("Open2");
+                    log.debug("Open2");
                 }
                 catch ( IOException e ) {
                     if ( e instanceof SmbException && ( (SmbException) e ).getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
@@ -211,9 +269,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
                     this.first.shutdown();
                 }
             }
-            catch (
-                IOException |
-                InterruptedException e ) {
+            catch ( Exception e ) {
                 log.error("Test case failed", e);
             }
         }
@@ -225,29 +281,34 @@ public class ConcurrencyTest extends BaseCIFSTest {
     public void lockedWrites () throws InterruptedException, IOException {
         int n = 45;
         String fname = makeRandomName();
-        SmbFile f = new SmbFile(getDefaultShareRoot(), fname);
-        try {
-            f.createNewFile();
-            final AtomicInteger failCount = new AtomicInteger();
-            final AtomicInteger writeCount = new AtomicInteger();
-            List<MultiTestCase> runnables = new ArrayList<>();
-            for ( int i = 0; i < n; i++ ) {
-                runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(getDefaultShareRoot(), fname, SmbFile.FILE_NO_SHARE)));
-            }
-            runMultiTestCase(runnables, 20);
 
-            int readCnt = 0;
-            try ( InputStream is = f.getInputStream() ) {
-                while ( is.read() >= 0 ) {
-                    readCnt++;
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbFile f = new SmbFile(sr, fname) ) {
+            try {
+                f.createNewFile();
+                final AtomicInteger failCount = new AtomicInteger();
+                final AtomicInteger writeCount = new AtomicInteger();
+                List<MultiTestCase> runnables = new ArrayList<>();
+                for ( int i = 0; i < n; i++ ) {
+                    runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE)));
                 }
+                runMultiTestCase(runnables, 20);
+
+                int readCnt = 0;
+                try ( InputStream is = f.getInputStream() ) {
+                    while ( is.read() >= 0 ) {
+                        readCnt++;
+                    }
+                }
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Failures " + failCount.get() + " wrote " + writeCount.get() + " read " + readCnt);
+                }
+                assertEquals("Read less than we wrote", writeCount.get(), readCnt);
+                assertEquals(n, failCount.get() + writeCount.get());
             }
-            log.debug("Failures " + failCount.get() + " wrote " + writeCount.get() + " read " + readCnt);
-            assertEquals(writeCount.get(), readCnt);
-            assertEquals(n, failCount.get() + writeCount.get());
-        }
-        finally {
-            f.delete();
+            finally {
+                f.delete();
+            }
         }
     }
 
@@ -289,6 +350,9 @@ public class ConcurrencyTest extends BaseCIFSTest {
                 }
                 log.error("Unexpected error", e);
             }
+            finally {
+                this.file.close();
+            }
         }
     }
 
@@ -310,7 +374,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
         this.executor.shutdown();
         this.executor.awaitTermination(timeoutSecs, TimeUnit.SECONDS);
         for ( MultiTestCase r : testcases ) {
-            assertTrue(r.completed);
+            assertTrue("Have not completed", r.completed);
         }
     }
 
@@ -330,22 +394,23 @@ public class ConcurrencyTest extends BaseCIFSTest {
         public void run () {
 
             try {
-                SmbFile f = createTestFile();
-                try {
-                    f.exists();
-                    try ( OutputStream os = f.getOutputStream() ) {
-                        os.write(new byte[] {
-                            1, 2, 3, 4, 5, 6, 7, 8
-                        });
-                    }
+                try ( SmbFile f = createTestFile() ) {
+                    try {
+                        f.exists();
+                        try ( OutputStream os = f.getOutputStream() ) {
+                            os.write(new byte[] {
+                                1, 2, 3, 4, 5, 6, 7, 8
+                            });
+                        }
 
-                    try ( InputStream is = f.getInputStream() ) {
-                        byte data[] = new byte[8];
-                        is.read(data);
+                        try ( InputStream is = f.getInputStream() ) {
+                            byte data[] = new byte[8];
+                            is.read(data);
+                        }
                     }
-                }
-                finally {
-                    f.delete();
+                    finally {
+                        f.delete();
+                    }
                 }
                 this.completed = true;
             }

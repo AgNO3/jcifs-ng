@@ -235,17 +235,6 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#isIdleTimeoutDisabled()
-     */
-    @Override
-    public boolean isIdleTimeoutDisabled () {
-        return this.delegate.isIdleTimeoutDisabled();
-    }
-
-
-    /**
-     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getLocalPort()
      */
@@ -702,6 +691,28 @@ public class DelegatingConfiguration implements Configuration {
     @Override
     public int getBatchLimit ( String cmd ) {
         return this.delegate.getBatchLimit(cmd);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isTraceResourceUsage()
+     */
+    @Override
+    public boolean isTraceResourceUsage () {
+        return this.delegate.isTraceResourceUsage();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isStrictResourceLifecycle()
+     */
+    @Override
+    public boolean isStrictResourceLifecycle () {
+        return this.delegate.isStrictResourceLifecycle();
     }
 
 

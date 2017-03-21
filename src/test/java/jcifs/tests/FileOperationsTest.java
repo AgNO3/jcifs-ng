@@ -18,15 +18,21 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.Map;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -45,26 +51,33 @@ public class FileOperationsTest extends BaseCIFSTest {
     }
 
 
+    @Parameters ( name = "{0}" )
+    public static Collection<Object> configs () {
+        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs");
+    }
+
+
     @Test
     public void testRenameFile () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile defaultShareRoot = getDefaultShareRoot();
-        SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
-        SmbFile f2 = new SmbFile(defaultShareRoot, makeRandomName());
-        f.createNewFile();
-        boolean renamed = false;
-        try {
-            f.renameTo(f2);
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+              SmbFile f2 = new SmbFile(defaultShareRoot, makeRandomName()) ) {
+            f.createNewFile();
+            boolean renamed = false;
             try {
-                assertTrue(f2.exists());
-                renamed = true;
+                f.renameTo(f2);
+                try {
+                    assertTrue(f2.exists());
+                    renamed = true;
+                }
+                finally {
+                    f2.delete();
+                }
             }
             finally {
-                f2.delete();
-            }
-        }
-        finally {
-            if ( !renamed && f.exists() ) {
-                f.delete();
+                if ( !renamed && f.exists() ) {
+                    f.delete();
+                }
             }
         }
     }
@@ -72,124 +85,173 @@ public class FileOperationsTest extends BaseCIFSTest {
 
     @Test
     public void testMoveFile () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile defaultShareRoot = getDefaultShareRoot();
-        SmbFile d = createTestDirectory();
-        SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
-        SmbFile f2 = new SmbFile(d, makeRandomName());
-        f.createNewFile();
-        boolean renamed = false;
-        try {
-            f.renameTo(f2);
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbFile d = createTestDirectory();
+              SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+              SmbFile f2 = new SmbFile(d, makeRandomName()) ) {
+            f.createNewFile();
+            boolean renamed = false;
             try {
-                assertTrue(f2.exists());
-                renamed = true;
+                f.renameTo(f2);
+                try {
+                    assertTrue(f2.exists());
+                    renamed = true;
+                }
+                finally {
+                    f2.delete();
+                }
             }
             finally {
-                f2.delete();
+                if ( !renamed && f.exists() ) {
+                    f.delete();
+                }
+                d.delete();
             }
-        }
-        finally {
-            if ( !renamed && f.exists() ) {
-                f.delete();
-            }
-            d.delete();
         }
     }
 
 
     @Test
     public void testRenameDirectory () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile defaultShareRoot = getDefaultShareRoot();
-        SmbFile d = createTestDirectory();
-        SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
-        SmbFile d2 = new SmbFile(d, makeRandomDirectoryName());
-        d1.mkdir();
-        boolean renamed = false;
-        try {
-            d1.renameTo(d2);
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbFile d = createTestDirectory();
+              SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+              SmbFile d2 = new SmbFile(d, makeRandomDirectoryName()) ) {
+            d1.mkdir();
+            boolean renamed = false;
             try {
-                assertTrue(d2.exists());
-                renamed = true;
+                d1.renameTo(d2);
+                try {
+                    assertTrue(d2.exists());
+                    renamed = true;
+                }
+                finally {
+                    d2.delete();
+                }
             }
             finally {
-                d2.delete();
+                if ( !renamed && d1.exists() ) {
+                    d1.delete();
+                }
+                d.delete();
             }
-        }
-        finally {
-            if ( !renamed && d1.exists() ) {
-                d1.delete();
-            }
-            d.delete();
         }
     }
 
 
     @Test
     public void testMoveDirectory () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile defaultShareRoot = getDefaultShareRoot();
-        SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
-        SmbFile d2 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
-        d1.mkdir();
-        boolean renamed = false;
-        try {
-            d1.renameTo(d2);
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+              SmbFile d2 = new SmbFile(defaultShareRoot, makeRandomDirectoryName()) ) {
+            d1.mkdir();
+            boolean renamed = false;
             try {
-                assertTrue(d2.exists());
-                renamed = true;
+                d1.renameTo(d2);
+                try {
+                    assertTrue(d2.exists());
+                    renamed = true;
+                }
+                finally {
+                    d2.delete();
+                }
             }
             finally {
-                d2.delete();
-            }
-        }
-        finally {
-            if ( !renamed && d1.exists() ) {
-                d1.delete();
+                if ( !renamed && d1.exists() ) {
+                    d1.delete();
+                }
             }
         }
     }
 
 
     @Test
-    public void testCopyFile () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            SmbFile d1 = createTestDirectory();
-            SmbFile t = new SmbFile(d1, makeRandomName());
-            try {
-                f.copyTo(t);
-                assertTrue(f.exists());
+    public void testCopyFile () throws IOException {
+        int bufSize = 4096;
+        long length = 4096 * 16;
+        try ( SmbFile f = createTestFile() ) {
+            try ( SmbFile d1 = createTestDirectory();
+                  SmbFile t = new SmbFile(d1, makeRandomName()) ) {
+                try {
+                    try ( OutputStream os = f.getOutputStream() ) {
+                        ReadWriteTest.writeRandom(bufSize, length, os);
+                    }
+
+                    f.copyTo(t);
+                    assertTrue(f.exists());
+                    assertEquals(f.length(), t.length());
+                    assertEquals(f.getAttributes(), t.getAttributes());
+
+                    try ( InputStream is = t.getInputStream() ) {
+                        ReadWriteTest.verifyRandom(bufSize, length, is);
+                    }
+                }
+                finally {
+                    d1.delete();
+                }
             }
             finally {
-                d1.delete();
+                f.delete();
             }
         }
-        finally {
-            f.delete();
+    }
+
+
+    @Test
+    public void testCopyFileUnresolved () throws IOException {
+        int bufSize = 4096;
+        long length = 4096 * 16 + 512;
+        try ( SmbFile d = createTestDirectory();
+              SmbFile f = new SmbFile(d, makeRandomName()) ) {
+            f.createNewFile();
+
+            try ( SmbFile t = new SmbFile(getDefaultShareRoot(), makeRandomName()) ) {
+                try {
+                    try ( OutputStream os = f.getOutputStream() ) {
+                        ReadWriteTest.writeRandom(bufSize, length, os);
+                    }
+                    f.copyTo(t);
+                    assertTrue(f.exists());
+                    assertEquals(f.length(), t.length());
+                    assertEquals(f.getAttributes(), t.getAttributes());
+
+                    try ( InputStream is = t.getInputStream() ) {
+                        ReadWriteTest.verifyRandom(bufSize, length, is);
+                    }
+                }
+                finally {
+                    t.delete();
+                }
+            }
+            finally {
+                d.delete();
+            }
         }
     }
 
 
     @Test
     public void testCopyDir () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestDirectory();
-        SmbFile e = new SmbFile(f, "test");
-        e.createNewFile();
-        try {
-            SmbFile d1 = createTestDirectory();
-            SmbFile t = new SmbFile(d1, makeRandomName());
-            try {
-                f.copyTo(t);
-                assertTrue(f.exists());
+        try ( SmbFile f = createTestDirectory();
+              SmbFile e = new SmbFile(f, "test") ) {
+            e.createNewFile();
+            try ( SmbFile d1 = createTestDirectory();
+                  SmbFile t = new SmbFile(d1, makeRandomName()) ) {
+                try {
+                    f.copyTo(t);
+                    assertTrue(f.exists());
 
-                SmbFile e2 = new SmbFile(t, "test");
-                assertTrue(e2.exists());
+                    try ( SmbFile e2 = new SmbFile(t, "test") ) {
+                        assertTrue(e2.exists());
+                    }
+                }
+                finally {
+                    d1.delete();
+                }
             }
             finally {
-                d1.delete();
+                f.delete();
             }
-        }
-        finally {
-            f.delete();
         }
     }
 }

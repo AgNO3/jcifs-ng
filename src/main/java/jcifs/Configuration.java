@@ -606,20 +606,25 @@ public interface Configuration {
 
 
     /**
-     * Property <tt>jcifs.smb.client.noIdleTimeout</tt> (bool, default false)
+     * Property <tt>jcifs.smb.client.strictResourceLifecycle</tt> (bool, default false)
      * 
-     * For complete coverage you also need to disable session timeouts by setting {@link #getSessionTimeout()} to 0.
+     * If enabled, SmbFile instances starting with their first use will hold a reference to their tree.
+     * This means that trees/sessions/connections won't be idle-disconnected even if there are no other active
+     * references (currently executing code, file descriptors).
      * 
-     * Idle timeouts can cause nasty race-conditions and do break file locking. Future versions will try to fix this
-     * more generally by tracking resoure usage on connections/sessions and prevent the idle timeout while there are
-     * open resources.
+     * Depending on the usage scenario, this may have some benefit as there won't be any delays for restablishing these
+     * resources, however comes at the cost of having to properly release all SmbFile instances you no longer need.
      * 
-     * If this setting is enabled, connection lifecycle management has to be taken care of by the user.
-     * If leaking connections is a concern you will have to manually clean up by calling
-     * {@link jcifs.CIFSContext#close()} and possibly using individual contexts for the individual connections.
-     * 
-     * @return whether idle timeouts are disabled
+     * @return whether to use strict resource lifecycle
      */
-    boolean isIdleTimeoutDisabled ();
+    boolean isStrictResourceLifecycle ();
+
+
+    /**
+     * This is solely intended for debugging
+     * 
+     * @return whether to track the locations from which resources were created
+     */
+    boolean isTraceResourceUsage ();
 
 }

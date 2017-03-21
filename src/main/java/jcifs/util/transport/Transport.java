@@ -20,12 +20,14 @@ package jcifs.util.transport;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
-import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jcifs.RuntimeCIFSException;
 
 
 /**
@@ -37,9 +39,9 @@ import org.slf4j.LoggerFactory;
  * concurrently.
  */
 
-public abstract class Transport implements Runnable {
+public abstract class Transport implements Runnable, AutoCloseable {
 
-    static int id = 0;
+    private static int id = 0;
     private static final Logger log = LoggerFactory.getLogger(Transport.class);
 
 
@@ -87,26 +89,70 @@ public abstract class Transport implements Runnable {
     volatile TransportException te;
 
     protected Map<Request, Response> response_map = new ConcurrentHashMap<>(4);
-    private boolean noTimeout;
-    private boolean noIdleTimeout;
+    private final AtomicLong usageCount = new AtomicLong(1);
 
 
     /**
-     * @param dontTimeout
-     *            disable all timeouts, including when there are inflight requests (needed for watch)
+     * @return session increased usage count
      */
-    public void setDontTimeout ( boolean dontTimeout ) {
-        this.noTimeout = dontTimeout;
+    public Transport acquire () {
+        long usage = this.usageCount.incrementAndGet();
+        if ( log.isTraceEnabled() ) {
+            log.trace("Acquire transport " + usage + " " + this);
+        }
+        return this;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.AutoCloseable#close()
+     */
+    @Override
+    public void close () {
+        release();
     }
 
 
     /**
      * 
-     * @param noIdleTimeout
-     *            diable idle timeouts in cases where the are no currently inflight requests
      */
-    public void setNoIdleTimeout ( boolean noIdleTimeout ) {
-        this.noIdleTimeout = noIdleTimeout;
+    public void release () {
+        long usage = this.usageCount.decrementAndGet();
+        if ( log.isTraceEnabled() ) {
+            log.trace("Release transport " + usage + " " + this);
+        }
+
+        if ( usage == 0 ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug("Transport usage dropped to zero " + this);
+            }
+        }
+        else if ( usage < 0 ) {
+            throw new RuntimeCIFSException("Usage count dropped below zero");
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize () throws Throwable {
+        if ( !isDisconnected() && this.usageCount.get() != 0 ) {
+            log.warn("Session was not properly released");
+        }
+    }
+
+
+    /**
+     * @return the number of known usages
+     */
+    protected long getUsageCount () {
+        return this.usageCount.get();
     }
 
 
@@ -142,12 +188,12 @@ public abstract class Transport implements Runnable {
      * @param timeout
      * @throws IOException
      */
-    public synchronized void sendrecv ( Request request, Response response, Long timeout ) throws IOException {
+    public synchronized void sendrecv ( Request request, Response response, long timeout ) throws IOException {
         makeKey(request);
         response.isReceived = false;
         response.isError = false;
         try {
-            if ( timeout != null ) {
+            if ( timeout > 0 ) {
                 response.expiration = System.currentTimeMillis() + timeout;
             }
             else {
@@ -156,7 +202,7 @@ public abstract class Transport implements Runnable {
             this.response_map.put(request, response);
             doSend(request);
             while ( !response.isReceived ) {
-                if ( timeout != null ) {
+                if ( timeout > 0 ) {
                     wait(timeout);
                     timeout = response.expiration - System.currentTimeMillis();
                     if ( response.isError ) {
@@ -207,66 +253,24 @@ public abstract class Transport implements Runnable {
         while ( this.thread == Thread.currentThread() ) {
             try {
                 Request key;
-                int waitingFor = this.response_map.size();
                 try {
                     key = peekKey();
                 }
                 catch ( SocketTimeoutException e ) {
                     log.trace("Socket timeout during peekKey", e);
-                    if ( this.noTimeout ) {
-                        continue;
-                    }
-
-                    int remaining = this.response_map.size();
-                    if ( this.noIdleTimeout && waitingFor == 0 && remaining == 0 && this.state == 3 ) {
-                        // if we were neither waiting for a response nor
-                        // a new one has been added this is the classic idle condition
-                        continue;
-                    }
-
-                    boolean haveUnexpired = false;
-                    boolean haveRequest = false;
-                    long now = System.currentTimeMillis();
-
-                    // only disconnect if all responses are expired
-                    Collection<Response> inflight = this.response_map.values();
-                    for ( Response r : inflight ) {
-                        haveRequest = true;
-                        if ( r.expiration != null && r.expiration > now ) {
-                            if ( log.isTraceEnabled() ) {
-                                log.trace("Have non-expired in flight request " + r);
-                            }
-                            haveUnexpired = true;
-                            break;
+                    if ( getUsageCount() > 0 ) {
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Transport still in use, no idle timeout " + this);
                         }
-                        else if ( r.expiration == null && log.isTraceEnabled() ) {
-                            log.debug("Have response without expiration " + r);
-                        }
-                        else if ( log.isTraceEnabled() ) {
-                            log.trace("Response already expired " + r);
-                        }
-                    }
-
-                    if ( haveUnexpired || ( this.noIdleTimeout && !haveRequest ) ) {
-                        if ( log.isTraceEnabled() ) {
-                            log.trace(
-                                String.format(
-                                    "Prevented idle timeout (haveUnexpired: %s, haveRequest: %s idleDisabled: %s)",
-                                    haveUnexpired,
-                                    haveRequest,
-                                    this.noIdleTimeout));
-                        }
-                        // notify threads that may have expired requests
-                        if ( haveRequest ) {
-                            synchronized ( this ) {
-                                notifyAll();
-                            }
+                        // notify, so that callers with timed-out requests can handle them
+                        synchronized ( this ) {
+                            notifyAll();
                         }
                         continue;
                     }
 
                     if ( log.isDebugEnabled() ) {
-                        log.debug(String.format("Idle timeout on %s inflight %d", this.name, inflight.size()));
+                        log.debug(String.format("Idle timeout on %s", this.name));
                     }
                     throw e;
                 }
@@ -281,8 +285,9 @@ public abstract class Transport implements Runnable {
                 synchronized ( this ) {
                     Response response = this.response_map.get(key);
                     if ( response == null ) {
-                        if ( log.isTraceEnabled() )
+                        if ( log.isTraceEnabled() ) {
                             log.trace("Invalid key, skipping message");
+                        }
                         doSkip();
                     }
                     else {
@@ -306,8 +311,7 @@ public abstract class Transport implements Runnable {
 
                 synchronized ( this ) {
                     try {
-
-                        disconnect(!timeout);
+                        disconnect(!timeout, false);
                     }
                     catch ( IOException ioe ) {
                         ex.addSuppressed(ioe);
@@ -340,7 +344,7 @@ public abstract class Transport implements Runnable {
      * this transport.
      */
 
-    protected abstract void doDisconnect ( boolean hard ) throws IOException;
+    protected abstract void doDisconnect ( boolean hard, boolean inUse ) throws IOException;
 
 
     /**
@@ -449,6 +453,19 @@ public abstract class Transport implements Runnable {
      * @throws IOException
      */
     public synchronized void disconnect ( boolean hard ) throws IOException {
+        disconnect(hard, true);
+    }
+
+
+    /**
+     * Disconnect the transport
+     * 
+     * @param hard
+     * @param inUse
+     *            whether the caller is holding a usage reference on the transport
+     * @throws IOException
+     */
+    public synchronized void disconnect ( boolean hard, boolean inUse ) throws IOException {
         IOException ioe = null;
 
         switch ( this.state ) {
@@ -463,7 +480,7 @@ public abstract class Transport implements Runnable {
             }
             try {
                 this.state = 5;
-                doDisconnect(hard);
+                doDisconnect(hard, inUse);
                 this.state = 0;
             }
             catch ( IOException ioe0 ) {
@@ -471,7 +488,7 @@ public abstract class Transport implements Runnable {
                 ioe = ioe0;
             }
         case 4: /* failed to connect - reset the transport */
-            // thread is cleaned up by connect routing, joining it here causes a deadlock
+            // thread is cleaned up by connect routine, joining it here causes a deadlock
             this.thread = null;
             this.state = 0;
             break;

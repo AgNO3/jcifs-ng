@@ -39,6 +39,7 @@ public class SmbFileInputStream extends InputStream {
 
     private static final Logger log = LoggerFactory.getLogger(SmbFileInputStream.class);
 
+    private SmbFileHandleImpl handle;
     private long fp;
     private int readSize, readSizeFile, openFlags, access;
     private byte[] tmp = new byte[1];
@@ -46,6 +47,8 @@ public class SmbFileInputStream extends InputStream {
     SmbFile file;
 
     private boolean largeReadX;
+
+    private final boolean unsharedFile;
 
 
     /**
@@ -55,8 +58,9 @@ public class SmbFileInputStream extends InputStream {
      * @throws SmbException
      * @throws MalformedURLException
      */
+    @SuppressWarnings ( "resource" )
     public SmbFileInputStream ( String url, CIFSContext tc ) throws SmbException, MalformedURLException {
-        this(new SmbFile(url, tc));
+        this(new SmbFile(url, tc), SmbFile.O_RDONLY, true);
     }
 
 
@@ -71,29 +75,50 @@ public class SmbFileInputStream extends InputStream {
      * @throws SmbException
      */
     public SmbFileInputStream ( SmbFile file ) throws SmbException {
-        this(file, SmbFile.O_RDONLY);
+        this(file, SmbFile.O_RDONLY, false);
     }
 
 
-    SmbFileInputStream ( SmbFile file, int openFlags ) throws SmbException {
+    SmbFileInputStream ( SmbFile file, int openFlags, boolean unshared ) throws SmbException {
         this.file = file;
+        this.unsharedFile = unshared;
         this.openFlags = openFlags & 0xFFFF;
         this.access = ( openFlags >>> 16 ) & 0xFFFF;
-        if ( file.type != SmbFile.TYPE_NAMED_PIPE ) {
-            file.open(openFlags, this.access, SmbFile.ATTR_NORMAL, 0);
-            this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC );
-        }
-        else {
-            file.connect0();
-        }
-        this.readSize = Math.min(file.tree.session.getTransport().rcv_buf_size - 70, file.tree.session.getTransport().server.maxBufferSize - 70);
 
-        boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningEnabled() );
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_READX) ) {
+        try ( SmbTreeHandle th = file.ensureTreeConnected() ) {
+            if ( file.getType() != SmbFile.TYPE_NAMED_PIPE ) {
+                try ( SmbFileHandle h = ensureOpen() ) {}
+                this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC );
+            }
+
+            init(th);
+        }
+    }
+
+
+    /**
+     * @throws SmbException
+     * 
+     */
+    SmbFileInputStream ( SmbFile file, SmbTreeHandleImpl th, SmbFileHandleImpl fh ) throws SmbException {
+        this.file = file;
+        this.handle = fh;
+        this.unsharedFile = false;
+        init(th);
+    }
+
+
+    /**
+     * @param f
+     * @param th
+     * @throws SmbException
+     */
+    private void init ( SmbTreeHandle th ) throws SmbException {
+        this.readSize = Math.min(th.getReceiveBufferSize() - 70, th.getMaximumBufferSize() - 70);
+
+        if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
             this.largeReadX = true;
-            this.readSizeFile = Math
-                    .min(file.getTransportContext().getConfig().getRecieveBufferSize() - 70, isSignatureActive ? 0xFFFF - 70 : 0xFFFFFF - 70);
+            this.readSizeFile = Math.min(th.getConfig().getRecieveBufferSize() - 70, th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
             log.debug("Enabling LARGE_READX with " + this.readSizeFile);
         }
         else {
@@ -107,7 +132,28 @@ public class SmbFileInputStream extends InputStream {
     }
 
 
-    protected IOException seToIoe ( SmbException se ) {
+    /**
+     * @param file
+     * @param openFlags
+     * @return
+     * @throws SmbException
+     */
+    synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+        if ( this.handle == null || !this.handle.isValid() ) {
+            // one extra acquire to keep this open till the stream is released
+            if ( this.file instanceof SmbNamedPipe ) {
+                this.handle = this.file.openUnshared(SmbFile.O_EXCL, ( (SmbNamedPipe) this.file ).getPipeType() & 0xFF0000, SmbFile.ATTR_NORMAL, 0);
+            }
+            else {
+                this.handle = this.file.openUnshared(this.openFlags, this.access, SmbFile.ATTR_NORMAL, 0).acquire();
+            }
+            return this.handle;
+        }
+        return this.handle.acquire();
+    }
+
+
+    protected static IOException seToIoe ( SmbException se ) {
         IOException ioe = se;
         Throwable root = se.getCause();
         if ( root instanceof TransportException ) {
@@ -132,11 +178,20 @@ public class SmbFileInputStream extends InputStream {
     @Override
     public void close () throws IOException {
         try {
-            this.file.close();
-            this.tmp = null;
+            SmbFileHandleImpl h = this.handle;
+            if ( h != null ) {
+                h.close();
+            }
         }
         catch ( SmbException se ) {
             throw seToIoe(se);
+        }
+        finally {
+            this.tmp = null;
+            this.handle = null;
+            if ( this.unsharedFile ) {
+                this.file.close();
+            }
         }
     }
 
@@ -205,66 +260,64 @@ public class SmbFileInputStream extends InputStream {
             throw new IOException("Bad file descriptor");
         }
         // ensure file is open
-        this.file.open(this.openFlags, this.access, SmbFile.ATTR_NORMAL, 0);
+        try ( SmbFileHandleImpl fd = ensureOpen();
+              SmbTreeHandleImpl th = fd.getTree() ) {
 
-        /*
-         * Read AndX Request / Response
-         */
-
-        if ( log.isTraceEnabled() ) {
-            log.trace("read: fid=" + this.file.fid + ",off=" + off + ",len=" + len);
-        }
-
-        SmbComReadAndXResponse response = new SmbComReadAndXResponse(getSession().getConfig(), b, off);
-
-        if ( this.file.type == SmbFile.TYPE_NAMED_PIPE ) {
-            response.responseTimeout = 0;
-        }
-
-        int r, n;
-        int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
-        do {
-            r = len > blockSize ? blockSize : len;
+            /*
+             * Read AndX Request / Response
+             */
 
             if ( log.isTraceEnabled() ) {
-                log.trace("read: len=" + len + ",r=" + r + ",fp=" + this.fp + ",b.length=" + b.length);
+                log.trace("read: fid=" + fd + ",off=" + off + ",len=" + len);
             }
 
-            try {
-                SmbComReadAndX request = new SmbComReadAndX(getSession().getConfig(), this.file.fid, this.fp, r, null);
-                if ( this.file.type == SmbFile.TYPE_NAMED_PIPE ) {
-                    request.minCount = request.maxCount = request.remaining = 1024;
-                }
-                else if ( this.largeReadX ) {
-                    request.maxCount = r & 0xFFFF;
-                    request.openTimeout = ( r >> 16 ) & 0xFFFF;
-                }
-                this.file.send(request, response);
+            SmbComReadAndXResponse response = new SmbComReadAndXResponse(th.getConfig(), b, off);
+
+            int type = this.file.getType();
+            if ( type == SmbFile.TYPE_NAMED_PIPE ) {
+                response.responseTimeout = 0;
             }
-            catch ( SmbException se ) {
-                if ( this.file.type == SmbFile.TYPE_NAMED_PIPE && se.getNtStatus() == NtStatus.NT_STATUS_PIPE_BROKEN ) {
-                    return -1;
+
+            int r, n;
+            int blockSize = ( type == SmbFile.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
+            do {
+                r = len > blockSize ? blockSize : len;
+
+                if ( log.isTraceEnabled() ) {
+                    log.trace("read: len=" + len + ",r=" + r + ",fp=" + this.fp + ",b.length=" + b.length);
                 }
-                throw seToIoe(se);
+
+                try {
+                    SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fd.getFid(), this.fp, r, null);
+                    if ( type == SmbFile.TYPE_NAMED_PIPE ) {
+                        request.minCount = request.maxCount = request.remaining = 1024;
+                    }
+                    else if ( this.largeReadX ) {
+                        request.maxCount = r & 0xFFFF;
+                        request.openTimeout = ( r >> 16 ) & 0xFFFF;
+                    }
+                    th.send(request, response, RequestParam.NO_RETRY);
+                }
+                catch ( SmbException se ) {
+                    if ( type == SmbFile.TYPE_NAMED_PIPE && se.getNtStatus() == NtStatus.NT_STATUS_PIPE_BROKEN ) {
+                        return -1;
+                    }
+                    throw seToIoe(se);
+                }
+                if ( ( n = response.dataLength ) <= 0 ) {
+                    return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
+                }
+                this.fp += n;
+                len -= n;
+                response.off += n;
             }
-            if ( ( n = response.dataLength ) <= 0 ) {
-                return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
-            }
-            this.fp += n;
-            len -= n;
-            response.off += n;
+            while ( len > blockSize && n == r );
+            // this used to be len > 0, but this is BS:
+            // - InputStream.read gives no such guarantee
+            // - otherwise the caller would need to figure out the block size, or otherwise might end up with very small
+            // reads
+            return (int) ( this.fp - start );
         }
-        while ( len > blockSize && n == r );
-        // this used to be len > 0, but this is BS:
-        // - InputStream.read gives no such guarantee
-        // - otherwise the caller would need to figure out the block size, or otherwise might end up with very small
-        // reads
-        return (int) ( this.fp - start );
-    }
-
-
-    private SmbSession getSession () {
-        return this.file.tree.session;
     }
 
 
@@ -277,32 +330,7 @@ public class SmbFileInputStream extends InputStream {
      */
     @Override
     public int available () throws IOException {
-        SmbNamedPipe pipe;
-        TransPeekNamedPipe req;
-        TransPeekNamedPipeResponse resp;
-
-        if ( this.file.type != SmbFile.TYPE_NAMED_PIPE ) {
-            return 0;
-        }
-
-        try {
-            pipe = (SmbNamedPipe) this.file;
-            this.file.open(SmbFile.O_EXCL, pipe.pipeType & 0xFF0000, SmbFile.ATTR_NORMAL, 0);
-
-            req = new TransPeekNamedPipe(getSession().getConfig(), this.file.unc, this.file.fid);
-            resp = new TransPeekNamedPipeResponse(getSession().getConfig(), pipe);
-
-            pipe.send(req, resp);
-            if ( resp.status == TransPeekNamedPipeResponse.STATUS_DISCONNECTED
-                    || resp.status == TransPeekNamedPipeResponse.STATUS_SERVER_END_CLOSED ) {
-                this.file.opened = false;
-                return 0;
-            }
-            return resp.available;
-        }
-        catch ( SmbException se ) {
-            throw seToIoe(se);
-        }
+        return 0;
     }
 
 

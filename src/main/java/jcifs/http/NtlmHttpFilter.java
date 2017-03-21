@@ -324,19 +324,21 @@ public class NtlmHttpFilter implements Filter {
 
     private static NtlmChallenge interrogate ( CIFSContext tf, NbtAddress addr ) throws SmbException {
         UniAddress dc = new UniAddress(addr);
-        SmbTransport trans = tf.getTransportPool()
-                .getSmbTransport(tf, dc, 0, false, tf.hasDefaultCredentials() && tf.getConfig().isIpcSigningEnforced());
-        if ( !tf.hasDefaultCredentials() ) {
-            trans.connect();
-            log.warn(
-                "Default credentials (jcifs.smb.client.username/password)" + " not specified. SMB signing may not work propertly."
-                        + "  Skipping DC interrogation.");
+        try ( SmbTransport trans = tf.getTransportPool()
+                .getSmbTransport(tf, dc, 0, false, tf.hasDefaultCredentials() && tf.getConfig().isIpcSigningEnforced()) ) {
+            if ( !tf.hasDefaultCredentials() ) {
+                trans.connect();
+                log.warn(
+                    "Default credentials (jcifs.smb.client.username/password)" + " not specified. SMB signing may not work propertly."
+                            + "  Skipping DC interrogation.");
+            }
+            else {
+                try ( SmbSession ssn = trans.getSmbSession(tf.withDefaultCredentials()) ) {
+                    ssn.treeConnect();
+                }
+            }
+            return new NtlmChallenge(trans.getServerEncryptionKey(), dc);
         }
-        else {
-            SmbSession ssn = trans.getSmbSession(tf.withDefaultCredentials());
-            ssn.treeConnect();
-        }
-        return new NtlmChallenge(trans.getServerEncryptionKey(), dc);
     }
 
 

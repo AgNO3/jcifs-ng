@@ -51,6 +51,7 @@ abstract class ServerMessageBlock extends Response implements Request {
     static final byte SMB_COM_DELETE = (byte) 0x06;
     static final byte SMB_COM_RENAME = (byte) 0x07;
     static final byte SMB_COM_QUERY_INFORMATION = (byte) 0x08;
+    static final byte SMB_COM_SET_INFORMATION = (byte) 0x09;
     static final byte SMB_COM_WRITE = (byte) 0x0B;
     static final byte SMB_COM_CHECK_DIRECTORY = (byte) 0x10;
     static final byte SMB_COM_TRANSACTION = (byte) 0x25;

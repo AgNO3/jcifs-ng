@@ -30,8 +30,11 @@ public final class TestProperties {
     private TestProperties () {}
 
     static final String TEST_SHARE_URL_MAIN = "test.share.main.url";
+    static final String TEST_SHARE_URL_DFSROOT = "test.share.dfsroot.url";
+
     static final String TEST_SHARE_MAIN = "test.share.main";
     static final String TEST_SHARE_GUEST = "test.share.guest";
+
     static final String TEST_USER_NAME = "test.user.name";
     static final String TEST_USER_PASSWORD = "test.user.password";
     static final String TEST_USER_DOMAIN = "test.user.domain";
@@ -52,5 +55,9 @@ public final class TestProperties {
     static final String TEST_MUTATIONS = "test.mutations";
 
     static final String EXCLUDE_TEST_MUTATIONS = "test.mutations.exclude";
+
+    static final Object TEST_FIFO_PIPE = "test.pipe.fifo";
+    static final Object TEST_TRANSACT_PIPE = "test.pipe.transact";
+    static final Object TEST_CALL_PIPE = "test.pipe.call";
 
 }

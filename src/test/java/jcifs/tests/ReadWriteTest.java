@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbNamedPipe;
+import jcifs.smb.SmbPipeHandle;
 import jcifs.smb.SmbRandomAccessFile;
 
 
@@ -61,20 +63,18 @@ public class ReadWriteTest extends BaseCIFSTest {
         super(name, properties);
     }
 
-    private long seed;
+    private static final long SEED = ( new Random() ).nextLong();
 
 
     @Override
     @Before
     public void setUp () throws Exception {
-        this.seed = ( new Random() ).nextLong();
         super.setUp();
     }
 
 
-    private Random getRandom () {
-        log.debug("Seed is " + this.seed);
-        return new Random(this.seed);
+    private static Random getRandom () {
+        return new Random(SEED);
     }
 
 
@@ -115,106 +115,207 @@ public class ReadWriteTest extends BaseCIFSTest {
 
 
     private void runReadWriteTest ( int bufSize, long length ) throws MalformedURLException, UnknownHostException, SmbException, IOException {
-        SmbFile f = createTestFile();
-        try {
-            try ( OutputStream os = f.getOutputStream() ) {
-                writeRandom(bufSize, length, os);
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                try ( OutputStream os = f.getOutputStream() ) {
+                    writeRandom(bufSize, length, os);
+                }
+
+                assertEquals("File size matches", length, f.length());
+
+                try ( InputStream is = f.getInputStream() ) {
+                    verifyRandom(bufSize, length, is);
+                }
+
             }
-
-            assertEquals("File size matches", length, f.length());
-
-            try ( InputStream is = f.getInputStream() ) {
-                verifyRandom(bufSize, length, is);
+            finally {
+                f.delete();
             }
-
-        }
-        finally {
-            f.delete();
         }
     }
 
 
     @Test
     public void testRandomAccess () throws SmbException, MalformedURLException, UnknownHostException {
-        SmbFile f = createTestFile();
-        try {
-            try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "rw") ) {
-
-            }
-        }
-        finally {
-            f.delete();
-        }
-    }
-
-
-    @Test
-    public void testPipeOneHandle () throws IOException {
-        SmbFile pn = new SmbFile(getDefaultShareRoot(), makeRandomName());
-        SmbNamedPipe f = new SmbNamedPipe(pn.getURL().toString(), SmbNamedPipe.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext()));
-        try {
-            f.createNewFile();
+        try ( SmbFile f = createTestFile() ) {
             try {
-                try ( OutputStream os = f.getNamedPipeOutputStream() ) {
-                    writeRandom(1024, 1024, os);
-                    try ( InputStream is = f.getNamedPipeInputStream() ) {
-                        verifyRandom(1024, 1024, is);
-                    }
+                try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "rw") ) {
+
                 }
             }
             finally {
                 f.delete();
             }
         }
-        finally {
-            f.close();
+    }
+
+
+    private String getFifoPipeUrl () {
+        String testFifoPipe = getProperties().get(TestProperties.TEST_FIFO_PIPE);
+        Assume.assumeNotNull(testFifoPipe);
+        return "smb://" + getTestServer() + "/IPC$/" + testFifoPipe;
+    }
+
+
+    private String getTransactPipeUrl () {
+        String testTransactPipe = getProperties().get(TestProperties.TEST_TRANSACT_PIPE);
+        Assume.assumeNotNull(testTransactPipe);
+        return "smb://" + getTestServer() + "/IPC$/" + testTransactPipe;
+    }
+
+
+    private String getCallPipeUrl () {
+        String testCallPipe = getProperties().get(TestProperties.TEST_CALL_PIPE);
+        Assume.assumeNotNull(testCallPipe);
+        return "smb://" + getTestServer() + "/IPC$/" + testCallPipe;
+    }
+
+
+    @Test
+    public void testTransactPipe () throws IOException {
+        try ( SmbNamedPipe f = new SmbNamedPipe(
+            getTransactPipeUrl(),
+            SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_TRANSACT,
+            withTestNTLMCredentials(getContext())) ) {
+            try ( SmbPipeHandle p = f.openPipe() ) {
+                try ( OutputStream os = p.getOutput() ) {
+                    writeRandom(1024, 1024, os);
+                    try ( InputStream is = p.getInput() ) {
+                        verifyRandom(1024, 1024, is);
+                    }
+                }
+            }
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == 0xC00000BB ) {
+                    Assume.assumeTrue("Server does not support pipes or it does not exist", false);
+                }
+                throw e;
+            }
         }
     }
 
 
     @Test
-    public void testPipeTwoHandles () throws IOException {
-        SmbFile pn = new SmbFile(getDefaultShareRoot(), makeRandomName());
-        SmbNamedPipe s = new SmbNamedPipe(pn.getURL().toString(), SmbNamedPipe.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext()));
-        SmbNamedPipe t = new SmbNamedPipe(pn.getURL().toString(), SmbNamedPipe.PIPE_TYPE_RDONLY, withTestNTLMCredentials(getContext()));
-        try {
-            s.createNewFile();
-            try {
-                try ( OutputStream os = s.getNamedPipeOutputStream() ) {
+    public void testCallPipe () throws IOException {
+        try ( SmbNamedPipe f = new SmbNamedPipe(
+            getCallPipeUrl(),
+            SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_CALL,
+            withTestNTLMCredentials(getContext())) ) {
+            try ( SmbPipeHandle p = f.openPipe() ) {
+                try ( OutputStream os = p.getOutput() ) {
+                    writeRandom(1024, 1024, os);
+                    try ( InputStream is = p.getInput() ) {
+                        verifyRandom(1024, 1024, is);
+                    }
+                }
+            }
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == 0xC00000BB ) {
+                    Assume.assumeTrue("Server does not support pipes or it does not exist", false);
+                }
+                throw e;
+            }
+        }
+    }
+
+
+    @Test
+    public void testFifoPipe () throws IOException {
+        try ( SmbNamedPipe f = new SmbNamedPipe(getFifoPipeUrl(), SmbNamedPipe.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext())) ) {
+            try ( SmbPipeHandle p = f.openPipe() ) {
+                try ( OutputStream os = p.getOutput() ) {
+                    writeRandom(1024, 1024, os);
+                    try ( InputStream is = p.getInput() ) {
+                        verifyRandom(1024, 1024, is);
+                    }
+                }
+            }
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == 0xC0000034 ) {
+                    Assume.assumeTrue("Server does not support pipes or it does not exist", false);
+                }
+                throw e;
+            }
+        }
+    }
+
+
+    @Test
+    public void testFifoPipeTwoHandles () throws IOException {
+        try ( SmbNamedPipe s = new SmbNamedPipe(getFifoPipeUrl(), SmbNamedPipe.PIPE_TYPE_WRONLY, withTestNTLMCredentials(getContext()));
+              SmbNamedPipe t = new SmbNamedPipe(getFifoPipeUrl(), SmbNamedPipe.PIPE_TYPE_RDONLY, withTestNTLMCredentials(getContext())) ) {
+            try ( SmbPipeHandle sp = s.openPipe();
+                  SmbPipeHandle tp = t.openPipe() ) {
+                try ( OutputStream os = sp.getOutput() ) {
                     writeRandom(1024, 1024, os);
                 }
-                try ( InputStream is = t.getNamedPipeInputStream() ) {
+                try ( InputStream is = tp.getInput() ) {
+                    verifyRandom(1024, 1024, is);
+                }
+            }
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == 0xC0000034 ) {
+                    Assume.assumeTrue("Server does not support pipes or it does not exist", false);
+                }
+                throw e;
+            }
+        }
+    }
+
+
+    @Test
+    public void testReadWriteOneHandle () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try ( SmbFile s = new SmbFile(f.getURL().toString(), withTestNTLMCredentials(getContext())) ) {
+                try ( OutputStream os = s.getOutputStream();
+                      InputStream is = s.getInputStream() ) {
+                    writeRandom(1024, 1024, os);
                     verifyRandom(1024, 1024, is);
                 }
             }
             finally {
-                s.delete();
+                f.delete();
             }
         }
-        finally {
-            s.close();
-            t.close();
+    }
+
+
+    @Test
+    public void testReadWriteTwoHandles () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try ( SmbFile s = new SmbFile(f.getURL().toString(), withTestNTLMCredentials(getContext()));
+                  SmbFile t = new SmbFile(f.getURL().toString(), withTestNTLMCredentials(getContext())) ) {
+                try ( OutputStream os = s.getOutputStream();
+                      InputStream is = t.getInputStream() ) {
+                    writeRandom(1024, 1024, os);
+                    verifyRandom(1024, 1024, is);
+                }
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
 
     @Test
     public void testLargeBufSmallWrite () throws IOException {
-        SmbFile f = createTestFile();
-        try {
-            int bufSize = 65535;
-            long length = 1024;
-            try ( OutputStream os = f.getOutputStream() ) {
-                writeRandom(bufSize, length, os);
-            }
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                int bufSize = 65535;
+                long length = 1024;
+                try ( OutputStream os = f.getOutputStream() ) {
+                    writeRandom(bufSize, length, os);
+                }
 
-            try ( InputStream is = f.getInputStream() ) {
-                verifyRandom(bufSize, length, is);
-            }
+                try ( InputStream is = f.getInputStream() ) {
+                    verifyRandom(bufSize, length, is);
+                }
 
-        }
-        finally {
-            f.delete();
+            }
+            finally {
+                f.delete();
+            }
         }
     }
 
@@ -225,7 +326,7 @@ public class ReadWriteTest extends BaseCIFSTest {
      * @param is
      * @throws IOException
      */
-    private void verifyRandom ( int bufSize, long length, InputStream is ) throws IOException {
+    static void verifyRandom ( int bufSize, long length, InputStream is ) throws IOException {
         long start = System.currentTimeMillis();
         byte buffer[] = new byte[bufSize];
         long p = 0;
@@ -257,7 +358,7 @@ public class ReadWriteTest extends BaseCIFSTest {
      * @param os
      * @throws IOException
      */
-    private void writeRandom ( int bufSize, long length, OutputStream os ) throws IOException {
+    static void writeRandom ( int bufSize, long length, OutputStream os ) throws IOException {
         long start = System.currentTimeMillis();
         byte buffer[] = new byte[bufSize];
         long p = 0;
@@ -272,7 +373,7 @@ public class ReadWriteTest extends BaseCIFSTest {
     }
 
 
-    private static void randBytes ( Random r, byte[] buffer ) {
+    static final void randBytes ( Random r, byte[] buffer ) {
         // regular nextBytes is not reproducible if the reads are not aligned
         for ( int i = 0; i < buffer.length; i++ ) {
             buffer[ i ] = (byte) r.nextInt(256);

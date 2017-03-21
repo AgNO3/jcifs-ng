@@ -22,15 +22,17 @@ package jcifs.smb;
 import java.io.IOException;
 
 
-class TransactNamedPipeOutputStream extends SmbPipeOutputStream {
+class TransactCallNamedPipeOutputStream extends SmbPipeOutputStream {
 
+    private String path;
+    private SmbPipeHandleImpl handle;
     private byte[] tmp = new byte[1];
-    private boolean dcePipe;
 
 
-    TransactNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws SmbException {
+    TransactCallNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws SmbException {
         super(handle, th);
-        this.dcePipe = ( handle.getPipeType() & SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT;
+        this.handle = handle;
+        this.path = handle.getPipe().getFileLocator().getUncPath();
     }
 
 
@@ -53,13 +55,9 @@ class TransactNamedPipeOutputStream extends SmbPipeOutputStream {
             len = 0;
         }
 
-        try ( SmbFileHandleImpl fh = ensureOpen();
-              SmbTreeHandleImpl th = fh.getTree() ) {
-            TransTransactNamedPipe req = new TransTransactNamedPipe(th.getConfig(), fh.getFid(), b, off, len);
-            if ( this.dcePipe ) {
-                req.maxDataCount = 1024;
-            }
-            th.send(req, new TransTransactNamedPipeResponse(th.getConfig(), getHandle()), RequestParam.NO_RETRY);
+        try ( SmbTreeHandleImpl th = this.handle.ensureTreeConnected() ) {
+            th.send(new TransWaitNamedPipe(th.getConfig(), this.path), new TransWaitNamedPipeResponse(th.getConfig()));
+            th.send(new TransCallNamedPipe(th.getConfig(), this.path, b, off, len), new TransCallNamedPipeResponse(th.getConfig(), this.handle));
         }
     }
 }

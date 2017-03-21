@@ -24,9 +24,10 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
-import jcifs.smb.SmbFileInputStream;
-import jcifs.smb.SmbFileOutputStream;
 import jcifs.smb.SmbNamedPipe;
+import jcifs.smb.SmbPipeHandle;
+import jcifs.smb.SmbPipeInputStream;
+import jcifs.smb.SmbPipeOutputStream;
 import jcifs.util.Encdec;
 
 
@@ -38,10 +39,9 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     /* This 0x20000 bit is going to get chopped! */
     final static int pipeFlags = ( 0x2019F << 16 ) | SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT;
 
-    SmbNamedPipe pipe;
-    SmbFileInputStream in = null;
-    SmbFileOutputStream out = null;
-    boolean isStart = true;
+    private SmbNamedPipe pipe;
+    private SmbPipeHandle handle;
+    private boolean isStart = true;
 
 
     /**
@@ -53,19 +53,20 @@ public class DcerpcPipeHandle extends DcerpcHandle {
      */
     public DcerpcPipeHandle ( String url, CIFSContext tc, boolean unshared ) throws DcerpcException, MalformedURLException {
         super(tc, DcerpcHandle.parseBinding(url));
-        this.pipe = new SmbNamedPipe(makePipeUrl(), pipeFlags, tc);
-        this.pipe.setNonPooled(unshared);
+        this.pipe = new SmbNamedPipe(makePipeUrl(), pipeFlags, unshared, tc);
+        this.handle = this.pipe.openPipe();
     }
 
 
     private String makePipeUrl () {
-        String url = "smb://" + this.getBinding().getServer() + "/IPC$/" + this.getBinding().getEndpoint().substring(6);
+        DcerpcBinding binding = getBinding();
+        String url = "smb://" + binding.getServer() + "/IPC$/" + binding.getEndpoint().substring(6);
 
         String params = "", server, address;
-        server = (String) this.getBinding().getOption("server");
+        server = (String) binding.getOption("server");
         if ( server != null )
             params += "&server=" + server;
-        address = (String) this.getBinding().getOption("address");
+        address = (String) binding.getOption("address");
         if ( server != null )
             params += "&address=" + address;
         if ( params.length() > 0 )
@@ -76,22 +77,42 @@ public class DcerpcPipeHandle extends DcerpcHandle {
 
 
     @Override
-    protected void doSendFragment ( byte[] buf, int off, int length, boolean isDirect ) throws IOException {
-        if ( this.out != null && this.out.isOpen() == false )
-            throw new IOException("DCERPC pipe is no longer open");
-
-        if ( this.in == null )
-            this.in = (SmbFileInputStream) this.pipe.getNamedPipeInputStream();
-        if ( this.out == null )
-            this.out = (SmbFileOutputStream) this.pipe.getNamedPipeOutputStream();
-        if ( isDirect ) {
-            this.out.writeDirect(buf, off, length, 1);
-            return;
-        }
-        this.out.write(buf, off, length);
+    public CIFSContext getTransportContext () {
+        return this.pipe.getTransportContext();
     }
 
 
+    @Override
+    public String getServer () {
+        return this.pipe.getFileLocator().getServer();
+    }
+
+
+    @Override
+    public String getServerWithDfs () {
+        return this.pipe.getFileLocator().getServerWithDfs();
+    }
+
+
+    @SuppressWarnings ( "resource" )
+    @Override
+    protected void doSendFragment ( byte[] buf, int off, int length, boolean isDirect ) throws IOException {
+        SmbPipeOutputStream out = this.handle.getOutput();
+
+        if ( this.handle.isStale() ) {
+            throw new IOException("DCERPC pipe is no longer open");
+        }
+
+        if ( isDirect ) {
+            out.writeDirect(buf, off, length, 1);
+        }
+        else {
+            out.write(buf, off, length);
+        }
+    }
+
+
+    @SuppressWarnings ( "resource" )
     @Override
     protected void doReceiveFragment ( byte[] buf, boolean isDirect ) throws IOException {
         int off, flags, length;
@@ -99,11 +120,12 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         if ( buf.length < this.getMaxRecv() )
             throw new IllegalArgumentException("buffer too small");
 
+        SmbPipeInputStream in = this.handle.getInput();
         if ( this.isStart && !isDirect ) { // start of new frag, do trans
-            off = this.in.read(buf, 0, 1024);
+            off = in.read(buf, 0, 1024);
         }
         else {
-            off = this.in.readDirect(buf, 0, buf.length);
+            off = in.readDirect(buf, 0, buf.length);
         }
 
         if ( buf[ 0 ] != 5 && buf[ 1 ] != 0 )
@@ -118,7 +140,7 @@ public class DcerpcPipeHandle extends DcerpcHandle {
             throw new IOException("Unexpected fragment length: " + length);
 
         while ( off < length ) {
-            off += this.in.readDirect(buf, off, length - off);
+            off += in.readDirect(buf, off, length - off);
         }
     }
 
@@ -126,11 +148,7 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     @Override
     public void close () throws IOException {
         super.close();
-        if ( this.out != null )
-            this.out.close();
-
-        if ( this.pipe != null ) {
-            this.pipe.close();
-        }
+        this.handle.close();
+        this.pipe.close();
     }
 }

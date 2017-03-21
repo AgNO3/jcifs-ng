@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSession;
 import jcifs.smb.SmbTransport;
+import jcifs.smb.SmbTreeHandle;
 
 
 /**
@@ -66,40 +67,45 @@ public class SessionTest extends BaseCIFSTest {
 
     @Test
     public void logonUser () throws IOException {
-        SmbFile f = getDefaultShareRoot();
-        checkConnection(f);
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            checkConnection(f);
+        }
     }
 
 
     @Test
     public void logonAnonymous () throws IOException {
-        SmbFile f = new SmbFile(getTestShareGuestURL(), withAnonymousCredentials());
-        checkConnection(f);
+        try ( SmbFile f = new SmbFile(getTestShareGuestURL(), withAnonymousCredentials()) ) {
+            checkConnection(f);
+        }
     }
 
 
     @Test
     public void logonGuest () throws IOException {
-        SmbFile f = new SmbFile(getTestShareGuestURL(), withTestGuestCredentials());
-        checkConnection(f);
+        try ( SmbFile f = new SmbFile(getTestShareGuestURL(), withTestGuestCredentials()) ) {
+            checkConnection(f);
+        }
     }
 
 
     @Test
     public void transportReconnects () throws IOException {
-        try {
+        try ( SmbFile f = getDefaultShareRoot() ) {
             // transport disconnects can happen pretty much any time
-            SmbFile f = getDefaultShareRoot();
             assertNotNull(f);
             f.connect();
             assertNotNull(f);
-            SmbSession session = f.getSession();
-            assertNotNull(session);
-            SmbTransport transport = session.getTransport();
-            assertNotNull(transport);
-            transport.disconnect(true);
-            assertNotNull(f);
-            checkConnection(f);
+            try ( SmbTreeHandle treeHandle = f.getTreeHandle();
+                  SmbSession session = treeHandle.getSession() ) {
+                assertNotNull(session);
+                try ( SmbTransport transport = session.getTransport() ) {
+                    assertNotNull(transport);
+                    transport.disconnect(true);
+                    assertNotNull(f);
+                    checkConnection(f);
+                }
+            }
         }
         catch ( Exception e ) {
             log.error("Exception", e);

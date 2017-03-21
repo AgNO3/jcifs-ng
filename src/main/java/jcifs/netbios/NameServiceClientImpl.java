@@ -731,7 +731,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
     @Override
     public NbtAddress[] getNbtAllByName ( String host, int type, String scope, InetAddress svr ) throws UnknownHostException {
-        return this.getAllByName(new Name(this.transportContext.getConfig(), host, type, scope), svr);
+        return getAllByName(new Name(this.transportContext.getConfig(), host, type, scope), svr);
     }
 
 
@@ -750,16 +750,15 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     @Override
     public NbtAddress[] getNbtAllByAddress ( NbtAddress addr ) throws UnknownHostException {
         try {
-            NbtAddress[] addrs = this.getNodeStatus(addr);
-            this.cacheAddressArray(addrs);
+            NbtAddress[] addrs = getNodeStatus(addr);
+            cacheAddressArray(addrs);
             return addrs;
         }
         catch ( UnknownHostException uhe ) {
-            throw new UnknownHostException(
-                "no name with type 0x" + Hexdump.toHexString(addr.hostName.hexCode, 2)
-                        + ( ( ( addr.hostName.scope == null ) || ( addr.hostName.scope.length() == 0 ) ) ? " with no scope"
-                                : " with scope " + addr.hostName.scope )
-                        + " for host " + addr.getHostAddress());
+            throw new UnknownHostException("no name with type 0x" + Hexdump.toHexString(addr.hostName.hexCode, 2)
+                    + ( ( ( addr.hostName.scope == null ) || ( addr.hostName.scope.length() == 0 ) ) ? " with no scope"
+                            : " with scope " + addr.hostName.scope )
+                    + " for host " + addr.getHostAddress());
         }
     }
 
@@ -958,13 +957,13 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         }
 
         if ( UniAddress.isDotQuadIP(hostname) ) {
-            UniAddress[] addrs = new UniAddress[1];
-            addrs[ 0 ] = new UniAddress(getNbtByName(hostname));
-            return addrs;
+            return new UniAddress[] {
+                new UniAddress(getNbtByName(hostname))
+            };
         }
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("Resolver order is " + this.transportContext.getConfig().getResolveOrder());
+        if ( log.isTraceEnabled() ) {
+            log.trace("Resolver order is " + this.transportContext.getConfig().getResolveOrder());
         }
 
         for ( ResolverType resolver : this.transportContext.getConfig().getResolveOrder() ) {

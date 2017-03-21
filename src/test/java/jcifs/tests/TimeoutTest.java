@@ -44,6 +44,7 @@ import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSession;
 import jcifs.smb.SmbTransport;
 import jcifs.smb.SmbTransportPoolImpl;
+import jcifs.smb.SmbTreeHandle;
 import jcifs.util.transport.ConnectionTimeoutException;
 
 
@@ -68,11 +69,6 @@ public class TimeoutTest extends BaseCIFSTest {
                 return 100;
             }
 
-
-            @Override
-            public boolean isIdleTimeoutDisabled () {
-                return true;
-            }
         });
 
     }
@@ -83,25 +79,19 @@ public class TimeoutTest extends BaseCIFSTest {
 
             @Override
             public int getSoTimeout () {
-                return 1000;
+                return 2000;
             }
 
 
             @Override
             public int getConnTimeout () {
-                return 1000;
+                return 2000;
             }
 
 
             @Override
             public int getSessionTimeout () {
-                return 1000;
-            }
-
-
-            @Override
-            public boolean isIdleTimeoutDisabled () {
-                return false;
+                return 2000;
             }
         });
 
@@ -129,49 +119,60 @@ public class TimeoutTest extends BaseCIFSTest {
     public void testTimeoutOpenFile () throws IOException, InterruptedException {
         // use separate context here as the settings stick to the transport
         CIFSContext ctx = lowTimeout(withTestNTLMCredentials(getNewContext()));
-        SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), ctx), makeRandomName());
-        int soTimeout = ctx.getConfig().getSoTimeout();
-        f.createNewFile();
-        try {
-            try ( OutputStream os = f.getOutputStream() ) {
-                os.write(new byte[] {
-                    1, 2, 3, 4, 5, 6, 7, 8
-                });
-            }
+        try ( SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), ctx), makeRandomName()) ) {
+            int soTimeout = ctx.getConfig().getSoTimeout();
+            f.createNewFile();
+            try {
+                try ( OutputStream os = f.getOutputStream() ) {
+                    os.write(new byte[] {
+                        1, 2, 3, 4, 5, 6, 7, 8
+                    });
+                }
 
-            try ( InputStream is = f.getInputStream() ) {
-                for ( int i = 0; i < 8; i++ ) {
-                    is.read();
-                    Thread.sleep(soTimeout);
+                try ( InputStream is = f.getInputStream() ) {
+                    for ( int i = 0; i < 8; i++ ) {
+                        is.read();
+                        Thread.sleep(soTimeout);
+                    }
                 }
             }
-        }
-        finally {
-            f.delete();
+            finally {
+                f.delete();
+            }
         }
     }
 
 
+    @SuppressWarnings ( "resource" )
     @Test
     public void testIdleTimeout () throws IOException, InterruptedException {
         // use separate context here as the settings stick to the transport
         CIFSContext ctx = fastIdle(withTestNTLMCredentials(getNewContext()));
-        SmbFile f = new SmbFile(new SmbFile(getTestShareURL(), ctx), makeRandomName());
-        int soTimeout = ctx.getConfig().getSoTimeout();
-        f.createNewFile();
+        try ( SmbFile r = new SmbFile(getTestShareURL(), ctx);
+              SmbFile f = new SmbFile(r, makeRandomName()) ) {
+            int soTimeout = ctx.getConfig().getSoTimeout();
+            f.createNewFile();
+            try {
+                SmbTransport t;
+                try ( SmbTreeHandle th = f.getTreeHandle();
+                      SmbSession session = th.getSession();
+                      SmbTransport trans = session.getTransport() ) {
 
-        try {
-            Thread.sleep(2 * soTimeout);
+                    t = trans;
+                }
+                f.close();
 
-            // connection should be closed by now
-            SmbSession session = f.getSession();
-            SmbTransport trans = session.getTransport();
-            assertTrue("Transport is still connected", trans.isDisconnected());
-            assertFalse("Connection is still in the pool", ( (SmbTransportPoolImpl) ctx.getTransportPool() ).contains(trans));
+                Thread.sleep(2 * soTimeout);
+
+                // connection should be closed by now
+                assertTrue("Transport is still connected", t.isDisconnected());
+                assertFalse("Connection is still in the pool", ( (SmbTransportPoolImpl) ctx.getTransportPool() ).contains(t));
+            }
+            finally {
+                f.delete();
+            }
         }
-        finally {
-            f.delete();
-        }
+
     }
 
 
@@ -184,8 +185,11 @@ public class TimeoutTest extends BaseCIFSTest {
 
             long start = System.currentTimeMillis();
             CIFSContext ctx = lowConnectTimeout(getContext());
-            SmbFile f = new SmbFile(new URL("smb", addr.getHostAddress(), port, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()), ctx);
-            runConnectTimeoutTest(threadsBefore, start, ctx, f);
+            try ( SmbFile f = new SmbFile(
+                new URL("smb", addr.getHostAddress(), port, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()),
+                ctx) ) {
+                runConnectTimeoutTest(threadsBefore, start, ctx, f);
+            }
         }
     }
 
@@ -196,8 +200,9 @@ public class TimeoutTest extends BaseCIFSTest {
         long start = System.currentTimeMillis();
         CIFSContext ctx = lowConnectTimeout(getContext());
 
-        SmbFile f = new SmbFile(new URL("smb", "10.255.255.1", 139, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()), ctx);
-        runConnectTimeoutTest(threadsBefore, start, ctx, f);
+        try ( SmbFile f = new SmbFile(new URL("smb", "10.255.255.1", 139, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()), ctx) ) {
+            runConnectTimeoutTest(threadsBefore, start, ctx, f);
+        }
     }
 
 

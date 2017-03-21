@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class TransactNamedPipeInputStream extends SmbFileInputStream {
+class TransactNamedPipeInputStream extends SmbPipeInputStream {
 
     private static final Logger log = LoggerFactory.getLogger(TransactNamedPipeInputStream.class);
 
@@ -36,8 +36,8 @@ class TransactNamedPipeInputStream extends SmbFileInputStream {
     Object lock;
 
 
-    TransactNamedPipeInputStream ( SmbNamedPipe pipe ) throws SmbException {
-        super(pipe, ( pipe.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
+    TransactNamedPipeInputStream ( SmbPipeHandleImpl pipe, SmbTreeHandleImpl th ) throws SmbException {
+        super(pipe, th);
         this.lock = new Object();
     }
 

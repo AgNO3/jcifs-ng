@@ -20,9 +20,6 @@
 package jcifs.smb;
 
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
@@ -147,9 +144,32 @@ public class SmbNamedPipe extends SmbFile {
      */
     public static final int PIPE_TYPE_DCE_TRANSACT = 0x0200 | 0x0400;
 
-    InputStream pipeIn;
-    OutputStream pipeOut;
-    int pipeType;
+    private final int pipeType;
+
+
+    /**
+     * Open the Named Pipe resource specified by the url
+     * parameter. The pipeType parameter should be at least one of
+     * the <code>PIPE_TYPE</code> flags combined with the bitwise OR
+     * operator <code>|</code>. See the examples listed above.
+     * 
+     * @param url
+     * @param pipeType
+     * @param unshared
+     *            whether to use an exclusive connection for this pipe
+     * @param tc
+     * @throws MalformedURLException
+     */
+
+    public SmbNamedPipe ( String url, int pipeType, boolean unshared, CIFSContext tc ) throws MalformedURLException {
+        super(url, tc);
+        this.pipeType = pipeType;
+        setNonPooled(unshared);
+        if ( !getFileLocator().isIPC() ) {
+            throw new MalformedURLException("Named pipes are only valid on IPC$");
+        }
+        this.fileLocator.updateType(TYPE_NAMED_PIPE);
+    }
 
 
     /**
@@ -163,60 +183,59 @@ public class SmbNamedPipe extends SmbFile {
      * @param tc
      * @throws MalformedURLException
      */
-
     public SmbNamedPipe ( String url, int pipeType, CIFSContext tc ) throws MalformedURLException {
-        super(url, tc);
-        this.pipeType = pipeType;
-        this.type = TYPE_NAMED_PIPE;
+        this(url, pipeType, false, tc);
     }
 
 
     /**
-     * Return the <code>InputStream</code> used to read information
-     * from this pipe instance. Presumably data would first be written
-     * to the <code>OutputStream</code> associated with this Named
-     * Pipe instance although this is not a requirement (e.g. a
-     * read-only named pipe would write data to this stream on
-     * connection). Reading from this stream may block. Therefore it
-     * may be necessary that an addition thread be used to read and
-     * write to a Named Pipe.
-     * 
-     * @return pipe input stream
-     * @throws IOException
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbFile#customizeCreate(jcifs.smb.SmbComNTCreateAndX, jcifs.smb.SmbComNTCreateAndXResponse)
      */
-
-    public InputStream getNamedPipeInputStream () throws IOException {
-        if ( this.pipeIn == null ) {
-            if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {
-                this.pipeIn = new TransactNamedPipeInputStream(this);
-            }
-            else {
-                this.pipeIn = new SmbFileInputStream(this, ( this.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
-            }
-        }
-        return this.pipeIn;
+    @Override
+    protected void customizeCreate ( SmbComNTCreateAndX request, SmbComNTCreateAndXResponse response ) {
+        request.flags0 |= 0x16;
+        response.isExtended = true;
     }
 
 
     /**
-     * Return the <code>OutputStream</code> used to write
-     * information to this pipe instance. The act of writing data
-     * to this stream will result in response data recieved in the
-     * <code>InputStream</code> associated with this Named Pipe
-     * instance (unless of course it does not elicite a response or the pipe is write-only).
-     * 
-     * @return pipe output stream
-     * @throws IOException
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbFile#getType()
      */
-    public OutputStream getNamedPipeOutputStream () throws IOException {
-        if ( this.pipeOut == null ) {
-            if ( ( this.pipeType & PIPE_TYPE_CALL ) == PIPE_TYPE_CALL || ( this.pipeType & PIPE_TYPE_TRANSACT ) == PIPE_TYPE_TRANSACT ) {
-                this.pipeOut = new TransactNamedPipeOutputStream(this);
-            }
-            else {
-                this.pipeOut = new SmbFileOutputStream(this, false, ( this.pipeType & 0xFFFF00FF ) | SmbFile.O_EXCL);
-            }
-        }
-        return this.pipeOut;
+    @Override
+    public int getType () throws SmbException {
+        return TYPE_NAMED_PIPE;
     }
+
+
+    /**
+     * @return the pipe type
+     */
+    public int getPipeType () {
+        return this.pipeType;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbFile#getUncPath()
+     */
+    @Override
+    public String getUncPath () {
+        return super.getUncPath();
+    }
+
+
+    /**
+     * @return a handle for interacting with the pipe
+     */
+    public SmbPipeHandleImpl openPipe () {
+        getFileLocator().getCanonicalResourcePath();
+        return new SmbPipeHandleImpl(this);
+    }
+
 }

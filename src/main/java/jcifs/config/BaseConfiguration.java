@@ -123,6 +123,8 @@ public class BaseConfiguration implements Configuration {
         "NT LM 0.12"
             // , "SMB 2.???",
     };
+    protected boolean traceResourceUsage;
+    protected boolean strictResourceLifecycle;
 
 
     /**
@@ -192,12 +194,6 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getSessionTimeout () {
         return this.smbSessionTimeout;
-    }
-
-
-    @Override
-    public boolean isIdleTimeoutDisabled () {
-        return this.idleTimeoutDisabled;
     }
 
 
@@ -520,6 +516,28 @@ public class BaseConfiguration implements Configuration {
     @Override
     public int getMaxRequestRetries () {
         return this.maxRequestRetries;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isTraceResourceUsage()
+     */
+    @Override
+    public boolean isTraceResourceUsage () {
+        return this.traceResourceUsage;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isStrictResourceLifecycle()
+     */
+    @Override
+    public boolean isStrictResourceLifecycle () {
+        return this.strictResourceLifecycle;
     }
 
 

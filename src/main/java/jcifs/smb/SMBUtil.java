@@ -90,6 +90,11 @@ public class SMBUtil {
         return ( readInt4(buffer, bufferIndex) & 0xFFFFFFFFL ) * 1000L;
     }
 
+
+    static void writeUTime ( long t, byte[] dst, int dstIndex ) {
+        writeInt4(t / 1000, dst, dstIndex);
+    }
+
     static final byte[] SMB_HEADER = {
         (byte) 0xFF, (byte) 'S', (byte) 'M', (byte) 'B', (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
         (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,

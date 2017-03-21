@@ -74,75 +74,78 @@ class SmbComTreeConnectAndX extends AndXServerMessageBlock {
     @Override
     int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
 
-        if ( this.session.getTransport().server.security == SmbConstants.SECURITY_SHARE
-                && this.session.getTransportContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
+        try ( SmbTransport transport = this.session.getTransport() ) {
+            if ( transport.server.security == SmbConstants.SECURITY_SHARE
+                    && this.session.getTransportContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
 
-            NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getTransportContext().getCredentials();
-            if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
-                this.passwordLength = 1;
-            }
-            else if ( this.session.getTransport().server.encryptedPasswords ) {
-                // encrypted
-                try {
-                    this.password = pwAuth.getAnsiHash(this.session.getTransportContext(), this.session.getTransport().server.encryptionKey);
+                NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getTransportContext().getCredentials();
+                if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
+                    this.passwordLength = 1;
                 }
-                catch ( GeneralSecurityException e ) {
-                    throw new RuntimeCIFSException("Failed to encrypt password", e);
+                else if ( transport.server.encryptedPasswords ) {
+                    // encrypted
+                    try {
+                        this.password = pwAuth.getAnsiHash(this.session.getTransportContext(), transport.server.encryptionKey);
+                    }
+                    catch ( GeneralSecurityException e ) {
+                        throw new RuntimeCIFSException("Failed to encrypt password", e);
+                    }
+                    this.passwordLength = this.password.length;
                 }
-                this.passwordLength = this.password.length;
-            }
-            else if ( this.session.getTransportContext().getConfig().isDisablePlainTextPasswords() ) {
-                throw new RuntimeCIFSException("Plain text passwords are disabled");
+                else if ( this.session.getTransportContext().getConfig().isDisablePlainTextPasswords() ) {
+                    throw new RuntimeCIFSException("Plain text passwords are disabled");
+                }
+                else {
+                    // plain text
+                    this.password = new byte[ ( pwAuth.getPassword().length() + 1 ) * 2];
+                    this.passwordLength = writeString(pwAuth.getPassword(), this.password, 0);
+                }
             }
             else {
-                // plain text
-                this.password = new byte[ ( pwAuth.getPassword().length() + 1 ) * 2];
-                this.passwordLength = writeString(pwAuth.getPassword(), this.password, 0);
+                // no password in tree connect
+                this.passwordLength = 1;
             }
-        }
-        else {
-            // no password in tree connect
-            this.passwordLength = 1;
-        }
 
-        dst[ dstIndex++ ] = this.disconnectTid ? (byte) 0x01 : (byte) 0x00;
-        dst[ dstIndex++ ] = (byte) 0x00;
-        SMBUtil.writeInt2(this.passwordLength, dst, dstIndex);
-        return 4;
+            dst[ dstIndex++ ] = this.disconnectTid ? (byte) 0x01 : (byte) 0x00;
+            dst[ dstIndex++ ] = (byte) 0x00;
+            SMBUtil.writeInt2(this.passwordLength, dst, dstIndex);
+            return 4;
+        }
     }
 
 
     @Override
     int writeBytesWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
+        try ( SmbTransport transport = this.session.getTransport() ) {
+            if ( transport.server.security == SmbConstants.SECURITY_SHARE
+                    && this.session.getTransportContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
 
-        if ( this.session.getTransport().server.security == SmbConstants.SECURITY_SHARE
-                && this.session.getTransportContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
-
-            NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getTransportContext().getCredentials();
-            if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
-                dst[ dstIndex++ ] = (byte) 0x00;
+                NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getTransportContext().getCredentials();
+                if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
+                    dst[ dstIndex++ ] = (byte) 0x00;
+                }
+                else {
+                    System.arraycopy(this.password, 0, dst, dstIndex, this.passwordLength);
+                    dstIndex += this.passwordLength;
+                }
             }
             else {
-                System.arraycopy(this.password, 0, dst, dstIndex, this.passwordLength);
-                dstIndex += this.passwordLength;
+                // no password in tree connect
+                dst[ dstIndex++ ] = (byte) 0x00;
             }
-        }
-        else {
-            // no password in tree connect
-            dst[ dstIndex++ ] = (byte) 0x00;
-        }
-        dstIndex += writeString(this.path, dst, dstIndex);
-        try {
-            System.arraycopy(this.service.getBytes("ASCII"), 0, dst, dstIndex, this.service.length());
-        }
-        catch ( UnsupportedEncodingException uee ) {
-            return 0;
-        }
-        dstIndex += this.service.length();
-        dst[ dstIndex++ ] = (byte) '\0';
+            dstIndex += writeString(this.path, dst, dstIndex);
+            try {
+                System.arraycopy(this.service.getBytes("ASCII"), 0, dst, dstIndex, this.service.length());
+            }
+            catch ( UnsupportedEncodingException uee ) {
+                return 0;
+            }
+            dstIndex += this.service.length();
+            dst[ dstIndex++ ] = (byte) '\0';
 
-        return dstIndex - start;
+            return dstIndex - start;
+        }
     }
 
 

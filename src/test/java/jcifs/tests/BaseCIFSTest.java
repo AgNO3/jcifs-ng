@@ -112,7 +112,9 @@ public abstract class BaseCIFSTest {
 
     @After
     public void tearDown () throws Exception {
-
+        // System.gc();
+        // System.gc();
+        // System.runFinalization();
     }
 
 
@@ -215,6 +217,13 @@ public abstract class BaseCIFSTest {
     }
 
 
+    protected String getDFSRootURL () {
+        String testDfsShare = getProperties().get(TestProperties.TEST_SHARE_URL_DFSROOT);
+        Assume.assumeNotNull(testDfsShare);
+        return testDfsShare;
+    }
+
+
     protected String getTestShare () {
         String testShare;
         testShare = getProperties().get(TestProperties.TEST_SHARE_MAIN);
@@ -242,16 +251,20 @@ public abstract class BaseCIFSTest {
 
 
     protected SmbFile createTestFile () throws MalformedURLException, UnknownHostException, SmbException {
-        SmbFile f = new SmbFile(getDefaultShareRoot(), makeRandomName());
-        f.createNewFile();
-        return f;
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot() ) {
+            SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+            f.createNewFile();
+            return f;
+        }
     }
 
 
     protected SmbFile createTestDirectory () throws MalformedURLException, UnknownHostException, SmbException {
-        SmbFile f = new SmbFile(getDefaultShareRoot(), makeRandomDirectoryName());
-        f.mkdir();
-        return f;
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot() ) {
+            SmbFile f = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+            f.mkdir();
+            return f;
+        }
     }
 
 

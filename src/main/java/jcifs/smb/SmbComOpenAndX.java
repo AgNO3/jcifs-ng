@@ -53,7 +53,7 @@ class SmbComOpenAndX extends AndXServerMessageBlock {
 
     // flags is NOT the same as flags member
 
-    SmbComOpenAndX ( Configuration config, String fileName, int access, int flags, ServerMessageBlock andx ) {
+    SmbComOpenAndX ( Configuration config, String fileName, int access, int shareAccess, int flags, ServerMessageBlock andx ) {
         super(config, andx);
         this.path = fileName;
         this.command = SMB_COM_OPEN_ANDX;
@@ -62,7 +62,22 @@ class SmbComOpenAndX extends AndXServerMessageBlock {
         if ( this.desiredAccess == 0x3 ) {
             this.desiredAccess = 0x2; /* Mmm, I thought 0x03 was RDWR */
         }
-        this.desiredAccess |= SHARING_DENY_NONE;
+
+        // map shareAccess as far as we can
+        if ( ( shareAccess & SmbFile.FILE_SHARE_DELETE ) != 0 && ( shareAccess & SmbFile.FILE_SHARE_READ ) != 0
+                && ( shareAccess & SmbFile.FILE_SHARE_WRITE ) != 0 ) {
+            this.desiredAccess |= SHARING_DENY_NONE;
+        }
+        else if ( shareAccess == SmbFile.FILE_NO_SHARE ) {
+            this.desiredAccess |= SHARING_DENY_READ_WRITE_EXECUTE;
+        }
+        else if ( ( shareAccess & SmbFile.FILE_SHARE_WRITE ) == 0 ) {
+            this.desiredAccess |= SHARING_DENY_WRITE;
+        }
+        else if ( ( shareAccess & SmbFile.FILE_SHARE_READ ) == 0 ) {
+            this.desiredAccess |= SHARING_DENY_READ_EXECUTE;
+        }
+
         this.desiredAccess &= ~0x1; // Win98 doesn't like GENERIC_READ ?! -- get Access Denied.
 
         // searchAttributes

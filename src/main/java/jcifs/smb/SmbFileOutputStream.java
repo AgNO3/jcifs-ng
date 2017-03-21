@@ -46,6 +46,8 @@ public class SmbFileOutputStream extends OutputStream {
     private SmbComWrite req;
     private SmbComWriteResponse rsp;
 
+    private SmbFileHandleImpl handle;
+
 
     /**
      * Creates an {@link java.io.OutputStream} for writing bytes to a file on
@@ -86,42 +88,56 @@ public class SmbFileOutputStream extends OutputStream {
         this.append = append;
         this.openFlags = openFlags;
         this.access = ( openFlags >>> 16 ) & 0xFFFF;
-        if ( file instanceof SmbNamedPipe ) {
-            file.getUncPath0();
-            if ( file.unc.startsWith("\\pipe\\") ) {
-                file.unc = file.unc.substring(5);
-                file.send(
-                    new TransWaitNamedPipe(getSession().getConfig(), "\\pipe" + file.unc),
-                    new TransWaitNamedPipeResponse(getSession().getConfig()));
-            }
-        }
-        file.open(openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0);
-        if ( append ) {
-            // do this after file.open so we get the actual position (and also don't waste another call)
-            try {
-                this.fp = file.length();
-            }
-            catch ( SmbAuthException sae ) {
-                throw sae;
-            }
-            catch ( SmbException se ) {
-                log.warn("Error determining length in append mode", se);
-                this.fp = 0L;
-            }
-        }
-        this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
-        this.writeSize = file.tree.session.getTransport().snd_buf_size - 70;
 
-        this.useNTSmbs = file.tree.session.getTransport().hasCapability(SmbConstants.CAP_NT_SMBS);
+        try ( SmbTreeHandleImpl th = file.ensureTreeConnected() ) {
+            try ( SmbFileHandle h = ensureOpen() ) {
+                if ( append ) {
+                    // do this after file.open so we get the actual position (and also don't waste another call)
+                    try {
+                        this.fp = file.length();
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("File pointer is at " + this.fp);
+                        }
+                    }
+                    catch ( SmbAuthException sae ) {
+                        throw sae;
+                    }
+                    catch ( SmbException se ) {
+                        log.warn("Error determining length in append mode", se);
+                        this.fp = 0L;
+                    }
+                }
+                init(th);
+            }
+        }
+    }
+
+
+    SmbFileOutputStream ( SmbFile file, SmbTreeHandleImpl th, SmbFileHandleImpl handle ) throws SmbException {
+        this.file = file;
+        this.handle = handle;
+        this.append = false;
+        init(th);
+    }
+
+
+    /**
+     * @param th
+     * @throws SmbException
+     */
+    protected final void init ( SmbTreeHandleImpl th ) throws SmbException {
+        this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
+        this.writeSize = th.getSendBufferSize() - 70;
+
+        this.useNTSmbs = th.hasCapability(SmbConstants.CAP_NT_SMBS);
         if ( !this.useNTSmbs ) {
             log.debug("No support for NT SMBs");
         }
 
-        // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
-        boolean isSignatureActive = file.tree.session.getTransport().server.signaturesRequired
-                || ( file.tree.session.getTransport().server.signaturesEnabled && file.getTransportContext().getConfig().isSigningEnabled() );
-        if ( file.tree.session.getTransport().hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !isSignatureActive ) {
-            this.writeSizeFile = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
+        // there seems to be a bug with some servers that causes corruption if using signatures +
+        // CAP_LARGE_WRITE
+        if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
+            this.writeSizeFile = Math.min(th.getSendBufferSize() - 70, 0xFFFF - 70);
         }
         else {
             log.debug("No support or SMB signing is enabled, not enabling large writes");
@@ -133,18 +149,13 @@ public class SmbFileOutputStream extends OutputStream {
         }
 
         if ( this.useNTSmbs ) {
-            this.reqx = new SmbComWriteAndX(getSession().getConfig());
-            this.rspx = new SmbComWriteAndXResponse(getSession().getConfig());
+            this.reqx = new SmbComWriteAndX(th.getConfig());
+            this.rspx = new SmbComWriteAndXResponse(th.getConfig());
         }
         else {
-            this.req = new SmbComWrite(getSession().getConfig());
-            this.rsp = new SmbComWriteResponse(getSession().getConfig());
+            this.req = new SmbComWrite(th.getConfig());
+            this.rsp = new SmbComWriteResponse(th.getConfig());
         }
-    }
-
-
-    private SmbSession getSession () {
-        return this.file.tree.session;
     }
 
 
@@ -158,8 +169,14 @@ public class SmbFileOutputStream extends OutputStream {
 
     @Override
     public void close () throws IOException {
-        this.file.close();
-        this.tmp = null;
+        try {
+            if ( this.handle.isValid() ) {
+                this.handle.close();
+            }
+        }
+        finally {
+            this.tmp = null;
+        }
     }
 
 
@@ -192,25 +209,33 @@ public class SmbFileOutputStream extends OutputStream {
 
 
     /**
-     * 
-     * @return whether the file is open
+     * @return whether the stream is open
      */
     public boolean isOpen () {
-        return this.file.isOpen();
+        return this.handle != null && this.handle.isValid();
     }
 
 
-    synchronized void ensureOpen () throws IOException {
-        // ensure file is open
+    protected synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
         if ( !isOpen() ) {
-            this.file.open(this.openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0);
+            // one extra acquire to keep this open till the stream is released
+            this.handle = this.file.openUnshared(this.openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0).acquire();
             if ( this.append ) {
                 this.fp = this.file.length();
+                if ( log.isDebugEnabled() ) {
+                    log.debug("File pointer is at " + this.fp);
+                }
             }
+            return this.handle;
         }
-        else {
-            log.debug("File already open");
-        }
+
+        log.trace("File already open");
+        return this.handle.acquire();
+    }
+
+
+    protected SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
+        return this.file.ensureTreeConnected();
     }
 
 
@@ -226,11 +251,6 @@ public class SmbFileOutputStream extends OutputStream {
 
     @Override
     public void write ( byte[] b, int off, int len ) throws IOException {
-        if ( this.file.isOpen() == false && this.file instanceof SmbNamedPipe ) {
-            this.file.send(
-                new TransWaitNamedPipe(getSession().getConfig(), "\\pipe" + this.file.unc),
-                new TransWaitNamedPipeResponse(getSession().getConfig()));
-        }
         writeDirect(b, off, len, 0);
     }
 
@@ -252,48 +272,50 @@ public class SmbFileOutputStream extends OutputStream {
         if ( this.tmp == null ) {
             throw new IOException("Bad file descriptor");
         }
-        ensureOpen();
 
-        if ( log.isDebugEnabled() ) {
-            log.debug("write: fid=" + this.file.fid + ",off=" + off + ",len=" + len);
-        }
+        try ( SmbFileHandleImpl fh = ensureOpen();
+              SmbTreeHandleImpl th = fh.getTree() ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug("write: fid=" + fh + ",off=" + off + ",len=" + len);
+            }
 
-        int w;
-        do {
-            int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.writeSizeFile : this.writeSize;
-            w = len > blockSize ? blockSize : len;
+            int w;
+            do {
+                int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.writeSizeFile : this.writeSize;
+                w = len > blockSize ? blockSize : len;
 
-            if ( this.useNTSmbs ) {
-                this.reqx.setParam(this.file.fid, this.fp, len - w, b, off, w);
-                if ( ( flags & 1 ) != 0 ) {
-                    this.reqx.setParam(this.file.fid, this.fp, len, b, off, w);
-                    this.reqx.writeMode = 0x8;
+                if ( this.useNTSmbs ) {
+                    this.reqx.setParam(fh.getFid(), this.fp, len - w, b, off, w);
+                    if ( ( flags & 1 ) != 0 ) {
+                        this.reqx.setParam(fh.getFid(), this.fp, len, b, off, w);
+                        this.reqx.writeMode = 0x8;
+                    }
+                    else {
+                        this.reqx.writeMode = 0;
+                    }
+
+                    th.send(this.reqx, this.rspx, RequestParam.NO_RETRY);
+                    this.fp += this.rspx.count;
+                    len -= this.rspx.count;
+                    off += this.rspx.count;
                 }
                 else {
-                    this.reqx.writeMode = 0;
+                    if ( log.isTraceEnabled() ) {
+                        log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
+                    }
+                    this.req.setParam(fh.getFid(), this.fp, len - w, b, off, w);
+                    th.send(this.req, this.rsp);
+                    this.fp += this.rsp.count;
+                    len -= this.rsp.count;
+                    off += this.rsp.count;
+                    if ( log.isTraceEnabled() ) {
+                        log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
+                    }
                 }
 
-                this.file.send(this.reqx, this.rspx);
-                this.fp += this.rspx.count;
-                len -= this.rspx.count;
-                off += this.rspx.count;
             }
-            else {
-                if ( log.isTraceEnabled() ) {
-                    log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
-                }
-                this.req.setParam(this.file.fid, this.fp, len - w, b, off, w);
-                this.file.send(this.req, this.rsp);
-                this.fp += this.rsp.count;
-                len -= this.rsp.count;
-                off += this.rsp.count;
-                if ( log.isTraceEnabled() ) {
-                    log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
-                }
-            }
-
+            while ( len > 0 );
         }
-        while ( len > 0 );
     }
 
 }

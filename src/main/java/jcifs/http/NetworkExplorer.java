@@ -22,6 +22,7 @@ package jcifs.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -149,7 +150,7 @@ public class NetworkExplorer extends HttpServlet {
         String url;
         int n;
         try ( SmbFileInputStream in = new SmbFileInputStream(file) ) {
-            url = file.getPath();
+            url = file.getFileLocator().getPath();
             resp.setContentType("text/plain");
             resp.setContentType(URLConnection.guessContentTypeFromName(url));
             resp.setHeader("Content-Length", file.length() + "");
@@ -343,7 +344,7 @@ public class NetworkExplorer extends HttpServlet {
         out.println("<a class=\"sort\" href=\"?fmt=detail&sort=type\">Type</a>");
         out.println("<a class=\"sort\" style=\"width: 180\" href=\"?fmt=detail&sort=date\">Modified</a><br clear='all'><p>");
 
-        path = dir.getCanonicalPath();
+        path = dir.getFileLocator().getCanonicalPath();
 
         if ( path.length() < 7 ) {
             out.println("<b><big>smb://</big></b><br>");
@@ -542,16 +543,7 @@ public class NetworkExplorer extends HttpServlet {
             }
         }
 
-        try {
-            SmbFile file;
-
-            if ( server == null ) {
-                file = new SmbFile("smb://", getTransportContext());
-            }
-            else {
-                file = new SmbFile("smb:/" + pathInfo, getTransportContext());
-            }
-
+        try ( SmbFile file = openFile(pathInfo, server) ) {
             if ( file.isDirectory() ) {
                 doDirectory(req, resp, file);
             }
@@ -596,6 +588,25 @@ public class NetworkExplorer extends HttpServlet {
             resp.flushBuffer();
             return;
         }
+    }
+
+
+    /**
+     * @param pathInfo
+     * @param server
+     * @return
+     * @throws MalformedURLException
+     */
+    private SmbFile openFile ( String pathInfo, String server ) throws MalformedURLException {
+        SmbFile file;
+
+        if ( server == null ) {
+            file = new SmbFile("smb://", getTransportContext());
+        }
+        else {
+            file = new SmbFile("smb:/" + pathInfo, getTransportContext());
+        }
+        return file;
     }
 
 

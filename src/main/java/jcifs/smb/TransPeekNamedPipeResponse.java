@@ -32,7 +32,7 @@ class TransPeekNamedPipeResponse extends SmbComTransactionResponse {
     int available;
 
 
-    TransPeekNamedPipeResponse ( Configuration config, SmbNamedPipe pipe ) {
+    TransPeekNamedPipeResponse ( Configuration config ) {
         super(config);
     }
 

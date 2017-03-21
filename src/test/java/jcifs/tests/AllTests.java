@@ -53,7 +53,7 @@ import jcifs.context.BaseContext;
 @RunWith ( Suite.class )
 @SuiteClasses ( {
     ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class,
-    NamingTest.class, WatchTest.class, ReadWriteTest.class, ConcurrencyTest.class, TimeoutTest.class
+    NamingTest.class, WatchTest.class, ReadWriteTest.class, ConcurrencyTest.class, TimeoutTest.class, EnumTest.class, PipeTest.class
 } )
 public class AllTests {
 
