@@ -1,3 +1,13 @@
+jcifs-ng 1.6.0
+- Completely overhaul the way SMB resources are used
+ - Idle disconnects will no longer break active resources (by default this means file descriptors), that behavior induced 
+   a wide range of potential bugs, including broken file locks and race conditions resulting in SMB errors.
+ - File descriptors are no longer magically shared through SmbFile. 
+ - Every occasion where a file descriptor is used now returns a handle object controlling it's lifetime.
+ - An optional mode (jcifs.smb.client.strictResourceLifecycle=true) to also prevent disconnecting trees that are still in use.
+- Refactoring of SmbFile breaking it up into smaller parts with clearer responsibilities.
+- Change logging to use SLF4J facade
+
 jcifs-ng 1.5.3
 - Fix thread leak when establishing a connection fails
 - Add mitigation against idle timeout issues that cause serious bugs in some usage scenarios:

@@ -217,14 +217,18 @@ class SmbTreeConnection {
 
             SmbTransport et = this.exclusiveTransport;
             if ( et != null ) {
-                try {
-                    log.debug("Disconnecting exclusive transport");
-                    this.exclusiveTransport = null;
-                    et.release();
-                    et.doDisconnect(false, false);
-                }
-                catch ( IOException e ) {
-                    log.error("Failed to close exclusive transport", e);
+                synchronized ( this ) {
+                    try {
+                        log.debug("Disconnecting exclusive transport");
+                        this.exclusiveTransport = null;
+                        this.tree = null;
+                        this.treeAcquired = false;
+                        et.release();
+                        et.doDisconnect(false, false);
+                    }
+                    catch ( Exception e ) {
+                        log.error("Failed to close exclusive transport", e);
+                    }
                 }
             }
         }
@@ -382,7 +386,6 @@ class SmbTreeConnection {
                 return new SmbTreeHandleImpl(loc, this);
             }
 
-            loc.getCanonicalResourcePath();
             UniAddress addr = loc.getFirstAddress();
             for ( ;; ) {
                 try {
@@ -566,10 +569,10 @@ class SmbTreeConnection {
               SmbSession session = th.getSession();
               SmbTransport transport = session.getTransport();
               SmbTree t = getTree() ) {
-            DfsReferral dr = this.ctx.getDfs().resolve(this.ctx, transport.tconHostName, loc.getShare(), loc.getUncPath());
+            DfsReferral dr = this.ctx.getDfs().resolve(this.ctx, transport.tconHostName, loc.getShare(), loc.getUNCPath());
             if ( dr != null ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Info " + transport.tconHostName + "\\" + loc.getShare() + loc.getUncPath() + " -> " + dr);
+                    log.debug("Info " + transport.tconHostName + "\\" + loc.getShare() + loc.getUNCPath() + " -> " + dr);
                 }
                 String service = t != null ? t.getService() : null;
 
@@ -680,9 +683,15 @@ class SmbTreeConnection {
 
 
     /**
+     * Use a exclusive connection for this tree
+     * 
+     * If an exclusive connection is used the caller must make sure that the tree handle is kept alive,
+     * otherwise the connection will be disconnected once the usage drops to zero.
+     * 
      * @param np
+     *            whether to use an exclusive connection
      */
-    public void setNonPool ( boolean np ) {
+    void setNonPooled ( boolean np ) {
         this.nonPooled = np;
     }
 

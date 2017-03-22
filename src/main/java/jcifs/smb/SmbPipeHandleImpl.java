@@ -21,6 +21,7 @@ package jcifs.smb;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.SmbConstants;
 
 
@@ -45,6 +46,8 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     private SmbPipeInputStream input;
 
     private final String uncPath;
+
+    private SmbTreeHandleImpl treeHandle;
 
 
     /**
@@ -72,7 +75,11 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
 
 
     SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
-        return this.pipe.ensureTreeConnected();
+        if ( this.treeHandle == null ) {
+            // extra acquire to keep the tree alive
+            this.treeHandle = this.pipe.ensureTreeConnected();
+        }
+        return this.treeHandle.acquire();
     }
 
 
@@ -95,6 +102,22 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     @Override
     public boolean isOpen () {
         return this.open && this.handle != null && this.handle.isValid();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws CIFSException
+     *
+     * @see jcifs.smb.SmbPipeHandle#getSessionKey()
+     */
+    @Override
+    public byte[] getSessionKey () throws CIFSException {
+        try ( SmbTreeHandleImpl th = ensureTreeConnected();
+              SmbSession sess = th.getSession() ) {
+            return sess.getSessionKey();
+        }
     }
 
 
@@ -184,7 +207,7 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
             return this.output;
         }
 
-        try ( SmbTreeHandleImpl th = this.ensureTreeConnected() ) {
+        try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
             if ( this.transact ) {
                 this.output = new TransactNamedPipeOutputStream(this, th);
             }
@@ -228,10 +251,18 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
             this.output.close();
             this.output = null;
         }
-        if ( wasOpen ) {
-            this.handle.close();
+
+        try {
+            if ( wasOpen ) {
+                this.handle.close();
+            }
+            this.handle = null;
         }
-        this.handle = null;
+        finally {
+            if ( this.treeHandle != null ) {
+                this.treeHandle.release();
+            }
+        }
     }
 
 }

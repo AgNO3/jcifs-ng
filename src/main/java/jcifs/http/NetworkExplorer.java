@@ -344,7 +344,7 @@ public class NetworkExplorer extends HttpServlet {
         out.println("<a class=\"sort\" href=\"?fmt=detail&sort=type\">Type</a>");
         out.println("<a class=\"sort\" style=\"width: 180\" href=\"?fmt=detail&sort=date\">Modified</a><br clear='all'><p>");
 
-        path = dir.getFileLocator().getCanonicalPath();
+        path = dir.getFileLocator().getCanonicalURL();
 
         if ( path.length() < 7 ) {
             out.println("<b><big>smb://</big></b><br>");

@@ -234,7 +234,6 @@ public class SmbNamedPipe extends SmbFile {
      * @return a handle for interacting with the pipe
      */
     public SmbPipeHandleImpl openPipe () {
-        getFileLocator().getCanonicalResourcePath();
         return new SmbPipeHandleImpl(this);
     }
 

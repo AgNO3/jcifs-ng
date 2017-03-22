@@ -1,8 +1,19 @@
-/**
+/*
  * © 2017 AgNO3 Gmbh & Co. KG
- * All right reserved.
  * 
- * Created: 20.03.2017 by mbechler
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package jcifs.smb;
 
@@ -61,21 +72,6 @@ public interface SmbFileLocator {
 
 
     /**
-     * Retuns the Windows UNC style path with backslashs intead of forward slashes.
-     *
-     * @return The UNC path.
-     */
-    String getCanonicalUncPath ();
-
-
-    /**
-     * 
-     * @return possibly unresolved UNC path
-     */
-    String getUncPath ();
-
-
-    /**
      * Returns the full URL of this SMB resource with '.' and '..' components
      * factored out. An <code>SmbFile</code> constructed with the result of
      * this method will result in an <code>SmbFile</code> that is equal to
@@ -83,13 +79,19 @@ public interface SmbFileLocator {
      *
      * @return The canonicalized URL of this SMB resource.
      */
-    String getCanonicalPath ();
+    String getCanonicalURL ();
 
 
     /**
-     * @return The canonicalized UNC path of this SMB resource
+     * @return The canonicalized UNC path of this SMB resource (relative to it's share)
      */
-    String getCanonicalResourcePath ();
+    String getUNCPath ();
+
+
+    /**
+     * @return The canonicalized URL path (relative to the server/domain)
+     */
+    String getURLPath ();
 
 
     /**
@@ -196,5 +198,15 @@ public interface SmbFileLocator {
      * @throws UnknownHostException
      */
     boolean overlaps ( SmbFileLocator other ) throws UnknownHostException;
+
+
+    /**
+     * Internal: for testing only
+     * 
+     * @param dr
+     * @param reqPath
+     * @return resolved unc path
+     */
+    String handleDFSReferral ( DfsReferral dr, String reqPath );
 
 }

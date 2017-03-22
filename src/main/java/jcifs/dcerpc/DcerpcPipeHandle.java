@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.smb.SmbNamedPipe;
 import jcifs.smb.SmbPipeHandle;
 import jcifs.smb.SmbPipeInputStream;
@@ -91,6 +92,12 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     @Override
     public String getServerWithDfs () {
         return this.pipe.getFileLocator().getServerWithDfs();
+    }
+
+
+    @Override
+    public byte[] getSessionKey () throws CIFSException {
+        return this.handle.getSessionKey();
     }
 
 

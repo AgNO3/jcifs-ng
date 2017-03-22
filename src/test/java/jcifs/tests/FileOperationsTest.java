@@ -254,4 +254,18 @@ public class FileOperationsTest extends BaseCIFSTest {
             }
         }
     }
+
+
+    @Test
+    public void testMkDirs () throws SmbException, MalformedURLException, UnknownHostException {
+        try ( SmbFile r = createTestDirectory();
+              SmbFile e = new SmbFile(r, "foo/bar/test/") ) {
+            try {
+                e.mkdirs();
+            }
+            finally {
+                r.delete();
+            }
+        }
+    }
 }

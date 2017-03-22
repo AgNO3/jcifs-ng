@@ -32,7 +32,7 @@ class TransactCallNamedPipeOutputStream extends SmbPipeOutputStream {
     TransactCallNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws SmbException {
         super(handle, th);
         this.handle = handle;
-        this.path = handle.getPipe().getFileLocator().getUncPath();
+        this.path = handle.getPipe().getFileLocator().getUNCPath();
     }
 
 

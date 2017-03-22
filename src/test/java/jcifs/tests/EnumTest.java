@@ -1,4 +1,4 @@
-/*tr
+/*
  * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or

@@ -249,4 +249,36 @@ public class FileAttributesTest extends BaseCIFSTest {
         }
     }
 
+
+    @Test
+    public void testShareSecurity () throws IOException {
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            try {
+                ACE[] security = f.getShareSecurity(true);
+                Assume.assumeNotNull((Object) security);
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
+        }
+    }
+
+
+    @Test
+    public void testShareSize () throws IOException {
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            long l = f.length();
+            Assume.assumeTrue("No share size reported", l != 0);
+        }
+    }
+
+
+    @Test
+    public void testShareFreeSize () throws IOException {
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            long fs = f.getDiskFreeSpace();
+            Assume.assumeTrue("No free space reported", fs != 0);
+        }
+    }
+
 }

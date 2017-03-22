@@ -30,6 +30,15 @@ import jcifs.netbios.UniAddress;
 
 
 /**
+ * 
+ * 
+ * This mainly tracks two locations:
+ * - canonical URL path: path component of the URL: this is used to reconstruct URLs to resources and is not adjusted by
+ * DFS referrals. (E.g. a resource with a DFS root's parent will still point to the DFS root not the share it's actually
+ * located in).
+ * - share + uncpath within it: This is the relevant information for most SMB requests. Both are adjusted by DFS
+ * referrals. Nested resources will inherit the information already resolved by the parent resource.
+ * 
  * @author mbechler
  *
  */
@@ -38,11 +47,13 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
     private static final Logger log = LoggerFactory.getLogger(SmbFileLocatorImpl.class);
 
     private final URL url;
-    private String canon; // Initially null; set by getUncPath; dir must end with '/'
-    private String share; // Can be null
+
     private DfsReferral dfsReferral = null; // For getDfsPath() and getServerWithDfs()
 
     private String unc; // Initially null; set by getUncPath; never ends with '/'
+    private String canon; // Initially null; set by getUncPath; dir must end with '/'
+    private String share; // Can be null
+
     private UniAddress[] addresses;
     private int addressIndex;
     private int type;
@@ -87,7 +98,7 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
      * @param context
      * @param name
      */
-    void setContext ( SmbFileLocatorImpl context, String name ) {
+    void resolveInContext ( SmbFileLocatorImpl context, String name ) {
         if ( context.share != null ) {
             this.dfsReferral = context.dfsReferral;
         }
@@ -96,20 +107,47 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
             name = name.substring(0, last);
         }
 
-        context.getCanonicalResourcePath();
-        if ( context.share == null ) {
-            this.unc = "\\";
-            this.canon = "/";
+        if ( context.getShare() == null ) {
+            String[] nameParts = name.split("/");
+
+            // server is set through URL, however it's still in the name
+            int pos = 0;
+            if ( context.getServer() == null ) {
+                pos = 1;
+            }
+
+            // first remaining path element would be share
+            if ( nameParts.length > pos ) {
+                this.share = nameParts[ pos++ ];
+            }
+
+            // all other remaining path elements are actual path
+            if ( nameParts.length > pos ) {
+                String[] remainParts = new String[nameParts.length - pos];
+                System.arraycopy(nameParts, pos, remainParts, 0, nameParts.length - pos);
+                this.unc = "\\" + String.join("\\", remainParts);
+                this.canon = "/" + this.share + "/" + String.join("/", remainParts);
+            }
+            else {
+                this.unc = "\\";
+                if ( this.share != null ) {
+                    this.canon = "/" + this.share;
+                }
+                else {
+                    this.canon = "/";
+                }
+            }
         }
-        else if ( context.unc.equals("\\") ) {
-            this.unc = '\\' + name;
-            this.canon = '/' + name;
-            this.share = context.share;
+        else if ( context.getUNCPath().equals("\\") ) {
+            // context share != null, so the remainder is path
+            this.unc = '\\' + name.replace('/', '\\');
+            this.canon = context.getURLPath() + name;
+            this.share = context.getShare();
         }
         else {
-            this.unc = context.unc + '\\' + name;
-            this.canon = context.canon + '/' + name;
-            this.share = context.share;
+            this.unc = context.getUNCPath() + '\\' + name.replace('/', '\\');
+            this.canon = context.getURLPath() + '/' + name;
+            this.share = context.getShare();
         }
     }
 
@@ -122,16 +160,17 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
 
     @Override
     public String getName () {
-        getCanonicalResourcePath();
-        if ( this.canon.length() > 1 ) {
-            int i = this.canon.length() - 2;
-            while ( this.canon.charAt(i) != '/' ) {
+        String urlpath = getURLPath();
+        String shr = getShare();
+        if ( urlpath.length() > 1 ) {
+            int i = urlpath.length() - 2;
+            while ( urlpath.charAt(i) != '/' ) {
                 i--;
             }
-            return this.canon.substring(i + 1);
+            return urlpath.substring(i + 1);
         }
-        else if ( this.share != null ) {
-            return this.share + '/';
+        else if ( shr != null ) {
+            return shr + '/';
         }
         else if ( this.url.getHost().length() > 0 ) {
             return this.url.getHost() + '/';
@@ -151,16 +190,17 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
     public String getParent () {
         String str = this.url.getAuthority();
 
-        if ( str.length() > 0 ) {
+        if ( str != null && !str.isEmpty() ) {
             StringBuffer sb = new StringBuffer("smb://");
 
             sb.append(str);
 
-            getCanonicalResourcePath();
-            if ( this.canon.length() > 1 ) {
-                sb.append(this.canon);
+            String urlpath = getURLPath();
+            if ( urlpath.length() > 1 ) {
+                sb.append(urlpath);
             }
             else {
+
                 sb.append('/');
             }
 
@@ -193,52 +233,41 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbFileLocator#getCanonicalUncPath()
+     * @see jcifs.smb.SmbFileLocator#getCanonicalURL()
      */
     @Override
-    public String getCanonicalUncPath () {
-        getCanonicalResourcePath();
-        if ( this.share == null ) {
-            return "\\\\" + this.url.getHost();
-        }
-        return "\\\\" + this.url.getHost() + this.canon.replace('/', '\\');
-    }
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbFileLocator#getUncPath()
-     */
-    @Override
-    public String getUncPath () {
-        return this.unc;
-    }
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbFileLocator#getCanonicalPath()
-     */
-    @Override
-    public String getCanonicalPath () {
+    public String getCanonicalURL () {
         String str = this.url.getAuthority();
-        getCanonicalResourcePath();
-        if ( str.length() > 0 ) {
-            return "smb://" + this.url.getAuthority() + this.canon;
+        if ( str != null && !str.isEmpty() ) {
+            return "smb://" + this.url.getAuthority() + this.getURLPath();
         }
         return "smb://";
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbFileLocator#getShare()
-     */
+    @Override
+    public String getUNCPath () {
+        if ( this.unc == null ) {
+            canonicalizePath();
+        }
+        return this.unc;
+    }
+
+
+    @Override
+    public String getURLPath () {
+        if ( this.unc == null ) {
+            canonicalizePath();
+        }
+        return this.canon;
+    }
+
+
     @Override
     public String getShare () {
+        if ( this.unc == null ) {
+            canonicalizePath();
+        }
         return this.share;
     }
 
@@ -282,8 +311,7 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
         if ( this.dfsReferral == null ) {
             return null;
         }
-        String path = "smb:/" + this.dfsReferral.server + "/" + this.dfsReferral.share + this.unc;
-        return path.replace('\\', '/');
+        return "smb:/" + this.dfsReferral.server + "/" + this.dfsReferral.share + this.getUNCPath().replace('\\', '/');
     }
 
 
@@ -327,7 +355,8 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
      */
     @Override
     public boolean isIPC () {
-        if ( this.share == null || "IPC$".equals(this.share) ) {
+        String shr = this.getShare();
+        if ( shr == null || "IPC$".equals(getShare()) ) {
             if ( log.isDebugEnabled() ) {
                 log.debug("Share is IPC " + this.share);
             }
@@ -353,18 +382,18 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
     @Override
     public int getType () throws SmbException {
         if ( this.type == 0 ) {
-            if ( getCanonicalResourcePath().length() > 1 ) {
+            if ( getUNCPath().length() > 1 ) {
                 this.type = SmbFile.TYPE_FILESYSTEM;
             }
-            else if ( this.share != null ) {
-                if ( this.share.equals("IPC$") ) {
+            else if ( getShare() != null ) {
+                if ( getShare().equals("IPC$") ) {
                     this.type = SmbFile.TYPE_NAMED_PIPE;
                 }
                 else {
                     this.type = SmbFile.TYPE_SHARE;
                 }
             }
-            else if ( this.url.getAuthority() == null || this.url.getAuthority().length() == 0 ) {
+            else if ( this.url.getAuthority() == null || this.url.getAuthority().isEmpty() ) {
                 this.type = SmbFile.TYPE_WORKGROUP;
             }
             else {
@@ -401,8 +430,7 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
             return true;
         }
 
-        getCanonicalResourcePath();
-        if ( this.share == null ) {
+        if ( getShare() == null ) {
             UniAddress addr = getAddress();
             if ( addr.getAddress() instanceof NbtAddress ) {
                 int code = ( (NbtAddress) addr.getAddress() ).getNameType();
@@ -526,82 +554,81 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
     @Override
     public boolean isRoot () {
         // length == 0 should not happen
-        return getCanonicalResourcePath().length() <= 1;
+        return getShare() == null && getUNCPath().length() <= 1;
     }
 
 
-    @Override
-    public String getCanonicalResourcePath () {
-        if ( this.unc == null ) {
-            char[] in = this.url.getPath().toCharArray();
-            char[] out = new char[in.length];
-            int length = in.length, i, o, state;
+    /**
+     * 
+     */
+    private synchronized void canonicalizePath () {
+        char[] in = this.url.getPath().toCharArray();
+        char[] out = new char[in.length];
+        int length = in.length, i, o, state;
 
-            /*
-             * The canonicalization routine
-             */
-            state = 0;
-            o = 0;
-            for ( i = 0; i < length; i++ ) {
-                switch ( state ) {
-                case 0:
-                    if ( in[ i ] != '/' ) {
-                        return null;
+        /*
+         * The canonicalization routine
+         */
+        state = 0;
+        o = 0;
+        for ( i = 0; i < length; i++ ) {
+            switch ( state ) {
+            case 0:
+                if ( in[ i ] != '/' ) {
+                    return;
+                }
+                out[ o++ ] = in[ i ];
+                state = 1;
+                break;
+            case 1:
+                if ( in[ i ] == '/' ) {
+                    break;
+                }
+                else if ( in[ i ] == '.' && ( ( i + 1 ) >= length || in[ i + 1 ] == '/' ) ) {
+                    i++;
+                    break;
+                }
+                else if ( ( i + 1 ) < length && in[ i ] == '.' && in[ i + 1 ] == '.' && ( ( i + 2 ) >= length || in[ i + 2 ] == '/' ) ) {
+                    i += 2;
+                    if ( o == 1 )
+                        break;
+                    do {
+                        o--;
                     }
-                    out[ o++ ] = in[ i ];
+                    while ( o > 1 && out[ o - 1 ] != '/' );
+                    break;
+                }
+                state = 2;
+            case 2:
+                if ( in[ i ] == '/' ) {
                     state = 1;
-                    break;
-                case 1:
-                    if ( in[ i ] == '/' ) {
-                        break;
-                    }
-                    else if ( in[ i ] == '.' && ( ( i + 1 ) >= length || in[ i + 1 ] == '/' ) ) {
-                        i++;
-                        break;
-                    }
-                    else if ( ( i + 1 ) < length && in[ i ] == '.' && in[ i + 1 ] == '.' && ( ( i + 2 ) >= length || in[ i + 2 ] == '/' ) ) {
-                        i += 2;
-                        if ( o == 1 )
-                            break;
-                        do {
-                            o--;
-                        }
-                        while ( o > 1 && out[ o - 1 ] != '/' );
-                        break;
-                    }
-                    state = 2;
-                case 2:
-                    if ( in[ i ] == '/' ) {
-                        state = 1;
-                    }
-                    out[ o++ ] = in[ i ];
-                    break;
                 }
-            }
-
-            this.canon = new String(out, 0, o);
-            if ( o > 1 ) {
-                o--;
-                i = this.canon.indexOf('/', 1);
-                if ( i < 0 ) {
-                    this.share = this.canon.substring(1);
-                    this.unc = "\\";
-                }
-                else if ( i == o ) {
-                    this.share = this.canon.substring(1, i);
-                    this.unc = "\\";
-                }
-                else {
-                    this.share = this.canon.substring(1, i);
-                    this.unc = this.canon.substring(i, out[ o ] == '/' ? o : o + 1).replace('/', '\\');
-                }
-            }
-            else {
-                this.share = null;
-                this.unc = "\\";
+                out[ o++ ] = in[ i ];
+                break;
             }
         }
-        return this.unc;
+
+        this.canon = new String(out, 0, o);
+        if ( o > 1 ) {
+            o--;
+            i = this.canon.indexOf('/', 1);
+            if ( i < 0 ) {
+                this.share = this.canon.substring(1);
+                this.unc = "\\";
+            }
+            else if ( i == o ) {
+                this.share = this.canon.substring(1, i);
+                this.unc = "\\";
+            }
+            else {
+                this.share = this.canon.substring(1, i);
+                this.unc = this.canon.substring(i, out[ o ] == '/' ? o : o + 1).replace('/', '\\');
+            }
+        }
+        else {
+            this.share = null;
+            this.unc = "\\";
+        }
     }
 
 
@@ -619,8 +646,7 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
         catch ( UnknownHostException uhe ) {
             hash = getServer().toUpperCase().hashCode();
         }
-        getCanonicalResourcePath();
-        return hash + this.canon.toUpperCase().hashCode();
+        return hash + getURLPath().toUpperCase().hashCode();
     }
 
 
@@ -642,11 +668,7 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
          * Comparing canonical paths is definitive.
          */
         if ( pathNamesPossiblyEqual(this.url.getPath(), o.url.getPath()) ) {
-
-            this.getCanonicalResourcePath();
-            o.getCanonicalResourcePath();
-
-            if ( this.canon.equalsIgnoreCase(o.canon) ) {
+            if ( getURLPath().equalsIgnoreCase(o.getURLPath()) ) {
                 try {
                     return getAddress().equals(o.getAddress());
                 }
@@ -688,8 +710,8 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
      */
     @Override
     public boolean overlaps ( SmbFileLocator other ) throws UnknownHostException {
-        String tp = getCanonicalPath();
-        String op = other.getCanonicalPath();
+        String tp = getCanonicalURL();
+        String op = other.getCanonicalURL();
         return getAddress().equals(other.getAddress()) && tp.regionMatches(true, 0, op, 0, Math.min(tp.length(), op.length()));
     }
 
@@ -699,22 +721,25 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
      * @param reqPath
      * @return UNC path the redirect leads to
      */
+    @Override
     public String handleDFSReferral ( DfsReferral dr, String reqPath ) {
         this.dfsReferral = dr;
+
+        String oldUncPath = getUNCPath();
         if ( dr.pathConsumed < 0 ) {
             log.warn("Path consumed out of range " + dr.pathConsumed);
             dr.pathConsumed = 0;
         }
         else if ( dr.pathConsumed > this.unc.length() ) {
             log.warn("Path consumed out of range " + dr.pathConsumed);
-            dr.pathConsumed = this.unc.length();
+            dr.pathConsumed = oldUncPath.length();
         }
 
         if ( log.isDebugEnabled() ) {
-            log.debug("UNC is '" + this.unc + "'");
-            log.debug("Consumed '" + this.unc.substring(0, dr.pathConsumed) + "'");
+            log.debug("UNC is '" + oldUncPath + "'");
+            log.debug("Consumed '" + oldUncPath.substring(0, dr.pathConsumed) + "'");
         }
-        String dunc = this.unc.substring(dr.pathConsumed);
+        String dunc = oldUncPath.substring(dr.pathConsumed);
         if ( log.isDebugEnabled() ) {
             log.debug("Remaining '" + dunc + "'");
         }
@@ -729,10 +754,12 @@ class SmbFileLocatorImpl implements SmbFileLocator, Cloneable {
         }
 
         this.unc = dunc;
+        if ( dr.share != null && !dr.share.isEmpty() ) {
+            this.share = dr.share;
+        }
         if ( reqPath != null && reqPath.endsWith("\\") && !dunc.endsWith("\\") ) {
             dunc += "\\";
         }
-
         return dunc;
     }
 

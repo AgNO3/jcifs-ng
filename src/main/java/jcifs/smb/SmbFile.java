@@ -726,7 +726,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @param name
      */
     private void setContext ( SmbFile context, String name ) {
-        this.fileLocator.setContext(context.fileLocator, name);
+        this.fileLocator.resolveInContext(context.fileLocator, name);
         if ( context.getFileLocator().getShare() != null ) {
             this.treeConnection = new SmbTreeConnection(context.treeConnection);
         }
@@ -746,7 +746,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      *            whether this file will use an exclusive connection
      */
     protected void setNonPooled ( boolean nonPooled ) {
-        this.treeConnection.setNonPool(nonPooled);
+        this.treeConnection.setNonPooled(nonPooled);
     }
 
 
@@ -817,10 +817,10 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
 
 
     /**
-     * @return this file's unc path
+     * @return this file's unc path below the share
      */
     public String getUncPath () {
-        return this.fileLocator.getUncPath();
+        return this.fileLocator.getUNCPath();
     }
 
 
@@ -902,8 +902,6 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             return this.isExists;
         }
 
-        this.fileLocator.getCanonicalResourcePath();
-
         this.attributes = ATTR_READONLY | ATTR_DIRECTORY;
         this.createTime = 0L;
         this.lastModified = 0L;
@@ -925,7 +923,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 try ( SmbTreeHandle th = this.ensureTreeConnected() ) {}
             }
             else {
-                Info info = queryPath(this.fileLocator.getCanonicalResourcePath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
+                Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
                 this.attributes = info.getAttributes();
                 this.createTime = info.getCreateTime();
                 this.lastModified = info.getLastWriteTime();
@@ -1038,7 +1036,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @return The UNC path.
      */
     public String getCanonicalUncPath () {
-        return this.fileLocator.getCanonicalPath();
+        return this.fileLocator.getCanonicalURL();
     }
 
 
@@ -1068,7 +1066,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @return The canonicalized URL of this SMB resource.
      */
     public String getCanonicalPath () {
-        return this.fileLocator.getCanonicalPath();
+        return this.fileLocator.getCanonicalURL();
     }
 
 
@@ -1120,7 +1118,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @return watch context
      * @throws SmbException
      */
-    public SmbWatchHandleImpl watch ( int filter, boolean recursive ) throws SmbException {
+    public SmbWatchHandle watch ( int filter, boolean recursive ) throws SmbException {
 
         if ( filter == 0 ) {
             throw new IllegalArgumentException("filter must not be 0");
@@ -1507,7 +1505,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             this.lastModified = 0L;
             this.isExists = false;
 
-            Info info = queryPath(this.fileLocator.getCanonicalResourcePath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
+            Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
             this.attributes = info.getAttributes();
             this.createTime = info.getCreateTime();
             this.lastModified = info.getLastWriteTime();
@@ -1626,8 +1624,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      */
     public void delete () throws SmbException {
         exists();
-        this.fileLocator.getCanonicalResourcePath();
-        delete(getUncPath());
+        delete(this.fileLocator.getUNCPath());
         close();
     }
 
@@ -1658,7 +1655,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 this.lastAccess = 0L;
                 this.isExists = false;
 
-                Info info = queryPath(this.fileLocator.getCanonicalResourcePath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
+                Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
                 this.attributes = info.getAttributes();
                 this.createTime = info.getCreateTime();
                 this.lastModified = info.getLastWriteTime();
@@ -1739,7 +1736,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             }
         }
         else if ( !this.fileLocator.isRoot() && this.fileLocator.getType() != TYPE_NAMED_PIPE ) {
-            Info info = queryPath(this.fileLocator.getCanonicalResourcePath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_STANDARD_INFO);
+            Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_STANDARD_INFO);
             this.size = info.getSize();
         }
         else {
@@ -1809,7 +1806,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @throws SmbException
      */
     public void mkdir () throws SmbException {
-        String path = this.fileLocator.getCanonicalResourcePath();
+        String path = this.fileLocator.getUNCPath();
 
         if ( path.length() == 1 ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
@@ -1820,7 +1817,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             th.ensureDFSResolved();
 
             // get the path again, this may have changed through DFS referrals
-            path = this.fileLocator.getCanonicalResourcePath();
+            path = this.fileLocator.getUNCPath();
 
             /*
              * Create Directory Request / Response
@@ -1847,10 +1844,22 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @throws SmbException
      */
     public void mkdirs () throws SmbException {
+        String p = this.fileLocator.getParent();
         try ( SmbTreeHandle th = ensureTreeConnected();
-              SmbFile parent = new SmbFile(this.fileLocator.getParent(), getTransportContext()) ) {
-            if ( parent.exists() == false ) {
-                parent.mkdirs();
+              SmbFile parent = new SmbFile(p, getTransportContext()) ) {
+            try {
+                if ( !parent.exists() ) {
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Parent does not exist " + p);
+                    }
+                    parent.mkdirs();
+                }
+            }
+            catch ( SmbException e ) {
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Failed to ensure parent exists " + p, e);
+                }
+                throw e;
             }
             try {
                 mkdir();
@@ -1924,6 +1933,8 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @param time
      *            the create time as milliseconds since Jan 1, 1970
      * @throws SmbException
+     * @throws SmbUnsupportedOperationException
+     *             if CAP_NT_SMBS is unavailable
      */
     public void setCreateTime ( long time ) throws SmbException {
         if ( this.fileLocator.isRoot() ) {
@@ -1964,6 +1975,8 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @param time
      *            the last access time as milliseconds since Jan 1, 1970
      * @throws SmbException
+     * @throws SmbUnsupportedOperationException
+     *             if CAP_NT_SMBS is unavailable
      */
     public void setLastAccess ( long time ) throws SmbException {
         if ( this.fileLocator.isRoot() ) {

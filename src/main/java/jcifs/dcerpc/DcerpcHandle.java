@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.dcerpc.ndr.NdrBuffer;
 
 
@@ -374,6 +375,14 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      * @return the transport context used
      */
     public abstract CIFSContext getTransportContext ();
+
+
+    /**
+     * 
+     * @return session key of the underlying smb session
+     * @throws CIFSException
+     */
+    public abstract byte[] getSessionKey () throws CIFSException;
 
 
     @Override

@@ -72,6 +72,17 @@ public class PipeTest extends BaseCIFSTest {
 
 
     @Test
+    public void exclusiveConnection () throws IOException {
+        try ( DcerpcHandle handle = DcerpcHandle
+                .getHandle("ncacn_np:" + getTestServer() + "[\\PIPE\\srvsvc]", withTestNTLMCredentials(getContext()), true) ) {
+            MsrpcShareEnum rpc = new MsrpcShareEnum(handle.getServerWithDfs());
+            handle.sendrecv(rpc);
+            assertEquals(0, rpc.retval);
+        }
+    }
+
+
+    @Test
     public void testLSA () throws DcerpcException, IOException {
         try ( DcerpcHandle handle = DcerpcHandle
                 .getHandle("ncacn_np:" + getTestServer() + "[\\PIPE\\lsarpc]", withTestNTLMCredentials(getContext())) ) {

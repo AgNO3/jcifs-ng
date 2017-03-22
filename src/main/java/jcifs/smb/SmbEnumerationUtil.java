@@ -1,8 +1,19 @@
-/**
+/*
  * © 2017 AgNO3 Gmbh & Co. KG
- * All right reserved.
  * 
- * Created: 20.03.2017 by mbechler
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package jcifs.smb;
 
@@ -155,7 +166,7 @@ public final class SmbEnumerationUtil {
     static void doFindFirstNext ( SmbFile parent, SmbTreeHandleImpl th, List<Object> list, boolean files, String wildcard, int searchAttributes,
             SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException, UnknownHostException, MalformedURLException {
         SmbFileLocatorImpl loc = parent.fileLocator;
-        String path = loc.getCanonicalResourcePath();
+        String path = loc.getUNCPath();
         String p = loc.getURL().getPath();
 
         if ( p.lastIndexOf('/') != ( p.length() - 1 ) ) {
@@ -342,7 +353,7 @@ public final class SmbEnumerationUtil {
                     doNetServerEnum(parent, th, list, files, wildcard, searchAttributes, fnf, ff);
                 }
             }
-            else if ( locator.getShare() == null ) {
+            else if ( locator.isRoot() ) {
                 doShareEnum(parent, list, files, wildcard, searchAttributes, fnf, ff);
             }
             else {

@@ -176,6 +176,7 @@
 					</execution>
 				</executions>
 				<configuration>
+					<ignoredDifferencesFile>breaking-changes.xml</ignoredDifferencesFile>
 					<ignored>
 						<difference>
 							<!-- seems to be a clirr bug that it cannot handle the different inherited 
@@ -232,6 +233,7 @@
 					<addDefaultLicenseMatchers>true</addDefaultLicenseMatchers>
 					<excludes>
 						<exclude>pom.xml</exclude>
+						<exclude>breaking-changes.xml</exclude>
 						<exclude>README.md</exclude>
 						<exclude>build.properties</exclude>
 						<exclude>src/test/resources/**</exclude>

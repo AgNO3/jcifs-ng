@@ -73,7 +73,7 @@ public class ReadWriteTest extends BaseCIFSTest {
     }
 
 
-    private static Random getRandom () {
+    static Random getRandom () {
         return new Random(SEED);
     }
 
@@ -320,13 +320,12 @@ public class ReadWriteTest extends BaseCIFSTest {
     }
 
 
-    /**
-     * @param bufSize
-     * @param length
-     * @param is
-     * @throws IOException
-     */
     static void verifyRandom ( int bufSize, long length, InputStream is ) throws IOException {
+        verifyRandom(bufSize, length, true, is);
+    }
+
+
+    static void verifyRandom ( int bufSize, long length, boolean expectEof, InputStream is ) throws IOException {
         long start = System.currentTimeMillis();
         byte buffer[] = new byte[bufSize];
         long p = 0;
@@ -347,7 +346,9 @@ public class ReadWriteTest extends BaseCIFSTest {
 
             p += read;
         }
-        assertEquals("Expecting EOF", -1, is.read(buffer, 0, 1));
+        if ( expectEof ) {
+            assertEquals("Expecting EOF", -1, is.read(buffer, 0, 1));
+        }
         log.debug("Read " + length + " took " + ( System.currentTimeMillis() - start ));
     }
 

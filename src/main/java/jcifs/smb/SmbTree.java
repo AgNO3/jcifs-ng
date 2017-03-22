@@ -328,37 +328,10 @@ class SmbTree implements AutoCloseable {
                 if ( request == null || ( response != null && response.received ) ) {
                     return;
                 }
-                if ( !"A:".equals(this.service) ) {
-                    switch ( request.command ) {
-                    case ServerMessageBlock.SMB_COM_OPEN_ANDX:
-                    case ServerMessageBlock.SMB_COM_NT_CREATE_ANDX:
-                    case ServerMessageBlock.SMB_COM_READ_ANDX:
-                    case ServerMessageBlock.SMB_COM_WRITE_ANDX:
-                    case ServerMessageBlock.SMB_COM_CLOSE:
-                    case ServerMessageBlock.SMB_COM_TREE_DISCONNECT:
-                        break;
-                    case ServerMessageBlock.SMB_COM_TRANSACTION:
-                    case ServerMessageBlock.SMB_COM_TRANSACTION2:
-                        switch ( ( (SmbComTransaction) request ).subCommand & 0xFF ) {
-                        case SmbComTransaction.NET_SHARE_ENUM:
-                        case SmbComTransaction.NET_SERVER_ENUM2:
-                        case SmbComTransaction.NET_SERVER_ENUM3:
-                        case SmbComTransaction.TRANS_PEEK_NAMED_PIPE:
-                        case SmbComTransaction.TRANS_WAIT_NAMED_PIPE:
-                        case SmbComTransaction.TRANS_CALL_NAMED_PIPE:
-                        case SmbComTransaction.TRANS_TRANSACT_NAMED_PIPE:
-                        case SmbComTransaction.TRANS2_GET_DFS_REFERRAL:
-                            break;
-                        default:
-                            throw new SmbException("Invalid operation for " + this.service + " service: " + request);
-                        }
-                        break;
-                    default:
-                        throw new SmbException("Invalid operation for " + this.service + " service" + request);
-                    }
-                }
+                String svc = this.service;
+                checkRequest(transport, request, svc);
                 request.tid = this.tid;
-                if ( this.inDfs && !this.service.equals("IPC") && request.path != null && request.path.length() > 0 ) {
+                if ( this.inDfs && !svc.equals("IPC") && request.path != null && request.path.length() > 0 ) {
                     /*
                      * When DFS is in action all request paths are
                      * full UNC paths minus the first backslash like
@@ -389,7 +362,45 @@ class SmbTree implements AutoCloseable {
     }
 
 
-    void treeConnect ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException {
+    /**
+     * @param transport
+     * @param request
+     * @throws SmbException
+     */
+    private static void checkRequest ( SmbTransport transport, ServerMessageBlock request, String svc ) throws SmbException {
+        if ( !"A:".equals(svc) ) {
+            switch ( request.command ) {
+            case ServerMessageBlock.SMB_COM_OPEN_ANDX:
+            case ServerMessageBlock.SMB_COM_NT_CREATE_ANDX:
+            case ServerMessageBlock.SMB_COM_READ_ANDX:
+            case ServerMessageBlock.SMB_COM_WRITE_ANDX:
+            case ServerMessageBlock.SMB_COM_CLOSE:
+            case ServerMessageBlock.SMB_COM_TREE_DISCONNECT:
+                break;
+            case ServerMessageBlock.SMB_COM_TRANSACTION:
+            case ServerMessageBlock.SMB_COM_TRANSACTION2:
+                switch ( ( (SmbComTransaction) request ).subCommand & 0xFF ) {
+                case SmbComTransaction.NET_SHARE_ENUM:
+                case SmbComTransaction.NET_SERVER_ENUM2:
+                case SmbComTransaction.NET_SERVER_ENUM3:
+                case SmbComTransaction.TRANS_PEEK_NAMED_PIPE:
+                case SmbComTransaction.TRANS_WAIT_NAMED_PIPE:
+                case SmbComTransaction.TRANS_CALL_NAMED_PIPE:
+                case SmbComTransaction.TRANS_TRANSACT_NAMED_PIPE:
+                case SmbComTransaction.TRANS2_GET_DFS_REFERRAL:
+                    break;
+                default:
+                    throw new SmbException("Invalid operation for " + svc + " service: " + request);
+                }
+                break;
+            default:
+                throw new SmbException("Invalid operation for " + svc + " service" + request);
+            }
+        }
+    }
+
+
+    synchronized void treeConnect ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException {
         try ( SmbSession sess = getSession();
               SmbTransport transport = sess.getTransport() ) {
             synchronized ( transport ) {
@@ -424,18 +435,18 @@ class SmbTree implements AutoCloseable {
                      * IBM iSeries doesn't like specifying a service. Always reset
                      * the service to whatever was determined in the constructor.
                      */
-                    this.service = this.service0;
+                    String svc = this.service0;
 
                     /*
                      * Tree Connect And X Request / Response
                      */
 
                     if ( log.isTraceEnabled() ) {
-                        log.trace("treeConnect: unc=" + unc + ",service=" + this.service);
+                        log.trace("treeConnect: unc=" + unc + ",service=" + svc);
                     }
 
                     SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(sess.getConfig(), andxResponse);
-                    SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess, unc, this.service, andx);
+                    SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess, unc, svc, andx);
 
                     for ( int retries = 0; retries < 1 + sess.getTransportContext().getConfig().getMaxRequestRetries(); retries++ ) {
                         try {
