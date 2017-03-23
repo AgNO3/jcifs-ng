@@ -34,7 +34,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
-import jcifs.smb.SmbException;
+import jcifs.CIFSException;
+import jcifs.SmbResource;
 import jcifs.smb.SmbFile;
 
 
@@ -58,9 +59,9 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testRenameFile () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testRenameFile () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot();
-              SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+              SmbResource f = new SmbFile(defaultShareRoot, makeRandomName());
               SmbFile f2 = new SmbFile(defaultShareRoot, makeRandomName()) ) {
             f.createNewFile();
             boolean renamed = false;
@@ -84,10 +85,10 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testMoveFile () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testMoveFile () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot();
               SmbFile d = createTestDirectory();
-              SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
+              SmbResource f = new SmbFile(defaultShareRoot, makeRandomName());
               SmbFile f2 = new SmbFile(d, makeRandomName()) ) {
             f.createNewFile();
             boolean renamed = false;
@@ -112,10 +113,10 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testRenameDirectory () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testRenameDirectory () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot();
               SmbFile d = createTestDirectory();
-              SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+              SmbResource d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
               SmbFile d2 = new SmbFile(d, makeRandomDirectoryName()) ) {
             d1.mkdir();
             boolean renamed = false;
@@ -140,9 +141,9 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testMoveDirectory () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testMoveDirectory () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot();
-              SmbFile d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
+              SmbResource d1 = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
               SmbFile d2 = new SmbFile(defaultShareRoot, makeRandomDirectoryName()) ) {
             d1.mkdir();
             boolean renamed = false;
@@ -231,9 +232,9 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testCopyDir () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testCopyDir () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestDirectory();
-              SmbFile e = new SmbFile(f, "test") ) {
+              SmbResource e = new SmbFile(f, "test") ) {
             e.createNewFile();
             try ( SmbFile d1 = createTestDirectory();
                   SmbFile t = new SmbFile(d1, makeRandomName()) ) {
@@ -241,7 +242,7 @@ public class FileOperationsTest extends BaseCIFSTest {
                     f.copyTo(t);
                     assertTrue(f.exists());
 
-                    try ( SmbFile e2 = new SmbFile(t, "test") ) {
+                    try ( SmbResource e2 = new SmbFile(t, "test") ) {
                         assertTrue(e2.exists());
                     }
                 }
@@ -257,9 +258,9 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testMkDirs () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testMkDirs () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile r = createTestDirectory();
-              SmbFile e = new SmbFile(r, "foo/bar/test/") ) {
+              SmbResource e = new SmbFile(r, "foo/bar/test/") ) {
             try {
                 e.mkdirs();
             }

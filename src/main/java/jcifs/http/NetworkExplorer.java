@@ -43,14 +43,16 @@ import org.bouncycastle.util.encoders.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
+import jcifs.DfsReferralData;
+import jcifs.NameServiceClient;
+import jcifs.SmbConstants;
 import jcifs.config.PropertyConfiguration;
 import jcifs.context.BaseContext;
-import jcifs.netbios.NameServiceClient;
 import jcifs.netbios.NbtAddress;
-import jcifs.netbios.UniAddress;
 import jcifs.smb.DfsReferral;
 import jcifs.smb.NtStatus;
 import jcifs.smb.NtlmPasswordAuthentication;
@@ -150,7 +152,7 @@ public class NetworkExplorer extends HttpServlet {
         String url;
         int n;
         try ( SmbFileInputStream in = new SmbFileInputStream(file) ) {
-            url = file.getFileLocator().getPath();
+            url = file.getLocator().getPath();
             resp.setContentType("text/plain");
             resp.setContentType(URLConnection.guessContentTypeFromName(url));
             resp.setHeader("Content-Length", file.length() + "");
@@ -262,7 +264,7 @@ public class NetworkExplorer extends HttpServlet {
         maxLen = 28;
         for ( i = 0; i < dirents.length; i++ ) {
             try {
-                if ( dirents[ i ].getType() == SmbFile.TYPE_NAMED_PIPE ) {
+                if ( dirents[ i ].getType() == SmbConstants.TYPE_NAMED_PIPE ) {
                     continue;
                 }
             }
@@ -344,7 +346,7 @@ public class NetworkExplorer extends HttpServlet {
         out.println("<a class=\"sort\" href=\"?fmt=detail&sort=type\">Type</a>");
         out.println("<a class=\"sort\" style=\"width: 180\" href=\"?fmt=detail&sort=date\">Modified</a><br clear='all'><p>");
 
-        path = dir.getFileLocator().getCanonicalURL();
+        path = dir.getLocator().getCanonicalURL();
 
         if ( path.length() < 7 ) {
             out.println("<b><big>smb://</big></b><br>");
@@ -366,7 +368,7 @@ public class NetworkExplorer extends HttpServlet {
             out.println("<br clear='all'>");
         }
 
-        if ( path.length() == 1 || dir.getType() != SmbFile.TYPE_WORKGROUP ) {
+        if ( path.length() == 1 || dir.getType() != SmbConstants.TYPE_WORKGROUP ) {
             path = "";
         }
 
@@ -474,7 +476,7 @@ public class NetworkExplorer extends HttpServlet {
 
     @Override
     public void doGet ( HttpServletRequest req, HttpServletResponse resp ) throws IOException, ServletException {
-        UniAddress dc;
+        Address dc;
         String msg, pathInfo, server = null;
         boolean offerBasic, possibleWorkgroup = true;
         NtlmPasswordAuthentication ntlm = null;
@@ -575,11 +577,12 @@ public class NetworkExplorer extends HttpServlet {
         catch ( DfsReferral dr ) {
             StringBuffer redir = req.getRequestURL();
             String qs = req.getQueryString();
+            DfsReferralData refdata = dr.getData();
             redir = new StringBuffer(redir.substring(0, redir.length() - req.getPathInfo().length()));
             redir.append('/');
-            redir.append(dr.server);
+            redir.append(refdata.getServer());
             redir.append('/');
-            redir.append(dr.share);
+            redir.append(refdata.getShare());
             redir.append('/');
             if ( qs != null ) {
                 redir.append(req.getQueryString());

@@ -38,12 +38,12 @@ import org.junit.runners.Parameterized.Parameters;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.SmbResource;
 import jcifs.config.DelegatingConfiguration;
 import jcifs.config.PropertyConfiguration;
 import jcifs.context.BaseContext;
 import jcifs.context.CIFSContextWrapper;
 import jcifs.smb.NtlmPasswordAuthentication;
-import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 
 
@@ -239,18 +239,18 @@ public abstract class BaseCIFSTest {
     }
 
 
-    protected SmbFile getDefaultShareRoot ( CIFSContext ctx ) throws MalformedURLException {
+    protected SmbResource getDefaultShareRoot ( CIFSContext ctx ) throws MalformedURLException {
         return new SmbFile(getTestShareURL(), withTestNTLMCredentials(ctx));
     }
 
 
-    protected void checkConnection ( SmbFile f ) throws SmbException {
+    protected void checkConnection ( SmbResource f ) throws CIFSException {
         assertNotNull(f);
         f.exists();
     }
 
 
-    protected SmbFile createTestFile () throws MalformedURLException, UnknownHostException, SmbException {
+    protected SmbFile createTestFile () throws MalformedURLException, UnknownHostException, CIFSException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot() ) {
             SmbFile f = new SmbFile(defaultShareRoot, makeRandomName());
             f.createNewFile();
@@ -259,7 +259,7 @@ public abstract class BaseCIFSTest {
     }
 
 
-    protected SmbFile createTestDirectory () throws MalformedURLException, UnknownHostException, SmbException {
+    protected SmbFile createTestDirectory () throws MalformedURLException, UnknownHostException, CIFSException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot() ) {
             SmbFile f = new SmbFile(defaultShareRoot, makeRandomDirectoryName());
             f.mkdir();
@@ -268,7 +268,7 @@ public abstract class BaseCIFSTest {
     }
 
 
-    protected void cleanupTestDirectory ( SmbFile f ) throws SmbException {
+    protected void cleanupTestDirectory ( SmbResource f ) throws CIFSException {
         if ( f != null ) {
             f.delete();
         }

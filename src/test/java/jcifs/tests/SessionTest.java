@@ -31,10 +31,11 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.SmbResource;
 import jcifs.smb.SmbFile;
-import jcifs.smb.SmbSession;
-import jcifs.smb.SmbTransport;
-import jcifs.smb.SmbTreeHandle;
+import jcifs.smb.SmbSessionInternal;
+import jcifs.smb.SmbTransportInternal;
+import jcifs.smb.SmbTreeHandleInternal;
 
 
 /**
@@ -67,7 +68,7 @@ public class SessionTest extends BaseCIFSTest {
 
     @Test
     public void logonUser () throws IOException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             checkConnection(f);
         }
     }
@@ -75,7 +76,7 @@ public class SessionTest extends BaseCIFSTest {
 
     @Test
     public void logonAnonymous () throws IOException {
-        try ( SmbFile f = new SmbFile(getTestShareGuestURL(), withAnonymousCredentials()) ) {
+        try ( SmbResource f = new SmbFile(getTestShareGuestURL(), withAnonymousCredentials()) ) {
             checkConnection(f);
         }
     }
@@ -83,7 +84,7 @@ public class SessionTest extends BaseCIFSTest {
 
     @Test
     public void logonGuest () throws IOException {
-        try ( SmbFile f = new SmbFile(getTestShareGuestURL(), withTestGuestCredentials()) ) {
+        try ( SmbResource f = new SmbFile(getTestShareGuestURL(), withTestGuestCredentials()) ) {
             checkConnection(f);
         }
     }
@@ -96,10 +97,10 @@ public class SessionTest extends BaseCIFSTest {
             assertNotNull(f);
             f.connect();
             assertNotNull(f);
-            try ( SmbTreeHandle treeHandle = f.getTreeHandle();
-                  SmbSession session = treeHandle.getSession() ) {
+            try ( SmbTreeHandleInternal treeHandle = (SmbTreeHandleInternal) f.getTreeHandle();
+                  SmbSessionInternal session = treeHandle.getSession().unwrap(SmbSessionInternal.class) ) {
                 assertNotNull(session);
-                try ( SmbTransport transport = session.getTransport() ) {
+                try ( SmbTransportInternal transport = session.getTransport().unwrap(SmbTransportInternal.class) ) {
                     assertNotNull(transport);
                     transport.disconnect(true);
                     assertNotNull(f);

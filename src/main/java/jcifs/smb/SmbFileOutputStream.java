@@ -25,7 +25,9 @@ import java.io.OutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbFileHandle;
 
 
 /**
@@ -47,6 +49,8 @@ public class SmbFileOutputStream extends OutputStream {
     private SmbComWriteResponse rsp;
 
     private SmbFileHandleImpl handle;
+
+    private int sharing;
 
 
     /**
@@ -79,15 +83,22 @@ public class SmbFileOutputStream extends OutputStream {
      */
 
     public SmbFileOutputStream ( SmbFile file, boolean append ) throws SmbException {
-        this(file, append, append ? SmbFile.O_CREAT | SmbFile.O_WRONLY | SmbFile.O_APPEND : SmbFile.O_CREAT | SmbFile.O_WRONLY | SmbFile.O_TRUNC);
+        this(
+            file,
+            append,
+            append ? SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_APPEND
+                    : SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_TRUNC,
+            0,
+            SmbConstants.DEFAULT_SHARING);
     }
 
 
-    SmbFileOutputStream ( SmbFile file, boolean append, int openFlags ) throws SmbException {
+    SmbFileOutputStream ( SmbFile file, boolean append, int openFlags, int access, int sharing ) throws SmbException {
         this.file = file;
         this.append = append;
         this.openFlags = openFlags;
-        this.access = ( openFlags >>> 16 ) & 0xFFFF;
+        this.sharing = sharing;
+        this.access = access | SmbConstants.FILE_WRITE_DATA;
 
         try ( SmbTreeHandleImpl th = file.ensureTreeConnected() ) {
             try ( SmbFileHandle h = ensureOpen() ) {
@@ -109,13 +120,20 @@ public class SmbFileOutputStream extends OutputStream {
                 }
                 init(th);
             }
+            catch ( CIFSException e ) {
+                throw SmbException.wrap(e);
+            }
         }
     }
 
 
-    SmbFileOutputStream ( SmbFile file, SmbTreeHandleImpl th, SmbFileHandleImpl handle ) throws SmbException {
+    SmbFileOutputStream ( SmbFile file, SmbTreeHandleImpl th, SmbFileHandleImpl handle, int openFlags, int access, int sharing )
+            throws CIFSException {
         this.file = file;
         this.handle = handle;
+        this.openFlags = openFlags;
+        this.access = access;
+        this.sharing = sharing;
         this.append = false;
         init(th);
     }
@@ -125,8 +143,8 @@ public class SmbFileOutputStream extends OutputStream {
      * @param th
      * @throws SmbException
      */
-    protected final void init ( SmbTreeHandleImpl th ) throws SmbException {
-        this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC ); /* in case close and reopen */
+    protected final void init ( SmbTreeHandleImpl th ) throws CIFSException {
+        this.openFlags &= ~ ( SmbConstants.O_CREAT | SmbConstants.O_TRUNC ); /* in case we close and reopen */
         this.writeSize = th.getSendBufferSize() - 70;
 
         this.useNTSmbs = th.hasCapability(SmbConstants.CAP_NT_SMBS);
@@ -216,10 +234,10 @@ public class SmbFileOutputStream extends OutputStream {
     }
 
 
-    protected synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+    protected synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
         if ( !isOpen() ) {
             // one extra acquire to keep this open till the stream is released
-            this.handle = this.file.openUnshared(this.openFlags, this.access | SmbConstants.FILE_WRITE_DATA, SmbFile.ATTR_NORMAL, 0).acquire();
+            this.handle = this.file.openUnshared(this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0).acquire();
             if ( this.append ) {
                 this.fp = this.file.length();
                 if ( log.isDebugEnabled() ) {
@@ -234,7 +252,7 @@ public class SmbFileOutputStream extends OutputStream {
     }
 
 
-    protected SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
+    protected SmbTreeHandleImpl ensureTreeConnected () throws CIFSException {
         return this.file.ensureTreeConnected();
     }
 
@@ -281,7 +299,7 @@ public class SmbFileOutputStream extends OutputStream {
 
             int w;
             do {
-                int blockSize = ( this.file.getType() == SmbFile.TYPE_FILESYSTEM ) ? this.writeSizeFile : this.writeSize;
+                int blockSize = ( this.file.getType() == SmbConstants.TYPE_FILESYSTEM ) ? this.writeSizeFile : this.writeSize;
                 w = len > blockSize ? blockSize : len;
 
                 if ( this.useNTSmbs ) {

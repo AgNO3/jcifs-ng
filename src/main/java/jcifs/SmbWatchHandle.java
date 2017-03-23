@@ -15,7 +15,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.smb;
+package jcifs;
 
 
 import java.util.List;
@@ -23,6 +23,9 @@ import java.util.concurrent.Callable;
 
 
 /**
+ * Handle for receiving change notifications from an SMB server
+ * 
+ * 
  * @author mbechler
  *
  */
@@ -45,9 +48,9 @@ public interface SmbWatchHandle extends AutoCloseable, Callable<List<FileNotifyI
      * it will return an empty list of changes.
      * 
      * @return changes since the last invocation
-     * @throws SmbException
+     * @throws CIFSException
      */
-    List<FileNotifyInformation> watch () throws SmbException;
+    List<FileNotifyInformation> watch () throws CIFSException;
 
 
     /**
@@ -56,7 +59,7 @@ public interface SmbWatchHandle extends AutoCloseable, Callable<List<FileNotifyI
      * @see java.util.concurrent.Callable#call()
      */
     @Override
-    List<FileNotifyInformation> call () throws SmbException;
+    List<FileNotifyInformation> call () throws CIFSException;
 
 
     /**
@@ -65,6 +68,6 @@ public interface SmbWatchHandle extends AutoCloseable, Callable<List<FileNotifyI
      * @see java.lang.AutoCloseable#close()
      */
     @Override
-    void close () throws SmbException;
+    void close () throws CIFSException;
 
 }

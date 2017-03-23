@@ -19,6 +19,11 @@ package jcifs;
 
 
 /**
+ * Base for all checked exceptions used by this library
+ * 
+ * 
+ * These should only occur under very rare circumstances.
+ * 
  * @author mbechler
  *
  */

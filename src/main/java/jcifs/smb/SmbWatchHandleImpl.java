@@ -23,7 +23,10 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
+import jcifs.FileNotifyInformation;
 import jcifs.SmbConstants;
+import jcifs.SmbWatchHandle;
 
 
 /**
@@ -55,10 +58,10 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbWatchHandle#watch()
+     * @see jcifs.SmbWatchHandle#watch()
      */
     @Override
-    public List<FileNotifyInformation> watch () throws SmbException {
+    public List<FileNotifyInformation> watch () throws CIFSException {
         if ( !this.handle.isValid() ) {
             throw new SmbException("Watch was broken by tree disconnect");
         }
@@ -95,10 +98,10 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbWatchHandle#call()
+     * @see jcifs.SmbWatchHandle#call()
      */
     @Override
-    public List<FileNotifyInformation> call () throws SmbException {
+    public List<FileNotifyInformation> call () throws CIFSException {
         return watch();
     }
 
@@ -106,10 +109,10 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbWatchHandle#close()
+     * @see jcifs.SmbWatchHandle#close()
      */
     @Override
-    public void close () throws SmbException {
+    public void close () throws CIFSException {
         if ( this.handle.isValid() ) {
             this.handle.close(0L);
         }

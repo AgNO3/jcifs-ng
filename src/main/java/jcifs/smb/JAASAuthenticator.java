@@ -240,7 +240,7 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
      * @see jcifs.smb.SmbRenewableCredentials#renew()
      */
     @Override
-    public SmbCredentials renew () {
+    public CredentialsInternal renew () {
         log.debug("Renewing credentials");
         this.cachedSubject = null;
         getSubject();

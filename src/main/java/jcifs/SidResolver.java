@@ -21,12 +21,12 @@ package jcifs;
 import java.util.List;
 import java.util.Map;
 
-import jcifs.smb.SID;
-
 
 /**
+ * This is an internal API for resolving SIDs to names and/or retrieving member SIDs
+ * 
  * @author mbechler
- *
+ * @internal
  */
 public interface SidResolver {
 
@@ -39,15 +39,12 @@ public interface SidResolver {
      * expired because under normal circumstances SID information never changes.
      * 
      * @param tc
-     *
+     *            context to use
      * @param authorityServerName
      *            The hostname of the server that should be queried. For maximum efficiency this should be the hostname
      *            of a domain controller however a member server will work as well and a domain controller may not
      *            return names for SIDs corresponding to local accounts for which the domain controller is not an
      *            authority.
-     * @param auth
-     *            The credentials that should be used to communicate with the named server. As usual, <tt>null</tt>
-     *            indicates that default credentials should be used.
      * @param sids
      *            The SIDs that should be resolved. After this function is called, the names associated with the SIDs
      *            may be queried with the <tt>toDisplayString</tt>, <tt>getDomainName</tt>, and <tt>getAccountName</tt>

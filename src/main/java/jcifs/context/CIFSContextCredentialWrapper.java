@@ -19,10 +19,11 @@ package jcifs.context;
 
 
 import jcifs.CIFSContext;
+import jcifs.Credentials;
+import jcifs.smb.CredentialsInternal;
 import jcifs.smb.NtlmAuthenticator;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
-import jcifs.smb.SmbCredentials;
 import jcifs.smb.SmbRenewableCredentials;
 
 
@@ -32,9 +33,9 @@ import jcifs.smb.SmbRenewableCredentials;
  * @author mbechler
  *
  */
-public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements CIFSContext {
+public final class CIFSContextCredentialWrapper extends CIFSContextWrapper implements CIFSContext {
 
-    private SmbCredentials creds;
+    private Credentials creds;
 
 
     /**
@@ -42,7 +43,7 @@ public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements 
      * @param creds
      *            Crendentials to use
      */
-    public CIFSContextCredentialWrapper ( AbstractCIFSContext delegate, SmbCredentials creds ) {
+    public CIFSContextCredentialWrapper ( AbstractCIFSContext delegate, Credentials creds ) {
         super(delegate);
         this.creds = creds;
     }
@@ -55,7 +56,7 @@ public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements 
      * @see jcifs.context.CIFSContextWrapper#getCredentials()
      */
     @Override
-    public SmbCredentials getCredentials () {
+    public Credentials getCredentials () {
         return this.creds;
     }
 
@@ -67,10 +68,10 @@ public class CIFSContextCredentialWrapper extends CIFSContextWrapper implements 
      */
     @Override
     public boolean renewCredentials ( String locationHint, Throwable error ) {
-        SmbCredentials cred = getCredentials();
+        Credentials cred = getCredentials();
         if ( cred instanceof SmbRenewableCredentials ) {
             SmbRenewableCredentials renewable = (SmbRenewableCredentials) cred;
-            SmbCredentials renewed = renewable.renew();
+            CredentialsInternal renewed = renewable.renew();
             if ( renewed != null ) {
                 this.creds = renewed;
             }

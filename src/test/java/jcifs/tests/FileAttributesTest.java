@@ -35,10 +35,9 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import jcifs.CIFSException;
 import jcifs.SmbConstants;
-import jcifs.smb.ACE;
-import jcifs.smb.SID;
-import jcifs.smb.SmbException;
+import jcifs.SmbResource;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbUnsupportedOperationException;
 
@@ -65,19 +64,19 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testBaseFile () throws MalformedURLException, SmbException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+    public void testBaseFile () throws MalformedURLException, CIFSException {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             checkConnection(f);
-            if ( f.getType() != SmbFile.TYPE_FILESYSTEM ) {
-                assertEquals(SmbFile.TYPE_SHARE, f.getType());
+            if ( f.getType() != SmbConstants.TYPE_FILESYSTEM ) {
+                assertEquals(SmbConstants.TYPE_SHARE, f.getType());
             }
         }
     }
 
 
     @Test
-    public void testGetFreeSpace () throws SmbException, MalformedURLException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+    public void testGetFreeSpace () throws CIFSException, MalformedURLException {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             f.getDiskFreeSpace();
         }
     }
@@ -91,8 +90,8 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testLastModified () throws SmbException, MalformedURLException, UnknownHostException {
-        try ( SmbFile f = createTestFile() ) {
+    public void testLastModified () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
             try {
                 assertCloseTime(f.lastModified());
             }
@@ -104,8 +103,8 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSetLastModified () throws SmbException, MalformedURLException, UnknownHostException {
-        try ( SmbFile f = createTestFile() ) {
+    public void testSetLastModified () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
             try {
                 long time = System.currentTimeMillis() - 60 * 60 * 12;
                 f.setLastModified(time);
@@ -129,8 +128,8 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testCreated () throws SmbException, MalformedURLException, UnknownHostException {
-        try ( SmbFile f = createTestFile() ) {
+    public void testCreated () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
             try {
                 assertCloseTime(f.createTime());
             }
@@ -142,8 +141,8 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSetCreated () throws SmbException, MalformedURLException, UnknownHostException {
-        try ( SmbFile f = createTestFile() ) {
+    public void testSetCreated () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
             try {
                 long time = System.currentTimeMillis() - 60 * 60 * 12;
                 f.setCreateTime(time);
@@ -160,8 +159,8 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testLastAccessed () throws SmbException, MalformedURLException, UnknownHostException {
-        try ( SmbFile f = createTestFile() ) {
+    public void testLastAccessed () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
             try {
                 assertCloseTime(f.lastAccess());
             }
@@ -173,8 +172,8 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSetLastAccessed () throws SmbException, MalformedURLException, UnknownHostException {
-        try ( SmbFile f = createTestFile() ) {
+    public void testSetLastAccessed () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
             try {
                 long time = System.currentTimeMillis() - 60 * 60 * 12;
                 f.setLastAccess(time);
@@ -191,10 +190,10 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSetAttributes () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testSetAttributes () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestFile() ) {
             try {
-                int attrs = f.getAttributes() ^ SmbFile.ATTR_ARCHIVE ^ SmbFile.ATTR_HIDDEN ^ SmbFile.ATTR_READONLY;
+                int attrs = f.getAttributes() ^ SmbConstants.ATTR_ARCHIVE ^ SmbConstants.ATTR_HIDDEN ^ SmbConstants.ATTR_READONLY;
                 f.setAttributes(attrs);
                 assertEquals(attrs, f.getAttributes());
             }
@@ -212,7 +211,7 @@ public class FileAttributesTest extends BaseCIFSTest {
     public void testGetACL () throws IOException {
         try ( SmbFile f = getDefaultShareRoot() ) {
             try {
-                ACE[] security = f.getSecurity();
+                jcifs.ACE[] security = f.getSecurity();
                 assertNotNull(security);
             }
             catch ( SmbUnsupportedOperationException e ) {
@@ -226,7 +225,7 @@ public class FileAttributesTest extends BaseCIFSTest {
     public void testGetOwner () throws IOException {
         try ( SmbFile f = getDefaultShareRoot() ) {
             try {
-                SID security = f.getOwnerUser();
+                jcifs.SID security = f.getOwnerUser();
                 assertNotNull(security);
             }
             catch ( SmbUnsupportedOperationException e ) {
@@ -238,9 +237,9 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Test
     public void testGetGroup () throws IOException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             try {
-                SID security = f.getOwnerGroup();
+                jcifs.SID security = f.getOwnerGroup();
                 assertNotNull(security);
             }
             catch ( SmbUnsupportedOperationException e ) {
@@ -252,9 +251,9 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Test
     public void testShareSecurity () throws IOException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             try {
-                ACE[] security = f.getShareSecurity(true);
+                jcifs.ACE[] security = f.getShareSecurity(true);
                 Assume.assumeNotNull((Object) security);
             }
             catch ( SmbUnsupportedOperationException e ) {
@@ -266,7 +265,7 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Test
     public void testShareSize () throws IOException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             long l = f.length();
             Assume.assumeTrue("No share size reported", l != 0);
         }
@@ -275,7 +274,7 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Test
     public void testShareFreeSize () throws IOException {
-        try ( SmbFile f = getDefaultShareRoot() ) {
+        try ( SmbResource f = getDefaultShareRoot() ) {
             long fs = f.getDiskFreeSpace();
             Assume.assumeTrue("No free space reported", fs != 0);
         }

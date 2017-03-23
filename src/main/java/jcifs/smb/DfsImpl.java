@@ -29,15 +29,19 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
-import jcifs.netbios.UniAddress;
+import jcifs.DfsReferralData;
+import jcifs.DfsResolver;
+import jcifs.SmbTransport;
 
 
 /**
+ * Caching DFS resolver implementation
  * 
- *
+ * @internal
  */
-public class DfsImpl implements Dfs {
+public class DfsImpl implements DfsResolver {
 
     private static class CacheEntry <T> {
 
@@ -65,13 +69,15 @@ public class DfsImpl implements Dfs {
     private static final Logger log = LoggerFactory.getLogger(DfsImpl.class);
     private static final String DC_ENTRY = "dc";
 
-    private CacheEntry<Map<String, CacheEntry<DfsReferral>>> _domains = null; /* aka trusted domains cache */
+    private CacheEntry<Map<String, CacheEntry<DfsReferralDataInternal>>> _domains = null; /*
+                                                                                           * aka trusted domains cache
+                                                                                           */
     private final Object domainsLock = new Object();
 
-    private Map<String, CacheEntry<DfsReferral>> _dcs = new HashMap<>();
+    private Map<String, CacheEntry<DfsReferralDataInternal>> _dcs = new HashMap<>();
     private final Object dcLock = new Object();
 
-    private CacheEntry<DfsReferral> referrals = null;
+    private CacheEntry<DfsReferralDataInternal> referrals = null;
     private final Object referralsLock = new Object();
 
 
@@ -82,7 +88,7 @@ public class DfsImpl implements Dfs {
     public DfsImpl ( CIFSContext tc ) {}
 
 
-    private Map<String, Map<String, CacheEntry<DfsReferral>>> getTrustedDomains ( CIFSContext tf ) throws SmbAuthException {
+    private Map<String, Map<String, CacheEntry<DfsReferralDataInternal>>> getTrustedDomains ( CIFSContext tf ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() || tf.getCredentials().getUserDomain() == null || tf.getCredentials().getUserDomain().isEmpty() ) {
             return null;
         }
@@ -99,25 +105,25 @@ public class DfsImpl implements Dfs {
             // https://lists.samba.org/archive/samba-technical/2009-August/066486.html
             // UniAddress addr = UniAddress.getByName(authDomain, true, tf);
             // SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
-            try ( SmbTransport trans = getDc(tf, authDomain) ) {
-                CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
-                DfsReferral dr = null;
+            try ( SmbTransportInternal trans = getDc(tf, authDomain).unwrap(SmbTransportInternal.class) ) {
+                CacheEntry<Map<String, CacheEntry<DfsReferralDataInternal>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
+                DfsReferralData initial = null;
                 if ( trans != null ) {
                     // get domain referral
-                    dr = trans.getDfsReferrals(tf, "", 0);
+                    initial = trans.getDfsReferrals(tf, "", 0);
                 }
-                if ( dr != null ) {
-                    DfsReferral start = dr;
+                if ( initial != null ) {
+                    DfsReferralDataInternal start = initial.unwrap(DfsReferralDataInternal.class);
+                    DfsReferralDataInternal dr = start;
                     do {
-                        String domain = dr.server.toLowerCase();
-                        entry.map.put(domain, new HashMap<String, CacheEntry<DfsReferral>>());
+                        String domain = dr.getServer().toLowerCase();
+                        entry.map.put(domain, new HashMap<String, CacheEntry<DfsReferralDataInternal>>());
                         if ( log.isTraceEnabled() ) {
                             log.trace("Inserting cache entry for domain " + domain + ": " + dr);
                         }
-                        dr = dr.next;
+                        dr = dr.next();
                     }
                     while ( dr != start );
-
                     this._domains = entry;
                     return this._domains.map;
                 }
@@ -127,7 +133,7 @@ public class DfsImpl implements Dfs {
             if ( log.isDebugEnabled() ) {
                 log.debug("getting trusted domains failed: " + tf.getCredentials().getUserDomain(), ioe);
             }
-            CacheEntry<Map<String, CacheEntry<DfsReferral>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
+            CacheEntry<Map<String, CacheEntry<DfsReferralDataInternal>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
             this._domains = entry;
             if ( tf.getConfig().isDfsStrictView() && ioe instanceof SmbAuthException ) {
                 throw (SmbAuthException) ioe;
@@ -142,12 +148,12 @@ public class DfsImpl implements Dfs {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.Dfs#isTrustedDomain(jcifs.CIFSContext, java.lang.String)
+     * @see jcifs.DfsResolver#isTrustedDomain(jcifs.CIFSContext, java.lang.String)
      */
     @Override
     public boolean isTrustedDomain ( CIFSContext tf, String domain ) throws SmbAuthException {
         synchronized ( this.domainsLock ) {
-            Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
+            Map<String, Map<String, CacheEntry<DfsReferralDataInternal>>> domains = getTrustedDomains(tf);
             if ( domains == null )
                 return false;
             domain = domain.toLowerCase();
@@ -156,12 +162,12 @@ public class DfsImpl implements Dfs {
     }
 
 
-    private DfsReferral getDcReferrals ( CIFSContext tf, String domain ) throws SmbAuthException {
+    private DfsReferralData getDcReferrals ( CIFSContext tf, String domain ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
         String dom = domain.toLowerCase(Locale.ROOT);
         synchronized ( this.dcLock ) {
-            CacheEntry<DfsReferral> ce = this._dcs.get(dom);
+            CacheEntry<DfsReferralDataInternal> ce = this._dcs.get(dom);
             if ( ce != null && System.currentTimeMillis() > ce.expiration ) {
                 ce = null;
             }
@@ -171,10 +177,11 @@ public class DfsImpl implements Dfs {
             ce = new CacheEntry<>(tf.getConfig().getDfsTtl());
             try {
 
-                UniAddress addr = tf.getNameServiceClient().getByName(domain, true);
-                try ( SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false) ) {
+                Address addr = tf.getNameServiceClient().getByName(domain, true);
+                try ( SmbTransportInternal trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false).unwrap(SmbTransportInternal.class) ) {
                     synchronized ( trans ) {
-                        DfsReferral dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1);
+                        DfsReferralDataInternal dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1)
+                                .unwrap(DfsReferralDataInternal.class);
                         if ( log.isDebugEnabled() ) {
                             log.debug("Got DC referral " + dr);
                         }
@@ -203,23 +210,23 @@ public class DfsImpl implements Dfs {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.Dfs#getDc(jcifs.CIFSContext, java.lang.String)
+     * @see jcifs.DfsResolver#getDc(jcifs.CIFSContext, java.lang.String)
      */
     @Override
     public SmbTransport getDc ( CIFSContext tf, String domain ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
         try {
-            DfsReferral dr = getDcReferrals(tf, domain);
+            DfsReferralData dr = getDcReferrals(tf, domain);
             if ( dr != null ) {
-                DfsReferral start = dr;
+                DfsReferralData start = dr;
                 IOException e = null;
                 do {
                     try {
-                        if ( dr.server != null && dr.server.length() > 0 ) {
+                        if ( dr.getServer() != null && !dr.getServer().isEmpty() ) {
                             return tf.getTransportPool().getSmbTransport(
                                 tf,
-                                tf.getNameServiceClient().getByName(dr.server),
+                                tf.getNameServiceClient().getByName(dr.getServer()),
                                 0,
                                 false,
                                 !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
@@ -231,7 +238,7 @@ public class DfsImpl implements Dfs {
                         e = ioe;
                     }
 
-                    dr = dr.next;
+                    dr = dr.next();
                 }
                 while ( dr != start );
 
@@ -250,14 +257,8 @@ public class DfsImpl implements Dfs {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.Dfs#getReferral(jcifs.CIFSContext, jcifs.smb.SmbTransport, java.lang.String, java.lang.String,
-     *      java.lang.String)
-     */
-    @Override
-    public DfsReferral getReferral ( CIFSContext tf, SmbTransport trans, String domain, String root, String path ) throws SmbAuthException {
+    protected DfsReferralDataInternal getReferral ( CIFSContext tf, SmbTransportInternal trans, String domain, String root, String path )
+            throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
 
@@ -268,9 +269,9 @@ public class DfsImpl implements Dfs {
             if ( log.isDebugEnabled() ) {
                 log.debug("Fetching referral for " + p);
             }
-            DfsReferral dr = trans.getDfsReferrals(tf, p, 0);
+            DfsReferralData dr = trans.getDfsReferrals(tf, p, 0);
             if ( dr != null ) {
-                return dr;
+                return dr.unwrap(DfsReferralDataInternal.class);
             }
         }
         catch ( IOException ioe ) {
@@ -289,10 +290,10 @@ public class DfsImpl implements Dfs {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.Dfs#resolve(jcifs.CIFSContext, java.lang.String, java.lang.String, java.lang.String)
+     * @see jcifs.DfsResolver#resolve(jcifs.CIFSContext, java.lang.String, java.lang.String, java.lang.String)
      */
     @Override
-    public DfsReferral resolve ( CIFSContext tf, String domain, String root, String path ) throws SmbAuthException {
+    public DfsReferralData resolve ( CIFSContext tf, String domain, String root, String path ) throws SmbAuthException {
 
         if ( tf.getConfig().isDfsDisabled() || root == null || root.equals("IPC$") ) {
             return null;
@@ -306,28 +307,28 @@ public class DfsImpl implements Dfs {
             log.trace(String.format("Resolving \\%s\\%s%s", domain, root, path != null ? path : ""));
         }
 
-        DfsReferral dr = null;
+        DfsReferralDataInternal dr = null;
         long now = System.currentTimeMillis();
         synchronized ( this.domainsLock ) {
             /*
              * domains that can contain DFS points to maps of roots for each
              */
-            Map<String, Map<String, CacheEntry<DfsReferral>>> domains = getTrustedDomains(tf);
+            Map<String, Map<String, CacheEntry<DfsReferralDataInternal>>> domains = getTrustedDomains(tf);
 
             if ( domains != null ) {
 
                 if ( log.isTraceEnabled() ) {
-                    for ( Entry<String, Map<String, CacheEntry<DfsReferral>>> entry : domains.entrySet() ) {
+                    for ( Entry<String, Map<String, CacheEntry<DfsReferralDataInternal>>> entry : domains.entrySet() ) {
                         log.trace("Domain " + entry.getKey());
-                        for ( Entry<String, CacheEntry<DfsReferral>> entry2 : entry.getValue().entrySet() ) {
+                        for ( Entry<String, CacheEntry<DfsReferralDataInternal>> entry2 : entry.getValue().entrySet() ) {
                             log.trace("  Root " + entry2.getKey());
                             if ( entry2.getValue().map != null ) {
-                                for ( Entry<String, DfsReferral> entry3 : entry2.getValue().map.entrySet() ) {
-                                    DfsReferral start = entry3.getValue();
-                                    DfsReferral r = start;
+                                for ( Entry<String, DfsReferralDataInternal> entry3 : entry2.getValue().map.entrySet() ) {
+                                    DfsReferralDataInternal start = entry3.getValue();
+                                    DfsReferralDataInternal r = start;
                                     do {
                                         log.trace("    " + entry3.getKey() + " => " + entry3.getValue());
-                                        r = start.next;
+                                        r = start.next();
                                     }
                                     while ( r != start );
                                 }
@@ -339,7 +340,7 @@ public class DfsImpl implements Dfs {
                 /*
                  * domain-based DFS root shares to links for each
                  */
-                Map<String, CacheEntry<DfsReferral>> roots = domains.get(domain);
+                Map<String, CacheEntry<DfsReferralDataInternal>> roots = domains.get(domain);
                 if ( roots != null ) {
                     if ( log.isTraceEnabled() ) {
                         log.trace("Is a domain referral for " + domain);
@@ -354,7 +355,7 @@ public class DfsImpl implements Dfs {
                      * The link entries contain maps of referrals by path representing DFS links.
                      * Note that paths are relative to the root like "\" and not "\example.com\root".
                      */
-                    CacheEntry<DfsReferral> links = roots.get(root);
+                    CacheEntry<DfsReferralDataInternal> links = roots.get(root);
                     if ( links != null && now > links.expiration ) {
                         if ( log.isDebugEnabled() ) {
                             log.debug("Removing expired " + links.map);
@@ -366,7 +367,7 @@ public class DfsImpl implements Dfs {
                     if ( links == null ) {
                         log.trace("Loadings links");
                         String refServerName = domain;
-                        try ( SmbTransport trans = getDc(tf, domain) ) {
+                        try ( SmbTransportInternal trans = getDc(tf, domain).unwrap(SmbTransportInternal.class) ) {
                             if ( trans == null ) {
                                 return null;
                             }
@@ -376,8 +377,8 @@ public class DfsImpl implements Dfs {
                             synchronized ( trans ) {
                                 try {
                                     // ensure connected
-                                    trans.connect();
-                                    refServerName = trans.tconHostName;
+                                    trans.ensureConnected();
+                                    refServerName = trans.getRemoteHostName();
                                 }
                                 catch ( SmbException e ) {
                                     log.warn("Failed to connect to domain controller", e);
@@ -390,7 +391,7 @@ public class DfsImpl implements Dfs {
                             log.trace("Have referral " + dr);
                         }
 
-                        if ( path == null && domain.equals(dr.server) && root.equals(dr.share) ) {
+                        if ( path == null && domain.equals(dr.getServer()) && root.equals(dr.getShare()) ) {
                             // If we do cache these we never get to the properly cached
                             // standalone referral we might have.
                             log.warn("Dropping self-referential referral " + dr);
@@ -402,7 +403,7 @@ public class DfsImpl implements Dfs {
 
                             links = new CacheEntry<>(tf.getConfig().getDfsTtl());
 
-                            DfsReferral tmp = dr;
+                            DfsReferralDataInternal tmp = dr;
                             do {
                                 if ( path == null ) {
 
@@ -416,11 +417,11 @@ public class DfsImpl implements Dfs {
                                      * attempts to resolve DFS use the last successful
                                      * referral first.
                                      */
-                                    tmp.map = links.map;
-                                    tmp.key = "\\";
+                                    tmp.setCacheMap(links.map);
+                                    tmp.setKey("\\");
                                 }
-                                tmp.pathConsumed -= len;
-                                tmp = tmp.next;
+                                tmp.stripPathConsumed(len);
+                                tmp = tmp.next();
                             }
                             while ( tmp != dr );
 
@@ -428,13 +429,13 @@ public class DfsImpl implements Dfs {
                                 log.debug("Have referral " + dr);
                             }
 
-                            if ( dr.key != null )
-                                links.map.put(dr.key, dr);
+                            if ( dr.getKey() != null )
+                                links.map.put(dr.getKey(), dr);
 
                             roots.put(root, links);
                         }
                         else if ( path == null ) {
-                            roots.put(root, new NegativeCacheEntry<DfsReferral>(tf.getConfig().getDfsTtl()));
+                            roots.put(root, new NegativeCacheEntry<DfsReferralDataInternal>(tf.getConfig().getDfsTtl()));
                         }
                     }
                     else if ( links instanceof NegativeCacheEntry ) {
@@ -449,7 +450,7 @@ public class DfsImpl implements Dfs {
                          * path is just "\" and not "\example.com\root".
                          */
                         dr = links.map.get(link);
-                        if ( dr != null && now > dr.expiration ) {
+                        if ( dr != null && now > dr.getExpiration() ) {
                             if ( log.isTraceEnabled() ) {
                                 log.trace("Expiring links " + link);
                             }
@@ -458,15 +459,15 @@ public class DfsImpl implements Dfs {
                         }
 
                         if ( dr == null ) {
-                            try ( SmbTransport trans = getDc(tf, domain) ) {
+                            try ( SmbTransportInternal trans = getDc(tf, domain).unwrap(SmbTransportInternal.class) ) {
                                 if ( trans == null )
                                     return null;
 
                                 dr = getReferral(tf, trans, domain, root, path);
                                 if ( dr != null ) {
 
-                                    dr.pathConsumed -= 1 + domain.length() + 1 + root.length();
-                                    dr.link = link;
+                                    dr.stripPathConsumed(1 + domain.length() + 1 + root.length());
+                                    dr.setLink(link);
                                     if ( log.isTraceEnabled() ) {
                                         log.trace("Have referral " + dr);
                                     }
@@ -483,14 +484,8 @@ public class DfsImpl implements Dfs {
                     }
                 }
 
-                if ( tf.getConfig().isDfsConvertToFQDN() && dr != null ) {
-                    if ( dr.server.indexOf('.') < 0 && dr.server.toUpperCase(Locale.ROOT).equals(dr.server) ) {
-                        String fqdn = dr.server + "." + domain;
-                        if ( log.isDebugEnabled() ) {
-                            log.debug(String.format("Applying DFS netbios name hack %s -> %s ", dr.server, fqdn));
-                        }
-                        dr.server = fqdn;
-                    }
+                if ( tf.getConfig().isDfsConvertToFQDN() && dr instanceof DfsReferralDataImpl ) {
+                    ( (DfsReferralDataImpl) dr ).fixupDomain(domain);
                 }
             }
         }
@@ -537,23 +532,23 @@ public class DfsImpl implements Dfs {
 
 
     @Override
-    public synchronized void cache ( CIFSContext tc, String path, DfsReferral dr ) {
-        int s1, s2;
-        String server, share, key;
+    public synchronized void cache ( CIFSContext tc, String path, DfsReferralData dr ) {
+
+        if ( tc.getConfig().isDfsDisabled() || ! ( dr instanceof DfsReferralDataInternal ) ) {
+            return;
+        }
 
         if ( log.isDebugEnabled() ) {
             log.debug("Inserting referral for " + path);
         }
 
-        if ( tc.getConfig().isDfsDisabled() )
-            return;
+        int s1 = path.indexOf('\\', 1);
+        int s2 = path.indexOf('\\', s1 + 1);
+        String server = path.substring(1, s1).toLowerCase(Locale.ROOT);
+        String share = path.substring(s1 + 1, s2);
+        String key = path.substring(0, dr.getPathConsumed()).toLowerCase(Locale.ROOT);
 
-        s1 = path.indexOf('\\', 1);
-        s2 = path.indexOf('\\', s1 + 1);
-        server = path.substring(1, s1).toLowerCase(Locale.ROOT);
-        share = path.substring(s1 + 1, s2);
-
-        key = path.substring(0, dr.pathConsumed).toLowerCase(Locale.ROOT);
+        DfsReferralDataInternal dri = (DfsReferralDataInternal) dr;
 
         /*
          * Samba has a tendency to return referral paths and pathConsumed values
@@ -571,17 +566,7 @@ public class DfsImpl implements Dfs {
         }
 
         if ( tc.getConfig().isDfsConvertToFQDN() ) {
-            if ( dr.server.indexOf('.') < 0 && dr.server.toUpperCase(Locale.ROOT).equals(dr.server) ) {
-                if ( server.startsWith(dr.server.toLowerCase(Locale.ROOT) + ".") ) {
-                    if ( log.isDebugEnabled() ) {
-                        log.debug("Adjusting server name " + dr.server + " to " + server);
-                    }
-                    dr.server = server;
-                }
-                else {
-                    log.warn("Have unmappable netbios name " + dr.server);
-                }
-            }
+            dri.fixupHost(server);
         }
 
         if ( log.isDebugEnabled() ) {
@@ -593,7 +578,7 @@ public class DfsImpl implements Dfs {
          * it refects the part of the relative path consumed and not
          * the entire path.
          */
-        dr.pathConsumed -= 1 + server.length() + 1 + share.length();
+        dri.stripPathConsumed(1 + server.length() + 1 + share.length());
 
         synchronized ( this.referralsLock ) {
             if ( this.referrals != null && ( System.currentTimeMillis() + 10000 ) > this.referrals.expiration ) {
@@ -602,7 +587,7 @@ public class DfsImpl implements Dfs {
             if ( this.referrals == null ) {
                 this.referrals = new CacheEntry<>(tc.getConfig().getDfsTtl());
             }
-            this.referrals.map.put(key, dr);
+            this.referrals.map.put(key, dri);
         }
 
     }

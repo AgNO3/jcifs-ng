@@ -20,7 +20,9 @@ package jcifs.netbios;
 
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 
 
@@ -44,7 +46,7 @@ import jcifs.CIFSContext;
  * DNS resolvable hosts.
  */
 
-public class UniAddress {
+public class UniAddress implements Address {
 
     /**
      * Check whether a hostname is actually an ip address
@@ -155,6 +157,7 @@ public class UniAddress {
      * 
      * @return the guessed name
      */
+    @Override
     public String firstCalledName () {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).firstCalledName();
@@ -190,6 +193,7 @@ public class UniAddress {
      * 
      * @return guessed alternate name
      */
+    @Override
     public String nextCalledName ( CIFSContext tc ) {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).nextCalledName(tc);
@@ -217,6 +221,7 @@ public class UniAddress {
      * 
      * @return the hostname associated with the address
      */
+    @Override
     public String getHostName () {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).getHostName();
@@ -230,11 +235,49 @@ public class UniAddress {
      * 
      * @return the ip address
      */
+    @Override
     public String getHostAddress () {
         if ( this.addr instanceof NbtAddress ) {
             return ( (NbtAddress) this.addr ).getHostAddress();
         }
         return ( (InetAddress) this.addr ).getHostAddress();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws UnknownHostException
+     *
+     * @see jcifs.Address#toInetAddress()
+     */
+    @Override
+    public InetAddress toInetAddress () throws UnknownHostException {
+        if ( this.addr instanceof Address ) {
+            return ( (Address) this.addr ).toInetAddress();
+        }
+        else if ( this.addr instanceof InetAddress ) {
+            return (InetAddress) this.addr;
+        }
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Address#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends Address> T unwrap ( Class<T> type ) {
+        if ( this.addr instanceof Address ) {
+            return ( (Address) this.addr ).unwrap(type);
+        }
+        else if ( this.getClass().isAssignableFrom(type) ) {
+            return (T) this;
+        }
+        return null;
     }
 
 

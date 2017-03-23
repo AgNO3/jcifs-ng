@@ -15,33 +15,16 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.smb;
+package jcifs;
 
 
 /**
+ * Opaque reference to a SMB session
+ * 
  * @author mbechler
- *
+ * @internal
  */
-public interface SmbFileHandle extends AutoCloseable {
-
-    /**
-     * @return the tree
-     */
-    SmbTreeHandle getTree ();
-
-
-    /**
-     * @return whether the file descriptor is valid
-     */
-    boolean isValid ();
-
-
-    /**
-     * @param lastWriteTime
-     * @throws SmbException
-     */
-    void close ( long lastWriteTime ) throws SmbException;
-
+public interface SmbSession extends AutoCloseable {
 
     /**
      * {@inheritDoc}
@@ -49,13 +32,27 @@ public interface SmbFileHandle extends AutoCloseable {
      * @see java.lang.AutoCloseable#close()
      */
     @Override
-    void close () throws SmbException;
+    void close ();
 
 
     /**
-     * @throws SmbException
-     * 
+     * @return the configuration used by this session
      */
-    void release () throws SmbException;
+    Configuration getConfig ();
+
+
+    /**
+     * 
+     * @param type
+     * @return session instance with the given type
+     */
+    <T extends SmbSession> T unwrap ( Class<T> type );
+
+
+    /**
+     * 
+     * @return the context this session is attached to
+     */
+    CIFSContext getContext ();
 
 }

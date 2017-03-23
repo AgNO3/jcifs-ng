@@ -19,30 +19,19 @@ package jcifs.smb;
 
 
 import jcifs.CIFSException;
+import jcifs.SmbPipeHandle;
 
 
 /**
  * @author mbechler
- *
+ * @internal
  */
-public interface SmbPipeHandle extends AutoCloseable {
-
-    /**
-     * @return the pipe
-     */
-    SmbNamedPipe getPipe ();
-
+public interface SmbPipeHandleInternal extends SmbPipeHandle {
 
     /**
      * @return the pipe type
      */
     int getPipeType ();
-
-
-    /**
-     * @return the uncPath
-     */
-    String getUncPath ();
 
 
     /**
@@ -53,39 +42,20 @@ public interface SmbPipeHandle extends AutoCloseable {
 
 
     /**
-     * @return whether the FD is open and valid
-     */
-    boolean isOpen ();
-
-
-    /**
-     * @return whether the FD was previously open but became invalid
-     */
-    boolean isStale ();
-
-
-    /**
      * 
      * @return this pipe's input stream
      * @throws SmbException
      */
-    SmbPipeInputStream getInput () throws SmbException;
+    @Override
+    SmbPipeInputStream getInput () throws CIFSException;
 
 
     /**
      * 
      * @return this pipe's output stream
      * @throws SmbException
-     */
-    SmbPipeOutputStream getOutput () throws SmbException;
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see java.lang.AutoCloseable#close()
+     * @throws
      */
     @Override
-    void close () throws SmbException;
-
+    SmbPipeOutputStream getOutput () throws CIFSException;
 }

@@ -23,9 +23,9 @@ import java.io.IOException;
 
 
 /**
+ * Internal use only
  * 
- * 
- *
+ * @internal
  */
 public class SecurityDescriptor {
 

@@ -30,6 +30,7 @@ import jcifs.SidResolver;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.UnicodeString;
 import jcifs.dcerpc.rpc;
+import jcifs.dcerpc.rpc.sid_t;
 import jcifs.dcerpc.msrpc.LsaPolicyHandle;
 import jcifs.dcerpc.msrpc.MsrpcEnumerateAliasesInDomain;
 import jcifs.dcerpc.msrpc.MsrpcGetMembersInAlias;
@@ -43,8 +44,10 @@ import jcifs.dcerpc.msrpc.samr;
 
 
 /**
+ * Internal use only: SID resolver cache
+ * 
  * @author mbechler
- *
+ * @internal
  */
 public class SIDCacheImpl implements SidResolver {
 
@@ -57,7 +60,7 @@ public class SIDCacheImpl implements SidResolver {
     public SIDCacheImpl ( CIFSContext baseContext ) {}
 
 
-    void resolveSids ( DcerpcHandle handle, LsaPolicyHandle policyHandle, SID[] sids ) throws IOException {
+    void resolveSids ( DcerpcHandle handle, LsaPolicyHandle policyHandle, jcifs.SID[] sids ) throws IOException {
         MsrpcLookupSids rpc = new MsrpcLookupSids(policyHandle, sids);
         handle.sendrecv(rpc);
         switch ( rpc.retval ) {
@@ -70,29 +73,31 @@ public class SIDCacheImpl implements SidResolver {
         }
 
         for ( int si = 0; si < sids.length; si++ ) {
-            sids[ si ].type = rpc.names.names[ si ].sid_type;
-            sids[ si ].domainName = null;
+            SID s = sids[ si ].unwrap(SID.class);
+            s.type = rpc.names.names[ si ].sid_type;
+            s.domainName = null;
 
-            switch ( sids[ si ].type ) {
-            case SID.SID_TYPE_USER:
-            case SID.SID_TYPE_DOM_GRP:
-            case SID.SID_TYPE_DOMAIN:
-            case SID.SID_TYPE_ALIAS:
-            case SID.SID_TYPE_WKN_GRP:
+            switch ( s.getType() ) {
+            case jcifs.SID.SID_TYPE_USER:
+            case jcifs.SID.SID_TYPE_DOM_GRP:
+            case jcifs.SID.SID_TYPE_DOMAIN:
+            case jcifs.SID.SID_TYPE_ALIAS:
+            case jcifs.SID.SID_TYPE_WKN_GRP:
                 int sid_index = rpc.names.names[ si ].sid_index;
                 rpc.unicode_string ustr = rpc.domains.domains[ sid_index ].name;
-                sids[ si ].domainName = ( new UnicodeString(ustr, false) ).toString();
+                s.domainName = ( new UnicodeString(ustr, false) ).toString();
                 break;
             }
 
-            sids[ si ].acctName = ( new UnicodeString(rpc.names.names[ si ].name, false) ).toString();
-            sids[ si ].origin_server = null;
-            sids[ si ].origin_ctx = null;
+            UnicodeString ucstr = new UnicodeString(rpc.names.names[ si ].name, false);
+            s.acctName = ucstr.toString();
+            s.origin_server = null;
+            s.origin_ctx = null;
         }
     }
 
 
-    void resolveSids0 ( String authorityServerName, CIFSContext tc, SID[] sids ) throws CIFSException {
+    void resolveSids0 ( String authorityServerName, CIFSContext tc, jcifs.SID[] sids ) throws CIFSException {
         LsaPolicyHandle policyHandle = null;
 
         synchronized ( this.sidCache ) {
@@ -112,28 +117,29 @@ public class SIDCacheImpl implements SidResolver {
 
 
     @Override
-    public void resolveSids ( CIFSContext tc, String authorityServerName, SID[] sids, int offset, int length ) throws CIFSException {
+    public void resolveSids ( CIFSContext tc, String authorityServerName, jcifs.SID[] sids, int offset, int length ) throws CIFSException {
         ArrayList<SID> list = new ArrayList<>(sids.length);
         int si;
 
         synchronized ( this.sidCache ) {
             for ( si = 0; si < length; si++ ) {
-                SID sid = this.sidCache.get(sids[ offset + si ]);
+                SID s = sids[ offset + si ].unwrap(SID.class);
+                SID sid = this.sidCache.get(s);
                 if ( sid != null ) {
-                    sids[ offset + si ].type = sid.type;
-                    sids[ offset + si ].domainName = sid.domainName;
-                    sids[ offset + si ].acctName = sid.acctName;
+                    s.type = sid.type;
+                    s.domainName = sid.domainName;
+                    s.acctName = sid.acctName;
                 }
                 else {
-                    list.add(sids[ offset + si ]);
+                    list.add(s);
                 }
             }
 
             if ( list.size() > 0 ) {
-                sids = list.toArray(new SID[0]);
-                resolveSids0(authorityServerName, tc, sids);
-                for ( si = 0; si < sids.length; si++ ) {
-                    this.sidCache.put(sids[ si ], sids[ si ]);
+                SID[] resolved = list.toArray(new SID[list.size()]);
+                resolveSids0(authorityServerName, tc, resolved);
+                for ( si = 0; si < resolved.length; si++ ) {
+                    this.sidCache.put(resolved[ si ], resolved[ si ]);
                 }
             }
         }
@@ -161,28 +167,29 @@ public class SIDCacheImpl implements SidResolver {
      *            methods.
      */
     @Override
-    public void resolveSids ( CIFSContext tc, String authorityServerName, SID[] sids ) throws CIFSException {
+    public void resolveSids ( CIFSContext tc, String authorityServerName, jcifs.SID[] sids ) throws CIFSException {
         ArrayList<SID> list = new ArrayList<>(sids.length);
         int si;
 
         synchronized ( this.sidCache ) {
             for ( si = 0; si < sids.length; si++ ) {
-                SID sid = this.sidCache.get(sids[ si ]);
+                SID s = sids[ si ].unwrap(SID.class);
+                SID sid = this.sidCache.get(s);
                 if ( sid != null ) {
-                    sids[ si ].type = sid.type;
-                    sids[ si ].domainName = sid.domainName;
-                    sids[ si ].acctName = sid.acctName;
+                    s.type = sid.type;
+                    s.domainName = sid.domainName;
+                    s.acctName = sid.acctName;
                 }
                 else {
-                    list.add(sids[ si ]);
+                    list.add(s);
                 }
             }
 
             if ( list.size() > 0 ) {
-                sids = list.toArray(new SID[0]);
-                resolveSids0(authorityServerName, tc, sids);
-                for ( si = 0; si < sids.length; si++ ) {
-                    this.sidCache.put(sids[ si ], sids[ si ]);
+                SID[] resolved = list.toArray(new SID[list.size()]);
+                resolveSids0(authorityServerName, tc, resolved);
+                for ( si = 0; si < resolved.length; si++ ) {
+                    this.sidCache.put(resolved[ si ], resolved[ si ]);
                 }
             }
         }
@@ -204,7 +211,7 @@ public class SIDCacheImpl implements SidResolver {
                 if ( rpc.retval != 0 )
                     throw new SmbException(rpc.retval, false);
 
-                return new SID(info.sid, SID.SID_TYPE_DOMAIN, ( new UnicodeString(info.name, false) ).toString(), null, false);
+                return new SID(info.sid, jcifs.SID.SID_TYPE_DOMAIN, ( new UnicodeString(info.name, false) ).toString(), null, false);
             }
             catch ( IOException e ) {
                 throw new CIFSException("Failed to get SID from server", e);
@@ -214,7 +221,7 @@ public class SIDCacheImpl implements SidResolver {
 
 
     @Override
-    public SID[] getGroupMemberSids ( CIFSContext tc, String authorityServerName, SID domsid, int rid, int flags ) throws CIFSException {
+    public SID[] getGroupMemberSids ( CIFSContext tc, String authorityServerName, jcifs.SID domsid, int rid, int flags ) throws CIFSException {
         SamrAliasHandle aliasHandle = null;
         lsarpc.LsarSidArray sidarray = new lsarpc.LsarSidArray();
         MsrpcGetMembersInAlias rpc = null;
@@ -222,7 +229,7 @@ public class SIDCacheImpl implements SidResolver {
         synchronized ( this.sidCache ) {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + authorityServerName + "[\\PIPE\\samr]", tc) ) {
                 SamrPolicyHandle policyHandle = new SamrPolicyHandle(handle, authorityServerName, 0x00000030);
-                SamrDomainHandle domainHandle = new SamrDomainHandle(handle, policyHandle, 0x00000200, domsid);
+                SamrDomainHandle domainHandle = new SamrDomainHandle(handle, policyHandle, 0x00000200, domsid.unwrap(sid_t.class));
                 try {
                     aliasHandle = new SamrAliasHandle(handle, domainHandle, 0x0002000c, rid);
                     rpc = new MsrpcGetMembersInAlias(aliasHandle, sidarray);
@@ -265,8 +272,8 @@ public class SIDCacheImpl implements SidResolver {
      * @see jcifs.SidResolver#getLocalGroupsMap(jcifs.CIFSContext, java.lang.String, int)
      */
     @Override
-    public Map<SID, List<SID>> getLocalGroupsMap ( CIFSContext tc, String authorityServerName, int flags ) throws CIFSException {
-        SID domSid = tc.getSIDResolver().getServerSid(tc, authorityServerName);
+    public Map<jcifs.SID, List<jcifs.SID>> getLocalGroupsMap ( CIFSContext tc, String authorityServerName, int flags ) throws CIFSException {
+        SID domSid = getServerSid(tc, authorityServerName);
         synchronized ( this.sidCache ) {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + authorityServerName + "[\\PIPE\\samr]", tc) ) {
                 samr.SamrSamArray sam = new samr.SamrSamArray();
@@ -277,19 +284,19 @@ public class SIDCacheImpl implements SidResolver {
                 if ( rpc.retval != 0 )
                     throw new SmbException(rpc.retval, false);
 
-                Map<SID, List<SID>> map = new HashMap<>();
+                Map<jcifs.SID, List<jcifs.SID>> map = new HashMap<>();
 
                 for ( int ei = 0; ei < rpc.sam.count; ei++ ) {
                     samr.SamrSamEntry entry = rpc.sam.entries[ ei ];
 
                     SID[] mems = getGroupMemberSids(tc, authorityServerName, domSid, entry.idx, flags);
                     SID groupSid = new SID(domSid, entry.idx);
-                    groupSid.type = SID.SID_TYPE_ALIAS;
+                    groupSid.type = jcifs.SID.SID_TYPE_ALIAS;
                     groupSid.domainName = domSid.getDomainName();
                     groupSid.acctName = ( new UnicodeString(entry.name, false) ).toString();
 
                     for ( int mi = 0; mi < mems.length; mi++ ) {
-                        List<SID> groups = map.get(mems[ mi ]);
+                        List<jcifs.SID> groups = map.get(mems[ mi ]);
                         if ( groups == null ) {
                             groups = new ArrayList<>();
                             map.put(mems[ mi ], groups);

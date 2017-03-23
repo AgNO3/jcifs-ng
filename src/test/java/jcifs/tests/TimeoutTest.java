@@ -38,13 +38,15 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
+import jcifs.SmbResource;
 import jcifs.config.DelegatingConfiguration;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
-import jcifs.smb.SmbSession;
-import jcifs.smb.SmbTransport;
+import jcifs.smb.SmbSessionInternal;
+import jcifs.smb.SmbTransportInternal;
 import jcifs.smb.SmbTransportPoolImpl;
-import jcifs.smb.SmbTreeHandle;
+import jcifs.smb.SmbTreeHandleInternal;
 import jcifs.util.transport.ConnectionTimeoutException;
 
 
@@ -153,11 +155,10 @@ public class TimeoutTest extends BaseCIFSTest {
             int soTimeout = ctx.getConfig().getSoTimeout();
             f.createNewFile();
             try {
-                SmbTransport t;
-                try ( SmbTreeHandle th = f.getTreeHandle();
-                      SmbSession session = th.getSession();
-                      SmbTransport trans = session.getTransport() ) {
-
+                SmbTransportInternal t;
+                try ( SmbTreeHandleInternal th = (SmbTreeHandleInternal) f.getTreeHandle();
+                      SmbSessionInternal session = th.getSession().unwrap(SmbSessionInternal.class);
+                      SmbTransportInternal trans = session.getTransport().unwrap(SmbTransportInternal.class) ) {
                     t = trans;
                 }
                 f.close();
@@ -185,7 +186,7 @@ public class TimeoutTest extends BaseCIFSTest {
 
             long start = System.currentTimeMillis();
             CIFSContext ctx = lowConnectTimeout(getContext());
-            try ( SmbFile f = new SmbFile(
+            try ( SmbResource f = new SmbFile(
                 new URL("smb", addr.getHostAddress(), port, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()),
                 ctx) ) {
                 runConnectTimeoutTest(threadsBefore, start, ctx, f);
@@ -200,7 +201,7 @@ public class TimeoutTest extends BaseCIFSTest {
         long start = System.currentTimeMillis();
         CIFSContext ctx = lowConnectTimeout(getContext());
 
-        try ( SmbFile f = new SmbFile(new URL("smb", "10.255.255.1", 139, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()), ctx) ) {
+        try ( SmbResource f = new SmbFile(new URL("smb", "10.255.255.1", 139, "/" + getTestShare() + "/connect.test", ctx.getUrlHandler()), ctx) ) {
             runConnectTimeoutTest(threadsBefore, start, ctx, f);
         }
     }
@@ -214,7 +215,8 @@ public class TimeoutTest extends BaseCIFSTest {
      * @throws ConnectionTimeoutException
      * @throws SmbException
      */
-    void runConnectTimeoutTest ( Set<Thread> threadsBefore, long start, CIFSContext ctx, SmbFile f ) throws ConnectionTimeoutException, SmbException {
+    void runConnectTimeoutTest ( Set<Thread> threadsBefore, long start, CIFSContext ctx, SmbResource f )
+            throws ConnectionTimeoutException, CIFSException {
         try {
             f.createNewFile();
             assertTrue("Did not see error", false);

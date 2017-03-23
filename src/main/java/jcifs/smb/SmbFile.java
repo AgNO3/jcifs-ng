@@ -32,9 +32,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.Configuration;
-import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbFileHandle;
+import jcifs.SmbResource;
+import jcifs.SmbResourceLocator;
+import jcifs.SmbTreeHandle;
+import jcifs.SmbWatchHandle;
 import jcifs.context.SingletonContext;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
@@ -360,131 +365,14 @@ import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
  * @see java.io.File
  */
 
-public class SmbFile extends URLConnection implements SmbConstants, AutoCloseable {
+public class SmbFile extends URLConnection implements SmbResource, SmbConstants {
 
-    static final int O_RDONLY = 0x01;
-    static final int O_WRONLY = 0x02;
-    static final int O_RDWR = 0x03;
-    static final int O_APPEND = 0x04;
+    protected static final int ATTR_GET_MASK = 0x7FFF;
+    protected static final int ATTR_SET_MASK = 0x30A7;
+    protected static final int DEFAULT_ATTR_EXPIRATION_PERIOD = 5000;
 
-    // Open Function Encoding
-    // create if the file does not exist
-    static final int O_CREAT = 0x0010;
-    // fail if the file exists
-    static final int O_EXCL = 0x0020;
-    // truncate if the file exists
-    static final int O_TRUNC = 0x0040;
-
-    // share access
-    /**
-     * When specified as the <tt>shareAccess</tt> constructor parameter,
-     * other SMB clients (including other threads making calls into jCIFS)
-     * will not be permitted to access the target file and will receive "The
-     * file is being accessed by another process" message.
-     */
-    public static final int FILE_NO_SHARE = 0x00;
-    /**
-     * When specified as the <tt>shareAccess</tt> constructor parameter,
-     * other SMB clients will be permitted to read from the target file while
-     * this file is open. This constant may be logically OR'd with other share
-     * access flags.
-     */
-    public static final int FILE_SHARE_READ = 0x01;
-    /**
-     * When specified as the <tt>shareAccess</tt> constructor parameter,
-     * other SMB clients will be permitted to write to the target file while
-     * this file is open. This constant may be logically OR'd with other share
-     * access flags.
-     */
-    public static final int FILE_SHARE_WRITE = 0x02;
-    /**
-     * When specified as the <tt>shareAccess</tt> constructor parameter,
-     * other SMB clients will be permitted to delete the target file while
-     * this file is open. This constant may be logically OR'd with other share
-     * access flags.
-     */
-    public static final int FILE_SHARE_DELETE = 0x04;
-
-    // file attribute encoding
-    /**
-     * A file with this bit on as returned by <tt>getAttributes()</tt> or set
-     * with <tt>setAttributes()</tt> will be read-only
-     */
-    public static final int ATTR_READONLY = 0x01;
-    /**
-     * A file with this bit on as returned by <tt>getAttributes()</tt> or set
-     * with <tt>setAttributes()</tt> will be hidden
-     */
-    public static final int ATTR_HIDDEN = 0x02;
-    /**
-     * A file with this bit on as returned by <tt>getAttributes()</tt> or set
-     * with <tt>setAttributes()</tt> will be a system file
-     */
-    public static final int ATTR_SYSTEM = 0x04;
-    /**
-     * A file with this bit on as returned by <tt>getAttributes()</tt> is
-     * a volume
-     */
-    public static final int ATTR_VOLUME = 0x08;
-    /**
-     * A file with this bit on as returned by <tt>getAttributes()</tt> is
-     * a directory
-     */
-    public static final int ATTR_DIRECTORY = 0x10;
-    /**
-     * A file with this bit on as returned by <tt>getAttributes()</tt> or set
-     * with <tt>setAttributes()</tt> is an archived file
-     */
-    public static final int ATTR_ARCHIVE = 0x20;
-
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a regular file or directory.
-     */
-    public static final int TYPE_FILESYSTEM = 0x01;
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a workgroup.
-     */
-    public static final int TYPE_WORKGROUP = 0x02;
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a server.
-     */
-    public static final int TYPE_SERVER = 0x04;
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a share.
-     */
-    public static final int TYPE_SHARE = 0x08;
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a named pipe.
-     */
-    public static final int TYPE_NAMED_PIPE = 0x10;
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a printer.
-     */
-    public static final int TYPE_PRINTER = 0x20;
-    /**
-     * Returned by {@link #getType()} if the resource this <tt>SmbFile</tt>
-     * represents is a communications device.
-     */
-    public static final int TYPE_COMM = 0x40;
-
-    // extended file attribute encoding(others same as above)
-    static final int ATTR_COMPRESSED = 0x800;
-    static final int ATTR_NORMAL = 0x080;
-    static final int ATTR_TEMPORARY = 0x100;
-
-    static final int ATTR_GET_MASK = 0x7FFF; /* orig 0x7fff */
-    static final int ATTR_SET_MASK = 0x30A7; /* orig 0x0027 */
-
-    static final int DEFAULT_ATTR_EXPIRATION_PERIOD = 5000;
-
-    static final int HASH_DOT = ".".hashCode();
-    static final int HASH_DOT_DOT = "..".hashCode();
+    protected static final int HASH_DOT = ".".hashCode();
+    protected static final int HASH_DOT_DOT = "..".hashCode();
 
     private static Logger log = LoggerFactory.getLogger(SmbFile.class);
 
@@ -496,11 +384,10 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     private long size;
     private long sizeExpiration;
     private boolean isExists;
-    private int shareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
 
     private CIFSContext transportContext;
     private SmbTreeConnection treeConnection;
-    protected final SmbFileLocatorImpl fileLocator;
+    protected final SmbResourceLocatorImpl fileLocator;
     private SmbTreeHandleImpl treeHandle;
 
 
@@ -551,62 +438,10 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      */
     public SmbFile ( SmbFile context, String name ) throws MalformedURLException, UnknownHostException {
         this(
-            context.getFileLocator().isWorkgroup() ? new URL(null, "smb://" + checkName(name), context.transportContext.getUrlHandler())
+            context.isWorkgroup() ? new URL(null, "smb://" + checkName(name), context.transportContext.getUrlHandler())
                     : new URL(context.getURL(), checkName(name), context.transportContext.getUrlHandler()),
             context.getTransportContext());
         setContext(context, name);
-    }
-
-
-    /**
-     * Constructs an SmbFile representing a resource on an SMB network such
-     * as a file or directory. The second parameter is a relative path from
-     * the <code>context</code>. See the description above for examples of
-     * using the second <code>name</code> parameter. The <tt>shareAccess</tt>
-     * parameter controls what permissions other clients have when trying
-     * to access the same file while this instance is still open. This
-     * value is either <tt>FILE_NO_SHARE</tt> or any combination
-     * of <tt>FILE_SHARE_READ</tt>, <tt>FILE_SHARE_WRITE</tt>, and
-     * <tt>FILE_SHARE_DELETE</tt> logically OR'd together.
-     *
-     * @param context
-     *            A base <code>SmbFile</code>
-     * @param name
-     *            A path string relative to the <code>context</code> file path
-     * @param shareAccess
-     *            Specifies what access other clients have while this file is open.
-     * @throws MalformedURLException
-     *             If the <code>context</code> and <code>name</code> parameters
-     *             do not follow the prescribed syntax
-     * @throws UnknownHostException
-     */
-    public SmbFile ( SmbFile context, String name, int shareAccess ) throws MalformedURLException, UnknownHostException {
-        this(
-            context.getFileLocator().isWorkgroup() ? new URL(null, "smb://" + checkName(name), context.getTransportContext().getUrlHandler())
-                    : new URL(context.getURL(), checkName(name), context.getTransportContext().getUrlHandler()),
-            context.transportContext);
-        if ( ( shareAccess & ~ ( FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE ) ) != 0 ) {
-            throw new RuntimeCIFSException("Illegal shareAccess parameter");
-        }
-        this.shareAccess = shareAccess;
-        setContext(context, name);
-    }
-
-
-    /**
-     * @param url
-     * @param tc
-     *            context to use
-     * @param shareAccess
-     *            Specifies what access other clients have while this file is open.
-     * @throws MalformedURLException
-     */
-    public SmbFile ( String url, CIFSContext tc, int shareAccess ) throws MalformedURLException {
-        this(new URL(null, url, tc.getUrlHandler()), tc);
-        if ( ( shareAccess & ~ ( FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE ) ) != 0 ) {
-            throw new RuntimeCIFSException("Illegal shareAccess parameter");
-        }
-        this.shareAccess = shareAccess;
     }
 
 
@@ -633,15 +468,15 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     public SmbFile ( URL url, CIFSContext tc ) {
         super(url);
         this.transportContext = tc;
-        this.fileLocator = new SmbFileLocatorImpl(tc, url);
+        this.fileLocator = new SmbResourceLocatorImpl(tc, url);
         this.treeConnection = new SmbTreeConnection(tc);
     }
 
 
     SmbFile ( SmbFile context, String name, boolean loadedAttributes, int type, int attributes, long createTime, long lastModified, long lastAccess,
-            long size ) throws MalformedURLException, UnknownHostException {
+            long size ) throws MalformedURLException {
         this(
-            context.getFileLocator().isWorkgroup() ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
+            context.isWorkgroup() ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
                     : new URL(context.url, checkName(name) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
             context.getTransportContext());
 
@@ -661,6 +496,20 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
 
         if ( loadedAttributes ) {
             this.attrExpiration = this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+        }
+    }
+
+
+    /**
+     * @return
+     */
+    private boolean isWorkgroup () {
+        try {
+            return this.fileLocator.isWorkgroup();
+        }
+        catch ( CIFSException e ) {
+            log.debug("Failed to check for workgroup", e);
+            return false;
         }
     }
 
@@ -727,7 +576,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      */
     private void setContext ( SmbFile context, String name ) {
         this.fileLocator.resolveInContext(context.fileLocator, name);
-        if ( context.getFileLocator().getShare() != null ) {
+        if ( context.getLocator().getShare() != null ) {
             this.treeConnection = new SmbTreeConnection(context.treeConnection);
         }
     }
@@ -753,25 +602,47 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     /**
      * @return the transportContext
      */
+    @Deprecated
     public CIFSContext getTransportContext () {
+        return this.getContext();
+    }
+
+
+    @Override
+    public CIFSContext getContext () {
         return this.transportContext;
     }
 
 
-    /**
-     * @return the fileLocator
-     */
-    public SmbFileLocator getFileLocator () {
+    @Override
+    public SmbResourceLocator getLocator () {
         return this.fileLocator;
     }
 
 
-    SmbFileHandleImpl openUnshared ( int flags, int access, int attrs, int options ) throws SmbException {
-        return openUnshared(getUncPath(), flags, access, attrs, options);
+    @Override
+    public SmbResource resolve ( String name ) throws CIFSException {
+        try {
+            if ( name == null || name.length() == 0 ) {
+                throw new SmbException("Name must not be empty");
+            }
+            return new SmbFile(this, name);
+        }
+        catch (
+            MalformedURLException |
+            UnknownHostException e ) {
+            // this should not actually happen
+            throw new SmbException("Failed to resolve child element", e);
+        }
     }
 
 
-    SmbFileHandleImpl openUnshared ( String uncPath, int flags, int access, int attrs, int options ) throws SmbException {
+    SmbFileHandleImpl openUnshared ( int flags, int access, int sharing, int attrs, int options ) throws CIFSException {
+        return openUnshared(getUncPath(), flags, access, sharing, attrs, options);
+    }
+
+
+    SmbFileHandleImpl openUnshared ( String uncPath, int flags, int access, int sharing, int attrs, int options ) throws CIFSException {
         SmbFileHandleImpl fh = null;
         try ( SmbTreeHandleImpl h = ensureTreeConnected() ) {
 
@@ -785,7 +656,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             Configuration config = h.getConfig();
             if ( h.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                 SmbComNTCreateAndXResponse response = new SmbComNTCreateAndXResponse(config);
-                SmbComNTCreateAndX request = new SmbComNTCreateAndX(config, uncPath, flags, access, this.shareAccess, attrs, options, null);
+                SmbComNTCreateAndX request = new SmbComNTCreateAndX(config, uncPath, flags, access, sharing, attrs, options, null);
                 customizeCreate(request, response);
 
                 h.send(request, response);
@@ -802,7 +673,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             }
             else {
                 SmbComOpenAndXResponse response = new SmbComOpenAndXResponse(config);
-                h.send(new SmbComOpenAndX(config, uncPath, access, this.shareAccess, flags, null), response);
+                h.send(new SmbComOpenAndX(config, uncPath, access, sharing, flags, null), response);
                 this.fileLocator.updateType(response.fileType);
                 this.lastModified = response.lastWriteTime + h.getServerTimeZoneOffset();
                 this.size = response.dataSize;
@@ -831,21 +702,12 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     protected void customizeCreate ( SmbComNTCreateAndX request, SmbComNTCreateAndXResponse response ) {}
 
 
-    Info queryPath ( String path, int infoLevel ) throws SmbException {
+    Info queryPath ( String path, int infoLevel ) throws CIFSException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
 
             if ( log.isDebugEnabled() ) {
                 log.debug("queryPath: " + path);
             }
-
-            /*
-             * normally we'd check the negotiatedCapabilities for CAP_NT_SMBS
-             * however I can't seem to get a good last modified time from
-             * SMB_COM_QUERY_INFORMATION so if NT_SMBs are requested
-             * by the server than in this case that's what it will get
-             * regardless of what jcifs.smb.client.useNTSmbs is set
-             * to(overrides negotiatedCapabilities).
-             */
 
             /*
              * We really should do the referral before this in case
@@ -881,20 +743,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Tests to see if the SMB resource exists. If the resource refers
-     * only to a server, this method determines if the server exists on the
-     * network and is advertising SMB services. If this resource refers to
-     * a workgroup, this method determines if the workgroup name is valid on
-     * the local SMB network. If this <code>SmbFile</code> refers to the root
-     * <code>smb://</code> resource <code>true</code> is always returned. If
-     * this <code>SmbFile</code> is a traditional file or directory, it will
-     * be queried for on the specified server as expected.
-     *
-     * @return <code>true</code> if the resource exists or is alive or
-     *         <code>false</code> otherwise
-     * @throws SmbException
-     */
+    @Override
     public boolean exists () throws SmbException {
 
         if ( this.attrExpiration > System.currentTimeMillis() ) {
@@ -952,52 +801,40 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 throw se;
             }
         }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
 
         this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
         return this.isExists;
     }
 
 
-    /**
-     * Returns type of of object this <tt>SmbFile</tt> represents.
-     * 
-     * @return <tt>TYPE_FILESYSTEM, TYPE_WORKGROUP, TYPE_SERVER, TYPE_SHARE,
-     * TYPE_PRINTER, TYPE_NAMED_PIPE</tt>, or <tt>TYPE_COMM</tt>.
-     * @throws SmbException
-     */
+    @Override
     public int getType () throws SmbException {
-        int t = this.fileLocator.getType();
-        if ( t == TYPE_SHARE ) {
-            try ( SmbTreeHandle th = ensureTreeConnected() ) {
-
-                if ( th.getConnectedService().equals("LPT1:") ) {
-                    t = TYPE_PRINTER;
-                    this.fileLocator.updateType(t);
-                }
-                else if ( th.getConnectedService().equals("COMM") ) {
-                    t = TYPE_COMM;
-                    this.fileLocator.updateType(t);
+        try {
+            int t = this.fileLocator.getType();
+            if ( t == TYPE_SHARE ) {
+                try ( SmbTreeHandle th = ensureTreeConnected() ) {
+                    if ( th.getConnectedService().equals("LPT1:") ) {
+                        t = TYPE_PRINTER;
+                        this.fileLocator.updateType(t);
+                    }
+                    else if ( th.getConnectedService().equals("COMM") ) {
+                        t = TYPE_COMM;
+                        this.fileLocator.updateType(t);
+                    }
                 }
             }
+            return t;
         }
-        return t;
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Returns the last component of the target URL. This will
-     * effectively be the name of the file or directory represented by this
-     * <code>SmbFile</code> or in the case of URLs that only specify a server
-     * or workgroup, the server or workgroup will be returned. The name of
-     * the root URL <code>smb://</code> is also <code>smb://</code>. If this
-     * <tt>SmbFile</tt> refers to a workgroup, server, share, or directory,
-     * the name will include a trailing slash '/' so that composing new
-     * <tt>SmbFile</tt>s will maintain the trailing slash requirement.
-     *
-     * @return The last component of the URL associated with this SMB
-     *         resource or <code>smb://</code> if the resource is <code>smb://</code>
-     *         itself.
-     */
+    @Override
     public String getName () {
         return this.fileLocator.getName();
     }
@@ -1049,11 +886,16 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      * @throws SmbException
      */
     public String getDfsPath () throws SmbException {
-        String path = this.treeConnection.ensureDFSResolved(this.fileLocator).getDfsPath();
-        if ( isDirectory() ) {
-            path += '/';
+        try {
+            String path = this.treeConnection.ensureDFSResolved(this.fileLocator).getDfsPath();
+            if ( isDirectory() ) {
+                path += '/';
+            }
+            return path;
         }
-        return path;
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
@@ -1108,17 +950,8 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Creates a directory watcher
-     * 
-     * @param filter
-     *            see constants in {@link FileNotifyInformation}
-     * @param recursive
-     *            whether to also watch subdirectories
-     * @return watch context
-     * @throws SmbException
-     */
-    public SmbWatchHandle watch ( int filter, boolean recursive ) throws SmbException {
+    @Override
+    public SmbWatchHandle watch ( int filter, boolean recursive ) throws CIFSException {
 
         if ( filter == 0 ) {
             throw new IllegalArgumentException("filter must not be 0");
@@ -1132,52 +965,30 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                 throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
             }
-            return new SmbWatchHandleImpl(openUnshared(O_RDONLY, READ_CONTROL, 0, 1), filter, recursive);
+            return new SmbWatchHandleImpl(openUnshared(O_RDONLY, READ_CONTROL, DEFAULT_SHARING, 0, 1), filter, recursive);
         }
     }
 
 
-    /**
-     * Tests to see if the file this <code>SmbFile</code> represents can be
-     * read. Because any file, directory, or other resource can be read if it
-     * exists, this method simply calls the <code>exists</code> method.
-     *
-     * @return <code>true</code> if the file is read-only
-     * @throws SmbException
-     */
+    @Override
     public boolean canRead () throws SmbException {
-        if ( this.fileLocator.getType() == TYPE_NAMED_PIPE ) { // try opening the pipe for reading?
+        if ( getType() == TYPE_NAMED_PIPE ) { // try opening the pipe for reading?
             return true;
         }
         return exists(); // try opening and catch sharing violation?
     }
 
 
-    /**
-     * Tests to see if the file this <code>SmbFile</code> represents
-     * exists and is not marked read-only. By default, resources are
-     * considered to be read-only and therefore for <code>smb://</code>,
-     * <code>smb://workgroup/</code>, and <code>smb://server/</code> resources
-     * will be read-only.
-     *
-     * @return <code>true</code> if the resource exists is not marked
-     *         read-only
-     * @throws SmbException
-     */
+    @Override
     public boolean canWrite () throws SmbException {
-        if ( this.fileLocator.getType() == TYPE_NAMED_PIPE ) { // try opening the pipe for writing?
+        if ( getType() == TYPE_NAMED_PIPE ) { // try opening the pipe for writing?
             return true;
         }
         return exists() && ( this.attributes & ATTR_READONLY ) == 0;
     }
 
 
-    /**
-     * Tests to see if the file this <code>SmbFile</code> represents is a directory.
-     *
-     * @return <code>true</code> if this <code>SmbFile</code> is a directory
-     * @throws SmbException
-     */
+    @Override
     public boolean isDirectory () throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             return true;
@@ -1188,12 +999,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Tests to see if the file this <code>SmbFile</code> represents is not a directory.
-     *
-     * @return <code>true</code> if this <code>SmbFile</code> is not a directory
-     * @throws SmbException
-     */
+    @Override
     public boolean isFile () throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             return false;
@@ -1203,14 +1009,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Tests to see if the file this SmbFile represents is marked as
-     * hidden. This method will also return true for shares with names that
-     * end with '$' such as <code>IPC$</code> or <code>C$</code>.
-     *
-     * @return <code>true</code> if the <code>SmbFile</code> is marked as being hidden
-     * @throws SmbException
-     */
+    @Override
     public boolean isHidden () throws SmbException {
         if ( this.fileLocator.getShare() == null ) {
             return false;
@@ -1226,19 +1025,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Retrieve the time this <code>SmbFile</code> was created. The value
-     * returned is suitable for constructing a {@link java.util.Date} object
-     * (i.e. seconds since Epoch 1970). Times should be the same as those
-     * reported using the properties dialog of the Windows Explorer program.
-     *
-     * For Win95/98/Me this is actually the last write time. It is currently
-     * not possible to retrieve the create time from files on these systems.
-     *
-     * @return The number of milliseconds since the 00:00:00 GMT, January 1,
-     *         1970 as a <code>long</code> value
-     * @throws SmbException
-     */
+    @Override
     public long createTime () throws SmbException {
         if ( !this.fileLocator.isRoot() ) {
             exists();
@@ -1248,17 +1035,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Retrieve the last time the file represented by this
-     * <code>SmbFile</code> was modified. The value returned is suitable for
-     * constructing a {@link java.util.Date} object (i.e. seconds since Epoch
-     * 1970). Times should be the same as those reported using the properties
-     * dialog of the Windows Explorer program.
-     *
-     * @return The number of milliseconds since the 00:00:00 GMT, January 1,
-     *         1970 as a <code>long</code> value
-     * @throws SmbException
-     */
+    @Override
     public long lastModified () throws SmbException {
         if ( !this.fileLocator.isRoot() ) {
             exists();
@@ -1268,13 +1045,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Retrieve the last acces time of the file represented by this <code>SmbFile</code>
-     * 
-     * @return The number of milliseconds since the 00:00:00 GMT, January 1,
-     *         1970 as a <code>long</code> value
-     * @throws SmbException
-     */
+    @Override
     public long lastAccess () throws SmbException {
         if ( !this.fileLocator.isRoot() ) {
             exists();
@@ -1329,148 +1100,64 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * List the contents of this SMB resource as an array of
-     * <code>SmbFile</code> objects. This method is much more efficient than
-     * the regular <code>list</code> method when querying attributes of each
-     * file in the result set.
-     * <p>
-     * The list of <code>SmbFile</code>s returned by this method will be;
-     *
-     * <ul>
-     * <li>files and directories contained within this resource if the
-     * resource is a normal disk file directory,
-     * <li>all available NetBIOS workgroups or domains if this resource is
-     * the top level URL <code>smb://</code>,
-     * <li>all servers registered as members of a NetBIOS workgroup if this
-     * resource refers to a workgroup in a <code>smb://workgroup/</code> URL,
-     * <li>all browseable shares of a server including printers, IPC
-     * services, or disk volumes if this resource is a server URL in the form
-     * <code>smb://server/</code>,
-     * <li>or <code>null</code> if the resource cannot be resolved.
-     * </ul>
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
-     * @return An array of <code>SmbFile</code> objects representing file
-     *         and directories, workgroups, servers, or shares depending on the context
-     *         of the resource URL
-     * @throws SmbException
-     */
+    @Override
     public SmbFile[] listFiles () throws SmbException {
         return listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
-    /**
-     * The CIFS protocol provides for DOS "wildcards" to be used as
-     * a performance enhancement. The client does not have to filter
-     * the names and the server does not have to return all directory
-     * entries.
-     * <p>
-     * The wildcard expression may consist of two special meta
-     * characters in addition to the normal filename characters. The '*'
-     * character matches any number of characters in part of a name. If
-     * the expression begins with one or more '?'s then exactly that
-     * many characters will be matched whereas if it ends with '?'s
-     * it will match that many characters <i>or less</i>.
-     * <p>
-     * Wildcard expressions will not filter workgroup names or server names.
-     *
-     * <blockquote>
-     * 
-     * <pre>
-     * winnt&gt; ls c?o*
-     * clock.avi                  -rw--      82944 Mon Oct 14 1996 1:38 AM
-     * Cookies                    drw--          0 Fri Nov 13 1998 9:42 PM
-     * 2 items in 5ms
-     * </pre>
-     * 
-     * </blockquote>
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
-     * @param wildcard
-     *            a wildcard expression
-     * @throws SmbException
-     * @return An array of <code>SmbFile</code> objects representing file
-     *         and directories, workgroups, servers, or shares depending on the context
-     *         of the resource URL
-     */
-
+    @Override
     public SmbFile[] listFiles ( String wildcard ) throws SmbException {
         return listFiles(wildcard, ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
-    /**
-     * List the contents of this SMB resource. The list returned will be
-     * identical to the list returned by the parameterless <code>listFiles()</code>
-     * method minus files filtered by the specified filename filter.
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
-     * @param filter
-     *            a filter to exclude files from the results
-     * @return An array of <tt>SmbFile</tt> objects
-     * @throws SmbException
-     */
+    @Override
     public SmbFile[] listFiles ( SmbFilenameFilter filter ) throws SmbException {
         return listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, filter, null);
     }
 
 
-    /**
-     * List the contents of this SMB resource. The list returned will be
-     * identical to the list returned by the parameterless <code>listFiles()</code>
-     * method minus filenames filtered by the specified filter.
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
-     * @param filter
-     *            a file filter to exclude files from the results
-     * @return An array of <tt>SmbFile</tt> objects
-     * @throws SmbException
-     */
+    @Override
     public SmbFile[] listFiles ( SmbFileFilter filter ) throws SmbException {
         return listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, filter);
     }
 
 
     String[] list ( String wildcard, int searchAttributes, SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException {
-        List<Object> list = SmbEnumerationUtil.doEnum(this, false, wildcard, searchAttributes, fnf, ff);;
-        return list.toArray(new String[list.size()]);
+        try {
+            List<Object> list = SmbEnumerationUtil.doEnum(this, false, wildcard, searchAttributes, fnf, ff);;
+            return list.toArray(new String[list.size()]);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
     SmbFile[] listFiles ( String wildcard, int searchAttributes, SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException {
-        List<Object> list = SmbEnumerationUtil.doEnum(this, true, wildcard, searchAttributes, fnf, ff);
-        return list.toArray(new SmbFile[list.size()]);
+        try {
+            List<Object> list = SmbEnumerationUtil.doEnum(this, true, wildcard, searchAttributes, fnf, ff);
+            return list.toArray(new SmbFile[list.size()]);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Changes the name of the file this <code>SmbFile</code> represents to the name
-     * designated by the <code>SmbFile</code> argument.
-     * <br>
-     * <i>Remember: <code>SmbFile</code>s are immutible and therefore
-     * the path associated with this <code>SmbFile</code> object will not
-     * change). To access the renamed file it is necessary to construct a
-     * new <tt>SmbFile</tt></i>.
-     *
-     * @param dest
-     *            An <code>SmbFile</code> that represents the new pathname
-     * @throws SmbException
-     * @throws NullPointerException
-     *             If the <code>dest</code> argument is <code>null</code>
-     */
-    public void renameTo ( SmbFile dest ) throws SmbException {
+    @Override
+    public void renameTo ( SmbResource d ) throws SmbException {
+        if ( ! ( d instanceof SmbFile ) ) {
+            throw new SmbException("Invalid target resource");
+        }
+        SmbFile dest = (SmbFile) d;
         try ( SmbTreeHandleImpl sh = ensureTreeConnected();
               SmbTreeHandleImpl th = dest.ensureTreeConnected() ) {
             sh.ensureDFSResolved();
             th.ensureDFSResolved();
 
-            if ( this.fileLocator.isRoot() || dest.getFileLocator().isRoot() ) {
+            if ( this.fileLocator.isRoot() || dest.getLocator().isRoot() ) {
                 throw new SmbException("Invalid operation for workgroups, servers, or shares");
             }
 
@@ -1495,10 +1182,13 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
              */
             sh.send(new SmbComRename(sh.getConfig(), getUncPath(), dest.getUncPath()), new SmbComBlankResponse(sh.getConfig()));
         }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    void copyRecursive ( SmbFile dest, byte[][] b, int bsize, WriterThread w, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh ) throws SmbException {
+    void copyRecursive ( SmbFile dest, byte[][] b, int bsize, WriterThread w, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh ) throws CIFSException {
         if ( this.attrExpiration < System.currentTimeMillis() ) {
             this.attributes = ATTR_READONLY | ATTR_DIRECTORY;
             this.createTime = 0L;
@@ -1527,25 +1217,12 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * This method will copy the file or directory represented by this
-     * <tt>SmbFile</tt> and it's sub-contents to the location specified by the
-     * <tt>dest</tt> parameter. This file and the destination file do not
-     * need to be on the same host. This operation does not copy extended
-     * file attibutes such as ACLs but it does copy regular attributes as
-     * well as create and last write times. This method is almost twice as
-     * efficient as manually copying as it employs an additional write
-     * thread to read and write data concurrently.
-     * <br>
-     * It is not possible (nor meaningful) to copy entire workgroups or
-     * servers.
-     *
-     * @param dest
-     *            the destination file or directory
-     * @throws SmbException
-     */
-    public void copyTo ( SmbFile dest ) throws SmbException {
-
+    @Override
+    public void copyTo ( SmbResource d ) throws SmbException {
+        if ( ! ( d instanceof SmbFile ) ) {
+            throw new SmbException("Invalid target resource");
+        }
+        SmbFile dest = (SmbFile) d;
         try ( SmbTreeHandleImpl sh = ensureTreeConnected();
               SmbTreeHandleImpl dh = dest.ensureTreeConnected() ) {
 
@@ -1555,7 +1232,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             /*
              * Should be able to copy an entire share actually
              */
-            if ( this.fileLocator.getShare() == null || dest.getFileLocator().getShare() == null ) {
+            if ( this.fileLocator.getShare() == null || dest.getLocator().getShare() == null ) {
                 throw new SmbException("Invalid operation for workgroups or servers");
             }
 
@@ -1578,13 +1255,8 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
              * It is invalid for the source path to be a child of the destination
              * path or visa versa.
              */
-            try {
-                if ( this.fileLocator.overlaps(dest.getFileLocator()) ) {
-                    throw new SmbException("Source and destination paths overlap.");
-                }
-            }
-            catch ( UnknownHostException uhe ) {
-                log.debug("Unknown host", uhe);
+            if ( this.fileLocator.overlaps(dest.getLocator()) ) {
+                throw new SmbException("Source and destination paths overlap.");
             }
 
             WriterThread w = new WriterThread();
@@ -1608,23 +1280,21 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 }
             }
         }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * This method will delete the file or directory specified by this
-     * <code>SmbFile</code>. If the target is a directory, the contents of
-     * the directory will be deleted as well. If a file within the directory or
-     * it's sub-directories is marked read-only, the read-only status will
-     * be removed and the file will be deleted.
-     * 
-     * If the file has been opened before, it will be closed.
-     *
-     * @throws SmbException
-     */
+    @Override
     public void delete () throws SmbException {
         exists();
-        delete(this.fileLocator.getUNCPath());
+        try {
+            delete(this.fileLocator.getUNCPath());
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
         close();
     }
 
@@ -1642,7 +1312,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    void delete ( String fileName ) throws SmbException {
+    void delete ( String fileName ) throws CIFSException {
         if ( this.fileLocator.isRoot() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
@@ -1684,9 +1354,14 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                  */
 
                 try {
-                    SmbFile[] l = listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
+                    SmbResource[] l = listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
                     for ( int i = 0; i < l.length; i++ ) {
-                        l[ i ].delete();
+                        try {
+                            l[ i ].delete();
+                        }
+                        catch ( CIFSException e ) {
+                            throw SmbException.wrap(e);
+                        }
                     }
                 }
                 catch ( SmbException se ) {
@@ -1710,81 +1385,74 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Returns the length of this <tt>SmbFile</tt> in bytes. If this object
-     * is a <tt>TYPE_SHARE</tt> the total capacity of the disk shared in
-     * bytes is returned. If this object is a directory or a type other than
-     * <tt>TYPE_SHARE</tt>, 0L is returned.
-     *
-     * @return The length of the file in bytes or 0 if this
-     *         <code>SmbFile</code> is not a file.
-     * @throws SmbException
-     */
-
+    @Override
     public long length () throws SmbException {
         if ( this.sizeExpiration > System.currentTimeMillis() ) {
             return this.size;
         }
 
-        if ( this.fileLocator.getType() == TYPE_SHARE ) {
-            try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
-                int level = Trans2QueryFSInformationResponse.SMB_INFO_ALLOCATION;
-                Trans2QueryFSInformationResponse response = new Trans2QueryFSInformationResponse(th.getConfig(), level);
-                th.send(new Trans2QueryFSInformation(th.getConfig(), level), response);
+        try {
+            int t = getType();
+            if ( t == TYPE_SHARE ) {
+                try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
+                    int level = Trans2QueryFSInformationResponse.SMB_INFO_ALLOCATION;
+                    Trans2QueryFSInformationResponse response = new Trans2QueryFSInformationResponse(th.getConfig(), level);
+                    th.send(new Trans2QueryFSInformation(th.getConfig(), level), response);
 
-                this.size = response.info.getCapacity();
+                    this.size = response.info.getCapacity();
+                }
             }
+            else if ( !this.fileLocator.isRoot() && t != TYPE_NAMED_PIPE ) {
+                Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_STANDARD_INFO);
+                this.size = info.getSize();
+            }
+            else {
+                this.size = 0L;
+            }
+            this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+            return this.size;
         }
-        else if ( !this.fileLocator.isRoot() && this.fileLocator.getType() != TYPE_NAMED_PIPE ) {
-            Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_STANDARD_INFO);
-            this.size = info.getSize();
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
-        else {
-            this.size = 0L;
-        }
-        this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
-        return this.size;
     }
 
 
-    /**
-     * This method returns the free disk space in bytes of the drive this share
-     * represents or the drive on which the directory or file resides. Objects
-     * other than <tt>TYPE_SHARE</tt> or <tt>TYPE_FILESYSTEM</tt> will result
-     * in 0L being returned.
-     *
-     * @return the free disk space in bytes of the drive on which this file or
-     *         directory resides
-     * @throws SmbException
-     */
+    @Override
     public long getDiskFreeSpace () throws SmbException {
-        if ( this.fileLocator.getType() == TYPE_SHARE || this.fileLocator.getType() == TYPE_FILESYSTEM ) {
-            int level = Trans2QueryFSInformationResponse.SMB_FS_FULL_SIZE_INFORMATION;
-            try {
-                return queryFSInformation(level);
-            }
-            catch ( SmbException ex ) {
-                log.debug("getDiskFreeSpace", ex);
-                switch ( ex.getNtStatus() ) {
-                case NtStatus.NT_STATUS_INVALID_INFO_CLASS:
-                case NtStatus.NT_STATUS_UNSUCCESSFUL: // NetApp Filer
-                    // SMB_FS_FULL_SIZE_INFORMATION not supported by the server.
-                    level = Trans2QueryFSInformationResponse.SMB_INFO_ALLOCATION;
+        try {
+            int t = getType();
+            if ( t == TYPE_SHARE || t == TYPE_FILESYSTEM ) {
+                int level = Trans2QueryFSInformationResponse.SMB_FS_FULL_SIZE_INFORMATION;
+                try {
                     return queryFSInformation(level);
                 }
-                throw ex;
+                catch ( SmbException ex ) {
+                    log.debug("getDiskFreeSpace", ex);
+                    switch ( ex.getNtStatus() ) {
+                    case NtStatus.NT_STATUS_INVALID_INFO_CLASS:
+                    case NtStatus.NT_STATUS_UNSUCCESSFUL: // NetApp Filer
+                        // SMB_FS_FULL_SIZE_INFORMATION not supported by the server.
+                        level = Trans2QueryFSInformationResponse.SMB_INFO_ALLOCATION;
+                        return queryFSInformation(level);
+                    }
+                    throw ex;
+                }
             }
+            return 0L;
         }
-        return 0L;
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    private long queryFSInformation ( int level ) throws SmbException {
+    private long queryFSInformation ( int level ) throws CIFSException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
             Trans2QueryFSInformationResponse response = new Trans2QueryFSInformationResponse(th.getConfig(), level);
             th.send(new Trans2QueryFSInformation(th.getConfig(), level), response);
 
-            if ( this.fileLocator.getType() == TYPE_SHARE ) {
+            if ( getType() == TYPE_SHARE ) {
                 this.size = response.info.getCapacity();
                 this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
             }
@@ -1794,17 +1462,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Creates a directory with the path specified by this
-     * <code>SmbFile</code>. For this method to be successful, the target
-     * must not already exist. This method will fail when
-     * used with <code>smb://</code>, <code>smb://workgroup/</code>,
-     * <code>smb://server/</code>, or <code>smb://server/share/</code> URLs
-     * because workgroups, servers, and shares cannot be dynamically created
-     * (although in the future it may be possible to create shares).
-     *
-     * @throws SmbException
-     */
+    @Override
     public void mkdir () throws SmbException {
         String path = this.fileLocator.getUNCPath();
 
@@ -1830,19 +1488,13 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             th.send(new SmbComCreateDirectory(th.getConfig(), path), new SmbComBlankResponse(th.getConfig()));
             this.attrExpiration = this.sizeExpiration = 0;
         }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Creates a directory with the path specified by this <tt>SmbFile</tt>
-     * and any parent directories that do not exist. This method will fail
-     * when used with <code>smb://</code>, <code>smb://workgroup/</code>,
-     * <code>smb://server/</code>, or <code>smb://server/share/</code> URLs
-     * because workgroups, servers, and shares cannot be dynamically created
-     * (although in the future it may be possible to create shares).
-     *
-     * @throws SmbException
-     */
+    @Override
     public void mkdirs () throws SmbException {
         String p = this.fileLocator.getParent();
         try ( SmbTreeHandle th = ensureTreeConnected();
@@ -1873,32 +1525,32 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 }
             }
         }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
         catch ( MalformedURLException e ) {
             throw new SmbException("Invalid URL in mkdirs", e);
         }
     }
 
 
-    /**
-     * Create a new file but fail if it already exists. The check for
-     * existance of the file and it's creation are an atomic operation with
-     * respect to other filesystem activities.
-     * 
-     * @throws SmbException
-     */
+    @Override
     public void createNewFile () throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
-        try ( SmbFileHandle fd = openUnshared(O_RDWR | O_CREAT | O_EXCL, 0, ATTR_NORMAL, 0) ) {
+        try ( SmbFileHandle fd = openUnshared(O_RDWR | O_CREAT | O_EXCL, FILE_NO_SHARE, 0, ATTR_NORMAL, 0) ) {
             // close explicitly
             fd.close(0L);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 
 
-    void setPathInformation ( int attrs, long ctime, long mtime, long atime ) throws SmbException {
+    void setPathInformation ( int attrs, long ctime, long mtime, long atime ) throws CIFSException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
             exists();
             if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
@@ -1911,7 +1563,12 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             }
             else {
                 int dir = this.attributes & ATTR_DIRECTORY;
-                try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, FILE_WRITE_ATTRIBUTES, dir, dir != 0 ? 0x0001 : 0x0040) ) {
+                try ( SmbFileHandleImpl f = openUnshared(
+                    O_RDONLY,
+                    FILE_WRITE_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    dir,
+                    dir != 0 ? 0x0001 : 0x0040) ) {
                     th.send(
                         new Trans2SetFileInformation(th.getConfig(), f.getFid(), attrs | dir, ctime, mtime, atime),
                         new Trans2SetFileInformationResponse(th.getConfig()),
@@ -1923,79 +1580,52 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Set the create time of the file. The time is specified as milliseconds
-     * from Jan 1, 1970 which is the same as that which is returned by the
-     * <tt>createTime()</tt> method.
-     * <br>
-     * This method does not apply to workgroups, servers, or shares.
-     *
-     * @param time
-     *            the create time as milliseconds since Jan 1, 1970
-     * @throws SmbException
-     * @throws SmbUnsupportedOperationException
-     *             if CAP_NT_SMBS is unavailable
-     */
+    @Override
     public void setCreateTime ( long time ) throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
-        setPathInformation(0, time, 0L, 0L);
+        try {
+            setPathInformation(0, time, 0L, 0L);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Set the last modified time of the file. The time is specified as milliseconds
-     * from Jan 1, 1970 which is the same as that which is returned by the
-     * <tt>lastModified()</tt>, <tt>getLastModified()</tt>, and <tt>getDate()</tt> methods.
-     * <br>
-     * This method does not apply to workgroups, servers, or shares.
-     *
-     * @param time
-     *            the last modified time as milliseconds since Jan 1, 1970
-     * @throws SmbException
-     */
+    @Override
     public void setLastModified ( long time ) throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
-        setPathInformation(0, 0L, time, 0L);
+        try {
+            setPathInformation(0, 0L, time, 0L);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Set the last accesss time of the file. The time is specified as milliseconds
-     * from Jan 1, 1970 which is the same as that which is returned by the
-     * <tt>lastModified()</tt>, <tt>getLastModified()</tt>, and <tt>getDate()</tt> methods.
-     * <br>
-     * This method does not apply to workgroups, servers, or shares.
-     *
-     * @param time
-     *            the last access time as milliseconds since Jan 1, 1970
-     * @throws SmbException
-     * @throws SmbUnsupportedOperationException
-     *             if CAP_NT_SMBS is unavailable
-     */
+    @Override
     public void setLastAccess ( long time ) throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
-        setPathInformation(0, 0L, 0L, time);
+        try {
+            setPathInformation(0, 0L, 0L, time);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Return the attributes of this file. Attributes are represented as a
-     * bitset that must be masked with <tt>ATTR_*</tt> constants to determine
-     * if they are set or unset. The value returned is suitable for use with
-     * the <tt>setAttributes()</tt> method.
-     *
-     * @return the <tt>ATTR_*</tt> attributes associated with this file
-     * @throws SmbException
-     */
+    @Override
     public int getAttributes () throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             return 0;
@@ -2005,42 +1635,27 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Set the attributes of this file. Attributes are composed into a
-     * bitset by bitwise ORing the <tt>ATTR_*</tt> constants. Setting the
-     * value returned by <tt>getAttributes</tt> will result in both files
-     * having the same attributes.
-     * 
-     * @param attrs
-     *            attribute flags
-     * 
-     * @throws SmbException
-     */
+    @Override
     public void setAttributes ( int attrs ) throws SmbException {
         if ( this.fileLocator.isRoot() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
-        setPathInformation(attrs & ATTR_SET_MASK, 0L, 0L, 0L);
+        try {
+            setPathInformation(attrs & ATTR_SET_MASK, 0L, 0L, 0L);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
-    /**
-     * Make this file read-only. This is shorthand for <tt>setAttributes(
-     * getAttributes() | ATTR_READ_ONLY )</tt>.
-     *
-     * @throws SmbException
-     */
+    @Override
     public void setReadOnly () throws SmbException {
         setAttributes(getAttributes() | ATTR_READONLY);
     }
 
 
-    /**
-     * Turn off the read-only attribute of this file. This is shorthand for
-     * <tt>setAttributes( getAttributes() &amp; ~ATTR_READONLY )</tt>.
-     *
-     * @throws SmbException
-     */
+    @Override
     public void setReadWrite () throws SmbException {
         setAttributes(getAttributes() & ~ATTR_READONLY);
     }
@@ -2057,7 +1672,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      */
     @Deprecated
     public URL toURL () {
-        return this.getURL();
+        return getURL();
     }
 
 
@@ -2072,7 +1687,6 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
      *
      * @return A hashcode for this abstract file
      */
-
     @Override
     public int hashCode () {
         return this.fileLocator.hashCode();
@@ -2110,12 +1724,12 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     @Override
     public boolean equals ( Object obj ) {
         if ( obj instanceof SmbFile ) {
-            SmbFile f = (SmbFile) obj;
+            SmbResource f = (SmbResource) obj;
 
             if ( this == f )
                 return true;
 
-            return this.fileLocator.equals(f.getFileLocator());
+            return this.fileLocator.equals(f.getLocator());
         }
 
         return false;
@@ -2219,15 +1833,63 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * This URLConnection method just returns a new <tt>SmbFileOutputStream</tt> created with this file.
-     *
-     * @throws IOException
-     *             thrown by <tt>SmbFileOutputStream</tt> constructor
-     */
+    @Override
+    public SmbFileInputStream openInputStream () throws SmbException {
+        return new SmbFileInputStream(this);
+    }
+
+
+    @Override
+    public SmbFileInputStream openInputStream ( int sharing ) throws SmbException {
+        return openInputStream(0, O_RDONLY, sharing);
+    }
+
+
+    @Override
+    public SmbFileInputStream openInputStream ( int flags, int access, int sharing ) throws SmbException {
+        return new SmbFileInputStream(this, flags, access, sharing, false);
+    }
+
+
     @Override
     public OutputStream getOutputStream () throws IOException {
         return new SmbFileOutputStream(this);
+    }
+
+
+    @Override
+    public SmbFileOutputStream openOutputStream () throws SmbException {
+        return new SmbFileOutputStream(this);
+    }
+
+
+    @Override
+    public SmbFileOutputStream openOutputStream ( boolean append ) throws SmbException {
+        return openOutputStream(append, FILE_SHARE_READ);
+    }
+
+
+    @Override
+    public SmbFileOutputStream openOutputStream ( boolean append, int sharing ) throws SmbException {
+        return openOutputStream(append, append ? O_CREAT | O_WRONLY | O_APPEND : O_CREAT | O_WRONLY | O_TRUNC, 0, sharing);
+    }
+
+
+    @Override
+    public SmbFileOutputStream openOutputStream ( boolean append, int openFlags, int access, int sharing ) throws SmbException {
+        return new SmbFileOutputStream(this, append, openFlags, access, sharing);
+    }
+
+
+    @Override
+    public SmbRandomAccessFile openRandomAccess ( String mode ) throws SmbException {
+        return new SmbRandomAccessFile(this, mode);
+    }
+
+
+    @Override
+    public SmbRandomAccessFile openRandomAccess ( String mode, int sharing ) throws SmbException {
+        return new SmbRandomAccessFile(this, mode, sharing, false);
     }
 
 
@@ -2258,28 +1920,19 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Get the file index
-     * 
-     * @return server side file index, 0 if unavailable
-     * @throws SmbException
-     */
+    @Override
     public long fileIndex () throws SmbException {
         return 0;
     }
 
 
-    /**
-     * Return an array of Access Control Entry (ACE) objects representing
-     * the security descriptor associated with this file or directory.
-     * If no DACL is present, null is returned. If the DACL is empty, an array with 0 elements is returned.
-     * 
-     * @param resolveSids
-     *            Attempt to resolve the SIDs within each ACE form
-     *            their numeric representation to their corresponding account names.
-     * @return array of ACEs
-     * @throws IOException
-     */
+    @Override
+    public ACE[] getSecurity () throws IOException {
+        return getSecurity(false);
+    }
+
+
+    @Override
     public ACE[] getSecurity ( boolean resolveSids ) throws IOException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
             if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
@@ -2289,7 +1942,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             ACE[] aces;
 
             NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(th.getConfig());
-            try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, 0, isDirectory() ? 1 : 0) ) {
+            try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, DEFAULT_SHARING, 0, isDirectory() ? 1 : 0) ) {
                 /*
                  * NtTrans Query Security Desc Request / Response
                  */
@@ -2307,25 +1960,13 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
     }
 
 
-    /**
-     * Return the resolved owner user SID for this file or directory
-     * 
-     * @return the owner user SID, <code>null</code> if not present
-     * @throws IOException
-     */
+    @Override
     public SID getOwnerUser () throws IOException {
         return getOwnerUser(true);
     }
 
 
-    /**
-     * Return the owner user SID for this file or directory
-     * 
-     * @param resolve
-     *            whether to resolve the user name
-     * @return the owner user SID, <code>null</code> if not present
-     * @throws IOException
-     */
+    @Override
     public SID getOwnerUser ( boolean resolve ) throws IOException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
             if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
@@ -2333,7 +1974,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             }
             NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getTransportContext().getConfig());
 
-            try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, 0, isDirectory() ? 1 : 0) ) {
+            try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, DEFAULT_SHARING, 0, isDirectory() ? 1 : 0) ) {
                 /*
                  * NtTrans Query Security Desc Request / Response
                  */
@@ -2346,31 +1987,21 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 return null;
             }
 
-            ownerUser.resolve(this.fileLocator.getServerWithDfs(), getTransportContext());
+            if ( resolve ) {
+                ownerUser.resolve(this.fileLocator.getServerWithDfs(), getTransportContext());
+            }
             return ownerUser;
         }
     }
 
 
-    /**
-     * Return the resolved owner group SID for this file or directory
-     * 
-     * @return the owner group SID, <code>null</code> if not present
-     * @throws IOException
-     */
+    @Override
     public SID getOwnerGroup () throws IOException {
         return getOwnerGroup(true);
     }
 
 
-    /**
-     * Return the owner group SID for this file or directory
-     * 
-     * @param resolve
-     *            whether to resolve the group name
-     * @return the owner group SID, <code>null</code> if not present
-     * @throws IOException
-     */
+    @Override
     public SID getOwnerGroup ( boolean resolve ) throws IOException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
             if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
@@ -2378,7 +2009,7 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             }
 
             NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getTransportContext().getConfig());
-            try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, 0, isDirectory() ? 1 : 0) ) {
+            try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, DEFAULT_SHARING, 0, isDirectory() ? 1 : 0) ) {
 
                 /*
                  * NtTrans Query Security Desc Request / Response
@@ -2392,35 +2023,17 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
                 return null;
             }
 
-            ownerGroup.resolve(this.fileLocator.getServerWithDfs(), getTransportContext());
+            if ( resolve ) {
+                ownerGroup.resolve(this.fileLocator.getServerWithDfs(), getTransportContext());
+            }
             return ownerGroup;
         }
     }
 
 
-    /**
-     * Return an array of Access Control Entry (ACE) objects representing
-     * the share permissions on the share exporting this file or directory.
-     * If no DACL is present, null is returned. If the DACL is empty, an array with 0 elements is returned.
-     * <p>
-     * Note that this is different from calling <tt>getSecurity</tt> on a
-     * share. There are actually two different ACLs for shares - the ACL on
-     * the share and the ACL on the folder being shared.
-     * Go to <i>Computer Management</i>
-     * &gt; <i>System Tools</i> &gt; <i>Shared Folders</i> &gt; <i>Shares</i> and
-     * look at the <i>Properties</i> for a share. You will see two tabs - one
-     * for "Share Permissions" and another for "Security". These correspond to
-     * the ACLs returned by <tt>getShareSecurity</tt> and <tt>getSecurity</tt>
-     * respectively.
-     * 
-     * @param resolveSids
-     *            Attempt to resolve the SIDs within each ACE form
-     *            their numeric representation to their corresponding account names.
-     * @return array of ACEs
-     * @throws IOException
-     */
+    @Override
     public ACE[] getShareSecurity ( boolean resolveSids ) throws IOException {
-        try ( SmbTreeHandle th = ensureTreeConnected() ) {
+        try ( SmbTreeHandleInternal th = ensureTreeConnected() ) {
             th.ensureDFSResolved();
             String server = this.fileLocator.getServerWithDfs();
             ACE[] aces;
@@ -2435,28 +2048,6 @@ public class SmbFile extends URLConnection implements SmbConstants, AutoCloseabl
             }
             return aces;
         }
-    }
-
-
-    /**
-     * Return an array of Access Control Entry (ACE) objects representing
-     * the security descriptor associated with this file or directory.
-     * <p>
-     * Initially, the SIDs within each ACE will not be resolved however when
-     * <tt>getType()</tt>, <tt>getDomainName()</tt>, <tt>getAccountName()</tt>,
-     * or <tt>toString()</tt> is called, the names will attempt to be
-     * resolved. If the names cannot be resolved (e.g. due to temporary
-     * network failure), the said methods will return default values (usually
-     * <tt>S-X-Y-Z</tt> strings of fragments of).
-     * <p>
-     * Alternatively <tt>getSecurity(true)</tt> may be used to resolve all
-     * SIDs together and detect network failures.
-     * 
-     * @return array of ACEs
-     * @throws IOException
-     */
-    public ACE[] getSecurity () throws IOException {
-        return getSecurity(false);
     }
 
 }

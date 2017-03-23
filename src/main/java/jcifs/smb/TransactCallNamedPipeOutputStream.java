@@ -21,6 +21,8 @@ package jcifs.smb;
 
 import java.io.IOException;
 
+import jcifs.CIFSException;
+
 
 class TransactCallNamedPipeOutputStream extends SmbPipeOutputStream {
 
@@ -29,10 +31,10 @@ class TransactCallNamedPipeOutputStream extends SmbPipeOutputStream {
     private byte[] tmp = new byte[1];
 
 
-    TransactCallNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws SmbException {
+    TransactCallNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws CIFSException {
         super(handle, th);
         this.handle = handle;
-        this.path = handle.getPipe().getFileLocator().getUNCPath();
+        this.path = handle.getPipe().getLocator().getUNCPath();
     }
 
 

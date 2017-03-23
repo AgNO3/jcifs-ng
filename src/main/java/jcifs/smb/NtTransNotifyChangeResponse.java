@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jcifs.Configuration;
+import jcifs.FileNotifyInformation;
 import jcifs.RuntimeCIFSException;
 
 
@@ -67,7 +68,7 @@ class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse {
         try {
             int elemStart = start;
 
-            FileNotifyInformation i = new FileNotifyInformation();
+            FileNotifyInformationImpl i = new FileNotifyInformationImpl();
             bufferIndex += i.decode(buffer, bufferIndex, len);
             this.notifyInformation.add(i);
 
@@ -75,7 +76,7 @@ class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse {
                 bufferIndex = elemStart + i.nextEntryOffset;
                 elemStart = bufferIndex;
 
-                i = new FileNotifyInformation();
+                i = new FileNotifyInformationImpl();
                 bufferIndex += i.decode(buffer, bufferIndex, len);
                 this.notifyInformation.add(i);
             }

@@ -24,20 +24,22 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
-import jcifs.smb.SmbTransport.ServerData;
+import jcifs.SmbTreeHandle;
+import jcifs.smb.SmbTransportImpl.ServerData;
 
 
 /**
  * @author mbechler
  *
  */
-class SmbTreeHandleImpl implements SmbTreeHandle {
+class SmbTreeHandleImpl implements SmbTreeHandleInternal {
 
     private static final Logger log = LoggerFactory.getLogger(SmbTreeHandleImpl.class);
 
-    private final SmbFileLocatorImpl resourceLoc;
+    private final SmbResourceLocatorImpl resourceLoc;
     private final SmbTreeConnection treeConnection;
 
     private final AtomicLong usageCount = new AtomicLong(1);
@@ -47,39 +49,24 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
      * @param resourceLoc
      * @param treeConnection
      */
-    public SmbTreeHandleImpl ( SmbFileLocatorImpl resourceLoc, SmbTreeConnection treeConnection ) {
+    public SmbTreeHandleImpl ( SmbResourceLocatorImpl resourceLoc, SmbTreeConnection treeConnection ) {
         this.resourceLoc = resourceLoc;
         this.treeConnection = treeConnection.acquire();
     }
 
 
-    /**
-     * Internal/testing use only
-     * 
-     * @return attached session
-     */
     @Override
-    public SmbSession getSession () {
+    public SmbSessionImpl getSession () {
         return this.treeConnection.getSession();
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#ensureDFSResolved()
-     */
     @Override
-    public void ensureDFSResolved () throws SmbException {
+    public void ensureDFSResolved () throws CIFSException {
         this.treeConnection.ensureDFSResolved(this.resourceLoc);
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#hasCapability(int)
-     */
     @Override
     public boolean hasCapability ( int cap ) throws SmbException {
         return this.treeConnection.hasCapability(cap);
@@ -89,7 +76,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#isConnected()
+     * @see jcifs.SmbTreeHandle#isConnected()
      */
     @Override
     public boolean isConnected () {
@@ -100,7 +87,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#getConfig()
+     * @see jcifs.SmbTreeHandle#getConfig()
      */
     @Override
     public Configuration getConfig () {
@@ -120,9 +107,9 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
      * @param request
      * @param response
      * @param params
-     * @throws SmbException
+     * @throws CIFSException
      */
-    public void send ( ServerMessageBlock request, ServerMessageBlock response, RequestParam... params ) throws SmbException {
+    public void send ( ServerMessageBlock request, ServerMessageBlock response, RequestParam... params ) throws CIFSException {
         this.treeConnection.send(this.resourceLoc, request, response);
     }
 
@@ -132,9 +119,9 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
      * @param request
      * @param response
      * @param params
-     * @throws SmbException
+     * @throws CIFSException
      */
-    public void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws SmbException {
+    public void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws CIFSException {
         this.treeConnection.send(this.resourceLoc, request, response, params);
     }
 
@@ -142,7 +129,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#close()
+     * @see jcifs.SmbTreeHandle#close()
      */
     @Override
     public synchronized void close () {
@@ -161,11 +148,6 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#release()
-     */
     @Override
     public void release () {
         long us = this.usageCount.decrementAndGet();
@@ -194,7 +176,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#getServerTimeZoneOffset()
+     * @see jcifs.SmbTreeHandle#getServerTimeZoneOffset()
      */
     @Override
     public long getServerTimeZoneOffset () {
@@ -205,7 +187,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#getOEMDomainName()
+     * @see jcifs.SmbTreeHandle#getOEMDomainName()
      */
     @Override
     public String getOEMDomainName () {
@@ -216,7 +198,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#getConnectedService()
+     * @see jcifs.SmbTreeHandle#getConnectedService()
      */
     @Override
     public String getConnectedService () {
@@ -227,7 +209,7 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#getConnectedShare()
+     * @see jcifs.SmbTreeHandle#getConnectedShare()
      */
     @Override
     public String getConnectedShare () {
@@ -236,60 +218,44 @@ class SmbTreeHandleImpl implements SmbTreeHandle {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbTreeHandle#isSameTree(jcifs.smb.SmbTreeHandleImpl)
+     * @see jcifs.SmbTreeHandle#isSameTree(jcifs.SmbTreeHandle)
      */
     @Override
-    public boolean isSameTree ( SmbTreeHandleImpl th ) {
-        return this.treeConnection.isSame(th.treeConnection);
+    public boolean isSameTree ( SmbTreeHandle th ) {
+        if ( ! ( th instanceof SmbTreeHandleImpl ) ) {
+            return false;
+        }
+        return this.treeConnection.isSame( ( (SmbTreeHandleImpl) th ).treeConnection);
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#getSendBufferSize()
-     */
     @Override
     public int getSendBufferSize () {
-        try ( SmbSession session = this.treeConnection.getSession();
-              SmbTransport transport = session.getTransport() ) {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
             return transport.snd_buf_size;
         }
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#getReceiveBufferSize()
-     */
     @Override
     public int getReceiveBufferSize () {
-        try ( SmbSession session = this.treeConnection.getSession();
-              SmbTransport transport = session.getTransport() ) {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
             return transport.rcv_buf_size;
         }
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#getMaximumBufferSize()
-     */
     @Override
     public int getMaximumBufferSize () {
         return this.treeConnection.getServerData().maxBufferSize;
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbTreeHandle#areSignaturesActive()
-     */
     @Override
     public boolean areSignaturesActive () {
         ServerData serverData = this.treeConnection.getServerData();

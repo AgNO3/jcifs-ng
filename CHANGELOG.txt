@@ -6,7 +6,11 @@ jcifs-ng 1.6.0
  - Every occasion where a file descriptor is used now returns a handle object controlling it's lifetime.
  - An optional mode (jcifs.smb.client.strictResourceLifecycle=true) to also prevent disconnecting trees that are still in use.
 - Refactoring of SmbFile breaking it up into smaller parts with clearer responsibilities.
+- Further refactoring for clean API/implementation split.
+- Do not retry requests when there is no way they ever could succeed.
+- Increased test coverage, fix some issues with legacy connections found through that.
 - Change logging to use SLF4J facade
+- Copy operations now use SmbFileInput/OutputStream and therefor can use LargeX
 
 jcifs-ng 1.5.3
 - Fix thread leak when establishing a connection fails

@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.Configuration;
+import jcifs.NameServiceClient;
+import jcifs.NetbiosAddress;
 import jcifs.ResolverType;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
@@ -625,16 +627,14 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
 
     @Override
-    public NbtAddress[] getNodeStatus ( NbtAddress addr ) throws UnknownHostException {
+    public NbtAddress[] getNodeStatus ( NetbiosAddress addr ) throws UnknownHostException {
         int n, srcHashCode;
-        NodeStatusRequest request;
-        NodeStatusResponse response;
 
-        response = new NodeStatusResponse(this.transportContext.getConfig(), addr);
-        request = new NodeStatusRequest(
+        NodeStatusResponse response = new NodeStatusResponse(this.transportContext.getConfig(), addr.unwrap(NbtAddress.class));
+        NodeStatusRequest request = new NodeStatusRequest(
             this.transportContext.getConfig(),
             new Name(this.transportContext.getConfig(), NbtAddress.ANY_HOSTS_NAME, 0x00, null));
-        request.addr = addr.getInetAddress();
+        request.addr = addr.toInetAddress();
 
         n = this.transportContext.getConfig().getNetbiosRetryCount();
         while ( n-- > 0 ) {
@@ -668,7 +668,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                 return response.addressArray;
             }
         }
-        throw new UnknownHostException(addr.hostName.name);
+        throw new UnknownHostException(addr.getHostName());
     }
 
 
@@ -748,16 +748,16 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
 
     @Override
-    public NbtAddress[] getNbtAllByAddress ( NbtAddress addr ) throws UnknownHostException {
+    public NbtAddress[] getNbtAllByAddress ( NetbiosAddress addr ) throws UnknownHostException {
         try {
             NbtAddress[] addrs = getNodeStatus(addr);
             cacheAddressArray(addrs);
             return addrs;
         }
         catch ( UnknownHostException uhe ) {
-            throw new UnknownHostException("no name with type 0x" + Hexdump.toHexString(addr.hostName.hexCode, 2)
-                    + ( ( ( addr.hostName.scope == null ) || ( addr.hostName.scope.length() == 0 ) ) ? " with no scope"
-                            : " with scope " + addr.hostName.scope )
+            throw new UnknownHostException("no name with type 0x" + Hexdump.toHexString(addr.getNameType(), 2)
+                    + ( ( ( addr.getName().getScope() == null ) || ( addr.getName().getScope().isEmpty() ) ) ? " with no scope"
+                            : " with scope " + addr.getName().getScope() )
                     + " for host " + addr.getHostAddress());
         }
     }
@@ -809,7 +809,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         private Sem sem;
         private String host, scope;
         private int type;
-        private NbtAddress ans = null;
+        private NetbiosAddress ans = null;
         private InetAddress svr;
         private UnknownHostException uhe;
         private CIFSContext tc;
@@ -849,7 +849,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         /**
          * @return the ans
          */
-        public NbtAddress getAnswer () {
+        public NetbiosAddress getAnswer () {
             return this.ans;
         }
 
@@ -864,7 +864,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     }
 
 
-    NbtAddress lookupServerOrWorkgroup ( String name, InetAddress svr ) throws UnknownHostException {
+    NetbiosAddress lookupServerOrWorkgroup ( String name, InetAddress svr ) throws UnknownHostException {
         Sem sem = new Sem(2);
         int type = isWINS(svr) ? 0x1b : 0x1d;
 
@@ -1026,7 +1026,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.netbios.NameServiceClient#getLocalHost()
+     * @see jcifs.NameServiceClient#getLocalHost()
      */
     @Override
     public NbtAddress getLocalHost () {
@@ -1037,7 +1037,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.netbios.NameServiceClient#getLocalName()
+     * @see jcifs.NameServiceClient#getLocalName()
      */
     @Override
     public Name getLocalName () {
@@ -1049,11 +1049,9 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
 
     /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.netbios.NameServiceClient#getLmhosts()
+     * 
+     * @return lmhosts file used
      */
-    @Override
     public Lmhosts getLmhosts () {
         return this.lmhosts;
     }
@@ -1062,7 +1060,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.netbios.NameServiceClient#getUnknownName()
+     * @see jcifs.NameServiceClient#getUnknownName()
      */
     @Override
     public Name getUnknownName () {

@@ -31,8 +31,9 @@ import jcifs.util.Hexdump;
 
 /**
  * 
+ * @internal
  */
-public class SigningDigest {
+class SigningDigest {
 
     private static final Logger log = LoggerFactory.getLogger(SigningDigest.class);
 
@@ -107,27 +108,27 @@ public class SigningDigest {
      * @param auth
      * @throws SmbException
      */
-    public SigningDigest ( SmbTransport transport, NtlmPasswordAuthentication auth ) throws SmbException {
+    public SigningDigest ( SmbTransportInternal transport, NtlmPasswordAuthentication auth ) throws SmbException {
         this.digest = Crypto.getMD5();
         try {
-            switch ( transport.getTransportContext().getConfig().getLanManCompatibility() ) {
+            switch ( transport.getContext().getConfig().getLanManCompatibility() ) {
             case 0:
             case 1:
             case 2:
                 this.macSigningKey = new byte[40];
-                auth.getUserSessionKey(transport.getTransportContext(), transport.server.encryptionKey, this.macSigningKey, 0);
-                System.arraycopy(auth.getUnicodeHash(transport.getTransportContext(), transport.server.encryptionKey), 0, this.macSigningKey, 16, 24);
+                auth.getUserSessionKey(transport.getContext(), transport.getServerEncryptionKey(), this.macSigningKey, 0);
+                System.arraycopy(auth.getUnicodeHash(transport.getContext(), transport.getServerEncryptionKey()), 0, this.macSigningKey, 16, 24);
                 break;
             case 3:
             case 4:
             case 5:
                 this.macSigningKey = new byte[16];
-                auth.getUserSessionKey(transport.getTransportContext(), transport.server.encryptionKey, this.macSigningKey, 0);
+                auth.getUserSessionKey(transport.getContext(), transport.getServerEncryptionKey(), this.macSigningKey, 0);
                 break;
             default:
                 this.macSigningKey = new byte[40];
-                auth.getUserSessionKey(transport.getTransportContext(), transport.server.encryptionKey, this.macSigningKey, 0);
-                System.arraycopy(auth.getUnicodeHash(transport.getTransportContext(), transport.server.encryptionKey), 0, this.macSigningKey, 16, 24);
+                auth.getUserSessionKey(transport.getContext(), transport.getServerEncryptionKey(), this.macSigningKey, 0);
+                System.arraycopy(auth.getUnicodeHash(transport.getContext(), transport.getServerEncryptionKey()), 0, this.macSigningKey, 16, 24);
                 break;
             }
         }
@@ -135,7 +136,7 @@ public class SigningDigest {
             throw new SmbException("", ex);
         }
         if ( log.isTraceEnabled() ) {
-            log.trace("LM_COMPATIBILITY=" + transport.getTransportContext().getConfig().getLanManCompatibility());
+            log.trace("LM_COMPATIBILITY=" + transport.getContext().getConfig().getLanManCompatibility());
             log.trace(Hexdump.toHexString(this.macSigningKey, 0, this.macSigningKey.length));
         }
     }

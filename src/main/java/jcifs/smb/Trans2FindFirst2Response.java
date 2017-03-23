@@ -22,6 +22,7 @@ package jcifs.smb;
 import java.util.Date;
 
 import jcifs.Configuration;
+import jcifs.SmbConstants;
 import jcifs.util.Strings;
 
 
@@ -63,7 +64,7 @@ class Trans2FindFirst2Response extends SmbComTransactionResponse {
 
         @Override
         public int getType () {
-            return SmbFile.TYPE_FILESYSTEM;
+            return SmbConstants.TYPE_FILESYSTEM;
         }
 
 

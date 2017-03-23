@@ -21,7 +21,6 @@ package jcifs.smb;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -30,18 +29,21 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
+import jcifs.SmbConstants;
+import jcifs.SmbResourceLocator;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcDfsRootEnum;
 import jcifs.dcerpc.msrpc.MsrpcShareEnum;
-import jcifs.netbios.UniAddress;
 
 
 /**
  * @author mbechler
  *
  */
-public final class SmbEnumerationUtil {
+final class SmbEnumerationUtil {
 
     private static final Logger log = LoggerFactory.getLogger(SmbEnumerationUtil.class);
 
@@ -52,7 +54,7 @@ public final class SmbEnumerationUtil {
     private SmbEnumerationUtil () {}
 
 
-    static FileEntry[] doDfsRootEnum ( CIFSContext ctx, SmbFileLocator loc ) throws IOException {
+    static FileEntry[] doDfsRootEnum ( CIFSContext ctx, SmbResourceLocator loc ) throws IOException {
         MsrpcDfsRootEnum rpc;
         try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + loc.getAddress().getHostAddress() + "[\\PIPE\\netdfs]", ctx) ) {
             rpc = new MsrpcDfsRootEnum(loc.getServer());
@@ -64,7 +66,7 @@ public final class SmbEnumerationUtil {
     }
 
 
-    static FileEntry[] doMsrpcShareEnum ( CIFSContext ctx, String host, UniAddress address ) throws IOException {
+    static FileEntry[] doMsrpcShareEnum ( CIFSContext ctx, String host, Address address ) throws IOException {
         MsrpcShareEnum rpc = new MsrpcShareEnum(host);
         /*
          * JCIFS will build a composite list of shares if the target host has
@@ -82,7 +84,7 @@ public final class SmbEnumerationUtil {
     }
 
 
-    static FileEntry[] doNetShareEnum ( SmbTreeHandleImpl th ) throws SmbException {
+    static FileEntry[] doNetShareEnum ( SmbTreeHandleImpl th ) throws CIFSException {
         SmbComTransaction req = new NetShareEnum(th.getConfig());
         SmbComTransactionResponse resp = new NetShareEnumResponse(th.getConfig());
         th.send(req, resp);
@@ -94,8 +96,8 @@ public final class SmbEnumerationUtil {
 
 
     static void doNetServerEnum ( SmbFile parent, SmbTreeHandleImpl th, List<Object> list, boolean files, String wildcard, int searchAttributes,
-            SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException, UnknownHostException, MalformedURLException {
-        SmbFileLocatorImpl locator = parent.fileLocator;
+            SmbFilenameFilter fnf, SmbFileFilter ff ) throws CIFSException, MalformedURLException {
+        SmbResourceLocatorImpl locator = parent.fileLocator;
         int listType = locator.getURL().getHost().isEmpty() ? 0 : locator.getType();
         SmbComTransaction req;
         SmbComTransactionResponse resp;
@@ -104,7 +106,7 @@ public final class SmbEnumerationUtil {
             req = new NetServerEnum2(th.getConfig(), th.getOEMDomainName(), NetServerEnum2.SV_TYPE_DOMAIN_ENUM);
             resp = new NetServerEnum2Response(th.getConfig());
         }
-        else if ( listType == SmbFile.TYPE_WORKGROUP ) {
+        else if ( listType == SmbConstants.TYPE_WORKGROUP ) {
             req = new NetServerEnum2(th.getConfig(), locator.getURL().getHost(), NetServerEnum2.SV_TYPE_ALL);
             resp = new NetServerEnum2Response(th.getConfig());
         }
@@ -136,7 +138,7 @@ public final class SmbEnumerationUtil {
                         name,
                         false,
                         e.getType(),
-                        SmbFile.ATTR_READONLY | SmbFile.ATTR_DIRECTORY,
+                        SmbConstants.ATTR_READONLY | SmbConstants.ATTR_DIRECTORY,
                         0L,
                         0L,
                         0L,
@@ -152,7 +154,7 @@ public final class SmbEnumerationUtil {
                     }
                 }
             }
-            if ( locator.getType() != SmbFile.TYPE_WORKGROUP ) {
+            if ( locator.getType() != SmbConstants.TYPE_WORKGROUP ) {
                 break;
             }
             req.subCommand = (byte) SmbComTransaction.NET_SERVER_ENUM3;
@@ -164,8 +166,8 @@ public final class SmbEnumerationUtil {
 
 
     static void doFindFirstNext ( SmbFile parent, SmbTreeHandleImpl th, List<Object> list, boolean files, String wildcard, int searchAttributes,
-            SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException, UnknownHostException, MalformedURLException {
-        SmbFileLocatorImpl loc = parent.fileLocator;
+            SmbFilenameFilter fnf, SmbFileFilter ff ) throws CIFSException, MalformedURLException {
+        SmbResourceLocatorImpl loc = parent.fileLocator;
         String path = loc.getUNCPath();
         String p = loc.getURL().getPath();
 
@@ -210,7 +212,7 @@ public final class SmbEnumerationUtil {
                         parent,
                         name,
                         true,
-                        SmbFile.TYPE_FILESYSTEM,
+                        SmbConstants.TYPE_FILESYSTEM,
                         e.getAttributes(),
                         e.createTime(),
                         e.lastModified(),
@@ -249,10 +251,10 @@ public final class SmbEnumerationUtil {
 
 
     static void doShareEnum ( SmbFile parent, List<Object> list, boolean files, String wildcard, int searchAttributes, SmbFilenameFilter fnf,
-            SmbFileFilter ff ) throws SmbException, UnknownHostException, MalformedURLException {
+            SmbFileFilter ff ) throws CIFSException, MalformedURLException {
         // clone the locator so that the address index is not modified
-        SmbFileLocatorImpl locator = parent.fileLocator.clone();
-        CIFSContext tc = parent.getTransportContext();
+        SmbResourceLocatorImpl locator = parent.fileLocator.clone();
+        CIFSContext tc = parent.getContext();
         URL u = locator.getURL();
 
         IOException last = null;
@@ -261,7 +263,7 @@ public final class SmbEnumerationUtil {
         if ( u.getPath().lastIndexOf('/') != ( u.getPath().length() - 1 ) )
             throw new SmbException(u.toString() + " directory must end with '/'");
 
-        if ( locator.getType() != SmbFile.TYPE_SERVER )
+        if ( locator.getType() != SmbConstants.TYPE_SERVER )
             throw new SmbException("The requested list operations is invalid: " + u.toString());
 
         Set<FileEntry> set = new HashSet<>();
@@ -285,7 +287,7 @@ public final class SmbEnumerationUtil {
         }
 
         SmbTreeConnection treeConn = new SmbTreeConnection(tc);
-        UniAddress addr = locator.getFirstAddress();
+        Address addr = locator.getFirstAddress();
         while ( addr != null ) {
             try ( SmbTreeHandleImpl th = treeConn.connectHost(locator, addr) ) {
                 try {
@@ -321,7 +323,16 @@ public final class SmbEnumerationUtil {
                 continue;
             if ( name.length() > 0 ) {
                 // if !files we don't need to create SmbFiles here
-                try ( SmbFile f = new SmbFile(parent, name, false, e.getType(), SmbFile.ATTR_READONLY | SmbFile.ATTR_DIRECTORY, 0L, 0L, 0L, 0L) ) {
+                try ( SmbFile f = new SmbFile(
+                    parent,
+                    name,
+                    false,
+                    e.getType(),
+                    SmbConstants.ATTR_READONLY | SmbConstants.ATTR_DIRECTORY,
+                    0L,
+                    0L,
+                    0L,
+                    0L) ) {
                     if ( ff != null && ff.accept(f) == false )
                         continue;
                     if ( files ) {
@@ -337,7 +348,7 @@ public final class SmbEnumerationUtil {
 
 
     static List<Object> doEnum ( SmbFile parent, boolean files, String wildcard, int searchAttributes, SmbFilenameFilter fnf, SmbFileFilter ff )
-            throws SmbException {
+            throws CIFSException {
         List<Object> list = new ArrayList<>();
         if ( ff != null && ff instanceof DosFileFilter ) {
             DosFileFilter dff = (DosFileFilter) ff;
@@ -345,9 +356,9 @@ public final class SmbEnumerationUtil {
                 wildcard = dff.wildcard;
             searchAttributes = dff.attributes;
         }
-        SmbFileLocatorImpl locator = parent.fileLocator;
+        SmbResourceLocatorImpl locator = parent.fileLocator;
         try {
-            if ( locator.getURL().getHost().isEmpty() || locator.getType() == SmbFile.TYPE_WORKGROUP ) {
+            if ( locator.getURL().getHost().isEmpty() || locator.getType() == SmbConstants.TYPE_WORKGROUP ) {
 
                 try ( SmbTreeHandleImpl th = parent.ensureTreeConnected() ) {
                     doNetServerEnum(parent, th, list, files, wildcard, searchAttributes, fnf, ff);
@@ -363,9 +374,6 @@ public final class SmbEnumerationUtil {
             }
 
             return list;
-        }
-        catch ( UnknownHostException uhe ) {
-            throw new SmbException(locator.getURL().toString(), uhe);
         }
         catch ( MalformedURLException mue ) {
             throw new SmbException(locator.getURL().toString(), mue);

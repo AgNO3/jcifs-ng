@@ -19,6 +19,8 @@ package jcifs;
 
 
 /**
+ * Runtime exception indicating that the JDK does not support the cryptographic primitives that we use.
+ * 
  * @author mbechler
  *
  */

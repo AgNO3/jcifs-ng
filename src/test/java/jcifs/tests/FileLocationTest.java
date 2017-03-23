@@ -28,11 +28,14 @@ import org.junit.Test;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.DfsReferralData;
+import jcifs.SmbConstants;
+import jcifs.SmbResource;
+import jcifs.SmbResourceLocator;
 import jcifs.config.BaseConfiguration;
 import jcifs.context.BaseContext;
-import jcifs.smb.DfsReferral;
 import jcifs.smb.SmbFile;
-import jcifs.smb.SmbFileLocator;
+import jcifs.smb.SmbResourceLocatorInternal;
 
 
 /**
@@ -44,11 +47,11 @@ public class FileLocationTest {
 
     @Test
     public void testRoot () throws MalformedURLException, CIFSException {
-        try ( SmbFile p = new SmbFile("smb://", getContext()) ) {
-            SmbFileLocator fl = p.getFileLocator();
+        try ( SmbResource p = new SmbFile("smb://", getContext()) ) {
+            SmbResourceLocator fl = p.getLocator();
             assertNull(fl.getServer());
             assertNull(fl.getShare());
-            assertEquals(SmbFile.TYPE_WORKGROUP, fl.getType());
+            assertEquals(SmbConstants.TYPE_WORKGROUP, fl.getType());
             assertEquals("\\", fl.getUNCPath());
             assertEquals("smb://", fl.getCanonicalURL());
             assertEquals("/", fl.getURLPath());
@@ -59,10 +62,10 @@ public class FileLocationTest {
     @Test
     public void testChildHost () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://", getContext());
-              SmbFile c = new SmbFile(p, "1.2.3.4") ) {
-            SmbFileLocator fl = c.getFileLocator();
+              SmbResource c = new SmbFile(p, "1.2.3.4") ) {
+            SmbResourceLocator fl = c.getLocator();
             assertEquals("1.2.3.4", fl.getServer());
-            assertEquals(SmbFile.TYPE_SERVER, fl.getType());
+            assertEquals(SmbConstants.TYPE_SERVER, fl.getType());
             assertNull(fl.getShare());
             assertEquals("\\", fl.getUNCPath());
             assertEquals("smb://1.2.3.4/", fl.getCanonicalURL());
@@ -74,10 +77,10 @@ public class FileLocationTest {
     @Test
     public void testChildShare () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/", getContext());
-              SmbFile c = new SmbFile(p, "share/") ) {
-            SmbFileLocator fl = c.getFileLocator();
+              SmbResource c = new SmbFile(p, "share/") ) {
+            SmbResourceLocator fl = c.getLocator();
             assertEquals("1.2.3.4", fl.getServer());
-            assertEquals(SmbFile.TYPE_SHARE, fl.getType());
+            assertEquals(SmbConstants.TYPE_SHARE, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\", fl.getUNCPath());
             assertEquals("smb://1.2.3.4/share", fl.getCanonicalURL());
@@ -89,10 +92,10 @@ public class FileLocationTest {
     @Test
     public void testChildShareCombined () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://", getContext());
-              SmbFile c = new SmbFile(p, "1.2.3.4/share/") ) {
-            SmbFileLocator fl = c.getFileLocator();
+              SmbResource c = new SmbFile(p, "1.2.3.4/share/") ) {
+            SmbResourceLocator fl = c.getLocator();
             assertEquals("1.2.3.4", fl.getServer());
-            assertEquals(SmbFile.TYPE_SHARE, fl.getType());
+            assertEquals(SmbConstants.TYPE_SHARE, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\", fl.getUNCPath());
             assertEquals("smb://1.2.3.4/share", fl.getCanonicalURL());
@@ -104,10 +107,10 @@ public class FileLocationTest {
     @Test
     public void testChildPath () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/", getContext());
-              SmbFile c = new SmbFile(p, "foo/") ) {
-            SmbFileLocator fl = c.getFileLocator();
+              SmbResource c = new SmbFile(p, "foo/") ) {
+            SmbResourceLocator fl = c.getLocator();
             assertEquals("1.2.3.4", fl.getServer());
-            assertEquals(SmbFile.TYPE_FILESYSTEM, fl.getType());
+            assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\foo", fl.getUNCPath());
             assertEquals("smb://1.2.3.4/share/foo", fl.getCanonicalURL());
@@ -119,10 +122,10 @@ public class FileLocationTest {
     @Test
     public void testChildMultiPath () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/", getContext());
-              SmbFile c = new SmbFile(p, "foo/bar/") ) {
-            SmbFileLocator fl = c.getFileLocator();
+              SmbResource c = new SmbFile(p, "foo/bar/") ) {
+            SmbResourceLocator fl = c.getLocator();
             assertEquals("1.2.3.4", fl.getServer());
-            assertEquals(SmbFile.TYPE_FILESYSTEM, fl.getType());
+            assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\foo\\bar", fl.getUNCPath());
             assertEquals("smb://1.2.3.4/share/foo/bar", fl.getCanonicalURL());
@@ -134,10 +137,10 @@ public class FileLocationTest {
     @Test
     public void testChildPathCombined () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://", getContext());
-              SmbFile c = new SmbFile(p, "1.2.3.4/share/foo/") ) {
-            SmbFileLocator fl = c.getFileLocator();
+              SmbResource c = new SmbFile(p, "1.2.3.4/share/foo/") ) {
+            SmbResourceLocator fl = c.getLocator();
             assertEquals("1.2.3.4", fl.getServer());
-            assertEquals(SmbFile.TYPE_FILESYSTEM, fl.getType());
+            assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\foo", fl.getUNCPath());
             assertEquals("smb://1.2.3.4/share/foo", fl.getCanonicalURL());
@@ -149,11 +152,11 @@ public class FileLocationTest {
     @Test
     public void testParentRoot () throws MalformedURLException, CIFSException {
         try ( SmbFile p = new SmbFile("smb://", getContext());
-              SmbFile pp = new SmbFile(p.getParent(), getContext()) ) {
-            assertEquals("smb://", p.getFileLocator().getParent());
-            assertEquals(SmbFile.TYPE_WORKGROUP, pp.getFileLocator().getType());
-            assertNull(pp.getFileLocator().getServer());
-            assertNull(pp.getFileLocator().getShare());
+              SmbResource pp = new SmbFile(p.getParent(), getContext()) ) {
+            assertEquals("smb://", p.getLocator().getParent());
+            assertEquals(SmbConstants.TYPE_WORKGROUP, pp.getLocator().getType());
+            assertNull(pp.getLocator().getServer());
+            assertNull(pp.getLocator().getShare());
         }
     }
 
@@ -161,10 +164,10 @@ public class FileLocationTest {
     @Test
     public void testParentServer () throws MalformedURLException, CIFSException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/", getContext());
-              SmbFile pp = new SmbFile(p.getParent(), getContext()) ) {
-            assertEquals("smb://", p.getFileLocator().getParent());
-            SmbFileLocator fl = pp.getFileLocator();
-            assertEquals(SmbFile.TYPE_WORKGROUP, fl.getType());
+              SmbResource pp = new SmbFile(p.getParent(), getContext()) ) {
+            assertEquals("smb://", p.getLocator().getParent());
+            SmbResourceLocator fl = pp.getLocator();
+            assertEquals(SmbConstants.TYPE_WORKGROUP, fl.getType());
             assertNull(fl.getServer());
             assertNull(fl.getShare());
         }
@@ -174,10 +177,10 @@ public class FileLocationTest {
     @Test
     public void testParentShare () throws MalformedURLException, CIFSException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/", getContext());
-              SmbFile pp = new SmbFile(p.getParent(), getContext()) ) {
-            assertEquals("smb://1.2.3.4/", p.getFileLocator().getParent());
-            SmbFileLocator fl = pp.getFileLocator();
-            assertEquals(SmbFile.TYPE_SERVER, fl.getType());
+              SmbResource pp = new SmbFile(p.getParent(), getContext()) ) {
+            assertEquals("smb://1.2.3.4/", p.getLocator().getParent());
+            SmbResourceLocator fl = pp.getLocator();
+            assertEquals(SmbConstants.TYPE_SERVER, fl.getType());
             assertEquals("1.2.3.4", fl.getServer());
             assertNull(fl.getShare());
             assertEquals("\\", fl.getUNCPath());
@@ -189,10 +192,10 @@ public class FileLocationTest {
     @Test
     public void testParentPath1 () throws MalformedURLException, CIFSException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/foo/", getContext());
-              SmbFile pp = new SmbFile(p.getParent(), getContext()) ) {
-            assertEquals("smb://1.2.3.4/share/", p.getFileLocator().getParent());
-            SmbFileLocator fl = pp.getFileLocator();
-            assertEquals(SmbFile.TYPE_SHARE, fl.getType());
+              SmbResource pp = new SmbFile(p.getParent(), getContext()) ) {
+            assertEquals("smb://1.2.3.4/share/", p.getLocator().getParent());
+            SmbResourceLocator fl = pp.getLocator();
+            assertEquals(SmbConstants.TYPE_SHARE, fl.getType());
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("share", fl.getShare());
             assertEquals("\\", fl.getUNCPath());
@@ -204,10 +207,10 @@ public class FileLocationTest {
     @Test
     public void testParentPath2 () throws MalformedURLException, CIFSException {
         try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/foo/bar/", getContext());
-              SmbFile pp = new SmbFile(p.getParent(), getContext()) ) {
-            assertEquals("smb://1.2.3.4/share/foo/", p.getFileLocator().getParent());
-            SmbFileLocator fl = pp.getFileLocator();
-            assertEquals(SmbFile.TYPE_FILESYSTEM, fl.getType());
+              SmbResource pp = new SmbFile(p.getParent(), getContext()) ) {
+            assertEquals("smb://1.2.3.4/share/foo/", p.getLocator().getParent());
+            SmbResourceLocator fl = pp.getLocator();
+            assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("share", fl.getShare());
             assertEquals("\\foo", fl.getUNCPath());
@@ -218,13 +221,11 @@ public class FileLocationTest {
 
     @Test
     public void testDfsReferralServer () throws MalformedURLException, CIFSException {
-        try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/foo/bar/", getContext()) ) {
-            DfsReferral dr = new DfsReferral();
-            dr.server = "2.3.4.5";
-            dr.path = "";
+        try ( SmbResource p = new SmbFile("smb://1.2.3.4/share/foo/bar/", getContext()) ) {
+            DfsReferralData dr = new TestDfsReferral("2.3.4.5", null, "", 0);
             String reqPath = "\\foo\\bar\\";
-            SmbFileLocator fl = p.getFileLocator();
-            assertEquals(reqPath, fl.handleDFSReferral(dr, reqPath));
+            SmbResourceLocator fl = p.getLocator();
+            assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl ).handleDFSReferral(dr, reqPath));
 
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("2.3.4.5", fl.getServerWithDfs());
@@ -237,14 +238,11 @@ public class FileLocationTest {
 
     @Test
     public void testDfsReferralShare () throws MalformedURLException, CIFSException {
-        try ( SmbFile p = new SmbFile("smb://1.2.3.4/share/foo/bar/", getContext()) ) {
-            DfsReferral dr = new DfsReferral();
-            dr.server = "1.2.3.4";
-            dr.share = "other";
-            dr.path = "";
+        try ( SmbResource p = new SmbFile("smb://1.2.3.4/share/foo/bar/", getContext()) ) {
+            DfsReferralData dr = new TestDfsReferral("1.2.3.4", "other", "", 0);
             String reqPath = "\\foo\\bar\\";
-            SmbFileLocator fl = p.getFileLocator();
-            assertEquals(reqPath, fl.handleDFSReferral(dr, reqPath));
+            SmbResourceLocator fl = p.getLocator();
+            assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl ).handleDFSReferral(dr, reqPath));
 
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("1.2.3.4", fl.getServerWithDfs());
@@ -258,15 +256,11 @@ public class FileLocationTest {
 
     @Test
     public void testDfsReferralShareNested () throws MalformedURLException, CIFSException {
-        try ( SmbFile p = new SmbFile("smb://1.2.3.4/dfs/share/bar/", getContext()) ) {
-            DfsReferral dr = new DfsReferral();
-            dr.server = "1.2.3.4";
-            dr.share = "target";
-            dr.pathConsumed = 6; // consumes the /share dfs root path
-            dr.path = "";
+        try ( SmbResource p = new SmbFile("smb://1.2.3.4/dfs/share/bar/", getContext()) ) {
+            DfsReferralData dr = new TestDfsReferral("1.2.3.4", "target", "", 6); // consumes the /share dfs root path
             String reqPath = "\\share\\bar\\";
-            SmbFileLocator fl = p.getFileLocator();
-            assertEquals("\\bar\\", fl.handleDFSReferral(dr, reqPath));
+            SmbResourceLocator fl = p.getLocator();
+            assertEquals("\\bar\\", ( (SmbResourceLocatorInternal) fl ).handleDFSReferral(dr, reqPath));
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("1.2.3.4", fl.getServerWithDfs());
             assertEquals("target", fl.getShare());
@@ -274,6 +268,107 @@ public class FileLocationTest {
             // this intentionally sticks to the old name
             assertEquals("/dfs/share/bar/", fl.getURLPath());
         }
+    }
+
+    private static class TestDfsReferral implements DfsReferralData {
+
+        private String server;
+        private String share;
+        private String path;
+        private int pathConsumed;
+
+
+        /**
+         * 
+         */
+        public TestDfsReferral ( String server, String share, String path, int pathConsumed ) {
+            this.server = server;
+            this.share = share;
+            this.path = path;
+            this.pathConsumed = pathConsumed;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#unwrap(java.lang.Class)
+         */
+        @SuppressWarnings ( "unchecked" )
+        @Override
+        public <T extends DfsReferralData> T unwrap ( Class<T> type ) {
+            if ( type.isAssignableFrom(this.getClass()) ) {
+                return (T) this;
+            }
+            throw new ClassCastException();
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getServer()
+         */
+        @Override
+        public String getServer () {
+            return this.server;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getShare()
+         */
+        @Override
+        public String getShare () {
+            return this.share;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getPathConsumed()
+         */
+        @Override
+        public int getPathConsumed () {
+            return this.pathConsumed;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getPath()
+         */
+        @Override
+        public String getPath () {
+            return this.path;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getExpiration()
+         */
+        @Override
+        public long getExpiration () {
+            return 0;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#next()
+         */
+        @Override
+        public DfsReferralData next () {
+            return this;
+        }
+
     }
 
 

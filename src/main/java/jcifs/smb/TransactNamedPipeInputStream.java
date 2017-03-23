@@ -24,6 +24,8 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
+
 
 class TransactNamedPipeInputStream extends SmbPipeInputStream {
 
@@ -36,7 +38,7 @@ class TransactNamedPipeInputStream extends SmbPipeInputStream {
     Object lock;
 
 
-    TransactNamedPipeInputStream ( SmbPipeHandleImpl pipe, SmbTreeHandleImpl th ) throws SmbException {
+    TransactNamedPipeInputStream ( SmbPipeHandleImpl pipe, SmbTreeHandleImpl th ) throws CIFSException {
         super(pipe, th);
         this.lock = new Object();
     }

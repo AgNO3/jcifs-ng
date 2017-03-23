@@ -36,14 +36,16 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
+import jcifs.DfsReferralData;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbTransport;
 import jcifs.netbios.Name;
 import jcifs.netbios.NbtException;
 import jcifs.netbios.SessionRequestPacket;
 import jcifs.netbios.SessionServicePacket;
-import jcifs.netbios.UniAddress;
 import jcifs.util.Encdec;
 import jcifs.util.Hexdump;
 import jcifs.util.transport.Request;
@@ -55,9 +57,9 @@ import jcifs.util.transport.TransportException;
 /**
  * 
  */
-public class SmbTransport extends Transport implements SmbConstants {
+class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbConstants {
 
-    private static Logger log = LoggerFactory.getLogger(SmbTransport.class);
+    private static Logger log = LoggerFactory.getLogger(SmbTransportImpl.class);
 
     class ServerData {
 
@@ -86,7 +88,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     private boolean smb2 = false;
     InetAddress localAddr;
     int localPort;
-    UniAddress address;
+    Address address;
     Socket socket;
     int port, mid;
     OutputStream out;
@@ -95,7 +97,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     SmbComBlankResponse key;
     long sessionExpiration;
     SigningDigest digest = null;
-    List<SmbSession> sessions = new LinkedList<>();
+    List<SmbSessionImpl> sessions = new LinkedList<>();
     ServerData server = new ServerData();
     /* Negotiated values */
     int flags2;
@@ -113,12 +115,12 @@ public class SmbTransport extends Transport implements SmbConstants {
     private Object socketLock = new Object();
 
 
-    SmbTransport ( CIFSContext tc, SmbComNegotiate nego, UniAddress address, int port, InetAddress localAddr, int localPort, boolean forceSigning ) {
+    SmbTransportImpl ( CIFSContext tc, SmbComNegotiate nego, Address address, int port, InetAddress localAddr, int localPort, boolean forceSigning ) {
         this.transportContext = tc;
         this.key = new SmbComBlankResponse(tc.getConfig());
         this.NEGOTIATE_REQUEST = nego;
         this.flags2 = this.NEGOTIATE_REQUEST.flags2;
-        this.signingEnforced = forceSigning || this.getTransportContext().getConfig().isSigningEnforced();
+        this.signingEnforced = forceSigning || this.getContext().getConfig().isSigningEnforced();
         this.sessionExpiration = System.currentTimeMillis() + tc.getConfig().getSessionTimeout();
         this.capabilities = tc.getConfig().getCapabilities();
         this.address = address;
@@ -141,7 +143,8 @@ public class SmbTransport extends Transport implements SmbConstants {
     /**
      * @return the context associated with this transport connection
      */
-    public CIFSContext getTransportContext () {
+    @Override
+    public CIFSContext getContext () {
         return this.transportContext;
     }
 
@@ -152,19 +155,53 @@ public class SmbTransport extends Transport implements SmbConstants {
      * @see jcifs.util.transport.Transport#acquire()
      */
     @Override
-    public SmbTransport acquire () {
-        return (SmbTransport) super.acquire();
+    public SmbTransportImpl acquire () {
+        return (SmbTransportImpl) super.acquire();
     }
 
 
     /**
      * @return the server's encryption key
      */
+    @Override
     public byte[] getServerEncryptionKey () {
         if ( this.server == null ) {
             return null;
         }
         return this.server.encryptionKey;
+    }
+
+
+    @Override
+    public boolean isSigningOptional () {
+        return ( this.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0 && !this.server.signaturesRequired;
+    }
+
+
+    @Override
+    public boolean isSigningEnforced () {
+        return this.signingEnforced || this.server.signaturesRequired;
+    }
+
+
+    @Override
+    public String getRemoteHostName () {
+        return this.tconHostName;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.SmbTransport#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends SmbTransport> T unwrap ( Class<T> type ) {
+        if ( type.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        throw new ClassCastException();
     }
 
 
@@ -174,17 +211,18 @@ public class SmbTransport extends Transport implements SmbConstants {
      *            context to use
      * @return a session for the context
      */
+    @Override
     @SuppressWarnings ( "resource" )
-    public synchronized SmbSession getSmbSession ( CIFSContext tf ) {
+    public synchronized SmbSessionImpl getSmbSession ( CIFSContext tf ) {
         long now;
 
         if ( log.isTraceEnabled() ) {
             log.trace("Currently " + this.sessions.size() + " session(s) active for " + this);
         }
 
-        ListIterator<SmbSession> iter = this.sessions.listIterator();
+        ListIterator<SmbSessionImpl> iter = this.sessions.listIterator();
         while ( iter.hasNext() ) {
-            SmbSession ssn = iter.next();
+            SmbSessionImpl ssn = iter.next();
             if ( ssn.matches(tf) ) {
                 if ( log.isTraceEnabled() ) {
                     log.trace("Reusing existing session " + ssn);
@@ -201,7 +239,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             this.sessionExpiration = now + tf.getConfig().getSessionTimeout();
             iter = this.sessions.listIterator();
             while ( iter.hasNext() ) {
-                SmbSession ssn = iter.next();
+                SmbSessionImpl ssn = iter.next();
                 if ( ssn.getExpiration() != null && ssn.getExpiration() < now && !ssn.isInUse() ) {
                     if ( log.isDebugEnabled() ) {
                         log.debug("Closing session after timeout " + ssn);
@@ -210,7 +248,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                 }
             }
         }
-        SmbSession ssn = new SmbSession(tf, this);
+        SmbSessionImpl ssn = new SmbSessionImpl(tf, this);
         if ( log.isDebugEnabled() ) {
             log.debug("Establishing new session " + ssn + " on " + this.name);
         }
@@ -219,7 +257,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     }
 
 
-    boolean matches ( UniAddress addr, int prt, InetAddress laddr, int lprt, String hostName ) {
+    boolean matches ( Address addr, int prt, InetAddress laddr, int lprt, String hostName ) {
         if ( hostName == null )
             hostName = addr.getHostName();
         return ( this.tconHostName == null || hostName.equalsIgnoreCase(this.tconHostName) ) && addr.equals(this.address)
@@ -235,6 +273,7 @@ public class SmbTransport extends Transport implements SmbConstants {
      * @return whether the given capability was negotiated
      * @throws SmbException
      */
+    @Override
     public boolean hasCapability ( int cap ) throws SmbException {
         try {
             connect(this.transportContext.getConfig().getResponseTimeout());
@@ -252,18 +291,19 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     void ssn139 () throws IOException {
-        Name calledName = new Name(this.transportContext.getConfig(), this.address.firstCalledName(), 0x20, null);
+        CIFSContext tc = this.transportContext;
+        Name calledName = new Name(tc.getConfig(), this.address.firstCalledName(), 0x20, null);
         do {
             this.socket = new Socket();
             if ( this.localAddr != null )
                 this.socket.bind(new InetSocketAddress(this.localAddr, this.localPort));
-            this.socket.connect(new InetSocketAddress(this.address.getHostAddress(), 139), this.transportContext.getConfig().getConnTimeout());
-            this.socket.setSoTimeout(this.transportContext.getConfig().getSoTimeout());
+            this.socket.connect(new InetSocketAddress(this.address.getHostAddress(), 139), tc.getConfig().getConnTimeout());
+            this.socket.setSoTimeout(tc.getConfig().getSoTimeout());
 
             this.out = this.socket.getOutputStream();
             this.in = this.socket.getInputStream();
 
-            SessionServicePacket ssp = new SessionRequestPacket(calledName, this.transportContext.getNameServiceClient().getLocalName());
+            SessionServicePacket ssp = new SessionRequestPacket(tc.getConfig(), calledName, tc.getNameServiceClient().getLocalName());
             this.out.write(this.sbuf, 0, ssp.writeWireFormat(this.sbuf, 0));
             if ( readn(this.in, this.sbuf, 0, 4) < 4 ) {
                 try {
@@ -299,7 +339,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                 throw new NbtException(NbtException.ERR_SSN_SRVC, 0);
             }
         }
-        while ( ( calledName.name = this.address.nextCalledName(this.getTransportContext()) ) != null );
+        while ( ( calledName.name = this.address.nextCalledName(tc) ) != null );
 
         throw new IOException("Failed to establish session with " + this.address);
     }
@@ -364,7 +404,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             SmbComNegotiateResponse resp;
 
             if ( !this.smb2 ) {
-                resp = new SmbComNegotiateResponse(this.getTransportContext().getConfig(), this.server);
+                resp = new SmbComNegotiateResponse(this.getContext().getConfig(), this.server);
             }
             else {
                 throw new RuntimeCIFSException("SMB2 not yet supported");
@@ -387,7 +427,8 @@ public class SmbTransport extends Transport implements SmbConstants {
      * 
      * @throws SmbException
      */
-    public void connect () throws SmbException {
+    @Override
+    public void ensureConnected () throws SmbException {
         try {
             super.connect(this.transportContext.getConfig().getResponseTimeout());
         }
@@ -419,7 +460,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             throw new SmbException("This client does not support the negotiated dialect.");
         }
         if ( ( this.server.scapabilities & CAP_EXTENDED_SECURITY ) != CAP_EXTENDED_SECURITY && this.server.encryptionKeyLength != 8
-                && this.getTransportContext().getConfig().getLanManCompatibility() == 0 ) {
+                && this.getContext().getConfig().getLanManCompatibility() == 0 ) {
             throw new SmbException("Unexpected encryption key length: " + this.server.encryptionKeyLength);
         }
 
@@ -428,7 +469,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( log.isDebugEnabled() ) {
             log.debug(
                 "Signature negotiation enforced " + this.signingEnforced + " (server " + serverRequireSig + ") enabled "
-                        + this.getTransportContext().getConfig().isSigningEnabled() + " (server " + serverEnableSig + ")");
+                        + this.getContext().getConfig().isSigningEnabled() + " (server " + serverEnableSig + ")");
         }
 
         /* Adjust negotiated values */
@@ -436,7 +477,7 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( this.signingEnforced && !serverEnableSig ) {
             throw new SmbException("Signatures are required but the server does not support them");
         }
-        else if ( this.signingEnforced || serverRequireSig || ( serverEnableSig && this.getTransportContext().getConfig().isSigningEnabled() ) ) {
+        else if ( this.signingEnforced || serverRequireSig || ( serverEnableSig && this.getContext().getConfig().isSigningEnabled() ) ) {
             this.flags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
             if ( this.signingEnforced || this.server.signaturesRequired ) {
                 this.flags2 |= SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;
@@ -461,13 +502,13 @@ public class SmbTransport extends Transport implements SmbConstants {
         if ( ( this.server.scapabilities & CAP_EXTENDED_SECURITY ) == CAP_EXTENDED_SECURITY )
             this.capabilities |= CAP_EXTENDED_SECURITY; // & doesn't copy high bit
 
-        if ( this.getTransportContext().getConfig().isUseUnicode() || this.getTransportContext().getConfig().isForceUnicode() ) {
+        if ( this.getContext().getConfig().isUseUnicode() || this.getContext().getConfig().isForceUnicode() ) {
             this.capabilities |= SmbConstants.CAP_UNICODE;
         }
 
         if ( ( this.capabilities & SmbConstants.CAP_UNICODE ) == 0 ) {
             // server doesn't want unicode
-            if ( this.getTransportContext().getConfig().isForceUnicode() ) {
+            if ( this.getContext().getConfig().isForceUnicode() ) {
                 this.capabilities |= SmbConstants.CAP_UNICODE;
                 this.useUnicode = true;
             }
@@ -477,7 +518,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             }
         }
         else {
-            this.useUnicode = this.getTransportContext().getConfig().isUseUnicode();
+            this.useUnicode = this.getContext().getConfig().isUseUnicode();
         }
 
         if ( this.useUnicode ) {
@@ -496,7 +537,7 @@ public class SmbTransport extends Transport implements SmbConstants {
 
     @Override
     protected synchronized void doDisconnect ( boolean hard, boolean inUse ) throws IOException {
-        ListIterator<SmbSession> iter = this.sessions.listIterator();
+        ListIterator<SmbSessionImpl> iter = this.sessions.listIterator();
 
         long l = getUsageCount();
         if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
@@ -513,7 +554,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             }
             while ( iter.hasNext() ) {
                 @SuppressWarnings ( "resource" )
-                SmbSession ssn = iter.next();
+                SmbSessionImpl ssn = iter.next();
                 try {
                     ssn.logoff(hard, false);
                 }
@@ -617,7 +658,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     protected void doSend ( Request request ) throws IOException {
 
         ServerMessageBlock smb = (ServerMessageBlock) request;
-        byte[] buffer = this.getTransportContext().getBufferCache().getBuffer();
+        byte[] buffer = this.getContext().getBufferCache().getBuffer();
         try {
             int n = smb.encode(buffer, 4);
             Encdec.enc_uint32be(n & 0xFFFF, buffer, 0); /* 4 byte session message header */
@@ -638,7 +679,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             }
         }
         finally {
-            this.getTransportContext().getBufferCache().releaseBuffer(buffer);
+            this.getContext().getBufferCache().releaseBuffer(buffer);
         }
     }
 
@@ -665,7 +706,7 @@ public class SmbTransport extends Transport implements SmbConstants {
     protected void doRecv ( Response response ) throws IOException {
         ServerMessageBlock resp = (ServerMessageBlock) response;
         resp.useUnicode = this.useUnicode;
-        byte[] buffer = this.getTransportContext().getBufferCache().getBuffer();
+        byte[] buffer = this.getContext().getBufferCache().getBuffer();
         try {
             int size;
             synchronized ( this.socketLock ) {
@@ -726,7 +767,7 @@ public class SmbTransport extends Transport implements SmbConstants {
             throw e;
         }
         finally {
-            this.getTransportContext().getBufferCache().releaseBuffer(buffer);
+            this.getContext().getBufferCache().releaseBuffer(buffer);
         }
     }
 
@@ -769,9 +810,9 @@ public class SmbTransport extends Transport implements SmbConstants {
         case NtStatus.NT_STATUS_PATH_NOT_COVERED:
             // samba fails to report the proper status for some operations
         case 0xC00000A2: // NT_STATUS_MEDIA_WRITE_PROTECTED
-            DfsReferral dr = null;
-            if ( !this.getTransportContext().getConfig().isDfsDisabled() ) {
-                dr = getDfsReferrals(getTransportContext(), req.path, 1);
+            DfsReferralData dr = null;
+            if ( !getContext().getConfig().isDfsDisabled() ) {
+                dr = getDfsReferrals(getContext(), req.path, 1);
             }
             if ( dr == null ) {
                 if ( log.isDebugEnabled() ) {
@@ -783,8 +824,8 @@ public class SmbTransport extends Transport implements SmbConstants {
             if ( log.isDebugEnabled() ) {
                 log.debug("Got referral " + dr);
             }
-            this.getTransportContext().getDfs().cache(getTransportContext(), req.path, dr);
-            throw dr;
+            getContext().getDfs().cache(getContext(), req.path, dr);
+            throw new DfsReferral(dr);
         case 0x80000005: /* STATUS_BUFFER_OVERFLOW */
             break; /* normal for DCERPC named pipes */
         case NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED:
@@ -808,7 +849,7 @@ public class SmbTransport extends Transport implements SmbConstants {
 
     void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws SmbException {
 
-        connect(); /* must negotiate before we can test flags2, useUnicode, etc */
+        ensureConnected(); /* must negotiate before we can test flags2, useUnicode, etc */
 
         request.flags2 |= this.flags2;
         request.useUnicode = request.forceUnicode || this.useUnicode;
@@ -843,7 +884,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                      */
                     req.nextElement();
                     if ( req.hasMoreElements() ) {
-                        SmbComBlankResponse interim = new SmbComBlankResponse(getTransportContext().getConfig());
+                        SmbComBlankResponse interim = new SmbComBlankResponse(getContext().getConfig());
                         super.sendrecv(
                             req,
                             interim,
@@ -915,8 +956,8 @@ public class SmbTransport extends Transport implements SmbConstants {
                     }
                 }
                 finally {
-                    this.getTransportContext().getBufferCache().releaseBuffer(req.txn_buf);
-                    this.getTransportContext().getBufferCache().releaseBuffer(resp.txn_buf);
+                    this.getContext().getBufferCache().releaseBuffer(req.txn_buf);
+                    this.getContext().getBufferCache().releaseBuffer(resp.txn_buf);
                 }
 
             }
@@ -943,8 +984,8 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     void setupBuffers ( SmbComTransaction req, SmbComTransactionResponse rsp ) {
-        req.txn_buf = getTransportContext().getBufferCache().getBuffer();
-        rsp.txn_buf = getTransportContext().getBufferCache().getBuffer();
+        req.txn_buf = getContext().getBufferCache().getBuffer();
+        rsp.txn_buf = getContext().getBufferCache().getBuffer();
     }
 
 
@@ -956,7 +997,8 @@ public class SmbTransport extends Transport implements SmbConstants {
 
 
     /* DFS */
-    DfsReferral getDfsReferrals ( CIFSContext ctx, String path, int rn ) throws SmbException {
+    @Override
+    public DfsReferralData getDfsReferrals ( CIFSContext ctx, String path, int rn ) throws SmbException {
         if ( log.isDebugEnabled() ) {
             log.debug("Resolving DFS path " + path);
         }
@@ -965,9 +1007,9 @@ public class SmbTransport extends Transport implements SmbConstants {
             throw new SmbException("Path must not start with double slash: " + path);
         }
 
-        try ( SmbSession sess = getSmbSession(ctx);
-              SmbTransport transport = sess.getTransport();
-              SmbTree ipc = sess.getSmbTree("IPC$", null) ) {
+        try ( SmbSessionImpl sess = getSmbSession(ctx);
+              SmbTransportImpl transport = sess.getTransport();
+              SmbTreeImpl ipc = sess.getSmbTree("IPC$", null) ) {
 
             if ( ( transport.flags2 & SmbConstants.FLAGS2_UNICODE ) == 0 ) {
                 log.debug("Unicode is disabled");
@@ -984,7 +1026,7 @@ public class SmbTransport extends Transport implements SmbConstants {
                 rn = resp.numReferrals;
             }
 
-            DfsReferral dr = new DfsReferral();
+            DfsReferralDataImpl dr = new DfsReferralDataImpl();
 
             String[] arr = new String[4];
             long expiration = System.currentTimeMillis() + ( ctx.getConfig().getDfsTtl() * 1000 );
@@ -995,9 +1037,11 @@ public class SmbTransport extends Transport implements SmbConstants {
                  * NTLM HTTP Authentication must be re-negotiated
                  * with challenge from 'server' to access DFS vol.
                  */
-                if ( ctx.getCredentials() instanceof NtlmPasswordAuthentication ) {
-                    dr.resolveHashes = ( (NtlmPasswordAuthentication) ctx.getCredentials() ).areHashesExternal();
+                NtlmPasswordAuthentication ntlmCreds = ctx.getCredentials().unwrap(NtlmPasswordAuthentication.class);
+                if ( ntlmCreds != null ) {
+                    dr.resolveHashes = ntlmCreds.areHashesExternal();
                 }
+
                 dr.ttl = resp.referrals[ di ].ttl;
                 dr.rflags = resp.referrals[ di ].rflags;
                 dr.expiration = expiration;
@@ -1032,14 +1076,14 @@ public class SmbTransport extends Transport implements SmbConstants {
                 if ( di == rn )
                     break;
 
-                dr.append(new DfsReferral());
-                dr = dr.next;
+                dr.append(new DfsReferralDataImpl());
+                dr = dr.next();
             }
 
             if ( log.isDebugEnabled() ) {
                 log.debug("Got referral " + dr);
             }
-            return dr.next;
+            return dr.next();
         }
     }
 

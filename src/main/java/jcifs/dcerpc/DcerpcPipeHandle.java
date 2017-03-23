@@ -25,8 +25,9 @@ import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.SmbPipeResource;
 import jcifs.smb.SmbNamedPipe;
-import jcifs.smb.SmbPipeHandle;
+import jcifs.smb.SmbPipeHandleInternal;
 import jcifs.smb.SmbPipeInputStream;
 import jcifs.smb.SmbPipeOutputStream;
 import jcifs.util.Encdec;
@@ -38,10 +39,10 @@ import jcifs.util.Encdec;
 public class DcerpcPipeHandle extends DcerpcHandle {
 
     /* This 0x20000 bit is going to get chopped! */
-    final static int pipeFlags = ( 0x2019F << 16 ) | SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT;
+    final static int pipeFlags = ( 0x2019F << 16 ) | SmbPipeResource.PIPE_TYPE_RDWR | SmbPipeResource.PIPE_TYPE_DCE_TRANSACT;
 
     private SmbNamedPipe pipe;
-    private SmbPipeHandle handle;
+    private SmbPipeHandleInternal handle;
     private boolean isStart = true;
 
 
@@ -55,7 +56,7 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     public DcerpcPipeHandle ( String url, CIFSContext tc, boolean unshared ) throws DcerpcException, MalformedURLException {
         super(tc, DcerpcHandle.parseBinding(url));
         this.pipe = new SmbNamedPipe(makePipeUrl(), pipeFlags, unshared, tc);
-        this.handle = this.pipe.openPipe();
+        this.handle = this.pipe.openPipe().unwrap(SmbPipeHandleInternal.class);
     }
 
 
@@ -79,19 +80,19 @@ public class DcerpcPipeHandle extends DcerpcHandle {
 
     @Override
     public CIFSContext getTransportContext () {
-        return this.pipe.getTransportContext();
+        return this.pipe.getContext();
     }
 
 
     @Override
     public String getServer () {
-        return this.pipe.getFileLocator().getServer();
+        return this.pipe.getLocator().getServer();
     }
 
 
     @Override
     public String getServerWithDfs () {
-        return this.pipe.getFileLocator().getServerWithDfs();
+        return this.pipe.getLocator().getServerWithDfs();
     }
 
 
@@ -128,6 +129,7 @@ public class DcerpcPipeHandle extends DcerpcHandle {
             throw new IllegalArgumentException("buffer too small");
 
         SmbPipeInputStream in = this.handle.getInput();
+
         if ( this.isStart && !isDirect ) { // start of new frag, do trans
             off = in.read(buf, 0, 1024);
         }

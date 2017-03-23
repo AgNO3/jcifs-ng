@@ -185,4 +185,16 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
         return this.getCause();
     }
 
+
+    /**
+     * @param e
+     * @return a CIFS exception wrapped in an SmbException
+     */
+    static SmbException wrap ( CIFSException e ) {
+        if ( e instanceof SmbException ) {
+            return (SmbException) e;
+        }
+        return new SmbException(e.getMessage(), e);
+    }
+
 }

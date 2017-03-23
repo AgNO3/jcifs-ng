@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
+import jcifs.SmbConstants;
 import jcifs.util.Hexdump;
 
 
@@ -48,13 +49,13 @@ class NetServerEnum2Response extends SmbComTransactionResponse {
 
         @Override
         public int getType () {
-            return ( this.type & 0x80000000 ) != 0 ? SmbFile.TYPE_WORKGROUP : SmbFile.TYPE_SERVER;
+            return ( this.type & 0x80000000 ) != 0 ? SmbConstants.TYPE_WORKGROUP : SmbConstants.TYPE_SERVER;
         }
 
 
         @Override
         public int getAttributes () {
-            return SmbFile.ATTR_READONLY | SmbFile.ATTR_DIRECTORY;
+            return SmbConstants.ATTR_READONLY | SmbConstants.ATTR_DIRECTORY;
         }
 
 

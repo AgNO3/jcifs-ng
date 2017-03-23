@@ -20,18 +20,12 @@ package jcifs;
 
 import java.net.InetAddress;
 
-import jcifs.netbios.UniAddress;
-import jcifs.smb.SmbException;
-import jcifs.smb.SmbTransport;
-
 
 /**
- * 
- * 
- * This is an internal interface that may require changes, even in minor versions.
+ * This is an internal API for managing pools of SMB connections
  * 
  * @author mbechler
- *
+ * @internal
  */
 public interface SmbTransportPool {
 
@@ -46,7 +40,7 @@ public interface SmbTransportPool {
      *            whether to acquire an unshared connection
      * @return a transport connection to the target
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean exclusive );
+    SmbTransport getSmbTransport ( CIFSContext tc, Address address, int port, boolean exclusive );
 
 
     /**
@@ -62,7 +56,7 @@ public interface SmbTransportPool {
      *            whether to enforce SMB signing on this connection
      * @return a transport connection to the target
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean exclusive, boolean forceSigning );
+    SmbTransport getSmbTransport ( CIFSContext tc, Address address, int port, boolean exclusive, boolean forceSigning );
 
 
     /**
@@ -79,7 +73,7 @@ public interface SmbTransportPool {
      *            whether to acquire an unshared connection
      * @return a transport connection to the target
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+    SmbTransport getSmbTransport ( CIFSContext tc, Address address, int port, InetAddress localAddr, int localPort, String hostName,
             boolean exclusive );
 
 
@@ -97,7 +91,7 @@ public interface SmbTransportPool {
      *            whether to enforce SMB signing on this connection
      * @return a transport connection to the target
      */
-    SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+    SmbTransport getSmbTransport ( CIFSContext tc, Address address, int port, InetAddress localAddr, int localPort, String hostName,
             boolean exclusive, boolean forceSigning );
 
 
@@ -130,9 +124,9 @@ public interface SmbTransportPool {
      * 
      * @param dc
      * @param tc
-     * @throws SmbException
+     * @throws CIFSException
      */
-    void logon ( CIFSContext tc, UniAddress dc ) throws SmbException;
+    void logon ( CIFSContext tc, Address dc ) throws CIFSException;
 
 
     /**
@@ -149,9 +143,9 @@ public interface SmbTransportPool {
      * @param dc
      * @param port
      * @param tc
-     * @throws SmbException
+     * @throws CIFSException
      */
-    void logon ( CIFSContext tc, UniAddress dc, int port ) throws SmbException;
+    void logon ( CIFSContext tc, Address dc, int port ) throws CIFSException;
 
 
     /**
@@ -160,9 +154,9 @@ public interface SmbTransportPool {
      * @param dc
      * @param tc
      * @return NTLM challenge
-     * @throws SmbException
+     * @throws CIFSException
      */
-    byte[] getChallenge ( CIFSContext tc, UniAddress dc ) throws SmbException;
+    byte[] getChallenge ( CIFSContext tc, Address dc ) throws CIFSException;
 
 
     /**
@@ -172,8 +166,8 @@ public interface SmbTransportPool {
      * @param port
      * @param tc
      * @return NTLM challenge
-     * @throws SmbException
+     * @throws CIFSException
      */
-    byte[] getChallenge ( CIFSContext tc, UniAddress dc, int port ) throws SmbException;
+    byte[] getChallenge ( CIFSContext tc, Address dc, int port ) throws CIFSException;
 
 }

@@ -18,18 +18,23 @@
 package jcifs.context;
 
 
+import java.net.MalformedURLException;
 import java.net.URLStreamHandler;
 
+import jcifs.BufferCache;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.Credentials;
+import jcifs.DfsResolver;
+import jcifs.NameServiceClient;
 import jcifs.SidResolver;
+import jcifs.SmbPipeResource;
+import jcifs.SmbResource;
 import jcifs.SmbTransportPool;
-import jcifs.netbios.NameServiceClient;
-import jcifs.smb.BufferCache;
-import jcifs.smb.Dfs;
 import jcifs.smb.Handler;
-import jcifs.smb.SmbCredentials;
+import jcifs.smb.SmbFile;
+import jcifs.smb.SmbNamedPipe;
 
 
 /**
@@ -52,6 +57,41 @@ public class CIFSContextWrapper implements CIFSContext {
     }
 
 
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws CIFSException
+     * 
+     * @see jcifs.CIFSContext#get(java.lang.String)
+     */
+    @Override
+    public SmbResource get ( String url ) throws CIFSException {
+        try {
+            return new SmbFile(url, this);
+        }
+        catch ( MalformedURLException e ) {
+            throw new CIFSException("Invalid URL " + url, e);
+        }
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.CIFSContext#getPipe(java.lang.String, int)
+     */
+    @Override
+    public SmbPipeResource getPipe ( String url, int pipeType ) throws CIFSException {
+        try {
+            return new SmbNamedPipe(url, pipeType, this);
+        }
+        catch ( MalformedURLException e ) {
+            throw new CIFSException("Invalid URL " + url, e);
+        }
+    }
+
+
     protected CIFSContext wrap ( CIFSContext newContext ) {
         return newContext;
     }
@@ -64,13 +104,13 @@ public class CIFSContextWrapper implements CIFSContext {
 
 
     @Override
-    public Dfs getDfs () {
+    public DfsResolver getDfs () {
         return this.delegate.getDfs();
     }
 
 
     @Override
-    public SmbCredentials getCredentials () {
+    public Credentials getCredentials () {
         return this.delegate.getCredentials();
     }
 
@@ -97,7 +137,7 @@ public class CIFSContextWrapper implements CIFSContext {
 
 
     @Override
-    public CIFSContext withCredentials ( SmbCredentials creds ) {
+    public CIFSContext withCredentials ( Credentials creds ) {
         return wrap(this.delegate.withCredentials(creds));
     }
 

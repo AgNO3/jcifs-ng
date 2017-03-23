@@ -28,7 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbFileHandle;
 import jcifs.util.transport.TransportException;
 
 
@@ -60,7 +62,7 @@ public class SmbFileInputStream extends InputStream {
      */
     @SuppressWarnings ( "resource" )
     public SmbFileInputStream ( String url, CIFSContext tc ) throws SmbException, MalformedURLException {
-        this(new SmbFile(url, tc), SmbFile.O_RDONLY, true);
+        this(new SmbFile(url, tc), 0, SmbConstants.O_RDONLY, SmbConstants.DEFAULT_SHARING, true);
     }
 
 
@@ -75,23 +77,26 @@ public class SmbFileInputStream extends InputStream {
      * @throws SmbException
      */
     public SmbFileInputStream ( SmbFile file ) throws SmbException {
-        this(file, SmbFile.O_RDONLY, false);
+        this(file, 0, SmbConstants.O_RDONLY, SmbConstants.DEFAULT_SHARING, false);
     }
 
 
-    SmbFileInputStream ( SmbFile file, int openFlags, boolean unshared ) throws SmbException {
+    SmbFileInputStream ( SmbFile file, int openFlags, int access, int sharing, boolean unshared ) throws SmbException {
         this.file = file;
         this.unsharedFile = unshared;
-        this.openFlags = openFlags & 0xFFFF;
-        this.access = ( openFlags >>> 16 ) & 0xFFFF;
+        this.openFlags = openFlags;
+        this.access = access;
 
-        try ( SmbTreeHandle th = file.ensureTreeConnected() ) {
-            if ( file.getType() != SmbFile.TYPE_NAMED_PIPE ) {
+        try ( SmbTreeHandleInternal th = file.ensureTreeConnected() ) {
+            if ( file.getType() != SmbConstants.TYPE_NAMED_PIPE ) {
                 try ( SmbFileHandle h = ensureOpen() ) {}
-                this.openFlags &= ~ ( SmbFile.O_CREAT | SmbFile.O_TRUNC );
+                this.openFlags &= ~ ( SmbConstants.O_CREAT | SmbConstants.O_TRUNC );
             }
 
             init(th);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 
@@ -104,7 +109,12 @@ public class SmbFileInputStream extends InputStream {
         this.file = file;
         this.handle = fh;
         this.unsharedFile = false;
-        init(th);
+        try {
+            init(th);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
     }
 
 
@@ -113,7 +123,7 @@ public class SmbFileInputStream extends InputStream {
      * @param th
      * @throws SmbException
      */
-    private void init ( SmbTreeHandle th ) throws SmbException {
+    private void init ( SmbTreeHandleInternal th ) throws CIFSException {
         this.readSize = Math.min(th.getReceiveBufferSize() - 70, th.getMaximumBufferSize() - 70);
 
         if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
@@ -138,14 +148,26 @@ public class SmbFileInputStream extends InputStream {
      * @return
      * @throws SmbException
      */
-    synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+    synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
         if ( this.handle == null || !this.handle.isValid() ) {
             // one extra acquire to keep this open till the stream is released
             if ( this.file instanceof SmbNamedPipe ) {
-                this.handle = this.file.openUnshared(SmbFile.O_EXCL, ( (SmbNamedPipe) this.file ).getPipeType() & 0xFF0000, SmbFile.ATTR_NORMAL, 0);
+                this.handle = this.file.openUnshared(
+                    SmbConstants.O_EXCL,
+                    ( (SmbNamedPipe) this.file ).getPipeType() & 0xFF0000,
+                    SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE,
+                    SmbConstants.ATTR_NORMAL,
+                    0);
             }
             else {
-                this.handle = this.file.openUnshared(this.openFlags, this.access, SmbFile.ATTR_NORMAL, 0).acquire();
+                this.handle = this.file
+                        .openUnshared(
+                            this.openFlags,
+                            this.access,
+                            SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE,
+                            SmbConstants.ATTR_NORMAL,
+                            0)
+                        .acquire();
             }
             return this.handle;
         }
@@ -274,12 +296,12 @@ public class SmbFileInputStream extends InputStream {
             SmbComReadAndXResponse response = new SmbComReadAndXResponse(th.getConfig(), b, off);
 
             int type = this.file.getType();
-            if ( type == SmbFile.TYPE_NAMED_PIPE ) {
+            if ( type == SmbConstants.TYPE_NAMED_PIPE ) {
                 response.responseTimeout = 0;
             }
 
             int r, n;
-            int blockSize = ( type == SmbFile.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
+            int blockSize = ( type == SmbConstants.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
             do {
                 r = len > blockSize ? blockSize : len;
 
@@ -289,7 +311,7 @@ public class SmbFileInputStream extends InputStream {
 
                 try {
                     SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fd.getFid(), this.fp, r, null);
-                    if ( type == SmbFile.TYPE_NAMED_PIPE ) {
+                    if ( type == SmbConstants.TYPE_NAMED_PIPE ) {
                         request.minCount = request.maxCount = request.remaining = 1024;
                     }
                     else if ( this.largeReadX ) {
@@ -299,7 +321,7 @@ public class SmbFileInputStream extends InputStream {
                     th.send(request, response, RequestParam.NO_RETRY);
                 }
                 catch ( SmbException se ) {
-                    if ( type == SmbFile.TYPE_NAMED_PIPE && se.getNtStatus() == NtStatus.NT_STATUS_PIPE_BROKEN ) {
+                    if ( type == SmbConstants.TYPE_NAMED_PIPE && se.getNtStatus() == NtStatus.NT_STATUS_PIPE_BROKEN ) {
                         return -1;
                     }
                     throw seToIoe(se);

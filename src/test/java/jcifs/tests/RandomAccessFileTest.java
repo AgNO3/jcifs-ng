@@ -38,7 +38,7 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.smb.SmbException;
+import jcifs.CIFSException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbRandomAccessFile;
 
@@ -70,7 +70,7 @@ public class RandomAccessFileTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSetLength () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testSetLength () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestFile() ) {
             try {
                 long newLength = 4096L;

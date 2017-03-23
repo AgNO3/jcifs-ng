@@ -35,10 +35,10 @@ class SmbComNegotiateResponse extends ServerMessageBlock {
     private static final Logger log = LoggerFactory.getLogger(SmbComNegotiateResponse.class);
 
     int dialectIndex;
-    SmbTransport.ServerData server;
+    SmbTransportImpl.ServerData server;
 
 
-    SmbComNegotiateResponse ( Configuration config, SmbTransport.ServerData server ) {
+    SmbComNegotiateResponse ( Configuration config, SmbTransportImpl.ServerData server ) {
         super(config);
         this.server = server;
     }

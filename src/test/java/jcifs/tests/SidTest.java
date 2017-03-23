@@ -54,7 +54,7 @@ public class SidTest extends BaseCIFSTest {
         s.resolve(getRequiredProperty(TestProperties.TEST_DOMAIN_DC), withTestNTLMCredentials(getContext()));
         assertEquals(getRequiredProperty(TestProperties.TEST_USER_DOMAIN_SHORT), s.getDomainName());
         assertEquals(getTestUser(), s.getAccountName());
-        assertEquals(SID.SID_TYPE_USER, s.getType());
+        assertEquals(jcifs.SID.SID_TYPE_USER, s.getType());
     }
 
 
@@ -65,7 +65,7 @@ public class SidTest extends BaseCIFSTest {
         s.resolve(getRequiredProperty(TestProperties.TEST_DOMAIN_DC), withTestNTLMCredentials(getContext()));
         assertEquals(getRequiredProperty(TestProperties.TEST_USER_DOMAIN_SHORT), s.getDomainName());
         assertEquals(getRequiredProperty(TestProperties.TEST_GROUP_NAME), s.getAccountName());
-        assertEquals(SID.SID_TYPE_DOM_GRP, s.getType());
+        assertEquals(jcifs.SID.SID_TYPE_DOM_GRP, s.getType());
     }
 
 
@@ -79,7 +79,7 @@ public class SidTest extends BaseCIFSTest {
             SID sid = new SID(domsid, rid);
             sid.resolve(getRequiredProperty(TestProperties.TEST_DOMAIN_DC), withTestNTLMCredentials(getContext()));
             assertEquals(getRequiredProperty(TestProperties.TEST_DOMAIN_SHORT), sid.getDomainName());
-            assertEquals(SID.SID_TYPE_USER, sid.getType());
+            assertEquals(jcifs.SID.SID_TYPE_USER, sid.getType());
         }
     }
 
@@ -94,7 +94,7 @@ public class SidTest extends BaseCIFSTest {
             SID sid = new SID(domsid, rid);
             sid.resolve(getRequiredProperty(TestProperties.TEST_DOMAIN_DC), withTestNTLMCredentials(getContext()));
             assertEquals(getRequiredProperty(TestProperties.TEST_DOMAIN_SHORT), sid.getDomainName());
-            assertEquals(SID.SID_TYPE_DOM_GRP, sid.getType());
+            assertEquals(jcifs.SID.SID_TYPE_DOM_GRP, sid.getType());
         }
     }
 

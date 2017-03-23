@@ -1,5 +1,5 @@
 /*
- * © 2016 AgNO3 Gmbh & Co. KG
+ * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,55 +18,37 @@
 package jcifs.smb;
 
 
-import javax.security.auth.Subject;
-
-import jcifs.CIFSContext;
+import jcifs.CIFSException;
+import jcifs.DfsReferralData;
+import jcifs.SmbResourceLocator;
 
 
 /**
  * @author mbechler
  *
  */
-public interface SmbCredentials extends Cloneable {
+public interface SmbResourceLocatorInternal extends SmbResourceLocator {
 
     /**
-     * @return the domain the user account is in
+     * @return whether to enforce the use of signing on connection to this resource
      */
-    String getUserDomain ();
+    boolean shouldForceSigning ();
 
 
     /**
-     * @return whether these are anonymous credentials
+     * @param other
+     * @return whether the paths share a common root
+     * @throws CIFSException
      */
-    boolean isAnonymous ();
+    boolean overlaps ( SmbResourceLocator other ) throws CIFSException;
 
 
     /**
-     * @return whether these are guest credentials
-     */
-    boolean isGuest ();
-
-
-    /**
+     * Internal: for testing only
      * 
-     * @return a copy of the credentials
+     * @param dr
+     * @param reqPath
+     * @return resolved unc path
      */
-    SmbCredentials clone ();
-
-
-    /**
-     * @param tc
-     * @param host
-     * @param initialToken
-     * @param doSigning
-     * @return a new context
-     * @throws SmbException
-     */
-    SSPContext createContext ( CIFSContext tc, String host, byte[] initialToken, boolean doSigning ) throws SmbException;
-
-
-    /**
-     * @return subject associated with the credentials
-     */
-    Subject getSubject ();
+    String handleDFSReferral ( DfsReferralData dr, String reqPath );
 }

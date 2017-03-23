@@ -22,6 +22,8 @@ import java.io.IOException;
 
 
 /**
+ * Base for all checked exceptions used by this library
+ * 
  * @author mbechler
  *
  */

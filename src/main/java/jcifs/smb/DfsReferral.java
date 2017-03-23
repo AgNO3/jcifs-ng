@@ -19,9 +19,15 @@
 package jcifs.smb;
 
 
-import java.util.Map;
+import jcifs.DfsReferralData;
 
 
+/**
+ * 
+ * @author mbechler
+ *
+ * @internal
+ */
 @SuppressWarnings ( "javadoc" )
 public class DfsReferral extends SmbException {
 
@@ -30,39 +36,24 @@ public class DfsReferral extends SmbException {
      */
     private static final long serialVersionUID = 1486630733410281686L;
 
-    public int pathConsumed;
-    public long ttl;
-    public String server; // Server
-    public String share; // Share
-    public String link;
-    public String path; // Path relative to tree from which this referral was thrown
-    public boolean resolveHashes;
-    public long expiration;
-    public int rflags;
-
-    DfsReferral next;
-    Map<String, DfsReferral> map;
-    String key = null;
+    private final DfsReferralData data;
 
 
-    /**
-     * 
-     */
-    public DfsReferral () {
-        this.next = this;
+    public DfsReferralData getData () {
+        return this.data;
     }
 
 
-    void append ( DfsReferral dr ) {
-        dr.next = this.next;
-        this.next = dr;
+    /**
+     * @param dr
+     */
+    public DfsReferral ( DfsReferralData data ) {
+        this.data = data;
     }
 
 
     @Override
     public String toString () {
-        return "DfsReferral[pathConsumed=" + this.pathConsumed + ",server=" + this.server + ",share=" + this.share + ",link=" + this.link + ",path="
-                + this.path + ",ttl=" + this.ttl + ",expiration=" + this.expiration + ",remain=" + ( this.expiration - System.currentTimeMillis() )
-                + ",resolveHashes=" + this.resolveHashes + "]";
+        return this.data.toString();
     }
 }

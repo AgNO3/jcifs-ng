@@ -20,21 +20,17 @@ package jcifs;
 
 import java.net.URLStreamHandler;
 
-import jcifs.netbios.NameServiceClient;
-import jcifs.smb.BufferCache;
-import jcifs.smb.Dfs;
-import jcifs.smb.SmbCredentials;
-
 
 /**
  * Encapsulation of client context
+ * 
  * 
  * A context holds the client configuration, shared services as well as the active credentials.
  * 
  * Usually you will want to create one context per client configuration and then
  * multiple sub-contexts using different credentials (if neccessary).
  * 
- * {@link #withDefaultCredentials()}, {@link #withAnonymousCredentials()}, {@link #withCredentials(SmbCredentials)}
+ * {@link #withDefaultCredentials()}, {@link #withAnonymousCredentials()}, {@link #withCredentials(Credentials)}
  * allow to create such sub-contexts.
  * 
  * 
@@ -47,10 +43,39 @@ import jcifs.smb.SmbCredentials;
 public interface CIFSContext {
 
     /**
+     * Get a resource
+     * 
+     * @param url
+     * @return the SMB resource at the specified location
+     * @throws CIFSException
+     */
+    SmbResource get ( String url ) throws CIFSException;
+
+
+    /**
+     * Get a pipe resource
+     * 
+     * @param url
+     * @param pipeType
+     *            the type of the pipe
+     * @return the SMB pipe resource at the specified location
+     * @throws CIFSException
+     */
+    SmbPipeResource getPipe ( String url, int pipeType ) throws CIFSException;
+
+
+    /**
      * 
      * @throws CIFSException
      */
     void close () throws CIFSException;
+
+
+    /**
+     * 
+     * @return the active configuration
+     */
+    Configuration getConfig ();
 
 
     /**
@@ -72,16 +97,9 @@ public interface CIFSContext {
 
 
     /**
-     * 
-     * @return the active configuration
-     */
-    Configuration getConfig ();
-
-
-    /**
      * @return the DFS instance for this context
      */
-    Dfs getDfs ();
+    DfsResolver getDfs ();
 
 
     /**
@@ -94,7 +112,7 @@ public interface CIFSContext {
      * 
      * @return the used credentials
      */
-    SmbCredentials getCredentials ();
+    Credentials getCredentials ();
 
 
     /**
@@ -133,7 +151,7 @@ public interface CIFSContext {
      * @param creds
      * @return a child context using using the given credentials
      */
-    CIFSContext withCredentials ( SmbCredentials creds );
+    CIFSContext withCredentials ( Credentials creds );
 
 
     /**

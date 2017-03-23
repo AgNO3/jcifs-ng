@@ -18,22 +18,28 @@
 package jcifs.context;
 
 
+import java.net.MalformedURLException;
 import java.net.URLStreamHandler;
 
+import jcifs.BufferCache;
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.Credentials;
+import jcifs.DfsResolver;
+import jcifs.NameServiceClient;
 import jcifs.SidResolver;
+import jcifs.SmbPipeResource;
+import jcifs.SmbResource;
 import jcifs.SmbTransportPool;
-import jcifs.netbios.NameServiceClient;
 import jcifs.netbios.NameServiceClientImpl;
-import jcifs.smb.BufferCache;
 import jcifs.smb.BufferCacheImpl;
-import jcifs.smb.Dfs;
+import jcifs.smb.CredentialsInternal;
 import jcifs.smb.DfsImpl;
 import jcifs.smb.Handler;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SIDCacheImpl;
-import jcifs.smb.SmbCredentials;
+import jcifs.smb.SmbFile;
+import jcifs.smb.SmbNamedPipe;
 import jcifs.smb.SmbTransportPoolImpl;
 
 
@@ -44,13 +50,13 @@ import jcifs.smb.SmbTransportPoolImpl;
 public class BaseContext extends AbstractCIFSContext {
 
     private final Configuration config;
-    private final Dfs dfs;
+    private final DfsResolver dfs;
     private final SidResolver sidResolver;
     private final Handler urlHandler;
     private final NameServiceClient nameServiceClient;
     private final BufferCache bufferCache;
     private final SmbTransportPool transportPool;
-    private final SmbCredentials defaultCredentials;
+    private final CredentialsInternal defaultCredentials;
 
 
     /**
@@ -69,6 +75,41 @@ public class BaseContext extends AbstractCIFSContext {
         this.bufferCache = new BufferCacheImpl(this.config);
         this.transportPool = new SmbTransportPoolImpl();
         this.defaultCredentials = new NtlmPasswordAuthentication(this, null, null, null);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws CIFSException
+     * 
+     * @see jcifs.CIFSContext#get(java.lang.String)
+     */
+    @Override
+    public SmbResource get ( String url ) throws CIFSException {
+        try {
+            return new SmbFile(url, this);
+        }
+        catch ( MalformedURLException e ) {
+            throw new CIFSException("Invalid URL " + url, e);
+        }
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.CIFSContext#getPipe(java.lang.String, int)
+     */
+    @Override
+    public SmbPipeResource getPipe ( String url, int pipeType ) throws CIFSException {
+        try {
+            return new SmbNamedPipe(url, pipeType, this);
+        }
+        catch ( MalformedURLException e ) {
+            throw new CIFSException("Invalid URL " + url, e);
+        }
     }
 
 
@@ -95,7 +136,7 @@ public class BaseContext extends AbstractCIFSContext {
      * @see jcifs.CIFSContext#getDfs()
      */
     @Override
-    public Dfs getDfs () {
+    public DfsResolver getDfs () {
         return this.dfs;
     }
 
@@ -150,7 +191,7 @@ public class BaseContext extends AbstractCIFSContext {
      * @see jcifs.context.AbstractCIFSContext#getDefaultCredentials()
      */
     @Override
-    protected SmbCredentials getDefaultCredentials () {
+    protected Credentials getDefaultCredentials () {
         return this.defaultCredentials;
     }
 

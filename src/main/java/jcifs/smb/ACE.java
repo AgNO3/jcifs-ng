@@ -62,103 +62,10 @@ import jcifs.util.Hexdump;
  * <tt>WNET\alice</tt> is in the local <tt>Administrators</tt> group the access check
  * will succeed because the inherited ACE allows local <tt>Administrators</tt>
  * both <tt>FILE_READ_DATA</tt> and <tt>FILE_WRITE_DATA</tt> access.
+ * 
+ * @internal
  */
-
-public class ACE {
-
-    /**
-     * 
-     */
-    public static final int FILE_READ_DATA = 0x00000001; // 1
-    /**
-     * 
-     */
-    public static final int FILE_WRITE_DATA = 0x00000002; // 2
-    /**
-     * 
-     */
-    public static final int FILE_APPEND_DATA = 0x00000004; // 3
-    /**
-     * 
-     */
-    public static final int FILE_READ_EA = 0x00000008; // 4
-    /**
-     * 
-     */
-    public static final int FILE_WRITE_EA = 0x00000010; // 5
-    /**
-     * 
-     */
-    public static final int FILE_EXECUTE = 0x00000020; // 6
-    /**
-     * 
-     */
-    public static final int FILE_DELETE = 0x00000040; // 7
-    /**
-     * 
-     */
-    public static final int FILE_READ_ATTRIBUTES = 0x00000080; // 8
-    /**
-     * 
-     */
-    public static final int FILE_WRITE_ATTRIBUTES = 0x00000100; // 9
-    /**
-     * 
-     */
-    public static final int DELETE = 0x00010000; // 16
-    /**
-     * 
-     */
-    public static final int READ_CONTROL = 0x00020000; // 17
-    /**
-     * 
-     */
-    public static final int WRITE_DAC = 0x00040000; // 18
-    /**
-     * 
-     */
-    public static final int WRITE_OWNER = 0x00080000; // 19
-    /**
-     * 
-     */
-    public static final int SYNCHRONIZE = 0x00100000; // 20
-    /**
-     * 
-     */
-    public static final int GENERIC_ALL = 0x10000000; // 28
-    /**
-     * 
-     */
-    public static final int GENERIC_EXECUTE = 0x20000000; // 29
-    /**
-     * 
-     */
-    public static final int GENERIC_WRITE = 0x40000000; // 30
-    /**
-     * 
-     */
-    public static final int GENERIC_READ = 0x80000000; // 31
-
-    /**
-     * 
-     */
-    public static final int FLAGS_OBJECT_INHERIT = 0x01;
-    /**
-     * 
-     */
-    public static final int FLAGS_CONTAINER_INHERIT = 0x02;
-    /**
-     * 
-     */
-    public static final int FLAGS_NO_PROPAGATE = 0x04;
-    /**
-     * 
-     */
-    public static final int FLAGS_INHERIT_ONLY = 0x08;
-    /**
-     * 
-     */
-    public static final int FLAGS_INHERITED = 0x10;
+public class ACE implements jcifs.ACE {
 
     boolean allow;
     int flags;
@@ -166,49 +73,25 @@ public class ACE {
     SID sid;
 
 
-    /**
-     * Returns true if this ACE is an allow ACE and false if it is a deny ACE.
-     * 
-     * @return whether this in an allow ACE
-     */
+    @Override
     public boolean isAllow () {
         return this.allow;
     }
 
 
-    /**
-     * Returns true if this ACE is an inherited ACE and false if it is a direct ACE.
-     * <p>
-     * Note: For reasons not fully understood, <tt>FLAGS_INHERITED</tt> may
-     * not be set within all security descriptors even though the ACE was in
-     * face inherited. If an inherited ACE is added to a parent the Windows
-     * ACL editor will rebuild all children ACEs and set this flag accordingly.
-     * 
-     * @return whether this is an inherited ACE
-     */
+    @Override
     public boolean isInherited () {
         return ( this.flags & FLAGS_INHERITED ) != 0;
     }
 
 
-    /**
-     * Returns the flags for this ACE. The <tt>isInherited()</tt>
-     * method checks the <tt>FLAGS_INHERITED</tt> bit in these flags.
-     * 
-     * @return the ACE falgs
-     */
+    @Override
     public int getFlags () {
         return this.flags;
     }
 
 
-    /**
-     * Returns the 'Apply To' text for inheritance of ACEs on
-     * directories such as 'This folder, subfolder and files'. For
-     * files the text is always 'This object only'.
-     * 
-     * @return descriptive text for the ACE scope
-     */
+    @Override
     public String getApplyToText () {
         switch ( this.flags & ( FLAGS_OBJECT_INHERIT | FLAGS_CONTAINER_INHERIT | FLAGS_INHERIT_ONLY ) ) {
         case 0x00:
@@ -230,24 +113,13 @@ public class ACE {
     }
 
 
-    /**
-     * Returns the access mask accociated with this ACE. Use the
-     * constants for <tt>FILE_READ_DATA</tt>, <tt>FILE_WRITE_DATA</tt>,
-     * <tt>READ_CONTROL</tt>, <tt>GENERIC_ALL</tt>, etc with bitwise
-     * operators to determine which bits of the mask are on or off.
-     * 
-     * @return the access mask
-     */
+    @Override
     public int getAccessMask () {
         return this.access;
     }
 
 
-    /**
-     * Return the SID associated with this ACE.
-     * 
-     * @return ACE target SID
-     */
+    @Override
     public SID getSID () {
         return this.sid;
     }

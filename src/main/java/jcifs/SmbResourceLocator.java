@@ -15,20 +15,19 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.smb;
+package jcifs;
 
 
 import java.net.URL;
-import java.net.UnknownHostException;
-
-import jcifs.netbios.UniAddress;
 
 
 /**
+ * Location information for a SMB resource
+ * 
  * @author mbechler
  *
  */
-public interface SmbFileLocator {
+public interface SmbResourceLocator {
 
     /**
      * Returns the last component of the target URL. This will
@@ -150,15 +149,9 @@ public interface SmbFileLocator {
 
     /**
      * @return resolved server address
-     * @throws UnknownHostException
+     * @throws CIFSException
      */
-    UniAddress getAddress () throws UnknownHostException;
-
-
-    /**
-     * @return whether to enforce the use of signing on connection to this resource
-     */
-    boolean shouldForceSigning ();
+    Address getAddress () throws CIFSException;
 
 
     /**
@@ -173,16 +166,16 @@ public interface SmbFileLocator {
      * @return <tt>TYPE_FILESYSTEM, TYPE_WORKGROUP, TYPE_SERVER,
      * TYPE_NAMED_PIPE</tt>, or <tt>TYPE_SHARE</tt> in which case it may be either <tt>TYPE_SHARE</tt>,
      *         <tt>TYPE_PRINTER</tt> or <tt>TYPE_COMM</tt>.
-     * @throws SmbException
+     * @throws CIFSException
      */
-    int getType () throws SmbException;
+    int getType () throws CIFSException;
 
 
     /**
      * @return whether this is a workgroup reference
-     * @throws UnknownHostException
+     * @throws CIFSException
      */
-    boolean isWorkgroup () throws UnknownHostException;
+    boolean isWorkgroup () throws CIFSException;
 
 
     /**
@@ -190,23 +183,5 @@ public interface SmbFileLocator {
      * @return whether this is a root resource
      */
     boolean isRoot ();
-
-
-    /**
-     * @param other
-     * @return whether the paths share a common root
-     * @throws UnknownHostException
-     */
-    boolean overlaps ( SmbFileLocator other ) throws UnknownHostException;
-
-
-    /**
-     * Internal: for testing only
-     * 
-     * @param dr
-     * @param reqPath
-     * @return resolved unc path
-     */
-    String handleDFSReferral ( DfsReferral dr, String reqPath );
 
 }

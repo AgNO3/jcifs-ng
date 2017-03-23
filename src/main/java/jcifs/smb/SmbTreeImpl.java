@@ -25,19 +25,22 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbTree;
 import jcifs.util.transport.TransportException;
 
 
-class SmbTree implements AutoCloseable {
+class SmbTreeImpl implements SmbTreeInternal {
 
-    private static final Logger log = LoggerFactory.getLogger(SmbTree.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbTreeImpl.class);
 
     private static AtomicLong TREE_CONN_COUNTER = new AtomicLong();
 
@@ -47,15 +50,16 @@ class SmbTree implements AutoCloseable {
      * 2 - connected
      * 3 - disconnecting
      */
-    private int connectionState;
-    private int tid;
+    private final AtomicInteger connectionState = new AtomicInteger();
 
-    private String share;
-    private String service = "?????";
-    private String service0;
-    private SmbSession session;
-    private boolean inDfs, inDomainDfs;
-    private long tree_num; // used by SmbFile.isOpen
+    private final String share;
+    private final String service0;
+    private final SmbSessionImpl session;
+
+    private volatile int tid;
+    private volatile String service = "?????";
+    private volatile boolean inDfs, inDomainDfs;
+    private volatile long tree_num; // used by SmbFile.isOpen
 
     private final AtomicLong usageCount = new AtomicLong(0);
     private boolean sessionAcquired = true;
@@ -65,14 +69,13 @@ class SmbTree implements AutoCloseable {
     private final List<StackTraceElement[]> releases;
 
 
-    SmbTree ( SmbSession session, String share, String service ) {
+    SmbTreeImpl ( SmbSessionImpl session, String share, String service ) {
         this.session = session.acquire();
         this.share = share.toUpperCase();
         if ( service != null && !service.startsWith("??") ) {
             this.service = service;
         }
         this.service0 = this.service;
-        this.connectionState = 0;
 
         this.traceResource = this.session.getConfig().isTraceResourceUsage();
         if ( this.traceResource ) {
@@ -93,16 +96,31 @@ class SmbTree implements AutoCloseable {
 
     @Override
     public boolean equals ( Object obj ) {
-        if ( obj instanceof SmbTree ) {
-            SmbTree tree = (SmbTree) obj;
+        if ( obj instanceof SmbTreeImpl ) {
+            SmbTreeImpl tree = (SmbTreeImpl) obj;
             return matches(tree.share, tree.service);
         }
         return false;
     }
 
 
-    public SmbTree acquire () {
+    public SmbTreeImpl acquire () {
         return acquire(true);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.SmbTree#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends SmbTree> T unwrap ( Class<T> type ) {
+        if ( type.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        throw new ClassCastException();
     }
 
 
@@ -110,7 +128,7 @@ class SmbTree implements AutoCloseable {
      * @param track
      * @return tree with increased usage count
      */
-    public SmbTree acquire ( boolean track ) {
+    public SmbTreeImpl acquire ( boolean track ) {
         long usage = this.usageCount.incrementAndGet();
         if ( log.isTraceEnabled() ) {
             log.trace("Acquire tree " + usage + " " + this);
@@ -193,7 +211,7 @@ class SmbTree implements AutoCloseable {
         for ( int i = s; i < e; i++ ) {
             StackTraceElement se = stackTrace[ i ];
 
-            if ( i == s && SmbTree.class.getName().equals(se.getClassName()) && "close".equals(se.getMethodName()) ) {
+            if ( i == s && SmbTreeImpl.class.getName().equals(se.getClassName()) && "close".equals(se.getMethodName()) ) {
                 s++;
                 continue;
             }
@@ -228,7 +246,7 @@ class SmbTree implements AutoCloseable {
      * @return whether the tree is connected
      */
     public boolean isConnected () {
-        return this.session.isConnected() && this.connectionState == 2;
+        return this.session.isConnected() && this.connectionState.get() == 2;
     }
 
 
@@ -267,7 +285,7 @@ class SmbTree implements AutoCloseable {
     /**
      * @return the session this tree is connected in
      */
-    public SmbSession getSession () {
+    public SmbSessionImpl getSession () {
         return this.session.acquire();
     }
 
@@ -297,7 +315,7 @@ class SmbTree implements AutoCloseable {
 
 
     void markConnected () {
-        this.connectionState = 2;
+        this.connectionState.set(2);
     }
 
 
@@ -318,17 +336,31 @@ class SmbTree implements AutoCloseable {
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws SmbException {
-        try ( SmbSession sess = getSession();
-              SmbTransport transport = sess.getTransport() ) {
+        try ( SmbSessionImpl sess = getSession();
+              SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
                 if ( response != null ) {
                     response.received = false;
                 }
-                treeConnect(request, response);
+
+                // try TreeConnectAndX with the request
+                // this does not make any sense if we are disconnecting right now
+                if ( ! ( request instanceof SmbComTreeDisconnect ) ) {
+                    treeConnect(request, response);
+                }
                 if ( request == null || ( response != null && response.received ) ) {
                     return;
                 }
+
+                // fall trough if the tree connection is already established
+                // and send it as a separate request instread
+
                 String svc = this.service;
+
+                if ( svc == null ) {
+                    throw new SmbException("Service is null");
+                }
+
                 checkRequest(transport, request, svc);
                 request.tid = this.tid;
                 if ( this.inDfs && !svc.equals("IPC") && request.path != null && request.path.length() > 0 ) {
@@ -367,7 +399,7 @@ class SmbTree implements AutoCloseable {
      * @param request
      * @throws SmbException
      */
-    private static void checkRequest ( SmbTransport transport, ServerMessageBlock request, String svc ) throws SmbException {
+    private static void checkRequest ( SmbTransportImpl transport, ServerMessageBlock request, String svc ) throws SmbException {
         if ( !"A:".equals(svc) ) {
             switch ( request.command ) {
             case ServerMessageBlock.SMB_COM_OPEN_ANDX:
@@ -400,24 +432,28 @@ class SmbTree implements AutoCloseable {
     }
 
 
-    synchronized void treeConnect ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException {
-        try ( SmbSession sess = getSession();
-              SmbTransport transport = sess.getTransport() ) {
+    void treeConnect ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException {
+        try ( SmbSessionImpl sess = getSession();
+              SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
-                String unc;
-
-                while ( this.connectionState != 0 ) {
-                    if ( this.connectionState == 2 || this.connectionState == 3 ) // connected or disconnecting
-                        return;
-                    try {
-                        log.debug("Waiting for transport");
-                        transport.wait();
-                    }
-                    catch ( InterruptedException ie ) {
-                        throw new SmbException(ie.getMessage(), ie);
-                    }
+                if ( waitForState(transport) == 2 ) {
+                    // already connected
+                    return;
                 }
-                this.connectionState = 1; // trying ...
+                int before = this.connectionState.getAndSet(1);
+                if ( before == 1 ) {
+                    // concurrent connection attempt
+                    if ( waitForState(transport) == 2 ) {
+                        // finished connecting
+                        return;
+                    }
+                    // failure to connect
+                    throw new SmbException("Tree disconnected while waiting for connection");
+                }
+                else if ( before == 2 ) {
+                    // concurrently connected
+                    return;
+                }
 
                 try {
                     /*
@@ -427,9 +463,9 @@ class SmbTree implements AutoCloseable {
                      */
 
                     log.debug("Connecting transport");
-                    transport.connect();
+                    transport.ensureConnected();
 
-                    unc = "\\\\" + transport.tconHostName + '\\' + this.share;
+                    String unc = "\\\\" + transport.tconHostName + '\\' + this.share;
 
                     /*
                      * IBM iSeries doesn't like specifying a service. Always reset
@@ -448,14 +484,14 @@ class SmbTree implements AutoCloseable {
                     SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(sess.getConfig(), andxResponse);
                     SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess, unc, svc, andx);
 
-                    for ( int retries = 0; retries < 1 + sess.getTransportContext().getConfig().getMaxRequestRetries(); retries++ ) {
+                    for ( int retries = 0; retries < 1 + sess.getContext().getConfig().getMaxRequestRetries(); retries++ ) {
                         try {
                             sess.send(request, response);
                             break;
                         }
                         catch ( SmbException se ) {
                             if ( se.getCause() instanceof TransportException ) {
-                                log.debug("Retrying tree connect");
+                                log.debug("Disconnecting transport for retry");
                                 try {
                                     transport.disconnect(true);
                                 }
@@ -472,11 +508,15 @@ class SmbTree implements AutoCloseable {
                     this.inDfs = response.shareIsInDfs;
                     this.tree_num = TREE_CONN_COUNTER.incrementAndGet();
 
-                    this.connectionState = 2; // connected
+                    this.connectionState.set(2); // connected
                 }
                 catch ( SmbException se ) {
-                    treeDisconnect(true, true);
-                    this.connectionState = 0;
+                    try {
+                        treeDisconnect(true, true);
+                    }
+                    finally {
+                        this.connectionState.set(0);
+                    }
                     throw se;
                 }
                 finally {
@@ -487,14 +527,59 @@ class SmbTree implements AutoCloseable {
     }
 
 
+    /**
+     * @param transport
+     * @return
+     * @throws SmbException
+     */
+    private int waitForState ( SmbTransportImpl transport ) throws SmbException {
+        int cs;
+        while ( ( cs = this.connectionState.get() ) != 0 ) {
+            if ( cs == 2 ) {
+                return cs;
+            }
+            if ( cs == 3 ) {
+                throw new SmbException("Disconnecting during tree connect");
+            }
+            try {
+                log.debug("Waiting for transport");
+                transport.wait();
+            }
+            catch ( InterruptedException ie ) {
+                throw new SmbException(ie.getMessage(), ie);
+            }
+        }
+        return cs;
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbTreeInternal#connectLogon(jcifs.CIFSContext)
+     */
+    @Override
+    public void connectLogon ( CIFSContext tf ) throws SmbException {
+        if ( tf.getConfig().getLogonShare() == null ) {
+            treeConnect(null, null);
+        }
+        else {
+            Trans2FindFirst2 req = new Trans2FindFirst2(tf.getConfig(), "\\", "*", SmbConstants.ATTR_DIRECTORY);
+            Trans2FindFirst2Response resp = new Trans2FindFirst2Response(tf.getConfig());
+            send(req, resp);
+        }
+    }
+
+
     void treeDisconnect ( boolean inError, boolean inUse ) {
-        try ( SmbSession sess = getSession();
-              SmbTransport transport = sess.getTransport() ) {
+        try ( SmbSessionImpl sess = getSession();
+              SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
 
-                if ( this.connectionState != 2 ) // not-connected
+                if ( this.connectionState.getAndSet(3) != 2 ) {
                     return;
-                this.connectionState = 3; // disconnecting
+                }
 
                 long l = this.usageCount.get();
                 if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
@@ -515,10 +600,9 @@ class SmbTree implements AutoCloseable {
                 }
                 this.inDfs = false;
                 this.inDomainDfs = false;
-                this.connectionState = 0;
+                this.connectionState.set(0);
                 transport.notifyAll();
             }
-
         }
     }
 

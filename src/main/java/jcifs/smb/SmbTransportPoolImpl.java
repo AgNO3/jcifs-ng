@@ -26,46 +26,47 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbTransport;
 import jcifs.SmbTransportPool;
-import jcifs.netbios.UniAddress;
 
 
 /**
  * @author mbechler
- *
+ * @internal
  */
 public class SmbTransportPoolImpl implements SmbTransportPool {
 
     private static final Logger log = LoggerFactory.getLogger(SmbTransportPoolImpl.class);
 
-    private final List<SmbTransport> connections = new LinkedList<>();
-    private final List<SmbTransport> nonPooledConnections = new LinkedList<>();
+    private final List<SmbTransportImpl> connections = new LinkedList<>();
+    private final List<SmbTransportImpl> nonPooledConnections = new LinkedList<>();
 
 
     @Override
-    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean nonPooled ) {
+    public SmbTransportImpl getSmbTransport ( CIFSContext tc, Address address, int port, boolean nonPooled ) {
         return getSmbTransport(tc, address, port, tc.getConfig().getLocalAddr(), tc.getConfig().getLocalPort(), null, nonPooled);
     }
 
 
     @Override
-    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, boolean nonPooled, boolean forceSigning ) {
+    public SmbTransportImpl getSmbTransport ( CIFSContext tc, Address address, int port, boolean nonPooled, boolean forceSigning ) {
         return getSmbTransport(tc, address, port, tc.getConfig().getLocalAddr(), tc.getConfig().getLocalPort(), null, nonPooled, forceSigning);
     }
 
 
     @Override
-    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+    public SmbTransportImpl getSmbTransport ( CIFSContext tc, Address address, int port, InetAddress localAddr, int localPort, String hostName,
             boolean nonPooled ) {
         return getSmbTransport(tc, address, port, localAddr, localPort, hostName, nonPooled, false);
     }
 
 
     @Override
-    public SmbTransport getSmbTransport ( CIFSContext tc, UniAddress address, int port, InetAddress localAddr, int localPort, String hostName,
+    public SmbTransportImpl getSmbTransport ( CIFSContext tc, Address address, int port, InetAddress localAddr, int localPort, String hostName,
             boolean nonPooled, boolean forceSigning ) {
         if ( port <= 0 ) {
             port = SmbConstants.DEFAULT_PORT;
@@ -76,7 +77,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                 log.trace("Exclusive " + nonPooled + " enforced signing " + forceSigning);
             }
             if ( !nonPooled && tc.getConfig().getSessionLimit() != 1 ) {
-                for ( SmbTransport conn : this.connections ) {
+                for ( SmbTransportImpl conn : this.connections ) {
                     if ( conn.matches(address, port, localAddr, localPort, hostName)
                             && ( tc.getConfig().getSessionLimit() == 0 || conn.sessions.size() < tc.getConfig().getSessionLimit() ) ) {
 
@@ -109,7 +110,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                     }
                 }
             }
-            SmbTransport conn = new SmbTransport(tc, negotiate, address, port, localAddr, localPort, forceSigning);
+            SmbTransportImpl conn = new SmbTransportImpl(tc, negotiate, address, port, localAddr, localPort, forceSigning);
             if ( log.isDebugEnabled() ) {
                 log.debug("New transport connection " + conn);
             }
@@ -157,9 +158,9 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     public void close () throws CIFSException {
         synchronized ( this.connections ) {
             log.debug("Closing pool");
-            List<SmbTransport> toClose = new LinkedList<>(this.connections);
+            List<SmbTransportImpl> toClose = new LinkedList<>(this.connections);
             toClose.addAll(this.nonPooledConnections);
-            for ( SmbTransport conn : toClose ) {
+            for ( SmbTransportImpl conn : toClose ) {
                 try {
                     conn.disconnect(false, false);
                 }
@@ -174,40 +175,35 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
 
     @Override
-    public byte[] getChallenge ( CIFSContext tf, UniAddress dc ) throws SmbException {
+    public byte[] getChallenge ( CIFSContext tf, Address dc ) throws SmbException {
         return getChallenge(tf, dc, 0);
     }
 
 
     @Override
-    public byte[] getChallenge ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
-        try ( SmbTransport trans = tf.getTransportPool()
-                .getSmbTransport(tf, dc, port, false, !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced()) ) {
-            trans.connect();
-            return trans.server.encryptionKey;
+    public byte[] getChallenge ( CIFSContext tf, Address dc, int port ) throws SmbException {
+        try ( SmbTransportInternal trans = tf.getTransportPool()
+                .getSmbTransport(tf, dc, port, false, !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced())
+                .unwrap(SmbTransportInternal.class) ) {
+            trans.ensureConnected();
+            return trans.getServerEncryptionKey();
         }
     }
 
 
     @Override
-    public void logon ( CIFSContext tf, UniAddress dc ) throws SmbException {
+    public void logon ( CIFSContext tf, Address dc ) throws SmbException {
         logon(tf, dc, 0);
     }
 
 
     @Override
-    public void logon ( CIFSContext tf, UniAddress dc, int port ) throws SmbException {
-        try ( SmbTransport smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced());
-              SmbSession smbSession = smbTransport.getSmbSession(tf);
-              SmbTree tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null) ) {
-            if ( tf.getConfig().getLogonShare() == null ) {
-                tree.treeConnect(null, null);
-            }
-            else {
-                Trans2FindFirst2 req = new Trans2FindFirst2(smbSession.getConfig(), "\\", "*", SmbFile.ATTR_DIRECTORY);
-                Trans2FindFirst2Response resp = new Trans2FindFirst2Response(smbSession.getConfig());
-                tree.send(req, resp);
-            }
+    public void logon ( CIFSContext tf, Address dc, int port ) throws SmbException {
+        try ( SmbTransportInternal smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced())
+                .unwrap(SmbTransportInternal.class);
+              SmbSessionInternal smbSession = smbTransport.getSmbSession(tf).unwrap(SmbSessionInternal.class);
+              SmbTreeInternal tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null).unwrap(SmbTreeInternal.class) ) {
+            tree.connectLogon(tf);
         }
     }
 

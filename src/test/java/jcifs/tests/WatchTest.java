@@ -44,10 +44,11 @@ import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.smb.FileNotifyInformation;
-import jcifs.smb.SmbException;
+import jcifs.CIFSException;
+import jcifs.FileNotifyInformation;
+import jcifs.SmbResource;
+import jcifs.SmbWatchHandle;
 import jcifs.smb.SmbFile;
-import jcifs.smb.SmbWatchHandle;
 
 
 /**
@@ -112,10 +113,10 @@ public class WatchTest extends BaseCIFSTest {
 
 
     @Test
-    public void testWatchCreate () throws SmbException, MalformedURLException, UnknownHostException, InterruptedException, ExecutionException {
+    public void testWatchCreate () throws CIFSException, MalformedURLException, UnknownHostException, InterruptedException, ExecutionException {
         try ( SmbWatchHandle w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false) ) {
             setupWatch(w);
-            try ( SmbFile cr = new SmbFile(this.base, "created") ) {
+            try ( SmbResource cr = new SmbFile(this.base, "created") ) {
                 cr.createNewFile();
                 assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
             }
@@ -153,12 +154,12 @@ public class WatchTest extends BaseCIFSTest {
     public void testWatchInBetween () throws InterruptedException, ExecutionException, IOException {
         try ( SmbWatchHandle w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, false) ) {
             setupWatch(w);
-            try ( SmbFile cr = new SmbFile(this.base, "created") ) {
+            try ( SmbResource cr = new SmbFile(this.base, "created") ) {
                 cr.createNewFile();
                 assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "created", null);
             }
 
-            try ( SmbFile cr = new SmbFile(this.base, "created2") ) {
+            try ( SmbResource cr = new SmbFile(this.base, "created2") ) {
                 cr.createNewFile();
             }
 
@@ -218,7 +219,7 @@ public class WatchTest extends BaseCIFSTest {
         }
         boolean found = false;
         for ( FileNotifyInformation fi : notifications ) {
-            if ( fi.action == action && fi.fileName.equals(name) ) {
+            if ( fi.getAction() == action && fi.getFileName().equals(name) ) {
                 found = true;
             }
         }

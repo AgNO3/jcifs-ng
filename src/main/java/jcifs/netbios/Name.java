@@ -21,6 +21,7 @@ package jcifs.netbios;
 
 
 import jcifs.Configuration;
+import jcifs.NetbiosName;
 import jcifs.util.Hexdump;
 import jcifs.util.Strings;
 
@@ -29,7 +30,7 @@ import jcifs.util.Strings;
  * 
  * 
  */
-public class Name {
+public class Name implements NetbiosName {
 
     private static final int TYPE_OFFSET = 31;
     private static final int SCOPE_OFFSET = 33;
@@ -59,6 +60,34 @@ public class Name {
 
 
     /**
+     * @return the name
+     */
+    @Override
+    public String getName () {
+        return this.name;
+    }
+
+
+    /**
+     * @return scope id
+     */
+    @Override
+    public String getScope () {
+        return this.scope;
+    }
+
+
+    /**
+     * 
+     * @return the name type
+     */
+    @Override
+    public int getNameType () {
+        return this.hexCode;
+    }
+
+
+    /**
      * 
      * @param cfg
      * @param name
@@ -74,6 +103,21 @@ public class Name {
         this.hexCode = hexCode;
         this.scope = scope != null && scope.length() > 0 ? scope : cfg.getNetbiosScope();
         this.srcHashCode = 0;
+    }
+
+
+    /**
+     * @param cfg
+     * @param name
+     */
+    public Name ( Configuration cfg, NetbiosName name ) {
+        this.config = cfg;
+        this.name = name.getName();
+        this.hexCode = name.getNameType();
+        this.scope = name.getScope();
+        if ( name instanceof Name ) {
+            this.srcHashCode = ( (Name) name ).srcHashCode;
+        }
     }
 
 

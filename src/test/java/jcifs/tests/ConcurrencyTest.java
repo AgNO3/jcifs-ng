@@ -45,6 +45,8 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.SmbConstants;
+import jcifs.SmbResource;
 import jcifs.smb.NtStatus;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -95,7 +97,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
     public void testExclusiveLock () throws InterruptedException, MalformedURLException, UnknownHostException {
         String fname = makeRandomName();
         try ( SmbFile sr = getDefaultShareRoot();
-              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+              SmbResource exclFile = new SmbFile(sr, fname) ) {
             ExclusiveLockFirst f = new ExclusiveLockFirst(exclFile);
             ExclusiveLockSecond s = new ExclusiveLockSecond(f, exclFile);
 
@@ -111,9 +113,9 @@ public class ConcurrencyTest extends BaseCIFSTest {
     public void testDeleteLocked () throws IOException {
         String fname = makeRandomName();
         try ( SmbFile sr = getDefaultShareRoot();
-              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+              SmbResource exclFile = new SmbFile(sr, fname) ) {
 
-            try ( OutputStream s = exclFile.getOutputStream() ) {
+            try ( OutputStream s = exclFile.openOutputStream(false, SmbConstants.FILE_NO_SHARE) ) {
                 try {
                     exclFile.delete();
                     fail("Could remove locked file");
@@ -136,10 +138,10 @@ public class ConcurrencyTest extends BaseCIFSTest {
     public void testOpenLocked () throws IOException {
         String fname = makeRandomName();
         try ( SmbFile sr = getDefaultShareRoot();
-              SmbFile exclFile = new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE) ) {
+              SmbResource exclFile = new SmbFile(sr, fname) ) {
 
-            try ( OutputStream s = exclFile.getOutputStream();
-                  InputStream is = exclFile.getInputStream() ) {}
+            try ( OutputStream s = exclFile.openOutputStream(false, SmbConstants.FILE_NO_SHARE);
+                  InputStream is = exclFile.openInputStream(SmbConstants.FILE_NO_SHARE) ) {}
             catch ( SmbException e ) {
                 if ( e.getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
                     return;
@@ -159,14 +161,14 @@ public class ConcurrencyTest extends BaseCIFSTest {
 
         private Object shutdownLock = new Object();
         private volatile boolean shutdown;
-        private SmbFile file;
+        private SmbResource file;
 
 
         /**
          * @param smbFile
          * 
          */
-        public ExclusiveLockFirst ( SmbFile smbFile ) {
+        public ExclusiveLockFirst ( SmbResource smbFile ) {
             this.file = smbFile;
         }
 
@@ -197,10 +199,10 @@ public class ConcurrencyTest extends BaseCIFSTest {
         public void run () {
 
             try {
-                SmbFile f = this.file;
+                SmbResource f = this.file;
                 f.createNewFile();
                 try {
-                    try ( OutputStream os = f.getOutputStream() ) {
+                    try ( OutputStream os = f.openOutputStream(false, SmbConstants.FILE_NO_SHARE) ) {
                         log.debug("Open1");
                         synchronized ( this.startedLock ) {
                             this.started = true;
@@ -232,14 +234,14 @@ public class ConcurrencyTest extends BaseCIFSTest {
     private class ExclusiveLockSecond extends MultiTestCase {
 
         private ExclusiveLockFirst first;
-        private SmbFile file;
+        private SmbResource file;
 
 
         /**
          * @param f
          * @param smbFile
          */
-        public ExclusiveLockSecond ( ExclusiveLockFirst f, SmbFile smbFile ) {
+        public ExclusiveLockSecond ( ExclusiveLockFirst f, SmbResource smbFile ) {
             this.first = f;
             this.file = smbFile;
         }
@@ -253,9 +255,9 @@ public class ConcurrencyTest extends BaseCIFSTest {
         @Override
         public void run () {
             try {
-                SmbFile f = this.file;
+                SmbResource f = this.file;
                 this.first.waitForStart();
-                try ( OutputStream os = f.getOutputStream() ) {
+                try ( OutputStream os = f.openOutputStream(false, SmbConstants.FILE_NO_SHARE) ) {
                     log.debug("Open2");
                 }
                 catch ( IOException e ) {
@@ -283,19 +285,19 @@ public class ConcurrencyTest extends BaseCIFSTest {
         String fname = makeRandomName();
 
         try ( SmbFile sr = getDefaultShareRoot();
-              SmbFile f = new SmbFile(sr, fname) ) {
+              SmbResource f = new SmbFile(sr, fname) ) {
             try {
                 f.createNewFile();
                 final AtomicInteger failCount = new AtomicInteger();
                 final AtomicInteger writeCount = new AtomicInteger();
                 List<MultiTestCase> runnables = new ArrayList<>();
                 for ( int i = 0; i < n; i++ ) {
-                    runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(sr, fname, SmbFile.FILE_NO_SHARE)));
+                    runnables.add(new LockedWritesTest(failCount, writeCount, new SmbFile(sr, fname)));
                 }
                 runMultiTestCase(runnables, 20);
 
                 int readCnt = 0;
-                try ( InputStream is = f.getInputStream() ) {
+                try ( InputStream is = f.openInputStream(SmbConstants.FILE_NO_SHARE) ) {
                     while ( is.read() >= 0 ) {
                         readCnt++;
                     }
@@ -337,7 +339,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
          */
         @Override
         public void run () {
-            try ( SmbFileOutputStream out = new SmbFileOutputStream(this.file, true) ) {
+            try ( SmbFileOutputStream out = this.file.openOutputStream(true, SmbConstants.FILE_NO_SHARE) ) {
                 out.write(0xAA);
                 this.writeCount.incrementAndGet();
                 this.completed = true;
@@ -394,16 +396,16 @@ public class ConcurrencyTest extends BaseCIFSTest {
         public void run () {
 
             try {
-                try ( SmbFile f = createTestFile() ) {
+                try ( SmbResource f = createTestFile() ) {
                     try {
                         f.exists();
-                        try ( OutputStream os = f.getOutputStream() ) {
+                        try ( OutputStream os = f.openOutputStream(false, SmbConstants.FILE_NO_SHARE) ) {
                             os.write(new byte[] {
                                 1, 2, 3, 4, 5, 6, 7, 8
                             });
                         }
 
-                        try ( InputStream is = f.getInputStream() ) {
+                        try ( InputStream is = f.openInputStream(SmbConstants.FILE_NO_SHARE) ) {
                             byte data[] = new byte[8];
                             is.read(data);
                         }

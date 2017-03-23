@@ -18,50 +18,16 @@
 package jcifs.smb;
 
 
-import jcifs.Configuration;
+import jcifs.CIFSException;
+import jcifs.SmbSession;
+import jcifs.SmbTreeHandle;
 
 
 /**
  * @author mbechler
  *
  */
-public interface SmbTreeHandle extends AutoCloseable {
-
-    /**
-     * 
-     * @throws SmbException
-     */
-    void ensureDFSResolved () throws SmbException;
-
-
-    /**
-     * @param cap
-     * @return whether the capabiltiy is present
-     * @throws SmbException
-     */
-    boolean hasCapability ( int cap ) throws SmbException;
-
-
-    /**
-     * @return the tree is connected
-     */
-    boolean isConnected ();
-
-
-    /**
-     * @return the active configuration
-     */
-    Configuration getConfig ();
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see java.lang.AutoCloseable#close()
-     */
-    @Override
-    void close () throws SmbException;
-
+public interface SmbTreeHandleInternal extends SmbTreeHandle {
 
     /**
      * 
@@ -70,34 +36,19 @@ public interface SmbTreeHandle extends AutoCloseable {
 
 
     /**
-     * @return server timezone offset
+     * 
+     * @throws SmbException
+     * @throws CIFSException
      */
-    long getServerTimeZoneOffset ();
+    void ensureDFSResolved () throws CIFSException;
 
 
     /**
-     * @return server reported domain name
+     * @param cap
+     * @return whether the capabiltiy is present
+     * @throws CIFSException
      */
-    String getOEMDomainName ();
-
-
-    /**
-     * @return the service we are connected to
-     */
-    String getConnectedService ();
-
-
-    /**
-     * @return the share we are connected to
-     */
-    String getConnectedShare ();
-
-
-    /**
-     * @param th
-     * @return whether the handles refer to the same tree
-     */
-    boolean isSameTree ( SmbTreeHandleImpl th );
+    boolean hasCapability ( int cap ) throws CIFSException;
 
 
     /**
@@ -130,5 +81,4 @@ public interface SmbTreeHandle extends AutoCloseable {
      * @return attached session
      */
     SmbSession getSession ();
-
 }

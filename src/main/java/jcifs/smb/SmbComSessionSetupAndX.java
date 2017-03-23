@@ -31,17 +31,17 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
     private int sessionKey, capabilities;
     private String accountName, primaryDomain;
 
-    SmbSession session;
+    SmbSessionImpl session;
     Object cred;
 
 
-    SmbComSessionSetupAndX ( SmbSession session, ServerMessageBlock andx, Object cred ) throws SmbException, GeneralSecurityException {
+    SmbComSessionSetupAndX ( SmbSessionImpl session, ServerMessageBlock andx, Object cred ) throws SmbException, GeneralSecurityException {
         super(session.getConfig(), andx);
         this.command = SMB_COM_SESSION_SETUP_ANDX;
         this.session = session;
         this.cred = cred;
 
-        try ( SmbTransport transport = session.getTransport() ) {
+        try ( SmbTransportImpl transport = session.getTransport() ) {
             this.sessionKey = transport.sessionKey;
             this.capabilities = transport.capabilities;
 
@@ -69,14 +69,14 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
                             this.accountName = this.accountName.toUpperCase();
                         this.primaryDomain = a.getUserDomain() != null ? a.getUserDomain().toUpperCase() : "?";
                         if ( transport.server.encryptedPasswords ) {
-                            this.lmHash = a.getAnsiHash(session.getTransportContext(), transport.server.encryptionKey);
-                            this.ntHash = a.getUnicodeHash(session.getTransportContext(), transport.server.encryptionKey);
+                            this.lmHash = a.getAnsiHash(session.getContext(), transport.server.encryptionKey);
+                            this.ntHash = a.getUnicodeHash(session.getContext(), transport.server.encryptionKey);
                             // prohibit HTTP auth attempts for the null session
                             if ( this.lmHash.length == 0 && this.ntHash.length == 0 ) {
                                 throw new RuntimeException("Null setup prohibited.");
                             }
                         }
-                        else if ( session.getTransportContext().getConfig().isDisablePlainTextPasswords() ) {
+                        else if ( session.getContext().getConfig().isDisablePlainTextPasswords() ) {
                             throw new RuntimeException("Plain text passwords are disabled");
                         }
                         else {
@@ -133,7 +133,7 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
     int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
 
-        try ( SmbTransport transport = this.session.getTransport() ) {
+        try ( SmbTransportImpl transport = this.session.getTransport() ) {
             SMBUtil.writeInt2(transport.snd_buf_size, dst, dstIndex);
             dstIndex += 2;
             SMBUtil.writeInt2(transport.maxMpxCount, dst, dstIndex);
@@ -202,7 +202,7 @@ class SmbComSessionSetupAndX extends AndXServerMessageBlock {
 
     @Override
     public String toString () {
-        try ( SmbTransport transport = this.session.getTransport() ) {
+        try ( SmbTransportImpl transport = this.session.getTransport() ) {
             String result = new String(
                 "SmbComSessionSetupAndX[" + super.toString() + ",snd_buf_size=" + transport.snd_buf_size + ",maxMpxCount=" + transport.maxMpxCount
                         + ",VC_NUMBER=" + getConfig().getVcNumber() + ",sessionKey=" + this.sessionKey + ",lmHash.length="

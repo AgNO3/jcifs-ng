@@ -40,14 +40,15 @@ import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbSession;
 
 
 /**
  *
  */
-public final class SmbSession implements AutoCloseable {
+final class SmbSessionImpl implements SmbSessionInternal {
 
-    private static final Logger log = LoggerFactory.getLogger(SmbSession.class);
+    private static final Logger log = LoggerFactory.getLogger(SmbSessionImpl.class);
 
     /*
      * 0 - not connected
@@ -57,15 +58,15 @@ public final class SmbSession implements AutoCloseable {
      */
     private int connectionState;
     private int uid;
-    private List<SmbTree> trees;
+    private List<SmbTreeImpl> trees;
 
-    private final SmbTransport transport;
+    private final SmbTransportImpl transport;
     private long expiration;
     private String netbiosName = null;
 
     private CIFSContext transportContext;
 
-    private SmbCredentials credentials;
+    private CredentialsInternal credentials;
     private byte[] sessionKey;
     private boolean extendedSecurity;
 
@@ -73,18 +74,19 @@ public final class SmbSession implements AutoCloseable {
     private boolean transportAcquired = true;
 
 
-    SmbSession ( CIFSContext tf, SmbTransport transport ) {
+    SmbSessionImpl ( CIFSContext tf, SmbTransportImpl transport ) {
         this.transportContext = tf;
         this.transport = transport.acquire();
         this.trees = new ArrayList<>();
         this.connectionState = 0;
-        this.credentials = tf.getCredentials().clone();
+        this.credentials = tf.getCredentials().unwrap(CredentialsInternal.class).clone();
     }
 
 
     /**
      * @return the configuration used by this session
      */
+    @Override
     public Configuration getConfig () {
         return this.transportContext.getConfig();
     }
@@ -93,15 +95,31 @@ public final class SmbSession implements AutoCloseable {
     /**
      * @return whether the session is in use
      */
+    @Override
     public boolean isInUse () {
         return this.usageCount.get() > 0;
     }
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.SmbSession#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends SmbSession> T unwrap ( Class<T> type ) {
+        if ( type.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        throw new ClassCastException();
+    }
+
+
+    /**
      * @return session increased usage count
      */
-    public SmbSession acquire () {
+    public SmbSessionImpl acquire () {
         long usage = this.usageCount.incrementAndGet();
         if ( log.isTraceEnabled() ) {
             log.trace("Acquire session " + usage + " " + this);
@@ -175,6 +193,7 @@ public final class SmbSession implements AutoCloseable {
      * @return the sessionKey
      * @throws CIFSException
      */
+    @Override
     public byte[] getSessionKey () throws CIFSException {
         if ( this.sessionKey == null ) {
             throw new CIFSException("No session key available");
@@ -183,16 +202,17 @@ public final class SmbSession implements AutoCloseable {
     }
 
 
-    synchronized SmbTree getSmbTree ( String share, String service ) {
+    @Override
+    public synchronized SmbTreeImpl getSmbTree ( String share, String service ) {
         if ( share == null ) {
             share = "IPC$";
         }
-        for ( SmbTree t : this.trees ) {
+        for ( SmbTreeImpl t : this.trees ) {
             if ( t.matches(share, service) ) {
                 return t.acquire();
             }
         }
-        SmbTree t = new SmbTree(this, share, service);
+        SmbTreeImpl t = new SmbTreeImpl(this, share, service);
         t.acquire();
         this.trees.add(t);
         return t;
@@ -200,12 +220,17 @@ public final class SmbSession implements AutoCloseable {
 
 
     /**
-     * Establish a tree connection
+     * Establish a tree connection with the configured logon share
      * 
      * @throws SmbException
      */
-    public void treeConnect () throws SmbException {
-        try ( SmbTree t = this.getSmbTree(this.getTransportContext().getConfig().getLogonShare(), null) ) {
+    @Override
+    public void treeConnectLogon () throws SmbException {
+        String logonShare = getContext().getConfig().getLogonShare();
+        if ( logonShare == null || logonShare.isEmpty() ) {
+            throw new SmbException("Logon share is not defined");
+        }
+        try ( SmbTreeImpl t = getSmbTree(logonShare, null) ) {
             t.treeConnect(null, null);
         }
     }
@@ -226,7 +251,7 @@ public final class SmbSession implements AutoCloseable {
 
 
     void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws SmbException {
-        try ( SmbTransport trans = getTransport() ) {
+        try ( SmbTransportImpl trans = getTransport() ) {
             synchronized ( trans ) {
                 if ( response != null ) {
                     response.received = false;
@@ -301,7 +326,7 @@ public final class SmbSession implements AutoCloseable {
 
 
     void sessionSetup ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException, GeneralSecurityException {
-        try ( SmbTransport trans = getTransport() ) {
+        try ( SmbTransportImpl trans = getTransport() ) {
             synchronized ( trans ) {
 
                 while ( this.connectionState != 0 ) {
@@ -317,7 +342,7 @@ public final class SmbSession implements AutoCloseable {
                 this.connectionState = 1; // trying ...
 
                 try {
-                    trans.connect();
+                    trans.ensureConnected();
 
                     /*
                      * Session Setup And X Request / Response
@@ -356,7 +381,7 @@ public final class SmbSession implements AutoCloseable {
      * @param andx
      * @param andxResponse
      */
-    private void sessionSetup2 ( final SmbTransport trans, ServerMessageBlock andx, ServerMessageBlock andxResponse )
+    private void sessionSetup2 ( final SmbTransportImpl trans, ServerMessageBlock andx, ServerMessageBlock andxResponse )
             throws SmbException, GeneralSecurityException {
         SmbException ex = null;
         SmbComSessionSetupAndX request = null;
@@ -374,7 +399,7 @@ public final class SmbSession implements AutoCloseable {
                     state = 20; /* NTLMSSP */
                     break;
                 }
-                else if ( this.getTransportContext().getConfig().isForceExtendedSecurity() ) {
+                else if ( getContext().getConfig().isForceExtendedSecurity() ) {
                     throw new SmbException("Server does not supported extended security");
                 }
 
@@ -386,7 +411,7 @@ public final class SmbSession implements AutoCloseable {
                 NtlmPasswordAuthentication npa = (NtlmPasswordAuthentication) this.credentials;
 
                 request = new SmbComSessionSetupAndX(this, andx, this.getCredentials());
-                response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), andxResponse);
+                response = new SmbComSessionSetupAndXResponse(getContext().getConfig(), andxResponse);
                 response.extendedSecurity = false;
 
                 /*
@@ -395,18 +420,18 @@ public final class SmbSession implements AutoCloseable {
                  * blank password initializes signing.
                  */
                 if ( !anonymous && trans.isSignatureSetupRequired() ) {
-                    if ( npa.areHashesExternal() && this.getTransportContext().getConfig().getDefaultPassword() != null ) {
+                    if ( npa.areHashesExternal() && getContext().getConfig().getDefaultPassword() != null ) {
                         /*
                          * preauthentication
                          */
-                        try ( SmbSession smbSession = trans.getSmbSession(this.getTransportContext().withDefaultCredentials());
-                              SmbTree t = smbSession.getSmbTree(this.getTransportContext().getConfig().getLogonShare(), null) ) {
+                        try ( SmbSessionImpl smbSession = trans.getSmbSession(getContext().withDefaultCredentials());
+                              SmbTreeImpl t = smbSession.getSmbTree(getContext().getConfig().getLogonShare(), null) ) {
                             t.treeConnect(null, null);
                         }
                     }
                     else {
                         log.debug("Initialize signing");
-                        byte[] signingKey = npa.getSigningKey(this.getTransportContext(), trans.server.encryptionKey);
+                        byte[] signingKey = npa.getSigningKey(getContext(), trans.server.encryptionKey);
                         if ( signingKey == null ) {
                             throw new SmbException("Need a signature key but the server did not provide one");
                         }
@@ -462,7 +487,7 @@ public final class SmbSession implements AutoCloseable {
                     }
 
                     if ( s == null ) {
-                        ctx = this.credentials.createContext(this.getTransportContext(), host, trans.server.encryptionKey, doSigning);
+                        ctx = this.credentials.createContext(getContext(), host, trans.server.encryptionKey, doSigning);
                     }
                     else {
                         try {
@@ -471,7 +496,7 @@ public final class SmbSession implements AutoCloseable {
 
                                 @Override
                                 public SSPContext run () throws Exception {
-                                    return getCredentials().createContext(getTransportContext(), hostName, trans.server.encryptionKey, doSigning);
+                                    return getCredentials().createContext(getContext(), hostName, trans.server.encryptionKey, doSigning);
                                 }
 
                             });
@@ -545,7 +570,7 @@ public final class SmbSession implements AutoCloseable {
                         log.trace("Not yet initializing signing");
                     }
 
-                    response = new SmbComSessionSetupAndXResponse(this.getTransportContext().getConfig(), null);
+                    response = new SmbComSessionSetupAndXResponse(getContext().getConfig(), null);
                     response.extendedSecurity = true;
 
                     request.uid = this.getUid();
@@ -623,7 +648,7 @@ public final class SmbSession implements AutoCloseable {
 
 
     void logoff ( boolean inError, boolean inUse ) {
-        try ( SmbTransport trans = getTransport() ) {
+        try ( SmbTransportImpl trans = getTransport() ) {
             synchronized ( trans ) {
 
                 if ( this.connectionState != 2 ) // not-connected
@@ -638,10 +663,10 @@ public final class SmbSession implements AutoCloseable {
 
                 long us = this.usageCount.get();
                 if ( ( inUse && us != 1 ) || ( !inUse && us > 0 ) ) {
-                    log.warn("Logging off session while still " + us + " in use " + this + ":" + this.trees);
+                    log.warn("Logging off session while still in use " + this + ":" + this.trees);
                 }
 
-                for ( SmbTree t : this.trees ) {
+                for ( SmbTreeImpl t : this.trees ) {
                     try {
                         t.treeDisconnect(inError, false);
                     }
@@ -700,15 +725,17 @@ public final class SmbSession implements AutoCloseable {
     /**
      * @return the context this session is attached to
      */
-    public CIFSContext getTransportContext () {
-        return this.transport.getTransportContext();
+    @Override
+    public CIFSContext getContext () {
+        return this.transport.getContext();
     }
 
 
     /**
      * @return the transport this session is attached to
      */
-    public SmbTransport getTransport () {
+    @Override
+    public SmbTransportImpl getTransport () {
         return this.transport.acquire();
     }
 
@@ -732,7 +759,7 @@ public final class SmbSession implements AutoCloseable {
     /**
      * @return this session's credentials
      */
-    public SmbCredentials getCredentials () {
+    public CredentialsInternal getCredentials () {
         return this.credentials;
     }
 

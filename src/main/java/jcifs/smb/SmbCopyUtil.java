@@ -20,11 +20,11 @@ package jcifs.smb;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.UnknownHostException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.SmbConstants;
 
 
@@ -49,25 +49,27 @@ final class SmbCopyUtil {
      * @throws SmbException
      * @throws SmbAuthException
      */
-    static SmbFileHandleImpl openCopyTargetFile ( SmbFile dest, int attrs ) throws SmbException, SmbAuthException {
+    static SmbFileHandleImpl openCopyTargetFile ( SmbFile dest, int attrs ) throws CIFSException {
         try {
             return dest.openUnshared(
-                SmbFile.O_CREAT | SmbFile.O_WRONLY | SmbFile.O_TRUNC,
+                SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_TRUNC,
                 SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES,
+                SmbConstants.FILE_NO_SHARE,
                 attrs,
                 0);
         }
         catch ( SmbAuthException sae ) {
             log.trace("copyTo0", sae);
             int dattrs = dest.getAttributes();
-            if ( ( dattrs & SmbFile.ATTR_READONLY ) != 0 ) {
+            if ( ( dattrs & SmbConstants.ATTR_READONLY ) != 0 ) {
                 /*
                  * Remove READONLY and try again
                  */
-                dest.setPathInformation(dattrs & ~SmbFile.ATTR_READONLY, 0L, 0L, 0L);
+                dest.setPathInformation(dattrs & ~SmbConstants.ATTR_READONLY, 0L, 0L, 0L);
                 return dest.openUnshared(
-                    SmbFile.O_CREAT | SmbFile.O_WRONLY | SmbFile.O_TRUNC,
+                    SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_TRUNC,
                     SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES,
+                    SmbConstants.FILE_NO_SHARE,
                     attrs,
                     0);
             }
@@ -89,11 +91,17 @@ final class SmbCopyUtil {
      */
     static void copyFile ( SmbFile src, SmbFile dest, byte[][] b, int bsize, WriterThread w, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh )
             throws SmbException {
-        try ( SmbFileHandleImpl sfd = src.openUnshared(SmbFile.O_RDONLY, 0, SmbFile.ATTR_NORMAL, 0);
+        try ( SmbFileHandleImpl sfd = src.openUnshared(0, SmbConstants.O_RDONLY, SmbConstants.FILE_SHARE_READ, SmbConstants.ATTR_NORMAL, 0);
               SmbFileInputStream fis = new SmbFileInputStream(src, sh, sfd) ) {
             int attrs = src.getAttributes();
             try ( SmbFileHandleImpl dfd = openCopyTargetFile(dest, attrs);
-                  SmbFileOutputStream fos = new SmbFileOutputStream(dest, dh, dfd) ) {
+                  SmbFileOutputStream fos = new SmbFileOutputStream(
+                      dest,
+                      dh,
+                      dfd,
+                      SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_TRUNC,
+                      SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES,
+                      SmbConstants.FILE_NO_SHARE) ) {
                 long mtime = src.lastModified();
                 long ctime = src.createTime();
                 long atime = src.lastAccess();
@@ -142,7 +150,7 @@ final class SmbCopyUtil {
             }
         }
         catch ( IOException se ) {
-            if ( !src.getTransportContext().getConfig().isIgnoreCopyToException() ) {
+            if ( !src.getContext().getConfig().isIgnoreCopyToException() ) {
                 throw new SmbException("Failed to copy file from [" + src.toString() + "] to [" + dest.toString() + "]", se);
             }
             log.debug("Copy failed", se);
@@ -162,9 +170,9 @@ final class SmbCopyUtil {
      * @throws SmbException
      */
     static void copyDir ( SmbFile src, SmbFile dest, byte[][] b, int bsize, WriterThread w, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh )
-            throws SmbException {
+            throws CIFSException {
         int i;
-        String path = dest.getFileLocator().getUNCPath();
+        String path = dest.getLocator().getUNCPath();
         if ( path.length() > 1 ) {
             try {
                 dest.mkdir();
@@ -183,14 +191,14 @@ final class SmbCopyUtil {
             }
         }
 
-        SmbFile[] files = src.listFiles("*", SmbFile.ATTR_DIRECTORY | SmbFile.ATTR_HIDDEN | SmbFile.ATTR_SYSTEM, null, null);
+        SmbFile[] files = src.listFiles("*", SmbConstants.ATTR_DIRECTORY | SmbConstants.ATTR_HIDDEN | SmbConstants.ATTR_SYSTEM, null, null);
         try {
             for ( i = 0; i < files.length; i++ ) {
                 try ( SmbFile ndest = new SmbFile(
                     dest,
-                    files[ i ].getFileLocator().getName(),
+                    files[ i ].getLocator().getName(),
                     true,
-                    files[ i ].getFileLocator().getType(),
+                    files[ i ].getLocator().getType(),
                     files[ i ].getAttributes(),
                     files[ i ].createTime(),
                     files[ i ].lastModified(),
@@ -204,9 +212,6 @@ final class SmbCopyUtil {
                     }
                 }
             }
-        }
-        catch ( UnknownHostException uhe ) {
-            throw new SmbException(src.getURL().toString(), uhe);
         }
         catch ( MalformedURLException mue ) {
             throw new SmbException(src.getURL().toString(), mue);

@@ -19,13 +19,14 @@
 package jcifs.smb;
 
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbFileHandle;
+import jcifs.SmbRandomAccess;
 import jcifs.util.Encdec;
 
 
@@ -34,7 +35,7 @@ import jcifs.util.Encdec;
  * 
  *
  */
-public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable {
+public class SmbRandomAccessFile implements SmbRandomAccess {
 
     private static final int WRITE_OPTIONS = 0x0842;
 
@@ -49,20 +50,22 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
 
     private SmbFileHandleImpl handle;
 
+    private int sharing;
+
 
     /**
      * Instantiate a random access file from URL
      * 
      * @param url
      * @param mode
-     * @param shareAccess
+     * @param sharing
      * @param tc
      * @throws SmbException
      * @throws MalformedURLException
      */
     @SuppressWarnings ( "resource" )
-    public SmbRandomAccessFile ( String url, String mode, int shareAccess, CIFSContext tc ) throws SmbException, MalformedURLException {
-        this(new SmbFile(url, tc, shareAccess), mode, true);
+    public SmbRandomAccessFile ( String url, String mode, int sharing, CIFSContext tc ) throws SmbException, MalformedURLException {
+        this(new SmbFile(url, tc), mode, sharing, true);
     }
 
 
@@ -74,7 +77,7 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @throws SmbException
      */
     public SmbRandomAccessFile ( SmbFile file, String mode ) throws SmbException {
-        this(file, mode, false);
+        this(file, mode, SmbConstants.DEFAULT_SHARING, false);
     }
 
 
@@ -85,16 +88,17 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @param mode
      * @throws SmbException
      */
-    private SmbRandomAccessFile ( SmbFile file, String mode, boolean unshared ) throws SmbException {
+    SmbRandomAccessFile ( SmbFile file, String mode, int sharing, boolean unsharedFile ) throws SmbException {
         this.file = file;
-        this.unsharedFile = unshared;
+        this.sharing = sharing;
+        this.unsharedFile = unsharedFile;
 
-        try ( SmbTreeHandle th = this.file.ensureTreeConnected() ) {
+        try ( SmbTreeHandleInternal th = this.file.ensureTreeConnected() ) {
             if ( mode.equals("r") ) {
-                this.openFlags = SmbFile.O_CREAT | SmbFile.O_RDONLY;
+                this.openFlags = SmbConstants.O_CREAT | SmbConstants.O_RDONLY;
             }
             else if ( mode.equals("rw") ) {
-                this.openFlags = SmbFile.O_CREAT | SmbFile.O_RDWR | SmbFile.O_APPEND;
+                this.openFlags = SmbConstants.O_CREAT | SmbConstants.O_RDWR | SmbConstants.O_APPEND;
                 this.write_andx_resp = new SmbComWriteAndXResponse(th.getConfig());
                 this.options = WRITE_OPTIONS;
                 this.access = SmbConstants.FILE_READ_DATA | SmbConstants.FILE_WRITE_DATA;
@@ -109,17 +113,18 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
 
             if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
                 this.largeReadX = true;
-                this.readSize = Math.min(
-                    file.getTransportContext().getConfig().getRecieveBufferSize() - 70,
-                    th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
+                this.readSize = Math.min(th.getConfig().getRecieveBufferSize() - 70, th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
             }
 
             // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE
             if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
-                this.writeSize = Math.min(file.getTransportContext().getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
+                this.writeSize = Math.min(th.getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
             }
 
             this.fp = 0L;
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 
@@ -155,11 +160,11 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
      * @return
      * @throws SmbException
      */
-    synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+    synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
         // ensure file is open
         if ( this.handle == null || !this.handle.isValid() ) {
             // one extra acquire to keep this open till the stream is released
-            this.handle = this.file.openUnshared(this.openFlags, this.access, SmbFile.ATTR_NORMAL, this.options).acquire();
+            this.handle = this.file.openUnshared(this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, this.options).acquire();
             return this.handle;
         }
         return this.handle.acquire();
@@ -175,7 +180,12 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
     public synchronized void close () throws SmbException {
         try {
             if ( this.handle != null ) {
-                this.handle.close();
+                try {
+                    this.handle.close();
+                }
+                catch ( CIFSException e ) {
+                    throw SmbException.wrap(e);
+                }
                 this.handle = null;
             }
         }
@@ -219,7 +229,12 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
                     request.openTimeout = ( r >> 16 ) & 0xFFFF;
                 }
 
-                th.send(request, response, RequestParam.NO_RETRY);
+                try {
+                    th.send(request, response, RequestParam.NO_RETRY);
+                }
+                catch ( CIFSException e ) {
+                    throw SmbException.wrap(e);
+                }
                 if ( ( n = response.dataLength ) <= 0 ) {
                     return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
                 }
@@ -230,6 +245,9 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
             while ( len > 0 && n == r );
 
             return (int) ( this.fp - start );
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 
@@ -291,12 +309,20 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
             do {
                 w = len > this.writeSize ? this.writeSize : len;
                 SmbComWriteAndX request = new SmbComWriteAndX(th.getConfig(), fh.getFid(), this.fp, len - w, b, off, w, null);
-                th.send(request, this.write_andx_resp, RequestParam.NO_RETRY);
+                try {
+                    th.send(request, this.write_andx_resp, RequestParam.NO_RETRY);
+                }
+                catch ( CIFSException e ) {
+                    throw SmbException.wrap(e);
+                }
                 this.fp += this.write_andx_resp.count;
                 len -= this.write_andx_resp.count;
                 off += this.write_andx_resp.count;
             }
             while ( len > 0 );
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 
@@ -348,6 +374,9 @@ public class SmbRandomAccessFile implements DataOutput, DataInput, AutoCloseable
             // TODO: is there a way to make this 64-bit safe
             SmbComWriteResponse rsp = new SmbComWriteResponse(th.getConfig());
             th.send(new SmbComWrite(th.getConfig(), fh.getFid(), (int) ( newLength & 0xFFFFFFFFL ), 0, this.tmp, 0, 0), rsp, RequestParam.NO_RETRY);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 

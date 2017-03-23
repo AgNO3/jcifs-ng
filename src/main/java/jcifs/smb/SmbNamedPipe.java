@@ -23,6 +23,8 @@ package jcifs.smb;
 import java.net.MalformedURLException;
 
 import jcifs.CIFSContext;
+import jcifs.SmbPipeHandle;
+import jcifs.SmbPipeResource;
 
 
 /**
@@ -107,42 +109,7 @@ import jcifs.CIFSContext;
  *
  */
 
-public class SmbNamedPipe extends SmbFile {
-
-    /**
-     * The pipe should be opened read-only.
-     */
-
-    public static final int PIPE_TYPE_RDONLY = O_RDONLY;
-
-    /**
-     * The pipe should be opened only for writing.
-     */
-
-    public static final int PIPE_TYPE_WRONLY = O_WRONLY;
-
-    /**
-     * The pipe should be opened for both reading and writing.
-     */
-
-    public static final int PIPE_TYPE_RDWR = O_RDWR;
-
-    /**
-     * Pipe operations should behave like the <code>CallNamedPipe</code> Win32 Named Pipe function.
-     */
-
-    public static final int PIPE_TYPE_CALL = 0x0100;
-
-    /**
-     * Pipe operations should behave like the <code>TransactNamedPipe</code> Win32 Named Pipe function.
-     */
-
-    public static final int PIPE_TYPE_TRANSACT = 0x0200;
-
-    /**
-     * Pipe is used for DCE
-     */
-    public static final int PIPE_TYPE_DCE_TRANSACT = 0x0200 | 0x0400;
+public class SmbNamedPipe extends SmbFile implements SmbPipeResource {
 
     private final int pipeType;
 
@@ -165,7 +132,7 @@ public class SmbNamedPipe extends SmbFile {
         super(url, tc);
         this.pipeType = pipeType;
         setNonPooled(unshared);
-        if ( !getFileLocator().isIPC() ) {
+        if ( !getLocator().isIPC() ) {
             throw new MalformedURLException("Named pipes are only valid on IPC$");
         }
         this.fileLocator.updateType(TYPE_NAMED_PIPE);
@@ -184,7 +151,7 @@ public class SmbNamedPipe extends SmbFile {
      * @throws MalformedURLException
      */
     public SmbNamedPipe ( String url, int pipeType, CIFSContext tc ) throws MalformedURLException {
-        this(url, pipeType, false, tc);
+        this(url, pipeType, ( pipeType & SmbPipeResource.PIPE_TYPE_UNSHARED ) != 0, tc);
     }
 
 
@@ -214,26 +181,17 @@ public class SmbNamedPipe extends SmbFile {
     /**
      * @return the pipe type
      */
+    @Override
     public int getPipeType () {
         return this.pipeType;
     }
 
 
     /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbFile#getUncPath()
-     */
-    @Override
-    public String getUncPath () {
-        return super.getUncPath();
-    }
-
-
-    /**
      * @return a handle for interacting with the pipe
      */
-    public SmbPipeHandleImpl openPipe () {
+    @Override
+    public SmbPipeHandle openPipe () {
         return new SmbPipeHandleImpl(this);
     }
 

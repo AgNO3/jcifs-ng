@@ -105,9 +105,9 @@ class SmbComNTCreateAndX extends AndXServerMessageBlock {
         this.shareAccess = shareAccess;
 
         // createDisposition
-        if ( ( flags & SmbFile.O_TRUNC ) == SmbFile.O_TRUNC ) {
+        if ( ( flags & SmbConstants.O_TRUNC ) == SmbConstants.O_TRUNC ) {
             // truncate the file
-            if ( ( flags & SmbFile.O_CREAT ) == SmbFile.O_CREAT ) {
+            if ( ( flags & SmbConstants.O_CREAT ) == SmbConstants.O_CREAT ) {
                 // create it if necessary
                 this.createDisposition = FILE_OVERWRITE_IF;
             }
@@ -117,9 +117,9 @@ class SmbComNTCreateAndX extends AndXServerMessageBlock {
         }
         else {
             // don't truncate the file
-            if ( ( flags & SmbFile.O_CREAT ) == SmbFile.O_CREAT ) {
+            if ( ( flags & SmbConstants.O_CREAT ) == SmbConstants.O_CREAT ) {
                 // create it if necessary
-                if ( ( flags & SmbFile.O_EXCL ) == SmbFile.O_EXCL ) {
+                if ( ( flags & SmbConstants.O_EXCL ) == SmbConstants.O_EXCL ) {
                     // fail if already exists
                     this.createDisposition = FILE_CREATE;
                 }

@@ -64,18 +64,21 @@ class SmbComOpenAndX extends AndXServerMessageBlock {
         }
 
         // map shareAccess as far as we can
-        if ( ( shareAccess & SmbFile.FILE_SHARE_DELETE ) != 0 && ( shareAccess & SmbFile.FILE_SHARE_READ ) != 0
-                && ( shareAccess & SmbFile.FILE_SHARE_WRITE ) != 0 ) {
+        if ( ( shareAccess & SmbConstants.FILE_SHARE_READ ) != 0 && ( shareAccess & SmbConstants.FILE_SHARE_WRITE ) != 0 ) {
             this.desiredAccess |= SHARING_DENY_NONE;
         }
-        else if ( shareAccess == SmbFile.FILE_NO_SHARE ) {
+        else if ( shareAccess == SmbConstants.FILE_NO_SHARE ) {
             this.desiredAccess |= SHARING_DENY_READ_WRITE_EXECUTE;
         }
-        else if ( ( shareAccess & SmbFile.FILE_SHARE_WRITE ) == 0 ) {
+        else if ( ( shareAccess & SmbConstants.FILE_SHARE_WRITE ) == 0 ) {
             this.desiredAccess |= SHARING_DENY_WRITE;
         }
-        else if ( ( shareAccess & SmbFile.FILE_SHARE_READ ) == 0 ) {
+        else if ( ( shareAccess & SmbConstants.FILE_SHARE_READ ) == 0 ) {
             this.desiredAccess |= SHARING_DENY_READ_EXECUTE;
+        }
+        else {
+            // neither SHARE_READ nor SHARE_WRITE are set
+            this.desiredAccess |= SHARING_DENY_READ_WRITE_EXECUTE;
         }
 
         this.desiredAccess &= ~0x1; // Win98 doesn't like GENERIC_READ ?! -- get Access Denied.
@@ -87,9 +90,9 @@ class SmbComOpenAndX extends AndXServerMessageBlock {
         this.fileAttributes = 0;
 
         // openFunction
-        if ( ( flags & SmbFile.O_TRUNC ) == SmbFile.O_TRUNC ) {
+        if ( ( flags & SmbConstants.O_TRUNC ) == SmbConstants.O_TRUNC ) {
             // truncate the file
-            if ( ( flags & SmbFile.O_CREAT ) == SmbFile.O_CREAT ) {
+            if ( ( flags & SmbConstants.O_CREAT ) == SmbConstants.O_CREAT ) {
                 // create it if necessary
                 this.openFunction = OPEN_FN_TRUNC | OPEN_FN_CREATE;
             }
@@ -99,9 +102,9 @@ class SmbComOpenAndX extends AndXServerMessageBlock {
         }
         else {
             // don't truncate the file
-            if ( ( flags & SmbFile.O_CREAT ) == SmbFile.O_CREAT ) {
+            if ( ( flags & SmbConstants.O_CREAT ) == SmbConstants.O_CREAT ) {
                 // create it if necessary
-                if ( ( flags & SmbFile.O_EXCL ) == SmbFile.O_EXCL ) {
+                if ( ( flags & SmbConstants.O_EXCL ) == SmbConstants.O_EXCL ) {
                     // fail if already exists
                     this.openFunction = OPEN_FN_CREATE | OPEN_FN_FAIL_IF_EXISTS;
                 }

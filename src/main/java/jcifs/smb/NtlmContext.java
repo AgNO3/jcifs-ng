@@ -36,6 +36,7 @@ import jcifs.util.Hexdump;
  * For initiating NTLM authentication (including NTLMv2). If you want to add NTLMv2 authentication support to something
  * this is what you want to use. See the code for details. Note that JCIFS does not implement the acceptor side of NTLM
  * authentication.
+ * 
  */
 public class NtlmContext implements SSPContext {
 

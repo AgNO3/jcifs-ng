@@ -19,11 +19,14 @@
 package jcifs.smb;
 
 
+import jcifs.SmbConstants;
 import jcifs.util.Hexdump;
 
 
 /**
+ * Internal use only
  * 
+ * @internal
  */
 public class SmbShareInfo implements FileEntry {
 
@@ -64,17 +67,17 @@ public class SmbShareInfo implements FileEntry {
          */
         switch ( this.type & 0xFFFF ) {
         case 1:
-            return SmbFile.TYPE_PRINTER;
+            return SmbConstants.TYPE_PRINTER;
         case 3:
-            return SmbFile.TYPE_NAMED_PIPE;
+            return SmbConstants.TYPE_NAMED_PIPE;
         }
-        return SmbFile.TYPE_SHARE;
+        return SmbConstants.TYPE_SHARE;
     }
 
 
     @Override
     public int getAttributes () {
-        return SmbFile.ATTR_READONLY | SmbFile.ATTR_DIRECTORY;
+        return SmbConstants.ATTR_READONLY | SmbConstants.ATTR_DIRECTORY;
     }
 
 

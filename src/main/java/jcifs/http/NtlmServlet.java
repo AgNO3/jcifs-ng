@@ -33,6 +33,7 @@ import javax.servlet.http.HttpSession;
 
 import org.bouncycastle.util.encoders.Base64;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
@@ -125,7 +126,7 @@ public abstract class NtlmServlet extends HttpServlet {
 
     @Override
     protected void service ( HttpServletRequest request, HttpServletResponse response ) throws ServletException, IOException {
-        UniAddress dc;
+        Address dc;
         boolean offerBasic = this.enableBasic && ( this.insecureBasic || request.isSecure() );
         String msg = request.getHeader("Authorization");
         if ( msg != null && ( msg.startsWith("NTLM ") || ( offerBasic && msg.startsWith("Basic ") ) ) ) {

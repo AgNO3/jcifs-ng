@@ -15,25 +15,25 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.smb;
-
-
-import jcifs.CIFSContext;
+package jcifs;
 
 
 /**
+ * This is an internal API.
+ * 
  * @author mbechler
- *
+ * @internal
  */
-public interface Dfs {
+public interface DfsResolver {
 
     /**
      * @param domain
      * @param tf
      * @return whether the given domain is trusted
-     * @throws SmbAuthException
+     * @throws CIFSException
+     * @throws jcifs.smb.SmbAuthException
      */
-    boolean isTrustedDomain ( CIFSContext tf, String domain ) throws SmbAuthException;
+    boolean isTrustedDomain ( CIFSContext tf, String domain ) throws CIFSException;
 
 
     /**
@@ -42,23 +42,10 @@ public interface Dfs {
      * @param domain
      * @param tf
      * @return connection
-     * @throws SmbAuthException
+     * @throws CIFSException
+     * @throws jcifs.smb.SmbAuthException
      */
-    SmbTransport getDc ( CIFSContext tf, String domain ) throws SmbAuthException;
-
-
-    /**
-     * Get a referral from a server
-     * 
-     * @param tf
-     * @param trans
-     * @param domain
-     * @param root
-     * @param path
-     * @return a referral for the given DFS path
-     * @throws SmbAuthException
-     */
-    DfsReferral getReferral ( CIFSContext tf, SmbTransport trans, String domain, String root, String path ) throws SmbAuthException;
+    SmbTransport getDc ( CIFSContext tf, String domain ) throws CIFSException;
 
 
     /**
@@ -69,9 +56,10 @@ public interface Dfs {
      * @param path
      * @param tf
      * @return the final referral for the given DFS path
-     * @throws SmbAuthException
+     * @throws CIFSException
+     * @throws jcifs.smb.SmbAuthException
      */
-    DfsReferral resolve ( CIFSContext tf, String domain, String root, String path ) throws SmbAuthException;
+    DfsReferralData resolve ( CIFSContext tf, String domain, String root, String path ) throws CIFSException;
 
 
     /**
@@ -81,6 +69,6 @@ public interface Dfs {
      * @param dr
      * @param tc
      */
-    void cache ( CIFSContext tc, String path, DfsReferral dr );
+    void cache ( CIFSContext tc, String path, DfsReferralData dr );
 
 }

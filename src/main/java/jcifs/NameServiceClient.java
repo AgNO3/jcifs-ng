@@ -15,7 +15,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.netbios;
+package jcifs;
 
 
 import java.net.InetAddress;
@@ -23,33 +23,30 @@ import java.net.UnknownHostException;
 
 
 /**
+ * 
+ * This is an internal API for resolving names
+ * 
  * @author mbechler
- *
+ * @internal
  */
 public interface NameServiceClient {
 
     /**
      * @return local host address
      */
-    NbtAddress getLocalHost ();
+    NetbiosAddress getLocalHost ();
 
 
     /**
      * @return the local host name
      */
-    Name getLocalName ();
-
-
-    /**
-     * @return lmhosts file used
-     */
-    Lmhosts getLmhosts ();
+    NetbiosName getLocalName ();
 
 
     /**
      * @return the numknown name
      */
-    Name getUnknownName ();
+    NetbiosName getUnknownName ();
 
 
     /**
@@ -64,7 +61,7 @@ public interface NameServiceClient {
      * @throws UnknownHostException
      *             if address cannot be resolved
      */
-    NbtAddress[] getNbtAllByAddress ( NbtAddress addr ) throws UnknownHostException;
+    NetbiosAddress[] getNbtAllByAddress ( NetbiosAddress addr ) throws UnknownHostException;
 
 
     /**
@@ -85,7 +82,7 @@ public interface NameServiceClient {
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
-    NbtAddress[] getNbtAllByAddress ( String host, int type, String scope ) throws UnknownHostException;
+    NetbiosAddress[] getNbtAllByAddress ( String host, int type, String scope ) throws UnknownHostException;
 
 
     /**
@@ -100,7 +97,7 @@ public interface NameServiceClient {
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
-    NbtAddress[] getNbtAllByAddress ( String host ) throws UnknownHostException;
+    NetbiosAddress[] getNbtAllByAddress ( String host ) throws UnknownHostException;
 
 
     /**
@@ -118,7 +115,7 @@ public interface NameServiceClient {
      * @return the resolved addresses
      * @throws UnknownHostException
      */
-    NbtAddress[] getNbtAllByName ( String host, int type, String scope, InetAddress svr ) throws UnknownHostException;
+    NetbiosAddress[] getNbtAllByName ( String host, int type, String scope, InetAddress svr ) throws UnknownHostException;
 
 
     /**
@@ -147,7 +144,7 @@ public interface NameServiceClient {
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
-    NbtAddress getNbtByName ( String host, int type, String scope, InetAddress svr ) throws UnknownHostException;
+    NetbiosAddress getNbtByName ( String host, int type, String scope, InetAddress svr ) throws UnknownHostException;
 
 
     /**
@@ -170,7 +167,7 @@ public interface NameServiceClient {
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
-    NbtAddress getNbtByName ( String host, int type, String scope ) throws UnknownHostException;
+    NetbiosAddress getNbtByName ( String host, int type, String scope ) throws UnknownHostException;
 
 
     /**
@@ -185,7 +182,7 @@ public interface NameServiceClient {
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
-    NbtAddress getNbtByName ( String host ) throws UnknownHostException;
+    NetbiosAddress getNbtByName ( String host ) throws UnknownHostException;
 
 
     /**
@@ -193,7 +190,7 @@ public interface NameServiceClient {
      * @return the node status responses
      * @throws UnknownHostException
      */
-    NbtAddress[] getNodeStatus ( NbtAddress nbtAddress ) throws UnknownHostException;
+    NetbiosAddress[] getNodeStatus ( NetbiosAddress nbtAddress ) throws UnknownHostException;
 
 
     /**
@@ -204,7 +201,7 @@ public interface NameServiceClient {
      * @return found addresses
      * @throws UnknownHostException
      */
-    UniAddress[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException;
+    Address[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException;
 
 
     /**
@@ -218,7 +215,7 @@ public interface NameServiceClient {
      * @return the first resolved address
      * @throws UnknownHostException
      */
-    UniAddress getByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException;
+    Address getByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException;
 
 
     /**
@@ -231,6 +228,6 @@ public interface NameServiceClient {
      * @throws java.net.UnknownHostException
      *             if there is an error resolving the name
      */
-    UniAddress getByName ( String hostname ) throws UnknownHostException;
+    Address getByName ( String hostname ) throws UnknownHostException;
 
 }

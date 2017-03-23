@@ -22,7 +22,10 @@ package jcifs.netbios;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
+import jcifs.NetbiosAddress;
+import jcifs.NetbiosName;
 
 
 /**
@@ -85,7 +88,7 @@ import jcifs.CIFSContext;
  * @since jcifs-0.1
  */
 
-public final class NbtAddress {
+public final class NbtAddress implements NetbiosAddress {
 
     /**
      * This is a special name that means all hosts. If you wish to find all hosts
@@ -181,11 +184,27 @@ public final class NbtAddress {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Address#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends Address> T unwrap ( Class<T> type ) {
+        if ( type.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        return null;
+    }
+
+
+    /**
      * Guess next called name to try for session establishment. These
      * methods are used by the smb package.
      * 
      * @return guessed name
      */
+    @Override
     public String firstCalledName () {
 
         this.calledName = this.hostName.name;
@@ -228,20 +247,21 @@ public final class NbtAddress {
      *            context to use
      * @return net name to try
      */
+    @Override
     public String nextCalledName ( CIFSContext tc ) {
 
         if ( this.calledName == this.hostName.name ) {
             this.calledName = SMBSERVER_NAME;
         }
         else if ( SMBSERVER_NAME.equals(this.calledName) ) {
-            NbtAddress[] addrs;
+            NetbiosAddress[] addrs;
 
             try {
                 addrs = tc.getNameServiceClient().getNodeStatus(this);
-                if ( this.hostName.hexCode == 0x1D ) {
+                if ( this.getNameType() == 0x1D ) {
                     for ( int i = 0; i < addrs.length; i++ ) {
-                        if ( addrs[ i ].hostName.hexCode == 0x20 ) {
-                            return addrs[ i ].hostName.name;
+                        if ( addrs[ i ].getNameType() == 0x20 ) {
+                            return addrs[ i ].getHostName();
                         }
                     }
                     return null;
@@ -252,7 +272,7 @@ public final class NbtAddress {
                      * have a real NetBIOS name
                      */
                     this.calledName = null;
-                    return this.hostName.name;
+                    return getHostName();
                 }
             }
             catch ( UnknownHostException uhe ) {
@@ -308,122 +328,49 @@ public final class NbtAddress {
     }
 
 
-    /**
-     * Determines if the address is a group address. This is also
-     * known as a workgroup name or group name.
-     * 
-     * @param tc
-     *            context to use
-     * @return whether the given address is a group address
-     *
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to find out.
-     */
-
+    @Override
     public boolean isGroupAddress ( CIFSContext tc ) throws UnknownHostException {
         checkData(tc);
         return this.groupName;
     }
 
 
-    /**
-     * Checks the node type of this address.
-     * 
-     * @param tc
-     *            context to use
-     * @return {@link jcifs.netbios.NbtAddress#B_NODE},
-     *         {@link jcifs.netbios.NbtAddress#P_NODE}, {@link jcifs.netbios.NbtAddress#M_NODE},
-     *         {@link jcifs.netbios.NbtAddress#H_NODE}
-     *
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to find out.
-     */
-
+    @Override
     public int getNodeType ( CIFSContext tc ) throws UnknownHostException {
         checkData(tc);
         return this.nodeType;
     }
 
 
-    /**
-     * Determines if this address in the process of being deleted.
-     * 
-     * @param tc
-     *            context to use
-     * @return whether this address is in the process of being deleted
-     *
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to find out.
-     */
-
+    @Override
     public boolean isBeingDeleted ( CIFSContext tc ) throws UnknownHostException {
         checkNodeStatusData(tc);
         return this.isBeingDeleted;
     }
 
 
-    /**
-     * Determines if this address in conflict with another address.
-     *
-     * @param tc
-     *            context to use
-     * @return whether this address is in conflict with another address
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to find out.
-     */
-
+    @Override
     public boolean isInConflict ( CIFSContext tc ) throws UnknownHostException {
         checkNodeStatusData(tc);
         return this.isInConflict;
     }
 
 
-    /**
-     * Determines if this address is active.
-     * 
-     * @param tc
-     *            context to use
-     * @return whether this adress is active
-     *
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to find out.
-     */
-
+    @Override
     public boolean isActive ( CIFSContext tc ) throws UnknownHostException {
         checkNodeStatusData(tc);
         return this.isActive;
     }
 
 
-    /**
-     * Determines if this address is set to be permanent.
-     * 
-     * @param tc
-     *            context to use
-     * @return whether this address is permanent
-     *
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to find out.
-     */
-
+    @Override
     public boolean isPermanent ( CIFSContext tc ) throws UnknownHostException {
         checkNodeStatusData(tc);
         return this.isPermanent;
     }
 
 
-    /**
-     * Retrieves the MAC address of the remote network interface. Samba returns all zeros.
-     * 
-     * @param tc
-     *            context to use
-     *
-     * @return the MAC address as an array of six bytes
-     * @throws UnknownHostException
-     *             if the host cannot be resolved to
-     *             determine the MAC address.
-     */
-
+    @Override
     public byte[] getMacAddress ( CIFSContext tc ) throws UnknownHostException {
         checkNodeStatusData(tc);
         return this.macAddress;
@@ -436,7 +383,7 @@ public final class NbtAddress {
      *
      * @return the text representation of the hostname associated with this address
      */
-
+    @Override
     public String getHostName () {
         /*
          * 2010 - We no longer try a Node Status to get the
@@ -452,16 +399,20 @@ public final class NbtAddress {
     }
 
 
+    @Override
+    public NetbiosName getName () {
+        return this.hostName;
+    }
+
+
     /**
      * Returns the raw IP address of this NbtAddress. The result is in network
      * byte order: the highest order byte of the address is in getAddress()[0].
      *
      * @return a four byte array
      */
-
     public byte[] getAddress () {
         byte[] addr = new byte[4];
-
         addr[ 0 ] = (byte) ( ( this.address >>> 24 ) & 0xFF );
         addr[ 1 ] = (byte) ( ( this.address >>> 16 ) & 0xFF );
         addr[ 2 ] = (byte) ( ( this.address >>> 8 ) & 0xFF );
@@ -482,24 +433,26 @@ public final class NbtAddress {
     }
 
 
+    @Override
+    public InetAddress toInetAddress () throws UnknownHostException {
+        return getInetAddress();
+    }
+
+
     /**
      * Returns this IP adress as a {@link java.lang.String} in the form "%d.%d.%d.%d".
      * 
      * @return string representation of the IP address
      */
 
+    @Override
     public String getHostAddress () {
         return ( ( this.address >>> 24 ) & 0xFF ) + "." + ( ( this.address >>> 16 ) & 0xFF ) + "." + ( ( this.address >>> 8 ) & 0xFF ) + "."
                 + ( ( this.address >>> 0 ) & 0xFF );
     }
 
 
-    /**
-     * Returned the hex code associated with this name(e.g. 0x20 is for the file service)
-     * 
-     * @return the name type
-     */
-
+    @Override
     public int getNameType () {
         return this.hostName.hexCode;
     }

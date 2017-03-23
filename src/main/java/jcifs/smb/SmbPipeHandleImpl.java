@@ -23,13 +23,15 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
+import jcifs.SmbPipeHandle;
+import jcifs.SmbPipeResource;
 
 
 /**
  * @author mbechler
  *
  */
-class SmbPipeHandleImpl implements SmbPipeHandle {
+class SmbPipeHandleImpl implements SmbPipeHandleInternal {
 
     private static final Logger log = LoggerFactory.getLogger(SmbPipeHandleImpl.class);
 
@@ -49,15 +51,17 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
 
     private SmbTreeHandleImpl treeHandle;
 
+    private int sharing = SmbConstants.DEFAULT_SHARING;
+
 
     /**
      * @param pipe
      */
     public SmbPipeHandleImpl ( SmbNamedPipe pipe ) {
         this.pipe = pipe;
-        this.transact = ( pipe.getPipeType() & SmbNamedPipe.PIPE_TYPE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_TRANSACT;
-        this.call = ( pipe.getPipeType() & SmbNamedPipe.PIPE_TYPE_CALL ) == SmbNamedPipe.PIPE_TYPE_CALL;
-        this.openFlags = ( pipe.getPipeType() & 0xFFFF00FF ) | SmbFile.O_EXCL;
+        this.transact = ( pipe.getPipeType() & SmbPipeResource.PIPE_TYPE_TRANSACT ) == SmbPipeResource.PIPE_TYPE_TRANSACT;
+        this.call = ( pipe.getPipeType() & SmbPipeResource.PIPE_TYPE_CALL ) == SmbPipeResource.PIPE_TYPE_CALL;
+        this.openFlags = ( pipe.getPipeType() & 0xFFFF00FF ) | SmbConstants.O_EXCL;
         this.access = ( pipe.getPipeType() >>> 16 ) & 0xFFFF | SmbConstants.FILE_WRITE_DATA | 0x20000;
         this.uncPath = this.pipe.getUncPath();
     }
@@ -66,7 +70,22 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#getPipe()
+     * @see jcifs.SmbPipeHandle#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends SmbPipeHandle> T unwrap ( Class<T> type ) {
+        if ( type.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        throw new ClassCastException();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.SmbPipeHandle#getPipe()
      */
     @Override
     public SmbNamedPipe getPipe () {
@@ -83,12 +102,6 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.SmbPipeHandle#getUncPath()
-     */
-    @Override
     public String getUncPath () {
         return this.uncPath;
     }
@@ -97,7 +110,7 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#isOpen()
+     * @see jcifs.SmbPipeHandle#isOpen()
      */
     @Override
     public boolean isOpen () {
@@ -106,16 +119,15 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
 
 
     /**
-     * {@inheritDoc}
      * 
-     * @throws CIFSException
+     * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#getSessionKey()
+     * @see jcifs.smb.SmbPipeHandleInternal#getSessionKey()
      */
     @Override
     public byte[] getSessionKey () throws CIFSException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected();
-              SmbSession sess = th.getSession() ) {
+              SmbSessionImpl sess = th.getSession() ) {
             return sess.getSessionKey();
         }
     }
@@ -124,7 +136,7 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#isStale()
+     * @see jcifs.SmbPipeHandle#isStale()
      */
     @Override
     public boolean isStale () {
@@ -132,7 +144,7 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     }
 
 
-    synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+    synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
         if ( !this.open ) {
             throw new SmbException("Pipe handle already closed");
         }
@@ -145,11 +157,12 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
                 }
 
                 if ( th.hasCapability(SmbConstants.CAP_NT_SMBS) || this.uncPath.startsWith("\\pipe\\") ) {
-                    this.handle = this.pipe.openUnshared(this.openFlags, this.access, SmbFile.ATTR_NORMAL, 0);
+                    this.handle = this.pipe.openUnshared(this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0);
                 }
                 else {
                     // at least on samba, SmbComOpenAndX fails without the pipe prefix
-                    this.handle = this.pipe.openUnshared("\\pipe" + getUncPath(), this.openFlags, this.access, SmbFile.ATTR_NORMAL, 0);
+                    this.handle = this.pipe
+                            .openUnshared("\\pipe" + getUncPath(), this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0);
                 }
                 // one extra acquire to keep this open till the stream is released
                 return this.handle.acquire();
@@ -164,10 +177,10 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#getInput()
+     * @see jcifs.SmbPipeHandle#getInput()
      */
     @Override
-    public SmbPipeInputStream getInput () throws SmbException {
+    public SmbPipeInputStream getInput () throws CIFSException {
 
         if ( !this.open ) {
             throw new SmbException("Already closed");
@@ -195,10 +208,10 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#getOutput()
+     * @see jcifs.SmbPipeHandle#getOutput()
      */
     @Override
-    public SmbPipeOutputStream getOutput () throws SmbException {
+    public SmbPipeOutputStream getOutput () throws CIFSException {
         if ( !this.open ) {
             throw new SmbException("Already closed");
         }
@@ -223,9 +236,10 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#getPipeType()
+     * @see jcifs.smb.SmbPipeHandleInternal#getPipeType()
      */
     @Override
     public int getPipeType () {
@@ -236,10 +250,10 @@ class SmbPipeHandleImpl implements SmbPipeHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandle#close()
+     * @see jcifs.SmbPipeHandle#close()
      */
     @Override
-    public synchronized void close () throws SmbException {
+    public synchronized void close () throws CIFSException {
         boolean wasOpen = isOpen();
         this.open = false;
         if ( this.input != null ) {

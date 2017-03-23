@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.Credentials;
 import jcifs.RuntimeCIFSException;
 import jcifs.util.Crypto;
 import jcifs.util.Strings;
@@ -49,7 +50,7 @@ import jcifs.util.Strings;
  * NtlmAuthenticator</a> for related information.
  */
 
-public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Serializable {
+public class NtlmPasswordAuthentication implements Principal, CredentialsInternal, Serializable {
 
     /**
      * 
@@ -74,6 +75,16 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
      * 
      */
     private NtlmPasswordAuthentication () {}
+
+
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T extends Credentials> T unwrap ( Class<T> type ) {
+        if ( type.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        return null;
+    }
 
 
     /**
@@ -202,7 +213,7 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbCredentials#getSubject()
+     * @see jcifs.smb.CredentialsInternal#getSubject()
      */
     @Override
     public Subject getSubject () {
@@ -213,7 +224,7 @@ public class NtlmPasswordAuthentication implements Principal, SmbCredentials, Se
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbCredentials#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
+     * @see jcifs.smb.CredentialsInternal#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
      */
     @Override
     public SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException {

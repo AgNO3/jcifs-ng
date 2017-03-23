@@ -18,7 +18,6 @@
 
 package jcifs.smb;
 
-
 /**
  * 
  * 

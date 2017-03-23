@@ -19,10 +19,14 @@
 package jcifs.smb;
 
 
+import java.io.InputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.SmbPipeHandle;
 
 
 class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
@@ -71,11 +75,11 @@ class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
     @SuppressWarnings ( "resource" )
     @Override
     int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        SmbPipeInputStream input;
+        InputStream input;
         try {
             input = this.pipe.getInput();
         }
-        catch ( SmbException e ) {
+        catch ( CIFSException e ) {
             log.error("Failed to get pipe input stream", e);
             input = null;
         }

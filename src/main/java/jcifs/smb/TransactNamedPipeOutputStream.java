@@ -21,6 +21,9 @@ package jcifs.smb;
 
 import java.io.IOException;
 
+import jcifs.CIFSException;
+import jcifs.SmbPipeResource;
+
 
 class TransactNamedPipeOutputStream extends SmbPipeOutputStream {
 
@@ -28,9 +31,9 @@ class TransactNamedPipeOutputStream extends SmbPipeOutputStream {
     private boolean dcePipe;
 
 
-    TransactNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws SmbException {
+    TransactNamedPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws CIFSException {
         super(handle, th);
-        this.dcePipe = ( handle.getPipeType() & SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT ) == SmbNamedPipe.PIPE_TYPE_DCE_TRANSACT;
+        this.dcePipe = ( handle.getPipeType() & SmbPipeResource.PIPE_TYPE_DCE_TRANSACT ) == SmbPipeResource.PIPE_TYPE_DCE_TRANSACT;
     }
 
 

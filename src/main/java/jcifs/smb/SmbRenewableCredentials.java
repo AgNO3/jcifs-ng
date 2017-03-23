@@ -22,13 +22,13 @@ package jcifs.smb;
  * @author mbechler
  *
  */
-public interface SmbRenewableCredentials extends SmbCredentials {
+public interface SmbRenewableCredentials extends CredentialsInternal {
 
     /**
      * Renew the credentials
      * 
      * @return the renewed credentials
      */
-    SmbCredentials renew ();
+    CredentialsInternal renew ();
 
 }

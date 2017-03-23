@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.Credentials;
 import jcifs.smb.NtlmPasswordAuthentication;
-import jcifs.smb.SmbCredentials;
 
 
 /**
@@ -50,7 +50,7 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
      * @return a wrapped context with the given credentials
      */
     @Override
-    public CIFSContext withCredentials ( SmbCredentials creds ) {
+    public CIFSContext withCredentials ( Credentials creds ) {
         return new CIFSContextCredentialWrapper(this, creds);
     }
 
@@ -95,8 +95,8 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
      * @see jcifs.CIFSContext#getCredentials()
      */
     @Override
-    public SmbCredentials getCredentials () {
-        return this.getDefaultCredentials();
+    public Credentials getCredentials () {
+        return getDefaultCredentials();
     }
 
 
@@ -114,7 +114,7 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
     /**
      * @return
      */
-    protected abstract SmbCredentials getDefaultCredentials ();
+    protected abstract Credentials getDefaultCredentials ();
 
 
     /**

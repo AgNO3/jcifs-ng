@@ -41,7 +41,8 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.smb.SmbException;
+import jcifs.CIFSException;
+import jcifs.SmbResource;
 import jcifs.smb.SmbFile;
 
 
@@ -68,13 +69,13 @@ public class NamingTest extends BaseCIFSTest {
 
 
     @Test
-    public void testASCII () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testASCII () throws CIFSException, MalformedURLException, UnknownHostException {
         runFilenameTest("just-testing", "adsfg.txt");
     }
 
 
     @Test
-    public void testCodepage () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testCodepage () throws MalformedURLException, UnknownHostException, CIFSException {
         Assume.assumeFalse("Unicode support", getContext().getConfig().isUseUnicode());
         String oemEncoding = getContext().getConfig().getOemEncoding();
         String str = null;
@@ -131,18 +132,18 @@ public class NamingTest extends BaseCIFSTest {
 
 
     @Test
-    public void testUnicode () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testUnicode () throws UnknownHostException, CIFSException, MalformedURLException {
         Assume.assumeTrue("No unicode support", getContext().getConfig().isUseUnicode());
         runFilenameTest(Strings.UNICODE_STRINGS);
     }
 
 
-    private void runFilenameTest ( String... names ) throws MalformedURLException, UnknownHostException, SmbException {
+    private void runFilenameTest ( String... names ) throws CIFSException, UnknownHostException, MalformedURLException {
         try ( SmbFile d = createTestDirectory() ) {
             try {
 
                 for ( String name : names ) {
-                    try ( SmbFile tf = new SmbFile(d, name) ) {
+                    try ( SmbResource tf = new SmbFile(d, name) ) {
                         tf.createNewFile();
                     }
                 }
@@ -166,7 +167,7 @@ public class NamingTest extends BaseCIFSTest {
                 URL purl = d.getURL();
                 for ( String name : names ) {
                     URL u = new URL(purl, name);
-                    try ( SmbFile tf = new SmbFile(u, d.getTransportContext()) ) {
+                    try ( SmbResource tf = new SmbFile(u, d.getContext()) ) {
                         assertTrue("File exists " + u, tf.exists());
                         assertEquals(name, tf.getName());
                     }

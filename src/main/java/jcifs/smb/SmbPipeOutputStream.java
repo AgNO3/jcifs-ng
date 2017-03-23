@@ -18,6 +18,9 @@
 package jcifs.smb;
 
 
+import jcifs.CIFSException;
+
+
 /**
  * @author mbechler
  *
@@ -31,8 +34,8 @@ public class SmbPipeOutputStream extends SmbFileOutputStream {
      * @param handle
      * @throws SmbException
      */
-    SmbPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws SmbException {
-        super(handle.getPipe(), th, null);
+    SmbPipeOutputStream ( SmbPipeHandleImpl handle, SmbTreeHandleImpl th ) throws CIFSException {
+        super(handle.getPipe(), th, null, 0, 0, 0);
         this.handle = handle;
     }
 
@@ -49,13 +52,13 @@ public class SmbPipeOutputStream extends SmbFileOutputStream {
 
 
     @Override
-    protected synchronized SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
+    protected synchronized SmbTreeHandleImpl ensureTreeConnected () throws CIFSException {
         return this.handle.ensureTreeConnected();
     }
 
 
     @Override
-    protected synchronized SmbFileHandleImpl ensureOpen () throws SmbException {
+    protected synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
         return this.handle.ensureOpen();
     }
 

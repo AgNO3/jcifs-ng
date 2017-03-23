@@ -18,6 +18,8 @@ package jcifs;
 
 
 /**
+ * Utility class holding several protocol constrants
+ * 
  * @author mbechler
  *
  * @internal
@@ -74,11 +76,30 @@ public interface SmbConstants {
     static final int CAP_EXTENDED_SECURITY = 0x80000000;
 
     // file attribute encoding
+    /**
+     * File is marked read-only
+     */
     static final int ATTR_READONLY = 0x01;
+    /**
+     * File is marked hidden
+     */
     static final int ATTR_HIDDEN = 0x02;
+    /**
+     * File is marked a system file
+     */
     static final int ATTR_SYSTEM = 0x04;
+    /**
+     * File is marked a volume
+     */
     static final int ATTR_VOLUME = 0x08;
+    /**
+     * File is a directory
+     */
     static final int ATTR_DIRECTORY = 0x10;
+
+    /**
+     * Files is marked to be archived
+     */
     static final int ATTR_ARCHIVE = 0x20;
 
     // extended file attribute encoding(others same as above)
@@ -130,8 +151,92 @@ public interface SmbConstants {
 
     static final long MILLISECONDS_BETWEEN_1970_AND_1601 = 11644473600000L;
 
-    String DEFAULT_OEM_ENCODING = "Cp850";
+    static final String DEFAULT_OEM_ENCODING = "Cp850";
 
-    public int FOREVER = -1;
+    static final int FOREVER = -1;
+
+    /**
+     * When specified as the <tt>shareAccess</tt> constructor parameter,
+     * other SMB clients (including other threads making calls into jCIFS)
+     * will not be permitted to access the target file and will receive "The
+     * file is being accessed by another process" message.
+     */
+    static final int FILE_NO_SHARE = 0x00;
+    /**
+     * When specified as the <tt>shareAccess</tt> constructor parameter,
+     * other SMB clients will be permitted to read from the target file while
+     * this file is open. This constant may be logically OR'd with other share
+     * access flags.
+     */
+    static final int FILE_SHARE_READ = 0x01;
+    /**
+     * When specified as the <tt>shareAccess</tt> constructor parameter,
+     * other SMB clients will be permitted to write to the target file while
+     * this file is open. This constant may be logically OR'd with other share
+     * access flags.
+     */
+    static final int FILE_SHARE_WRITE = 0x02;
+    /**
+     * When specified as the <tt>shareAccess</tt> constructor parameter,
+     * other SMB clients will be permitted to delete the target file while
+     * this file is open. This constant may be logically OR'd with other share
+     * access flags.
+     */
+    static final int FILE_SHARE_DELETE = 0x04;
+    /**
+     * Default sharing mode for files
+     */
+    static final int DEFAULT_SHARING = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a regular file or directory.
+     */
+    static final int TYPE_FILESYSTEM = 0x01;
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a workgroup.
+     */
+    static final int TYPE_WORKGROUP = 0x02;
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a server.
+     */
+    static final int TYPE_SERVER = 0x04;
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a share.
+     */
+    static final int TYPE_SHARE = 0x08;
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a named pipe.
+     */
+    static final int TYPE_NAMED_PIPE = 0x10;
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a printer.
+     */
+    static final int TYPE_PRINTER = 0x20;
+    /**
+     * Returned by {@link jcifs.SmbResource#getType()} if the resource this <tt>SmbFile</tt>
+     * represents is a communications device.
+     */
+    static final int TYPE_COMM = 0x40;
+
+    /* open flags */
+
+    static final int O_RDONLY = 0x01;
+    static final int O_WRONLY = 0x02;
+    static final int O_RDWR = 0x03;
+    static final int O_APPEND = 0x04;
+
+    // Open Function Encoding
+    // create if the file does not exist
+    static final int O_CREAT = 0x0010;
+    // fail if the file exists
+    static final int O_EXCL = 0x0020;
+    // truncate if the file exists
+    static final int O_TRUNC = 0x0040;
 
 }

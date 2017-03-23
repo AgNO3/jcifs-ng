@@ -302,7 +302,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbCredentials#isAnonymous()
+     * @see jcifs.smb.CredentialsInternal#isAnonymous()
      */
     @Override
     public boolean isAnonymous () {

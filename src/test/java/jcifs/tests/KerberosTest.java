@@ -38,9 +38,10 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
+import jcifs.SmbResource;
 import jcifs.smb.JAASAuthenticator;
 import jcifs.smb.Kerb5Authenticator;
-import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbUnsupportedOperationException;
 import sun.security.jgss.krb5.Krb5Util;
@@ -75,7 +76,7 @@ public class KerberosTest extends BaseCIFSTest {
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired());
         CIFSContext ctx = getContext()
                 .withCredentials(new Kerb5Authenticator(getContext(), s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
-        try ( SmbFile f = new SmbFile(getTestShareURL(), ctx) ) {
+        try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
             f.exists();
         }
         catch ( SmbUnsupportedOperationException e ) {
@@ -85,10 +86,10 @@ public class KerberosTest extends BaseCIFSTest {
 
 
     @Test
-    public void testJAAS () throws SmbException, MalformedURLException {
+    public void testJAAS () throws CIFSException, MalformedURLException {
         CIFSContext ctx = getContext()
                 .withCredentials(new JAASAuthenticator(getContext(), getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
-        try ( SmbFile f = new SmbFile(getTestShareURL(), ctx) ) {
+        try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
             f.exists();
         }
         catch ( SmbUnsupportedOperationException e ) {

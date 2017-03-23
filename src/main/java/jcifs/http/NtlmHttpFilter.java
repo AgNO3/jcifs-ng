@@ -42,20 +42,20 @@ import org.bouncycastle.util.encoders.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Config;
 import jcifs.config.PropertyConfiguration;
 import jcifs.context.BaseContext;
-import jcifs.netbios.NbtAddress;
 import jcifs.netbios.UniAddress;
 import jcifs.smb.NtStatus;
 import jcifs.smb.NtlmChallenge;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbException;
-import jcifs.smb.SmbSession;
-import jcifs.smb.SmbTransport;
+import jcifs.smb.SmbSessionInternal;
+import jcifs.smb.SmbTransportInternal;
 
 
 /**
@@ -82,7 +82,7 @@ public class NtlmHttpFilter implements Filter {
     private String realm;
 
     private CIFSContext transportContext;
-    private NbtAddress[] dcList = null;
+    private Address[] dcList = null;
     private long dcListExpiration;
 
     private int netbiosLookupRespLimit = 3;
@@ -182,7 +182,7 @@ public class NtlmHttpFilter implements Filter {
      */
     protected NtlmPasswordAuthentication negotiate ( HttpServletRequest req, HttpServletResponse resp, boolean skipAuthentication )
             throws IOException, ServletException {
-        UniAddress dc;
+        Address dc;
         String msg;
         NtlmPasswordAuthentication ntlm = null;
         msg = req.getHeader("Authorization");
@@ -285,7 +285,7 @@ public class NtlmHttpFilter implements Filter {
 
         do {
             if ( this.dcListExpiration < now ) {
-                NbtAddress[] list = getTransportContext().getNameServiceClient().getNbtAllByName(domain, 0x1C, null, null);
+                Address[] list = getTransportContext().getNameServiceClient().getNbtAllByName(domain, 0x1C, null, null);
                 this.dcListExpiration = now + this.netbiosCacheTimeout * 1000L;
                 if ( list != null && list.length > 0 ) {
                     this.dcList = list;
@@ -322,19 +322,20 @@ public class NtlmHttpFilter implements Filter {
     }
 
 
-    private static NtlmChallenge interrogate ( CIFSContext tf, NbtAddress addr ) throws SmbException {
+    private static NtlmChallenge interrogate ( CIFSContext tf, Address addr ) throws SmbException {
         UniAddress dc = new UniAddress(addr);
-        try ( SmbTransport trans = tf.getTransportPool()
-                .getSmbTransport(tf, dc, 0, false, tf.hasDefaultCredentials() && tf.getConfig().isIpcSigningEnforced()) ) {
+        try ( SmbTransportInternal trans = tf.getTransportPool()
+                .getSmbTransport(tf, dc, 0, false, tf.hasDefaultCredentials() && tf.getConfig().isIpcSigningEnforced())
+                .unwrap(SmbTransportInternal.class) ) {
             if ( !tf.hasDefaultCredentials() ) {
-                trans.connect();
+                trans.ensureConnected();
                 log.warn(
                     "Default credentials (jcifs.smb.client.username/password)" + " not specified. SMB signing may not work propertly."
                             + "  Skipping DC interrogation.");
             }
             else {
-                try ( SmbSession ssn = trans.getSmbSession(tf.withDefaultCredentials()) ) {
-                    ssn.treeConnect();
+                try ( SmbSessionInternal ssn = trans.getSmbSession(tf.withDefaultCredentials()).unwrap(SmbSessionInternal.class) ) {
+                    ssn.treeConnectLogon();
                 }
             }
             return new NtlmChallenge(trans.getServerEncryptionKey(), dc);

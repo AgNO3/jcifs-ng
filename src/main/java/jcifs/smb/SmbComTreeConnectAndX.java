@@ -30,14 +30,14 @@ import jcifs.util.Hexdump;
 
 class SmbComTreeConnectAndX extends AndXServerMessageBlock {
 
-    private SmbSession session;
+    private SmbSessionImpl session;
     private boolean disconnectTid = false;
     private String service;
     private byte[] password;
     private int passwordLength;
 
 
-    SmbComTreeConnectAndX ( SmbSession session, String path, String service, ServerMessageBlock andx ) {
+    SmbComTreeConnectAndX ( SmbSessionImpl session, String path, String service, ServerMessageBlock andx ) {
         super(session.getConfig(), andx);
         this.session = session;
         this.path = path;
@@ -74,25 +74,25 @@ class SmbComTreeConnectAndX extends AndXServerMessageBlock {
     @Override
     int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
 
-        try ( SmbTransport transport = this.session.getTransport() ) {
+        try ( SmbTransportImpl transport = this.session.getTransport() ) {
             if ( transport.server.security == SmbConstants.SECURITY_SHARE
-                    && this.session.getTransportContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
+                    && this.session.getContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
 
-                NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getTransportContext().getCredentials();
+                NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getContext().getCredentials();
                 if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
                     this.passwordLength = 1;
                 }
                 else if ( transport.server.encryptedPasswords ) {
                     // encrypted
                     try {
-                        this.password = pwAuth.getAnsiHash(this.session.getTransportContext(), transport.server.encryptionKey);
+                        this.password = pwAuth.getAnsiHash(this.session.getContext(), transport.server.encryptionKey);
                     }
                     catch ( GeneralSecurityException e ) {
                         throw new RuntimeCIFSException("Failed to encrypt password", e);
                     }
                     this.passwordLength = this.password.length;
                 }
-                else if ( this.session.getTransportContext().getConfig().isDisablePlainTextPasswords() ) {
+                else if ( this.session.getContext().getConfig().isDisablePlainTextPasswords() ) {
                     throw new RuntimeCIFSException("Plain text passwords are disabled");
                 }
                 else {
@@ -117,11 +117,11 @@ class SmbComTreeConnectAndX extends AndXServerMessageBlock {
     @Override
     int writeBytesWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
-        try ( SmbTransport transport = this.session.getTransport() ) {
+        try ( SmbTransportImpl transport = this.session.getTransport() ) {
             if ( transport.server.security == SmbConstants.SECURITY_SHARE
-                    && this.session.getTransportContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
+                    && this.session.getContext().getCredentials() instanceof NtlmPasswordAuthentication ) {
 
-                NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getTransportContext().getCredentials();
+                NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.session.getContext().getCredentials();
                 if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
                     dst[ dstIndex++ ] = (byte) 0x00;
                 }

@@ -41,10 +41,12 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
+import jcifs.SmbPipeHandle;
+import jcifs.SmbPipeResource;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbNamedPipe;
-import jcifs.smb.SmbPipeHandle;
 import jcifs.smb.SmbRandomAccessFile;
 
 
@@ -136,7 +138,7 @@ public class ReadWriteTest extends BaseCIFSTest {
 
 
     @Test
-    public void testRandomAccess () throws SmbException, MalformedURLException, UnknownHostException {
+    public void testRandomAccess () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestFile() ) {
             try {
                 try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "rw") ) {
@@ -175,7 +177,7 @@ public class ReadWriteTest extends BaseCIFSTest {
     public void testTransactPipe () throws IOException {
         try ( SmbNamedPipe f = new SmbNamedPipe(
             getTransactPipeUrl(),
-            SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_TRANSACT,
+            SmbPipeResource.PIPE_TYPE_RDWR | SmbPipeResource.PIPE_TYPE_TRANSACT,
             withTestNTLMCredentials(getContext())) ) {
             try ( SmbPipeHandle p = f.openPipe() ) {
                 try ( OutputStream os = p.getOutput() ) {
@@ -199,7 +201,7 @@ public class ReadWriteTest extends BaseCIFSTest {
     public void testCallPipe () throws IOException {
         try ( SmbNamedPipe f = new SmbNamedPipe(
             getCallPipeUrl(),
-            SmbNamedPipe.PIPE_TYPE_RDWR | SmbNamedPipe.PIPE_TYPE_CALL,
+            SmbPipeResource.PIPE_TYPE_RDWR | SmbPipeResource.PIPE_TYPE_CALL,
             withTestNTLMCredentials(getContext())) ) {
             try ( SmbPipeHandle p = f.openPipe() ) {
                 try ( OutputStream os = p.getOutput() ) {
@@ -221,7 +223,7 @@ public class ReadWriteTest extends BaseCIFSTest {
 
     @Test
     public void testFifoPipe () throws IOException {
-        try ( SmbNamedPipe f = new SmbNamedPipe(getFifoPipeUrl(), SmbNamedPipe.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext())) ) {
+        try ( SmbNamedPipe f = new SmbNamedPipe(getFifoPipeUrl(), SmbPipeResource.PIPE_TYPE_RDWR, withTestNTLMCredentials(getContext())) ) {
             try ( SmbPipeHandle p = f.openPipe() ) {
                 try ( OutputStream os = p.getOutput() ) {
                     writeRandom(1024, 1024, os);
@@ -242,8 +244,8 @@ public class ReadWriteTest extends BaseCIFSTest {
 
     @Test
     public void testFifoPipeTwoHandles () throws IOException {
-        try ( SmbNamedPipe s = new SmbNamedPipe(getFifoPipeUrl(), SmbNamedPipe.PIPE_TYPE_WRONLY, withTestNTLMCredentials(getContext()));
-              SmbNamedPipe t = new SmbNamedPipe(getFifoPipeUrl(), SmbNamedPipe.PIPE_TYPE_RDONLY, withTestNTLMCredentials(getContext())) ) {
+        try ( SmbNamedPipe s = new SmbNamedPipe(getFifoPipeUrl(), SmbPipeResource.PIPE_TYPE_WRONLY, withTestNTLMCredentials(getContext()));
+              SmbNamedPipe t = new SmbNamedPipe(getFifoPipeUrl(), SmbPipeResource.PIPE_TYPE_RDONLY, withTestNTLMCredentials(getContext())) ) {
             try ( SmbPipeHandle sp = s.openPipe();
                   SmbPipeHandle tp = t.openPipe() ) {
                 try ( OutputStream os = sp.getOutput() ) {

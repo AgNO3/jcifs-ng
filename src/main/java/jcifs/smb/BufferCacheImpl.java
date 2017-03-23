@@ -21,13 +21,14 @@ package jcifs.smb;
 
 import java.util.Arrays;
 
+import jcifs.BufferCache;
 import jcifs.Configuration;
 
 
 /**
  * Cache for reusable byte buffers
  * 
- *
+ * @internal
  */
 public class BufferCacheImpl implements BufferCache {
 
@@ -57,7 +58,7 @@ public class BufferCacheImpl implements BufferCache {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.BufferCache#getBuffer()
+     * @see jcifs.BufferCache#getBuffer()
      */
     @Override
     public byte[] getBuffer () {
@@ -82,7 +83,7 @@ public class BufferCacheImpl implements BufferCache {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.BufferCache#releaseBuffer(byte[])
+     * @see jcifs.BufferCache#releaseBuffer(byte[])
      */
     @Override
     public void releaseBuffer ( byte[] buf ) {

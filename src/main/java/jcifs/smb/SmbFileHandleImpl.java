@@ -24,7 +24,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.SmbFileHandle;
 
 
 /**
@@ -96,7 +98,7 @@ class SmbFileHandleImpl implements SmbFileHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbFileHandle#getTree()
+     * @see jcifs.SmbFileHandle#getTree()
      */
     @Override
     public SmbTreeHandleImpl getTree () {
@@ -107,7 +109,7 @@ class SmbFileHandleImpl implements SmbFileHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbFileHandle#isValid()
+     * @see jcifs.SmbFileHandle#isValid()
      */
     @Override
     public boolean isValid () {
@@ -118,10 +120,10 @@ class SmbFileHandleImpl implements SmbFileHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbFileHandle#close(long)
+     * @see jcifs.SmbFileHandle#close(long)
      */
     @Override
-    public synchronized void close ( long lastWriteTime ) throws SmbException {
+    public synchronized void close ( long lastWriteTime ) throws CIFSException {
         closeInternal(lastWriteTime, true);
     }
 
@@ -130,7 +132,7 @@ class SmbFileHandleImpl implements SmbFileHandle {
      * @param lastWriteTime
      * @throws SmbException
      */
-    void closeInternal ( long lastWriteTime, boolean explicit ) throws SmbException {
+    void closeInternal ( long lastWriteTime, boolean explicit ) throws CIFSException {
         SmbTreeHandleImpl t = this.tree;
         try {
             if ( t != null && isValid() ) {
@@ -154,10 +156,10 @@ class SmbFileHandleImpl implements SmbFileHandle {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbFileHandle#close()
+     * @see jcifs.SmbFileHandle#close()
      */
     @Override
-    public void close () throws SmbException {
+    public void close () throws CIFSException {
         release();
     }
 
@@ -167,10 +169,10 @@ class SmbFileHandleImpl implements SmbFileHandle {
      * 
      * @throws SmbException
      *
-     * @see jcifs.smb.SmbFileHandle#release()
+     * @see jcifs.SmbFileHandle#release()
      */
     @Override
-    public synchronized void release () throws SmbException {
+    public synchronized void release () throws CIFSException {
         long usage = this.usageCount.decrementAndGet();
         if ( usage == 0 ) {
             closeInternal(0L, false);

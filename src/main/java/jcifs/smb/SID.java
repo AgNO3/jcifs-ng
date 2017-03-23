@@ -29,11 +29,12 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.dcerpc.rpc;
-import jcifs.dcerpc.msrpc.lsarpc;
 import jcifs.util.Hexdump;
 
 
 /**
+ * Internal representation of SIDs
+ * 
  * A Windows SID is a numeric identifier used to represent Windows
  * accounts. SIDs are commonly represented using a textual format such as
  * <tt>S-1-5-21-1496946806-2192648263-3843101252-1029</tt> but they may
@@ -50,56 +51,12 @@ import jcifs.util.Hexdump;
  *   getDomainName: WNET
  *  getAccountName: Domain Admins
  * </pre>
+ * 
+ * @internal
  */
-
-public class SID extends rpc.sid_t {
+public class SID extends rpc.sid_t implements jcifs.SID {
 
     private static final Logger log = LoggerFactory.getLogger(SID.class);
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_USE_NONE = lsarpc.SID_NAME_USE_NONE;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_USER = lsarpc.SID_NAME_USER;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_DOM_GRP = lsarpc.SID_NAME_DOM_GRP;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_DOMAIN = lsarpc.SID_NAME_DOMAIN;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_ALIAS = lsarpc.SID_NAME_ALIAS;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_WKN_GRP = lsarpc.SID_NAME_WKN_GRP;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_DELETED = lsarpc.SID_NAME_DELETED;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_INVALID = lsarpc.SID_NAME_INVALID;
-
-    /**
-     * 
-     */
-    public static final int SID_TYPE_UNKNOWN = lsarpc.SID_NAME_UNKNOWN;
 
     static final String[] SID_TYPE_NAMES = {
         "0", "User", "Domain group", "Domain", "Local group", "Builtin group", "Deleted", "Invalid", "Unknown"
@@ -296,6 +253,22 @@ public class SID extends rpc.sid_t {
 
     /**
      * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.SID#unwrap(java.lang.Class)
+     */
+    @SuppressWarnings ( "unchecked" )
+    @Override
+    public <T> T unwrap ( Class<T> t ) {
+        if ( t.isAssignableFrom(this.getClass()) ) {
+            return (T) this;
+        }
+        throw new ClassCastException();
+    }
+
+
+    /**
+     * 
      * @return encoded SID
      */
     public byte[] toByteArray () {
@@ -328,6 +301,7 @@ public class SID extends rpc.sid_t {
      * 
      * @return domain SID
      */
+    @Override
     public SID getDomainSid () {
         return new SID(this, SID_TYPE_DOMAIN, this.domainName, null, getType() != SID_TYPE_DOMAIN);
     }
@@ -340,6 +314,7 @@ public class SID extends rpc.sid_t {
      * 
      * @return the RID
      */
+    @Override
     public int getRid () {
         if ( getType() == SID_TYPE_DOMAIN )
             throw new IllegalArgumentException("This SID is a domain sid");
@@ -347,55 +322,7 @@ public class SID extends rpc.sid_t {
     }
 
 
-    /**
-     * Returns the type of this SID indicating the state or type of account.
-     * <p>
-     * SID types are described in the following table.
-     * <table summary="Type codes">
-     * <tr>
-     * <th>Type</th>
-     * <th>Name</th>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_USE_NONE</td>
-     * <td>0</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_USER</td>
-     * <td>User</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_DOM_GRP</td>
-     * <td>Domain group</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_DOMAIN</td>
-     * <td>Domain</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_ALIAS</td>
-     * <td>Local group</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_WKN_GRP</td>
-     * <td>Builtin group</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_DELETED</td>
-     * <td>Deleted</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_INVALID</td>
-     * <td>Invalid</td>
-     * </tr>
-     * <tr>
-     * <td>SID_TYPE_UNKNOWN</td>
-     * <td>Unknown</td>
-     * </tr>
-     * </table>
-     * 
-     * @return type code
-     */
+    @Override
     public int getType () {
         if ( this.origin_server != null )
             resolveWeak();
@@ -403,12 +330,7 @@ public class SID extends rpc.sid_t {
     }
 
 
-    /**
-     * Return text represeting the SID type suitable for display to
-     * users. Text includes 'User', 'Domain group', 'Local group', etc.
-     * 
-     * @return textual representation of type
-     */
+    @Override
     public String getTypeText () {
         if ( this.origin_server != null )
             resolveWeak();
@@ -416,12 +338,7 @@ public class SID extends rpc.sid_t {
     }
 
 
-    /**
-     * Return the domain name of this SID unless it could not be
-     * resolved in which case the numeric representation is returned.
-     * 
-     * @return the domain name
-     */
+    @Override
     public String getDomainName () {
         if ( this.origin_server != null )
             resolveWeak();
@@ -433,13 +350,7 @@ public class SID extends rpc.sid_t {
     }
 
 
-    /**
-     * Return the sAMAccountName of this SID unless it could not
-     * be resolved in which case the numeric RID is returned. If this
-     * SID is a domain SID, this method will return an empty String.
-     * 
-     * @return the account name
-     */
+    @Override
     public String getAccountName () {
         if ( this.origin_server != null )
             resolveWeak();
@@ -516,24 +427,7 @@ public class SID extends rpc.sid_t {
     }
 
 
-    /**
-     * Return a String representing this SID ideal for display to
-     * users. This method should return the same text that the ACL
-     * editor in Windows would display.
-     * <p>
-     * Specifically, if the SID has
-     * been resolved and it is not a domain SID or builtin account,
-     * the full DOMAIN\name form of the account will be
-     * returned (e.g. MYDOM\alice or MYDOM\Domain Users).
-     * If the SID has been resolved but it is is a domain SID,
-     * only the domain name will be returned (e.g. MYDOM).
-     * If the SID has been resolved but it is a builtin account,
-     * only the name component will be returned (e.g. SYSTEM).
-     * If the sid cannot be resolved the numeric representation from
-     * toString() is returned.
-     * 
-     * @return display format, potentially with resolved names
-     */
+    @Override
     public String toDisplayString () {
         if ( this.origin_server != null )
             resolveWeak();
@@ -606,7 +500,7 @@ public class SID extends rpc.sid_t {
      * @return the members of the group
      * @throws IOException
      */
-    public SID[] getGroupMemberSids ( String authorityServerName, CIFSContext tc, int flags ) throws IOException {
+    public jcifs.SID[] getGroupMemberSids ( String authorityServerName, CIFSContext tc, int flags ) throws IOException {
         if ( this.type != SID_TYPE_DOM_GRP && this.type != SID_TYPE_ALIAS )
             return new SID[0];
 

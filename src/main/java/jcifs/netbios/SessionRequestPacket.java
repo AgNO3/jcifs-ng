@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import jcifs.Configuration;
+import jcifs.NetbiosName;
 
 
 /**
@@ -41,13 +42,14 @@ public class SessionRequestPacket extends SessionServicePacket {
 
     /**
      * 
+     * @param config
      * @param calledName
      * @param callingName
      */
-    public SessionRequestPacket ( Name calledName, Name callingName ) {
+    public SessionRequestPacket ( Configuration config, NetbiosName calledName, NetbiosName callingName ) {
         this.type = SESSION_REQUEST;
-        this.calledName = calledName;
-        this.callingName = callingName;
+        this.calledName = new Name(config, calledName);
+        this.callingName = new Name(config, callingName);
     }
 
 
