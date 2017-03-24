@@ -39,6 +39,7 @@ import jcifs.SmbConstants;
 import jcifs.SmbResourceLocator;
 import jcifs.SmbTreeHandle;
 import jcifs.smb.SmbTransportImpl.ServerData;
+import jcifs.util.transport.TransportException;
 
 
 /**
@@ -124,7 +125,7 @@ class SmbTreeConnection {
 
 
     /**
-     * @param connectTree
+     * @param t
      */
     private synchronized void switchTree ( SmbTreeImpl t ) {
         try ( SmbTreeImpl old = getTree() ) {
@@ -228,7 +229,7 @@ class SmbTreeConnection {
                         this.tree = null;
                         this.treeAcquired = false;
                         et.close();
-                        et.disconnect(false);
+                        et.disconnect(false, false);
                     }
                     catch ( Exception e ) {
                         log.error("Failed to close exclusive transport", e);
@@ -283,8 +284,10 @@ class SmbTreeConnection {
 
 
     void send ( SmbResourceLocatorImpl loc, ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws CIFSException {
+        SmbException last = null;
         String savedPath = ( request != null ) ? request.path : null;
-        for ( int retries = 1; retries < this.ctx.getConfig().getMaxRequestRetries(); retries++ ) {
+        int maxRetries = this.ctx.getConfig().getMaxRequestRetries();
+        for ( int retries = 1; retries <= maxRetries; retries++ ) {
             try {
                 send0(loc, request, response, params);
                 return;
@@ -292,23 +295,35 @@ class SmbTreeConnection {
             catch ( SmbException smbe ) {
                 // Retrying only makes sense if the invalid parameter is an tree id. If we have a stale file descriptor
                 // retrying make no sense, as it will never become available again.
-                if ( params.contains(RequestParam.NO_RETRY) || smbe.getNtStatus() != NtStatus.NT_STATUS_INVALID_PARAMETER ) {
+                if ( params.contains(RequestParam.NO_RETRY)
+                        || ( ! ( smbe.getCause() instanceof TransportException ) ) && smbe.getNtStatus() != NtStatus.NT_STATUS_INVALID_PARAMETER ) {
+                    log.debug("Not retrying", smbe);
                     throw smbe;
                 }
                 log.debug("send", smbe);
+                last = smbe;
             }
-            // If we get here, we got the 'The Parameter is incorrect' error.
+            // If we get here, we got the 'The Parameter is incorrect' error or a transport exception
             // Disconnect and try again from scratch.
 
             if ( log.isDebugEnabled() ) {
-                log.debug("Retrying (" + retries + ") send: " + request);
+                log.debug(String.format("Retrying (%d/%d) request %s", retries, maxRetries, request));
             }
             disconnect(true);
+
+            if ( retries == maxRetries ) {
+                break;
+            }
+
             try {
-                Thread.sleep(500 + RAND.nextInt(5000));
+                if ( retries != 1 ) {
+                    // backoff, but don't delay the first attempt as there are various reasons that can be fixed
+                    // immediately
+                    Thread.sleep(500 + RAND.nextInt(1000));
+                }
             }
             catch ( InterruptedException e ) {
-                log.debug("send", e);
+                log.debug("interrupted sleep in send", e);
             }
             if ( request != null ) {
                 // resolveDfs() and tree.send() modify the request packet.
@@ -320,7 +335,17 @@ class SmbTreeConnection {
             if ( response != null )
                 response.reset();
 
-            try ( SmbTreeHandle th = connectWrapException(loc) ) {}
+            try ( SmbTreeHandle th = connectWrapException(loc) ) {
+                log.debug("Have new tree connection for retry");
+            }
+            catch ( SmbException e ) {
+                log.debug("Failed to connect tree on retry", e);
+                last = e;
+            }
+        }
+        if ( last != null ) {
+            log.debug("All attempts have failed, last exception", last);
+            throw last;
         }
     }
 

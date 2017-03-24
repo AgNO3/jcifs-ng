@@ -102,7 +102,7 @@ public class SessionTest extends BaseCIFSTest {
                 assertNotNull(session);
                 try ( SmbTransportInternal transport = session.getTransport().unwrap(SmbTransportInternal.class) ) {
                     assertNotNull(transport);
-                    transport.disconnect(true);
+                    transport.disconnect(true, true);
                     assertNotNull(f);
                     checkConnection(f);
                 }

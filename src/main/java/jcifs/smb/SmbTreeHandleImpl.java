@@ -110,7 +110,7 @@ class SmbTreeHandleImpl implements SmbTreeHandleInternal {
      * @throws CIFSException
      */
     public void send ( ServerMessageBlock request, ServerMessageBlock response, RequestParam... params ) throws CIFSException {
-        this.treeConnection.send(this.resourceLoc, request, response);
+        this.treeConnection.send(this.resourceLoc, request, response, params);
     }
 
 

@@ -209,7 +209,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                         throw new TransportException(this.name + " error reading response to " + request, response.exception);
                     }
                     if ( isDisconnected() ) {
-                        throw new InterruptedException("Transport was disconnected while waiting for a response");
+                        throw new TransportException("Transport was disconnected while waiting for a response");
                     }
                     if ( timeout <= 0 ) {
                         if ( log.isDebugEnabled() ) {
@@ -230,7 +230,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
             }
         }
         catch ( IOException ioe ) {
-            log.info("sendrecv failed", ioe);
+            log.debug("sendrecv failed", ioe);
             try {
                 disconnect(true);
             }

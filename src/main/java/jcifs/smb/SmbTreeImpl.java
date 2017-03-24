@@ -19,7 +19,6 @@
 package jcifs.smb;
 
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -35,7 +34,6 @@ import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTree;
-import jcifs.util.transport.TransportException;
 
 
 class SmbTreeImpl implements SmbTreeInternal {
@@ -358,7 +356,9 @@ class SmbTreeImpl implements SmbTreeInternal {
                 String svc = this.service;
 
                 if ( svc == null ) {
-                    throw new SmbException("Service is null");
+                    // there still is some kind of race condition, where?
+                    // this used to trigger "invalid operation..."
+                    throw new SmbException("Service is null in state " + this.connectionState.get());
                 }
 
                 checkRequest(transport, request, svc);
@@ -462,9 +462,6 @@ class SmbTreeImpl implements SmbTreeInternal {
                      * established.
                      */
 
-                    log.debug("Connecting transport");
-                    transport.ensureConnected();
-
                     String unc = "\\\\" + transport.tconHostName + '\\' + this.share;
 
                     /*
@@ -484,27 +481,16 @@ class SmbTreeImpl implements SmbTreeInternal {
                     SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(sess.getConfig(), andxResponse);
                     SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess, unc, svc, andx);
 
-                    for ( int retries = 0; retries < 1 + sess.getContext().getConfig().getMaxRequestRetries(); retries++ ) {
-                        try {
-                            sess.send(request, response);
-                            break;
-                        }
-                        catch ( SmbException se ) {
-                            if ( se.getCause() instanceof TransportException ) {
-                                log.debug("Disconnecting transport for retry");
-                                try {
-                                    transport.disconnect(true);
-                                }
-                                catch ( IOException e ) {
-                                    se.addSuppressed(e);
-                                }
-                                continue;
-                            }
-                            throw se;
-                        }
-                    }
+                    log.debug("Connecting transport");
+                    transport.ensureConnected();
+                    sess.send(request, response);
+
                     this.tid = response.tid;
-                    this.service = response.service;
+                    String rsvc = response.service;
+                    if ( rsvc == null ) {
+                        throw new SmbException("Service is NULL");
+                    }
+                    this.service = rsvc;
                     this.inDfs = response.shareIsInDfs;
                     this.tree_num = TREE_CONN_COUNTER.incrementAndGet();
 

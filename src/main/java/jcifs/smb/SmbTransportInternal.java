@@ -48,9 +48,10 @@ public interface SmbTransportInternal extends SmbTransport {
 
     /**
      * @param hard
+     * @param inuse
      * @throws IOException
      */
-    void disconnect ( boolean hard ) throws IOException;
+    void disconnect ( boolean hard, boolean inuse ) throws IOException;
 
 
     /**
