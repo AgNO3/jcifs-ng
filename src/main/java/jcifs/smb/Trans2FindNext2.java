@@ -27,9 +27,10 @@ class Trans2FindNext2 extends SmbComTransaction {
 
     private int sid, informationLevel, resumeKey, tflags;
     private String filename;
+    private long maxItems;
 
 
-    Trans2FindNext2 ( Configuration config, int sid, int resumeKey, String filename ) {
+    Trans2FindNext2 ( Configuration config, int sid, int resumeKey, String filename, int batchCount, int batchSize ) {
         super(config);
         this.sid = sid;
         this.resumeKey = resumeKey;
@@ -39,7 +40,8 @@ class Trans2FindNext2 extends SmbComTransaction {
         this.informationLevel = Trans2FindFirst2.SMB_FILE_BOTH_DIRECTORY_INFO;
         this.tflags = 0x00;
         this.maxParameterCount = 8;
-        this.maxDataCount = config.getListSize();
+        this.maxItems = batchCount;
+        this.maxDataCount = batchSize;
         this.maxSetupCount = 0;
     }
 
@@ -67,7 +69,7 @@ class Trans2FindNext2 extends SmbComTransaction {
 
         SMBUtil.writeInt2(this.sid, dst, dstIndex);
         dstIndex += 2;
-        SMBUtil.writeInt2(getConfig().getListCount(), dst, dstIndex);
+        SMBUtil.writeInt2(this.maxItems, dst, dstIndex);
         dstIndex += 2;
         SMBUtil.writeInt2(this.informationLevel, dst, dstIndex);
         dstIndex += 2;

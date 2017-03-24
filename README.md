@@ -10,6 +10,7 @@ A cleaned-up and improved version of the jCIFS library
  * Drop pre-java 1.7 support
  * Unify authentication subsystem, NTLMSSP/Kerberos support
  * Large ReadX/WriteX support
+ * Streaming list operations
  * NtTransNotifyChange support
  * Google patches: various bugfixes, lastAccess support, retrying requests
  * A proper test suite
@@ -63,7 +64,7 @@ that should make it easier for users to decide what should be considered public 
 what internal API. New users are encourage to use ```SmbResource```s obtained through
  ```CIFSContext->get()``` instead of directly referencing ```SmbFile```. The APIs
 in the jcifs package should be considered stable, everything else possibly unstable 
-(although SmbFile won't be going away) and several implemtation details have been
+(although SmbFile won't be going away) and several implementation details have been
 hidden. If you encounter use cases that require the use of implementation classes
 or internal interfaces - please open an issue.
 

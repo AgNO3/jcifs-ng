@@ -104,16 +104,17 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
      * @param context
      * @param name
      */
-    void resolveInContext ( SmbResourceLocatorImpl context, String name ) {
-        if ( context.share != null ) {
-            this.dfsReferral = context.dfsReferral;
+    void resolveInContext ( SmbResourceLocator context, String name ) {
+        String shr = context.getShare();
+        if ( shr != null ) {
+            this.dfsReferral = context.getDfsReferral();
         }
         int last = name.length() - 1;
         if ( last >= 0 && name.charAt(last) == '/' ) {
             name = name.substring(0, last);
         }
 
-        if ( context.getShare() == null ) {
+        if ( shr == null ) {
             String[] nameParts = name.split("/");
 
             // server is set through URL, however it's still in the name
@@ -148,13 +149,24 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             // context share != null, so the remainder is path
             this.unc = '\\' + name.replace('/', '\\');
             this.canon = context.getURLPath() + name;
-            this.share = context.getShare();
+            this.share = shr;
         }
         else {
             this.unc = context.getUNCPath() + '\\' + name.replace('/', '\\');
             this.canon = context.getURLPath() + '/' + name;
-            this.share = context.getShare();
+            this.share = shr;
         }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.SmbResourceLocator#getDfsReferral()
+     */
+    @Override
+    public DfsReferralData getDfsReferral () {
+        return this.dfsReferral;
     }
 
 

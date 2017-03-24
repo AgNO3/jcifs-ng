@@ -177,8 +177,8 @@ class SmbFileHandleImpl implements SmbFileHandle {
         if ( usage == 0 ) {
             closeInternal(0L, false);
         }
-        else if ( log.isDebugEnabled() ) {
-            log.debug(String.format("Release %s (%d)", this, usage));
+        else if ( log.isTraceEnabled() ) {
+            log.trace(String.format("Release %s (%d)", this, usage));
         }
     }
 
@@ -204,8 +204,8 @@ class SmbFileHandleImpl implements SmbFileHandle {
      */
     public SmbFileHandleImpl acquire () {
         long usage = this.usageCount.incrementAndGet();
-        if ( log.isDebugEnabled() ) {
-            log.debug(String.format("Acquire %s (%d)", this, usage));
+        if ( log.isTraceEnabled() ) {
+            log.trace(String.format("Acquire %s (%d)", this, usage));
         }
         return this;
     }

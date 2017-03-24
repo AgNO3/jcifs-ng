@@ -37,6 +37,7 @@ class Trans2FindFirst2 extends SmbComTransaction {
     private int tflags;
     private int informationLevel;
     private int searchStorageType = 0;
+    private int maxItems;
     private String wildcard;
 
     // information levels
@@ -50,7 +51,7 @@ class Trans2FindFirst2 extends SmbComTransaction {
     static final int SMB_FILE_BOTH_DIRECTORY_INFO = 0x104;
 
 
-    Trans2FindFirst2 ( Configuration config, String filename, String wildcard, int searchAttributes ) {
+    Trans2FindFirst2 ( Configuration config, String filename, String wildcard, int searchAttributes, int batchCount, int batchSize ) {
         super(config);
         if ( filename.equals("\\") ) {
             this.path = filename;
@@ -68,7 +69,8 @@ class Trans2FindFirst2 extends SmbComTransaction {
 
         this.totalDataCount = 0;
         this.maxParameterCount = 10;
-        this.maxDataCount = config.getListSize();
+        this.maxItems = batchCount;
+        this.maxDataCount = batchSize;
         this.maxSetupCount = 0;
     }
 
@@ -87,7 +89,7 @@ class Trans2FindFirst2 extends SmbComTransaction {
 
         SMBUtil.writeInt2(this.searchAttributes, dst, dstIndex);
         dstIndex += 2;
-        SMBUtil.writeInt2(getConfig().getListCount(), dst, dstIndex);
+        SMBUtil.writeInt2(this.maxItems, dst, dstIndex);
         dstIndex += 2;
         SMBUtil.writeInt2(this.tflags, dst, dstIndex);
         dstIndex += 2;
@@ -129,7 +131,7 @@ class Trans2FindFirst2 extends SmbComTransaction {
     public String toString () {
         return new String(
             "Trans2FindFirst2[" + super.toString() + ",searchAttributes=0x" + Hexdump.toHexString(this.searchAttributes, 2) + ",searchCount="
-                    + getConfig().getListCount() + ",flags=0x" + Hexdump.toHexString(this.tflags, 2) + ",informationLevel=0x"
+                    + this.maxItems + ",flags=0x" + Hexdump.toHexString(this.tflags, 2) + ",informationLevel=0x"
                     + Hexdump.toHexString(this.informationLevel, 3) + ",searchStorageType=" + this.searchStorageType + ",filename=" + this.path
                     + "]");
     }

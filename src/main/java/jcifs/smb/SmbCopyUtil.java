@@ -25,7 +25,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
+import jcifs.CloseableIterator;
 import jcifs.SmbConstants;
+import jcifs.SmbResource;
 
 
 /**
@@ -171,7 +173,6 @@ final class SmbCopyUtil {
      */
     static void copyDir ( SmbFile src, SmbFile dest, byte[][] b, int bsize, WriterThread w, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh )
             throws CIFSException {
-        int i;
         String path = dest.getLocator().getUNCPath();
         if ( path.length() > 1 ) {
             try {
@@ -191,24 +192,25 @@ final class SmbCopyUtil {
             }
         }
 
-        SmbFile[] files = src.listFiles("*", SmbConstants.ATTR_DIRECTORY | SmbConstants.ATTR_HIDDEN | SmbConstants.ATTR_SYSTEM, null, null);
-        try {
-            for ( i = 0; i < files.length; i++ ) {
-                try ( SmbFile ndest = new SmbFile(
-                    dest,
-                    files[ i ].getLocator().getName(),
-                    true,
-                    files[ i ].getLocator().getType(),
-                    files[ i ].getAttributes(),
-                    files[ i ].createTime(),
-                    files[ i ].lastModified(),
-                    files[ i ].lastAccess(),
-                    files[ i ].length()) ) {
-                    try {
-                        files[ i ].copyRecursive(ndest, b, bsize, w, sh, dh);
-                    }
-                    finally {
-                        files[ i ].close();
+        try ( CloseableIterator<SmbResource> it = SmbEnumerationUtil
+                .doEnum(src, "*", SmbConstants.ATTR_DIRECTORY | SmbConstants.ATTR_HIDDEN | SmbConstants.ATTR_SYSTEM, null, null) ) {
+            while ( it.hasNext() ) {
+                try ( SmbResource r = it.next() ) {
+                    try ( SmbFile ndest = new SmbFile(
+                        dest,
+                        r.getLocator().getName(),
+                        true,
+                        r.getLocator().getType(),
+                        r.getAttributes(),
+                        r.createTime(),
+                        r.lastModified(),
+                        r.lastAccess(),
+                        r.length()) ) {
+
+                        if ( r instanceof SmbFile ) {
+                            ( (SmbFile) r ).copyRecursive(ndest, b, bsize, w, sh, dh);
+                        }
+
                     }
                 }
             }

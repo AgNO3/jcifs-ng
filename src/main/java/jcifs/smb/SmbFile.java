@@ -26,14 +26,16 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.CloseableIterator;
 import jcifs.Configuration;
+import jcifs.ResourceFilter;
+import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbFileHandle;
 import jcifs.SmbResource;
@@ -436,11 +438,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * @throws UnknownHostException
      *             If the server or workgroup of the <tt>context</tt> file cannot be determined
      */
-    public SmbFile ( SmbFile context, String name ) throws MalformedURLException, UnknownHostException {
+    public SmbFile ( SmbResource context, String name ) throws MalformedURLException, UnknownHostException {
         this(
-            context.isWorkgroup() ? new URL(null, "smb://" + checkName(name), context.transportContext.getUrlHandler())
-                    : new URL(context.getURL(), checkName(name), context.transportContext.getUrlHandler()),
-            context.getTransportContext());
+            isWorkgroup(context) ? new URL(null, "smb://" + checkName(name), context.getContext().getUrlHandler())
+                    : new URL(context.getLocator().getURL(), checkName(name), context.getContext().getUrlHandler()),
+            context.getContext());
         setContext(context, name);
     }
 
@@ -473,12 +475,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     }
 
 
-    SmbFile ( SmbFile context, String name, boolean loadedAttributes, int type, int attributes, long createTime, long lastModified, long lastAccess,
-            long size ) throws MalformedURLException {
+    SmbFile ( SmbResource context, String name, boolean loadedAttributes, int type, int attributes, long createTime, long lastModified,
+            long lastAccess, long size ) throws MalformedURLException {
         this(
-            context.isWorkgroup() ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
-                    : new URL(context.url, checkName(name) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
-            context.getTransportContext());
+            isWorkgroup(context) ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
+                    : new URL(context.getLocator().getURL(), checkName(name) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
+            context.getContext());
 
         setContext(context, name);
 
@@ -495,7 +497,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         this.isExists = true;
 
         if ( loadedAttributes ) {
-            this.attrExpiration = this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+            this.attrExpiration = this.sizeExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
         }
     }
 
@@ -503,9 +505,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     /**
      * @return
      */
-    private boolean isWorkgroup () {
+    private static boolean isWorkgroup ( SmbResource r ) {
         try {
-            return this.fileLocator.isWorkgroup();
+            return r.getLocator().isWorkgroup();
         }
         catch ( CIFSException e ) {
             log.debug("Failed to check for workgroup", e);
@@ -574,10 +576,13 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * @param context
      * @param name
      */
-    private void setContext ( SmbFile context, String name ) {
-        this.fileLocator.resolveInContext(context.fileLocator, name);
-        if ( context.getLocator().getShare() != null ) {
-            this.treeConnection = new SmbTreeConnection(context.treeConnection);
+    private void setContext ( SmbResource context, String name ) {
+        this.fileLocator.resolveInContext(context.getLocator(), name);
+        if ( context.getLocator().getShare() != null && ( context instanceof SmbFile ) ) {
+            this.treeConnection = new SmbTreeConnection( ( (SmbFile) context ).treeConnection);
+        }
+        else {
+            this.treeConnection = new SmbTreeConnection(context.getContext());
         }
     }
 
@@ -1078,7 +1083,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * @throws SmbException
      */
     public String[] list () throws SmbException {
-        return list("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
+        return SmbEnumerationUtil.list(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
@@ -1096,53 +1101,138 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      *             # @return An array of filenames
      */
     public String[] list ( SmbFilenameFilter filter ) throws SmbException {
-        return list("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, filter, null);
+        return SmbEnumerationUtil.list(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, filter, null);
     }
 
 
-    @Override
+    /**
+     * List the contents of this SMB resource as an array of
+     * <code>SmbResource</code> objects. This method is much more efficient than
+     * the regular <code>list</code> method when querying attributes of each
+     * file in the result set.
+     * <p>
+     * The list of <code>SmbResource</code>s returned by this method will be;
+     *
+     * <ul>
+     * <li>files and directories contained within this resource if the
+     * resource is a normal disk file directory,
+     * <li>all available NetBIOS workgroups or domains if this resource is
+     * the top level URL <code>smb://</code>,
+     * <li>all servers registered as members of a NetBIOS workgroup if this
+     * resource refers to a workgroup in a <code>smb://workgroup/</code> URL,
+     * <li>all browseable shares of a server including printers, IPC
+     * services, or disk volumes if this resource is a server URL in the form
+     * <code>smb://server/</code>,
+     * <li>or <code>null</code> if the resource cannot be resolved.
+     * </ul>
+     * 
+     * If strict resource lifecycle is used, make sure you close the individual files after use.
+     *
+     * @return An array of <code>SmbResource</code> objects representing file
+     *         and directories, workgroups, servers, or shares depending on the context
+     *         of the resource URL
+     * @throws SmbException
+     */
     public SmbFile[] listFiles () throws SmbException {
-        return listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
+        return SmbEnumerationUtil.listFiles(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
-    @Override
+    /**
+     * The CIFS protocol provides for DOS "wildcards" to be used as
+     * a performance enhancement. The client does not have to filter
+     * the names and the server does not have to return all directory
+     * entries.
+     * <p>
+     * The wildcard expression may consist of two special meta
+     * characters in addition to the normal filename characters. The '*'
+     * character matches any number of characters in part of a name. If
+     * the expression begins with one or more '?'s then exactly that
+     * many characters will be matched whereas if it ends with '?'s
+     * it will match that many characters <i>or less</i>.
+     * <p>
+     * Wildcard expressions will not filter workgroup names or server names.
+     *
+     * <blockquote>
+     * 
+     * <pre>
+     * winnt&gt; ls c?o*
+     * clock.avi                  -rw--      82944 Mon Oct 14 1996 1:38 AM
+     * Cookies                    drw--          0 Fri Nov 13 1998 9:42 PM
+     * 2 items in 5ms
+     * </pre>
+     * 
+     * </blockquote>
+     * 
+     * If strict resource lifecycle is used, make sure you close the individual files after use.
+     *
+     * @param wildcard
+     *            a wildcard expression
+     * @throws SmbException
+     * @return An array of <code>SmbResource</code> objects representing file
+     *         and directories, workgroups, servers, or shares depending on the context
+     *         of the resource URL
+     */
     public SmbFile[] listFiles ( String wildcard ) throws SmbException {
-        return listFiles(wildcard, ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
+        return SmbEnumerationUtil.listFiles(this, wildcard, ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
-    @Override
+    /**
+     * List the contents of this SMB resource. The list returned will be
+     * identical to the list returned by the parameterless <code>listFiles()</code>
+     * method minus files filtered by the specified filename filter.
+     * 
+     * If strict resource lifecycle is used, make sure you close the individual files after use.
+     *
+     * @param filter
+     *            a filter to exclude files from the results
+     * @return An array of <tt>SmbResource</tt> objects
+     * @throws SmbException
+     */
     public SmbFile[] listFiles ( SmbFilenameFilter filter ) throws SmbException {
-        return listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, filter, null);
+        return SmbEnumerationUtil.listFiles(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, filter, null);
+    }
+
+
+    /**
+     * List the contents of this SMB resource. The list returned will be
+     * identical to the list returned by the parameterless <code>listFiles()</code>
+     * method minus filenames filtered by the specified filter.
+     * 
+     * If strict resource lifecycle is used, make sure you close the individual files after use.
+     *
+     * @param filter
+     *            a file filter to exclude files from the results
+     * @return An array of <tt>SmbResource</tt> objects
+     * @throws SmbException
+     */
+    public SmbFile[] listFiles ( SmbFileFilter filter ) throws SmbException {
+        return SmbEnumerationUtil.listFiles(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, filter);
     }
 
 
     @Override
-    public SmbFile[] listFiles ( SmbFileFilter filter ) throws SmbException {
-        return listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, filter);
+    public CloseableIterator<SmbResource> children () throws CIFSException {
+        return SmbEnumerationUtil.doEnum(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
-    String[] list ( String wildcard, int searchAttributes, SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException {
-        try {
-            List<Object> list = SmbEnumerationUtil.doEnum(this, false, wildcard, searchAttributes, fnf, ff);;
-            return list.toArray(new String[list.size()]);
-        }
-        catch ( CIFSException e ) {
-            throw SmbException.wrap(e);
-        }
+    @Override
+    public CloseableIterator<SmbResource> children ( String wildcard ) throws CIFSException {
+        return SmbEnumerationUtil.doEnum(this, wildcard, ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
     }
 
 
-    SmbFile[] listFiles ( String wildcard, int searchAttributes, SmbFilenameFilter fnf, SmbFileFilter ff ) throws SmbException {
-        try {
-            List<Object> list = SmbEnumerationUtil.doEnum(this, true, wildcard, searchAttributes, fnf, ff);
-            return list.toArray(new SmbFile[list.size()]);
-        }
-        catch ( CIFSException e ) {
-            throw SmbException.wrap(e);
-        }
+    @Override
+    public CloseableIterator<SmbResource> children ( ResourceNameFilter filter ) throws CIFSException {
+        return SmbEnumerationUtil.doEnum(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, filter, null);
+    }
+
+
+    @Override
+    public CloseableIterator<SmbResource> children ( ResourceFilter filter ) throws CIFSException {
+        return SmbEnumerationUtil.doEnum(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, filter);
     }
 
 
@@ -1353,14 +1443,16 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                  * Recursively delete directory contents
                  */
 
-                try {
-                    SmbResource[] l = listFiles("*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null);
-                    for ( int i = 0; i < l.length; i++ ) {
-                        try {
-                            l[ i ].delete();
-                        }
-                        catch ( CIFSException e ) {
-                            throw SmbException.wrap(e);
+                try ( CloseableIterator<SmbResource> it = SmbEnumerationUtil
+                        .doEnum(this, "*", ATTR_DIRECTORY | ATTR_HIDDEN | ATTR_SYSTEM, null, null) ) {
+                    while ( it.hasNext() ) {
+                        try ( SmbResource r = it.next() ) {
+                            try {
+                                r.delete();
+                            }
+                            catch ( CIFSException e ) {
+                                throw SmbException.wrap(e);
+                            }
                         }
                     }
                 }

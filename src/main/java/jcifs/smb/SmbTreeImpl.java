@@ -565,7 +565,13 @@ class SmbTreeImpl implements SmbTreeInternal {
             treeConnect(null, null);
         }
         else {
-            Trans2FindFirst2 req = new Trans2FindFirst2(tf.getConfig(), "\\", "*", SmbConstants.ATTR_DIRECTORY);
+            Trans2FindFirst2 req = new Trans2FindFirst2(
+                tf.getConfig(),
+                "\\",
+                "*",
+                SmbConstants.ATTR_DIRECTORY,
+                tf.getConfig().getListCount(),
+                tf.getConfig().getListSize());
             Trans2FindFirst2Response resp = new Trans2FindFirst2Response(tf.getConfig());
             send(req, resp);
         }

@@ -22,9 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import jcifs.smb.SmbFileFilter;
-import jcifs.smb.SmbFilenameFilter;
-
 
 /**
  * This class represents a resource on an SMB network. Mainly these
@@ -641,41 +638,28 @@ public interface SmbResource extends AutoCloseable {
 
 
     /**
-     * List the contents of this SMB resource as an array of
-     * <code>SmbResource</code> objects. This method is much more efficient than
-     * the regular <code>list</code> method when querying attributes of each
-     * file in the result set.
-     * <p>
-     * The list of <code>SmbResource</code>s returned by this method will be;
-     *
-     * <ul>
-     * <li>files and directories contained within this resource if the
-     * resource is a normal disk file directory,
-     * <li>all available NetBIOS workgroups or domains if this resource is
-     * the top level URL <code>smb://</code>,
-     * <li>all servers registered as members of a NetBIOS workgroup if this
-     * resource refers to a workgroup in a <code>smb://workgroup/</code> URL,
-     * <li>all browseable shares of a server including printers, IPC
-     * services, or disk volumes if this resource is a server URL in the form
-     * <code>smb://server/</code>,
-     * <li>or <code>null</code> if the resource cannot be resolved.
-     * </ul>
+     * Close/release the file
      * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
+     * This releases all resources that this file holds. If not using strict mode this is currently a no-op.
      *
-     * @return An array of <code>SmbResource</code> objects representing file
-     *         and directories, workgroups, servers, or shares depending on the context
-     *         of the resource URL
-     * @throws CIFSException
+     * @see java.lang.AutoCloseable#close()
      */
-    SmbResource[] listFiles () throws CIFSException;
+    @Override
+    void close ();
 
 
     /**
-     * The CIFS protocol provides for DOS "wildcards" to be used as
-     * a performance enhancement. The client does not have to filter
-     * the names and the server does not have to return all directory
-     * entries.
+     * Fetch all children
+     * 
+     * @return an interator over the child resources
+     * @throws CIFSException
+     */
+    CloseableIterator<SmbResource> children () throws CIFSException;
+
+
+    /**
+     * Fetch children matching pattern, server-side filtering
+     * 
      * <p>
      * The wildcard expression may consist of two special meta
      * characters in addition to the normal filename characters. The '*'
@@ -685,68 +669,33 @@ public interface SmbResource extends AutoCloseable {
      * it will match that many characters <i>or less</i>.
      * <p>
      * Wildcard expressions will not filter workgroup names or server names.
-     *
-     * <blockquote>
      * 
-     * <pre>
-     * winnt&gt; ls c?o*
-     * clock.avi                  -rw--      82944 Mon Oct 14 1996 1:38 AM
-     * Cookies                    drw--          0 Fri Nov 13 1998 9:42 PM
-     * 2 items in 5ms
-     * </pre>
-     * 
-     * </blockquote>
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
      * @param wildcard
-     *            a wildcard expression
+     * @return an interator over the child resources
      * @throws CIFSException
-     * @return An array of <code>SmbResource</code> objects representing file
-     *         and directories, workgroups, servers, or shares depending on the context
-     *         of the resource URL
      */
-    SmbResource[] listFiles ( String wildcard ) throws CIFSException;
+    CloseableIterator<SmbResource> children ( String wildcard ) throws CIFSException;
 
 
     /**
-     * List the contents of this SMB resource. The list returned will be
-     * identical to the list returned by the parameterless <code>listFiles()</code>
-     * method minus files filtered by the specified filename filter.
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
      * @param filter
-     *            a filter to exclude files from the results
-     * @return An array of <tt>SmbResource</tt> objects
+     *            filter acting on file names
+     * @return an interator over the child resources
+     * @see SmbResource#children(String) for a more efficient way to do this when a pattern on the filename is
+     *      sufficient for filtering
      * @throws CIFSException
      */
-    SmbResource[] listFiles ( SmbFilenameFilter filter ) throws CIFSException;
+    CloseableIterator<SmbResource> children ( ResourceNameFilter filter ) throws CIFSException;
 
 
     /**
-     * List the contents of this SMB resource. The list returned will be
-     * identical to the list returned by the parameterless <code>listFiles()</code>
-     * method minus filenames filtered by the specified filter.
-     * 
-     * If strict resource lifecycle is used, make sure you close the individual files after use.
-     *
      * @param filter
-     *            a file filter to exclude files from the results
-     * @return An array of <tt>SmbResource</tt> objects
+     *            filter acting on SmbResource instances
+     * @return an interator over the child resources
+     * @see SmbResource#children(String) for a more efficient way to do this when a pattern on the filename is
+     *      sufficient for filtering
      * @throws CIFSException
      */
-    SmbResource[] listFiles ( SmbFileFilter filter ) throws CIFSException;
-
-
-    /**
-     * Close/release the file
-     * 
-     * This releases all resources that this file holds. If not using strict mode this is currently a no-op.
-     *
-     * @see java.lang.AutoCloseable#close()
-     */
-    @Override
-    void close ();
+    CloseableIterator<SmbResource> children ( ResourceFilter filter ) throws CIFSException;
 
 }

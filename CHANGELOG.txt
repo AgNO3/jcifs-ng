@@ -11,6 +11,7 @@ jcifs-ng 1.6.0
 - Increased test coverage, fix some issues with legacy connections found through that.
 - Change logging to use SLF4J facade
 - Copy operations now use SmbFileInput/OutputStream and therefor can use LargeX
+- Streaming enumeration operations
 
 jcifs-ng 1.5.3
 - Fix thread leak when establishing a connection fails

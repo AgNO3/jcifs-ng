@@ -48,6 +48,13 @@ public interface SmbResourceLocator {
 
 
     /**
+     * 
+     * @return dfs referral data
+     */
+    DfsReferralData getDfsReferral ();
+
+
+    /**
      * Everything but the last component of the URL representing this SMB
      * resource is effectivly it's parent. The root URL <code>smb://</code>
      * does not have a parent. In this case <code>smb://</code> is returned.
