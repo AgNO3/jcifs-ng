@@ -399,7 +399,7 @@ class SmbTreeConnection {
         try ( SmbSessionImpl session = getSession() ) {
             if ( isConnected() ) {
                 try ( SmbTransportImpl transport = session.getTransport() ) {
-                    if ( transport.tconHostName == null ) {
+                    if ( transport.getRemoteHostName() == null ) {
                         /*
                          * Tree/session thinks it is connected but transport disconnected
                          * under it, reset tree to reflect the truth.
@@ -598,10 +598,10 @@ class SmbTreeConnection {
               SmbSessionImpl session = th.getSession();
               SmbTransportImpl transport = session.getTransport();
               SmbTreeImpl t = getTree() ) {
-            DfsReferralData dr = this.ctx.getDfs().resolve(this.ctx, transport.tconHostName, loc.getShare(), loc.getUNCPath());
+            DfsReferralData dr = this.ctx.getDfs().resolve(this.ctx, transport.getRemoteHostName(), loc.getShare(), loc.getUNCPath());
             if ( dr != null ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Info " + transport.tconHostName + "\\" + loc.getShare() + loc.getUNCPath() + " -> " + dr);
+                    log.debug("Info " + transport.getRemoteHostName() + "\\" + loc.getShare() + loc.getUNCPath() + " -> " + dr);
                 }
                 String service = t != null ? t.getService() : null;
 

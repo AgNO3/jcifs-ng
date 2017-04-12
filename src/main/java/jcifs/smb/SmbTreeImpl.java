@@ -372,7 +372,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                      * \path\to\file
                      */
                     request.flags2 |= SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
-                    request.path = '\\' + transport.tconHostName + '\\' + this.share + request.path;
+                    request.path = '\\' + transport.getRemoteHostName() + '\\' + this.share + request.path;
                 }
                 try {
                     sess.send(request, response, params);
@@ -436,6 +436,10 @@ class SmbTreeImpl implements SmbTreeInternal {
         try ( SmbSessionImpl sess = getSession();
               SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
+
+                // this needs to be done before the reference to the remote hostname later
+                transport.ensureConnected();
+
                 if ( waitForState(transport) == 2 ) {
                     // already connected
                     return;
@@ -462,7 +466,13 @@ class SmbTreeImpl implements SmbTreeInternal {
                      * established.
                      */
 
-                    String unc = "\\\\" + transport.tconHostName + '\\' + this.share;
+                    String tconHostName = transport.getRemoteHostName();
+
+                    if ( tconHostName == null ) {
+                        throw new SmbException("Transport disconnected while waiting for connection");
+                    }
+
+                    String unc = "\\\\" + tconHostName + '\\' + this.share;
 
                     /*
                      * IBM iSeries doesn't like specifying a service. Always reset
@@ -481,8 +491,6 @@ class SmbTreeImpl implements SmbTreeInternal {
                     SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(sess.getConfig(), andxResponse);
                     SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess, unc, svc, andx);
 
-                    log.debug("Connecting transport");
-                    transport.ensureConnected();
                     sess.send(request, response);
 
                     this.tid = response.tid;

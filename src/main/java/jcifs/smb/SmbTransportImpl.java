@@ -107,7 +107,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     int capabilities;
     int sessionKey = 0x00000000;
     boolean useUnicode;
-    String tconHostName = null;
+    private String tconHostName = null;
 
     private final CIFSContext transportContext;
     boolean signingEnforced;
