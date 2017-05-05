@@ -21,12 +21,18 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.security.Key;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
+import java.security.MessageDigest;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import jcifs.util.Hexdump;
 
 
 @SuppressWarnings ( "javadoc" )
 public class Pac {
+
+    private static final Logger log = LoggerFactory.getLogger(Pac.class);
 
     private PacLogonInfo logonInfo;
     private PacCredentialType credentialType;
@@ -53,13 +59,20 @@ public class Pac {
                 int bufferType = pacStream.readInt();
                 int bufferSize = pacStream.readInt();
                 long bufferOffset = pacStream.readLong();
+
+                if ( bufferOffset % 8 != 0 ) {
+                    throw new PACDecodingException("Unaligned buffer " + bufferType);
+                }
+
                 byte[] bufferData = new byte[bufferSize];
                 System.arraycopy(data, (int) bufferOffset, bufferData, 0, bufferSize);
 
                 switch ( bufferType ) {
                 case PacConstants.LOGON_INFO:
                     // PAC Credential Information
-                    this.logonInfo = new PacLogonInfo(bufferData);
+                    if ( this.logonInfo == null ) {
+                        this.logonInfo = new PacLogonInfo(bufferData);
+                    }
                     break;
                 case PacConstants.CREDENTIAL_TYPE:
                     // PAC Credential Type
@@ -67,19 +80,33 @@ public class Pac {
                     break;
                 case PacConstants.SERVER_CHECKSUM:
                     // PAC Server Signature
-                    this.serverSignature = new PacSignature(bufferData);
-                    // Clear signature from checksum copy
-                    for ( int i = 0; i < bufferSize; i++ )
-                        checksumData[ (int) bufferOffset + 4 + i ] = 0;
+                    if ( this.serverSignature == null ) {
+                        this.serverSignature = new PacSignature(bufferData);
+                        if ( log.isDebugEnabled() ) {
+                            log.debug(
+                                String.format("Server signature is type %d @ %d len %d", this.serverSignature.getType(), bufferOffset, bufferSize));
+                        }
+                        // Clear signature from checksum copy
+                        for ( int i = 0; i < this.serverSignature.getChecksum().length; i++ )
+                            checksumData[ (int) bufferOffset + 4 + i ] = 0;
+                    }
                     break;
                 case PacConstants.PRIVSVR_CHECKSUM:
                     // PAC KDC Signature
-                    this.kdcSignature = new PacSignature(bufferData);
-                    // Clear signature from checksum copy
-                    for ( int i = 0; i < bufferSize; i++ )
-                        checksumData[ (int) bufferOffset + 4 + i ] = 0;
+                    if ( this.kdcSignature == null ) {
+                        this.kdcSignature = new PacSignature(bufferData);
+                        if ( log.isDebugEnabled() ) {
+                            log.debug(String.format("KDC signature is type %d @ %d len %d", this.kdcSignature.getType(), bufferOffset, bufferSize));
+                        }
+                        // Clear signature from checksum copy
+                        for ( int i = 0; i < this.kdcSignature.getChecksum().length; i++ )
+                            checksumData[ (int) bufferOffset + 4 + i ] = 0;
+                    }
                     break;
                 default:
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Found unhandled PAC buffer " + bufferType);
+                    }
                 }
             }
         }
@@ -87,18 +114,36 @@ public class Pac {
             throw new PACDecodingException("Malformed PAC", e);
         }
 
-        PacMac mac = new PacMac();
-        try {
-            mac.init(key);
-            mac.update(checksumData);
-        }
-        catch ( NoSuchAlgorithmException e ) {
-            throw new PACDecodingException("Could not compute MAC", e);
+        if ( this.serverSignature == null || this.kdcSignature == null || this.logonInfo == null ) {
+            throw new PACDecodingException("Missing required buffers");
         }
 
-        byte checksum[] = mac.doFinal();
-        if ( !Arrays.equals(this.serverSignature.getChecksum(), checksum) )
+        if ( log.isTraceEnabled() ) {
+            log.trace(
+                String.format(
+                    "Checksum data %s type %d signature %s key %s",
+                    Hexdump.toHexString(checksumData),
+                    this.serverSignature.getType(),
+                    Hexdump.toHexString(this.serverSignature.getChecksum()),
+                    Hexdump.toHexString(key.getEncoded())));
+        }
+
+        byte checksum[] = PacMac.calculateMac(this.serverSignature.getType(), key.getEncoded(), checksumData);
+        if ( !MessageDigest.isEqual(this.serverSignature.getChecksum(), checksum) ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug(
+                    String.format(
+                        "PAC signature validation failed, have: %s expected: %s type: %d len: %d",
+                        Hexdump.toHexString(checksum),
+                        Hexdump.toHexString(this.serverSignature.getChecksum()),
+                        this.serverSignature.getType(),
+                        data.length));
+            }
+            if ( log.isTraceEnabled() ) {
+                log.trace(String.format("Checksum data %s key %s", Hexdump.toHexString(checksumData), Hexdump.toHexString(key.getEncoded())));
+            }
             throw new PACDecodingException("Invalid PAC signature");
+        }
     }
 
 

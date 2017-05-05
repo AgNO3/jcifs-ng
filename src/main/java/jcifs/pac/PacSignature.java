@@ -25,6 +25,10 @@ import java.io.IOException;
 @SuppressWarnings ( "javadoc" )
 public class PacSignature {
 
+    public static final int KERB_CHECKSUM_HMAC_MD5 = 0xFFFFFF76;
+    public static final int HMAC_SHA1_96_AES128 = 0x0000000F;
+    public static final int HMAC_SHA1_96_AES256 = 0x00000010;
+
     private int type;
     private byte[] checksum;
 
@@ -32,9 +36,19 @@ public class PacSignature {
     public PacSignature ( byte[] data ) throws PACDecodingException {
         try {
             PacDataInputStream bufferStream = new PacDataInputStream(new DataInputStream(new ByteArrayInputStream(data)));
-
             this.type = bufferStream.readInt();
-            this.checksum = new byte[bufferStream.available()];
+            switch ( this.type ) {
+            case KERB_CHECKSUM_HMAC_MD5:
+                this.checksum = new byte[16];
+                break;
+            case HMAC_SHA1_96_AES128:
+            case HMAC_SHA1_96_AES256:
+                this.checksum = new byte[12];
+                break;
+            default:
+                this.checksum = new byte[bufferStream.available()];
+                break;
+            }
             bufferStream.readFully(this.checksum);
         }
         catch ( IOException e ) {

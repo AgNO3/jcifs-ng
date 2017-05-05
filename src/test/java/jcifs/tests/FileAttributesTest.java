@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
 
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -38,8 +39,11 @@ import org.junit.runners.Parameterized.Parameters;
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.smb.NtStatus;
+import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbUnsupportedOperationException;
+import jcifs.smb.WinError;
 
 
 /**
@@ -106,12 +110,14 @@ public class FileAttributesTest extends BaseCIFSTest {
     public void testSetLastModified () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbResource f = createTestFile() ) {
             try {
-                long time = System.currentTimeMillis() - 60 * 60 * 12;
+                long time = System.currentTimeMillis() - 1000 * 60 * 60 * 12;
                 f.setLastModified(time);
 
                 if ( ( getContext().getConfig().getCapabilities() & SmbConstants.CAP_NT_SMBS ) == 0 ) {
                     // only have second precision
-                    assertEquals(time / 1000, f.lastModified() / 1000);
+                    // there seems to be some random factor (adding one second)
+                    int diff = Math.abs((int) ( ( time / 1000 ) - ( f.lastModified() / 1000 ) ));
+                    Assert.assertTrue("Have set time correctly", diff < 2);
                 }
                 else {
                     assertEquals(time, f.lastModified());
@@ -258,6 +264,13 @@ public class FileAttributesTest extends BaseCIFSTest {
             }
             catch ( SmbUnsupportedOperationException e ) {
                 Assume.assumeTrue("No Ntsmbs", false);
+            }
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == NtStatus.NT_STATUS_ACCESS_DENIED || e.getNtStatus() == WinError.ERROR_ACCESS_DENIED ) {
+                    // we might not have permissions for that
+                    Assume.assumeTrue("No permission for share security accesss", false);
+                }
+                throw e;
             }
         }
     }

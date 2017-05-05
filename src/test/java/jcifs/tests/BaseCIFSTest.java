@@ -90,15 +90,32 @@ public abstract class BaseCIFSTest {
         return configs;
     }
 
+    private static final class CIFSConfigContextWrapper extends CIFSContextWrapper {
+
+        private final DelegatingConfiguration cfg;
+
+
+        CIFSConfigContextWrapper ( CIFSContext delegate, DelegatingConfiguration cfg ) {
+            super(delegate);
+            this.cfg = cfg;
+        }
+
+
+        @Override
+        protected CIFSContext wrap ( CIFSContext newContext ) {
+            return new CIFSConfigContextWrapper(super.wrap(newContext), this.cfg);
+        }
+
+
+        @Override
+        public Configuration getConfig () {
+            return this.cfg;
+        }
+    }
+
 
     protected static CIFSContext withConfig ( CIFSContext ctx, final DelegatingConfiguration cfg ) {
-        return new CIFSContextWrapper(ctx) {
-
-            @Override
-            public Configuration getConfig () {
-                return cfg;
-            }
-        };
+        return new CIFSConfigContextWrapper(ctx, cfg);
     }
 
 

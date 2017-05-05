@@ -48,6 +48,8 @@
 		<maven.build.timestamp.format>yyyyMMddHHmm</maven.build.timestamp.format>
 		<osgi-version-qualifier>${maven.build.timestamp}</osgi-version-qualifier>
 		<project.scm.id>github</project.scm.id>
+		<osgi.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</osgi.version>
+		<osgi.pkg.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</osgi.pkg.version>
 	</properties>
 
 	<dependencies>
@@ -107,12 +109,12 @@
 
 				<configuration>
 					<instructions>
-						<Bundle-Version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</Bundle-Version>
+						<Bundle-Version>${osgi.version}</Bundle-Version>
 						<Bundle-License>LGPL</Bundle-License>
 						<Bundle-Vendor>AgNO3 GmbH &amp; Co. KG</Bundle-Vendor>
 						<Bundle-SymbolicName>eu.agno3.jcifsng</Bundle-SymbolicName>
 						<Export-Package>
-							jcifs*;version="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}",
+							jcifs*;version="${osgi.pkg.version}",
 						</Export-Package>
 						<Private-Package />
 						<Import-Package>

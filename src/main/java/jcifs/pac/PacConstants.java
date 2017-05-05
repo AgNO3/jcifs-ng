@@ -27,6 +27,13 @@ public interface PacConstants {
     static final int SERVER_CHECKSUM = 6;
     static final int PRIVSVR_CHECKSUM = 7;
 
+    static final int CLIENT_NAME_TYPE = 0xA;
+    static final int CONSTRAINT_DELEGATIION_TYPE = 0xB;
+    static final int CLIENT_UPN_TYPE = 0xC;
+    static final int CLIENT_CLAIMS_TYPE = 0xD;
+    static final int DEVICE_INFO_TYPE = 0xE;
+    static final int DEVICE_CLAIMS_TYPE = 0xF;
+
     static final int LOGON_EXTRA_SIDS = 0x20;
     static final int LOGON_RESOURCE_GROUPS = 0x200;
 

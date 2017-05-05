@@ -105,9 +105,11 @@ public class DfsImpl implements DfsResolver {
             // https://lists.samba.org/archive/samba-technical/2009-August/066486.html
             // UniAddress addr = UniAddress.getByName(authDomain, true, tf);
             // SmbTransport trans = tf.getTransportPool().getSmbTransport(tf, addr, 0);
-            try ( SmbTransportInternal trans = getDc(tf, authDomain).unwrap(SmbTransportInternal.class) ) {
+            try ( SmbTransport dc = getDc(tf, authDomain) ) {
                 CacheEntry<Map<String, CacheEntry<DfsReferralDataInternal>>> entry = new CacheEntry<>(tf.getConfig().getDfsTtl() * 10L);
                 DfsReferralData initial = null;
+                @SuppressWarnings ( "resource" )
+                SmbTransportInternal trans = dc != null ? dc.unwrap(SmbTransportInternal.class) : null;
                 if ( trans != null ) {
                     // get domain referral
                     initial = trans.getDfsReferrals(tf, "", 0);
@@ -176,18 +178,29 @@ public class DfsImpl implements DfsResolver {
             }
             ce = new CacheEntry<>(tf.getConfig().getDfsTtl());
             try {
-
-                Address addr = tf.getNameServiceClient().getByName(domain, true);
-                try ( SmbTransportInternal trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false).unwrap(SmbTransportInternal.class) ) {
-                    synchronized ( trans ) {
-                        DfsReferralDataInternal dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1)
-                                .unwrap(DfsReferralDataInternal.class);
-                        if ( log.isDebugEnabled() ) {
-                            log.debug("Got DC referral " + dr);
+                IOException se = null;
+                Address[] addrs = tf.getNameServiceClient().getAllByName(domain, true);
+                for ( Address addr : addrs ) {
+                    try ( SmbTransportInternal trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false)
+                            .unwrap(SmbTransportInternal.class) ) {
+                        synchronized ( trans ) {
+                            DfsReferralDataInternal dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1)
+                                    .unwrap(DfsReferralDataInternal.class);
+                            if ( log.isDebugEnabled() ) {
+                                log.debug("Got DC referral " + dr);
+                            }
+                            ce.map.put(DC_ENTRY, dr);
+                            return dr;
                         }
-                        ce.map.put(DC_ENTRY, dr);
-                        return dr;
                     }
+                    catch ( IOException e ) {
+                        log.debug("Failed to get DC referral for " + domain, e);
+                        se = e;
+                        continue;
+                    }
+                }
+                if ( se != null ) {
+                    throw se;
                 }
             }
             catch ( IOException ioe ) {
@@ -367,10 +380,16 @@ public class DfsImpl implements DfsResolver {
                     if ( links == null ) {
                         log.trace("Loadings links");
                         String refServerName = domain;
-                        try ( SmbTransportInternal trans = getDc(tf, domain).unwrap(SmbTransportInternal.class) ) {
-                            if ( trans == null ) {
+                        try ( SmbTransport dc = getDc(tf, domain) ) {
+                            if ( dc == null ) {
+                                if ( log.isDebugEnabled() ) {
+                                    log.debug("Failed to get domain controller for " + domain);
+                                }
                                 return null;
                             }
+
+                            @SuppressWarnings ( "resource" )
+                            SmbTransportInternal trans = dc.unwrap(SmbTransportInternal.class);
                             // the tconHostName is from the DC referral, that referral must be resolved
                             // before following deeper ones. Otherwise e.g. samba will return a broken
                             // referral.
@@ -474,7 +493,7 @@ public class DfsImpl implements DfsResolver {
                                     links.map.put(link, dr);
                                 }
                                 else {
-                                    log.trace("No referral found for " + link);
+                                    log.debug("No referral found for " + link);
                                 }
                             }
                         }

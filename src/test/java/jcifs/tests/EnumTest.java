@@ -71,7 +71,7 @@ public class EnumTest extends BaseCIFSTest {
 
     @Test
     public void testShareEnum () throws MalformedURLException, CIFSException {
-        try ( SmbFile smbFile = new SmbFile("smb://" + getTestServer(), getContext()) ) {
+        try ( SmbFile smbFile = new SmbFile("smb://" + getTestServer(), withTestNTLMCredentials(getContext())) ) {
             String[] list = smbFile.list();
             assertNotNull(list);
             assertTrue("No share found", list.length > 0);
@@ -82,7 +82,7 @@ public class EnumTest extends BaseCIFSTest {
 
     @Test
     public void testDomainShareEnum () throws MalformedURLException, CIFSException {
-        try ( SmbFile smbFile = new SmbFile("smb://" + getTestDomain(), getContext()) ) {
+        try ( SmbFile smbFile = new SmbFile("smb://" + getTestDomain(), withTestNTLMCredentials(getContext())) ) {
             String[] list = smbFile.list();
             assertNotNull(list);
             assertTrue("No share found", list.length > 0);

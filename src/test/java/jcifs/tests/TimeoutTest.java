@@ -25,8 +25,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -37,10 +39,15 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.NameServiceClient;
+import jcifs.NetbiosAddress;
 import jcifs.SmbResource;
 import jcifs.config.DelegatingConfiguration;
+import jcifs.context.CIFSContextWrapper;
+import jcifs.netbios.UniAddress;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSessionInternal;
@@ -112,6 +119,23 @@ public class TimeoutTest extends BaseCIFSTest {
             @Override
             public int getConnTimeout () {
                 return 100;
+            }
+        });
+    }
+
+
+    protected CIFSContext medConnectTimeout ( CIFSContext ctx ) {
+        return withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public int getResponseTimeout () {
+                return 2000;
+            }
+
+
+            @Override
+            public int getConnTimeout () {
+                return 2000;
             }
         });
     }
@@ -244,6 +268,108 @@ public class TimeoutTest extends BaseCIFSTest {
                 throw (ConnectionTimeoutException) e.getCause();
             }
             throw e;
+        }
+    }
+
+    private static final class NSOverrideWrapper extends CIFSContextWrapper {
+
+        private final NameServiceClient wrapper;
+
+
+        NSOverrideWrapper ( CIFSContext delegate, NameServiceClient wrapper ) {
+            super(delegate);
+            this.wrapper = wrapper;
+        }
+
+
+        @Override
+        protected CIFSContext wrap ( CIFSContext newContext ) {
+            return new NSOverrideWrapper(super.wrap(newContext), this.wrapper);
+        }
+
+
+        @Override
+        public NameServiceClient getNameServiceClient () {
+            return this.wrapper;
+        }
+    }
+
+
+    protected CIFSContext failHostInjecting ( CIFSContext ctx, final String replacement ) throws UnknownHostException {
+
+        final NameServiceClient nscl = ctx.getNameServiceClient();
+
+        final NameServiceClient wrapper = new DelegatingNameServiceClient(nscl) {
+
+            private InetAddress replacementINET = InetAddress.getByName(replacement);
+            private NetbiosAddress replacementNetbios = nscl.getNbtByName(replacement);
+
+
+            @Override
+            public Address[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException {
+                Address[] all = super.getAllByName(hostname, possibleNTDomainOrWorkgroup);
+                return wrap(hostname, all);
+            }
+
+
+            @Override
+            public Address getByName ( String hostname ) throws UnknownHostException {
+                return wrap(hostname, super.getByName(hostname));
+            }
+
+
+            @Override
+            public Address getByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException {
+                return wrap(hostname, super.getByName(hostname, possibleNTDomainOrWorkgroup));
+            }
+
+
+            private Address wrap ( String hostname, Address byName ) {
+                NetbiosAddress nbt = byName.unwrap(NetbiosAddress.class);
+                if ( nbt != null ) {
+                    return new UniAddress(this.replacementNetbios);
+                }
+
+                return new UniAddress(this.replacementINET);
+            }
+
+
+            private Address[] wrap ( String hostname, Address[] all ) {
+                Address actual = all[ 0 ];
+                NetbiosAddress nbt = actual.unwrap(NetbiosAddress.class);
+
+                if ( nbt != null ) {
+                    return new Address[] {
+                        new UniAddress(this.replacementNetbios), actual
+                    };
+                }
+
+                return new Address[] {
+                    new UniAddress(this.replacementINET), actual
+                };
+            }
+        };
+
+        return new NSOverrideWrapper(ctx, wrapper);
+    }
+
+
+    @Test
+    public void testMultiHostFailoverTimeout () throws MalformedURLException, CIFSException, UnknownHostException {
+        // this could inject wrong DFS cache entries
+        CIFSContext newContext = getNewContext();
+        try ( SmbResource root = getDefaultShareRoot(failHostInjecting(medConnectTimeout(newContext), "10.255.255.1")) ) {
+            root.exists();
+        }
+    }
+
+
+    @Test
+    public void testMultiHostFailover () throws MalformedURLException, CIFSException, UnknownHostException {
+        // this could inject wrong DFS cache entries
+        CIFSContext newContext = getNewContext();
+        try ( SmbResource root = getDefaultShareRoot(failHostInjecting(medConnectTimeout(newContext), "0.0.0.0")) ) {
+            root.exists();
         }
     }
 

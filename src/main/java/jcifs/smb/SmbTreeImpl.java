@@ -576,26 +576,24 @@ class SmbTreeImpl implements SmbTreeInternal {
         try ( SmbSessionImpl sess = getSession();
               SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
-
-                if ( this.connectionState.getAndSet(3) != 2 ) {
-                    return;
-                }
-
-                long l = this.usageCount.get();
-                if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
-                    log.warn("Disconnected tree while still in use " + this);
-                    dumpResource();
-                    if ( sess.getConfig().isTraceResourceUsage() ) {
-                        throw new RuntimeCIFSException("Disconnected tree while still in use");
+                int st = this.connectionState.getAndSet(3);
+                if ( st == 2 ) {
+                    long l = this.usageCount.get();
+                    if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
+                        log.warn("Disconnected tree while still in use " + this);
+                        dumpResource();
+                        if ( sess.getConfig().isTraceResourceUsage() ) {
+                            throw new RuntimeCIFSException("Disconnected tree while still in use");
+                        }
                     }
-                }
 
-                if ( !inError && this.tid != 0 ) {
-                    try {
-                        send(new SmbComTreeDisconnect(sess.getConfig()), null);
-                    }
-                    catch ( SmbException se ) {
-                        log.error("SmbComTreeDisconnect failed", se);
+                    if ( !inError && this.tid != 0 ) {
+                        try {
+                            send(new SmbComTreeDisconnect(sess.getConfig()), null);
+                        }
+                        catch ( SmbException se ) {
+                            log.error("SmbComTreeDisconnect failed", se);
+                        }
                     }
                 }
                 this.inDfs = false;

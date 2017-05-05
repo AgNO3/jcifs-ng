@@ -44,7 +44,10 @@ class SmbComSetInformation extends ServerMessageBlock {
         dstIndex += 2;
         SMBUtil.writeUTime(this.lastWriteTime, dst, dstIndex);
         dstIndex += 4;
-        return dstIndex - start;
+        // reserved
+        dstIndex += 10;
+        int len = dstIndex - start;
+        return len;
     }
 
 

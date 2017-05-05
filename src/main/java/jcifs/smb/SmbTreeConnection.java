@@ -632,6 +632,9 @@ class SmbTreeConnection {
             }
             else if ( t.isInDomainDfs() && ! ( request instanceof NtTransQuerySecurityDesc ) && ! ( request instanceof SmbComClose )
                     && ! ( request instanceof SmbComFindClose2 ) ) {
+                if ( log.isDebugEnabled() ) {
+                    log.debug("No referral available for  " + transport.getRemoteHostName() + "\\" + loc.getShare() + loc.getUNCPath());
+                }
                 throw new SmbException(NtStatus.NT_STATUS_NOT_FOUND, false);
             }
             else {
@@ -653,7 +656,7 @@ class SmbTreeConnection {
      * @throws SmbException
      */
     private DfsReferralData followReferrals ( SmbResourceLocatorInternal loc, DfsReferralData dr, String service ) throws SmbException {
-        SmbException se;
+        SmbException se = null;
         DfsReferralData start = dr;
         do {
             try {
@@ -661,35 +664,49 @@ class SmbTreeConnection {
                     log.trace("DFS redirect: " + dr);
                 }
 
-                Address addr = this.ctx.getNameServiceClient().getByName(dr.getServer());
-                try ( SmbTransportInternal trans = this.ctx.getTransportPool()
-                        .getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning()).unwrap(SmbTransportInternal.class) ) {
+                Address[] addrs = this.ctx.getNameServiceClient().getAllByName(dr.getServer(), false);
 
-                    synchronized ( trans ) {
-                        /*
-                         * This is a key point. This is where we set the "tree" of this file which
-                         * is like changing the rug out from underneath our feet.
-                         */
-                        /*
-                         * Technically we should also try to authenticate here but that means doing the session
-                         * setup
-                         * and
-                         * tree connect separately. For now a simple connect will at least tell us if the host is
-                         * alive.
-                         * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
-                         */
-                        trans.ensureConnected();
-                        try ( SmbSessionInternal smbSession = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
-                              SmbTreeImpl t = smbSession.getSmbTree(dr.getShare(), service).unwrap(SmbTreeImpl.class) ) {
-                            switchTree(t);
+                if ( addrs == null || addrs.length == 0 ) {
+                    se = new SmbException("Could not resolve name for " + dr.getServer());
+                }
+                else {
+                    for ( Address addr : addrs ) {
+                        try ( SmbTransportInternal trans = this.ctx.getTransportPool()
+                                .getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning())
+                                .unwrap(SmbTransportInternal.class) ) {
+
+                            synchronized ( trans ) {
+                                /*
+                                 * This is a key point. This is where we set the "tree" of this file which
+                                 * is like changing the rug out from underneath our feet.
+                                 */
+                                /*
+                                 * Technically we should also try to authenticate here but that means doing the session
+                                 * setup
+                                 * and
+                                 * tree connect separately. For now a simple connect will at least tell us if the host
+                                 * is
+                                 * alive.
+                                 * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
+                                 */
+                                trans.ensureConnected();
+                                try ( SmbSessionInternal smbSession = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
+                                      SmbTreeImpl t = smbSession.getSmbTree(dr.getShare(), service).unwrap(SmbTreeImpl.class) ) {
+                                    switchTree(t);
+                                }
+                                if ( dr != start ) {
+                                    dr.unwrap(DfsReferralDataInternal.class).replaceCache();
+                                }
+                            }
                         }
-                        if ( dr != start ) {
-                            dr.unwrap(DfsReferralDataInternal.class).replaceCache();
+                        catch ( IOException e ) {
+                            log.debug("Connection attempt failed", e);
+                            continue;
                         }
+                        se = null;
+                        break;
                     }
                 }
-                se = null;
-                break;
             }
             catch ( IOException ioe ) {
                 log.debug("Error checking dfs root", ioe);

@@ -1,5 +1,5 @@
 /*
- * © 2016 AgNO3 Gmbh & Co. KG
+ * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -54,7 +54,7 @@ import jcifs.context.BaseContext;
 @SuiteClasses ( {
     ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class,
     NamingTest.class, WatchTest.class, ReadWriteTest.class, ConcurrencyTest.class, TimeoutTest.class, EnumTest.class, PipeTest.class,
-    RandomAccessFileTest.class
+    RandomAccessFileTest.class, PACTest.class
 } )
 public class AllTests {
 

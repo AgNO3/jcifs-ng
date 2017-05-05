@@ -766,10 +766,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             if ( this.url.getHost().length() == 0 ) {}
             else if ( this.fileLocator.getShare() == null ) {
                 if ( this.fileLocator.getType() == TYPE_WORKGROUP ) {
-                    getTransportContext().getNameServiceClient().getByName(this.url.getHost(), true);
+                    getContext().getNameServiceClient().getByName(this.url.getHost(), true);
                 }
                 else {
-                    getTransportContext().getNameServiceClient().getByName(this.url.getHost()).getHostName();
+                    getContext().getNameServiceClient().getByName(this.url.getHost()).getHostName();
                 }
             }
             else if ( this.fileLocator.isRoot() || this.fileLocator.isIPC() ) {
@@ -810,7 +810,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             throw SmbException.wrap(e);
         }
 
-        this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+        this.attrExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
         return this.isExists;
     }
 
@@ -1295,7 +1295,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
              */
 
             this.isExists = true;
-            this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+            this.attrExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
         }
 
         if ( isDirectory() ) {
@@ -1421,7 +1421,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 this.lastModified = info.getLastWriteTime();
                 this.lastAccess = info.getLastAccessTime();
 
-                this.attrExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+                this.attrExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
                 this.isExists = true;
             }
 
@@ -1501,7 +1501,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             else {
                 this.size = 0L;
             }
-            this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+            this.sizeExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
             return this.size;
         }
         catch ( CIFSException e ) {
@@ -1546,7 +1546,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
             if ( getType() == TYPE_SHARE ) {
                 this.size = response.info.getCapacity();
-                this.sizeExpiration = System.currentTimeMillis() + getTransportContext().getConfig().getAttributeCacheTimeout();
+                this.sizeExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
             }
 
             return response.info.getFree();
@@ -1590,7 +1590,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     public void mkdirs () throws SmbException {
         String p = this.fileLocator.getParent();
         try ( SmbTreeHandle th = ensureTreeConnected();
-              SmbFile parent = new SmbFile(p, getTransportContext()) ) {
+              SmbFile parent = new SmbFile(p, getContext()) ) {
             try {
                 if ( !parent.exists() ) {
                     if ( log.isDebugEnabled() ) {
@@ -2000,13 +2000,13 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 if ( len > 64 )
                     len = 64;
 
-                getTransportContext().getSIDResolver().resolveSids(getTransportContext(), server, sids, off, len);
+                getContext().getSIDResolver().resolveSids(getContext(), server, sids, off, len);
             }
         }
         else {
             for ( ai = 0; ai < aces.length; ai++ ) {
                 aces[ ai ].sid.origin_server = server;
-                aces[ ai ].sid.origin_ctx = getTransportContext();
+                aces[ ai ].sid.origin_ctx = getContext();
             }
         }
     }
@@ -2064,13 +2064,13 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                 throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
             }
-            NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getTransportContext().getConfig());
+            NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getContext().getConfig());
 
             try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, DEFAULT_SHARING, 0, isDirectory() ? 1 : 0) ) {
                 /*
                  * NtTrans Query Security Desc Request / Response
                  */
-                NtTransQuerySecurityDesc request = new NtTransQuerySecurityDesc(getTransportContext().getConfig(), f.getFid(), 0x01);
+                NtTransQuerySecurityDesc request = new NtTransQuerySecurityDesc(getContext().getConfig(), f.getFid(), 0x01);
                 th.send(request, response, RequestParam.NO_RETRY);
             }
 
@@ -2080,7 +2080,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             }
 
             if ( resolve ) {
-                ownerUser.resolve(this.fileLocator.getServerWithDfs(), getTransportContext());
+                ownerUser.resolve(this.fileLocator.getServerWithDfs(), getContext());
             }
             return ownerUser;
         }
@@ -2100,13 +2100,13 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
             }
 
-            NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getTransportContext().getConfig());
+            NtTransQuerySecurityDescResponse response = new NtTransQuerySecurityDescResponse(getContext().getConfig());
             try ( SmbFileHandleImpl f = openUnshared(O_RDONLY, READ_CONTROL, DEFAULT_SHARING, 0, isDirectory() ? 1 : 0) ) {
 
                 /*
                  * NtTrans Query Security Desc Request / Response
                  */
-                NtTransQuerySecurityDesc request = new NtTransQuerySecurityDesc(getTransportContext().getConfig(), f.getFid(), 0x02);
+                NtTransQuerySecurityDesc request = new NtTransQuerySecurityDesc(getContext().getConfig(), f.getFid(), 0x02);
                 th.send(request, response, RequestParam.NO_RETRY);
             }
 
@@ -2116,7 +2116,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             }
 
             if ( resolve ) {
-                ownerGroup.resolve(this.fileLocator.getServerWithDfs(), getTransportContext());
+                ownerGroup.resolve(this.fileLocator.getServerWithDfs(), getContext());
             }
             return ownerGroup;
         }
@@ -2130,7 +2130,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             String server = this.fileLocator.getServerWithDfs();
             ACE[] aces;
             MsrpcShareGetInfo rpc = new MsrpcShareGetInfo(server, th.getConnectedShare());
-            try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + server + "[\\PIPE\\srvsvc]", getTransportContext()) ) {
+            try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + server + "[\\PIPE\\srvsvc]", getContext()) ) {
                 handle.sendrecv(rpc);
                 if ( rpc.retval != 0 )
                     throw new SmbException(rpc.retval, true);
