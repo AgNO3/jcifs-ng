@@ -27,6 +27,7 @@ import java.util.Locale;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.kerberos.KerberosKey;
 
 import org.bouncycastle.util.encoders.Hex;
 import org.junit.Assert;
@@ -144,7 +145,7 @@ public class PACTest {
         byte[] keyb = Hex.decode(key);
         byte[] datab = data.getBytes(StandardCharsets.US_ASCII);
         byte[] javaMac = sun.security.krb5.internal.crypto.ArcFourHmac.calculateChecksum(keyb, usage, datab, 0, datab.length);
-        byte[] mac = PacMac.calculateMacArcfourHMACMD5(usage, keyb, datab);
+        byte[] mac = PacMac.calculateMacArcfourHMACMD5(usage, makeKey(keyb, 23), datab);
         checkBytes(javaMac, mac);
         checkBytes(Hex.decode(expect), javaMac);
         checkBytes(Hex.decode(expect), mac);
@@ -251,7 +252,7 @@ public class PACTest {
             javaChecksum = sun.security.krb5.internal.crypto.Aes256.calculateChecksum(keybytes, usage, bytes, 0, bytes.length);
         }
 
-        byte[] mac = PacMac.calculateMacHMACAES(usage, keybytes, bytes);
+        byte[] mac = PacMac.calculateMacHMACAES(usage, makeKey(keybytes, keybytes.length == 16 ? 17 : 18), bytes);
         checkBytes(javaChecksum, mac);
         checkBytes(Hex.decode(expect), mac);
     }
@@ -268,9 +269,18 @@ public class PACTest {
             javaChecksum = sun.security.krb5.internal.crypto.ArcFourHmac.calculateChecksum(keybytes, usage, bytes, 0, bytes.length);
         }
 
-        byte[] mac = PacMac.calculateMacArcfourHMACMD5(usage, keybytes, bytes);
+        byte[] mac = PacMac.calculateMacArcfourHMACMD5(usage, makeKey(keybytes, 23), bytes);
         checkBytes(javaChecksum, mac);
         checkBytes(Hex.decode(expect), mac);
+    }
+
+
+    /**
+     * @param keybytes
+     * @return
+     */
+    private static KerberosKey makeKey ( byte[] keybytes, int etype ) {
+        return new KerberosKey(null, keybytes, etype, 0);
     }
 
 

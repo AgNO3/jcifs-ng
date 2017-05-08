@@ -20,13 +20,16 @@ package jcifs.pac;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.Key;
 import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.Map;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.kerberos.KerberosKey;
 
 
 @SuppressWarnings ( "javadoc" )
@@ -42,11 +45,11 @@ public class PacMac {
     };
 
 
-    public static byte[] calculateMacArcfourHMACMD5 ( int keyusage, byte[] key, byte[] data ) throws GeneralSecurityException {
+    public static byte[] calculateMacArcfourHMACMD5 ( int keyusage, Key key, byte[] data ) throws GeneralSecurityException {
         int ms_usage = mapArcfourMD5KeyUsage(keyusage);
         Mac mac = Mac.getInstance("HmacMD5");
         MessageDigest md = MessageDigest.getInstance("MD5");
-        mac.init(new SecretKeySpec(key, HMAC_KEY));
+        mac.init(key);
         byte[] dk = mac.doFinal(MD5_CONSTANT);
         try {
             // little endian
@@ -79,7 +82,7 @@ public class PacMac {
     }
 
 
-    public static byte[] calculateMacHMACAES ( int usage, byte[] baseKey, byte[] input ) throws GeneralSecurityException {
+    public static byte[] calculateMacHMACAES ( int usage, KerberosKey baseKey, byte[] input ) throws GeneralSecurityException {
         byte[] cst = new byte[] {
             (byte) ( ( usage >> 24 ) & 0xFF ), (byte) ( ( usage >> 16 ) & 0xFF ), (byte) ( ( usage >> 8 ) & 0xFF ), (byte) ( usage & 0xFF ),
             (byte) 0x99
@@ -99,17 +102,19 @@ public class PacMac {
     }
 
 
-    public static byte[] deriveKeyAES ( byte[] key, byte[] constant ) throws GeneralSecurityException {
+    public static byte[] deriveKeyAES ( KerberosKey key, byte[] constant ) throws GeneralSecurityException {
+        byte[] keybytes = key.getEncoded();
         Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(ZERO_IV, 0, ZERO_IV.length));
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keybytes, "AES"), new IvParameterSpec(ZERO_IV, 0, ZERO_IV.length));
         if ( constant.length != cipher.getBlockSize() ) {
             constant = expandNFold(constant, cipher.getBlockSize());
         }
         byte[] enc = constant;
-        byte[] dk = new byte[key.length];
-        for ( int n = 0; n < key.length; ) {
+        int klen = keybytes.length;
+        byte[] dk = new byte[klen];
+        for ( int n = 0; n < klen; ) {
             byte[] block = cipher.doFinal(enc);
-            int len = Math.min(key.length - n, block.length);
+            int len = Math.min(klen - n, block.length);
             System.arraycopy(block, 0, dk, n, len);
             n += len;
             enc = block;
@@ -161,21 +166,25 @@ public class PacMac {
 
     /**
      * @param type
-     * @param key
+     * @param keys
      * @return the calculated mac
      * @throws PACDecodingException
      */
-    public static byte[] calculateMac ( int type, byte[] key, byte[] data ) throws PACDecodingException {
+    public static byte[] calculateMac ( int type, Map<Integer, KerberosKey> keys, byte[] data ) throws PACDecodingException {
         try {
             int usage = 17;
             if ( type == PacSignature.KERB_CHECKSUM_HMAC_MD5 ) {
+                KerberosKey key = keys.get(PacSignature.ETYPE_ARCFOUR_HMAC);
+                if ( key == null ) {
+                    throw new PACDecodingException("Missing key");
+                }
                 return calculateMacArcfourHMACMD5(usage, key, data);
             }
             else if ( type == PacSignature.HMAC_SHA1_96_AES128 || type == PacSignature.HMAC_SHA1_96_AES256 ) {
-
-                int klen = type == PacSignature.HMAC_SHA1_96_AES128 ? 16 : 32;
-                if ( key.length != klen ) {
-                    throw new PACDecodingException("Invalid key size");
+                KerberosKey key = type == PacSignature.HMAC_SHA1_96_AES128 ? keys.get(PacSignature.ETYPE_AES128_CTS_HMAC_SHA1_96)
+                        : keys.get(PacSignature.ETYPE_AES256_CTS_HMAC_SHA1_96);
+                if ( key == null ) {
+                    throw new PACDecodingException("Missing key");
                 }
                 return calculateMacHMACAES(usage, key, data);
             }

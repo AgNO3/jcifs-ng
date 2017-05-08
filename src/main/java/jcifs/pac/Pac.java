@@ -20,8 +20,10 @@ package jcifs.pac;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.security.Key;
 import java.security.MessageDigest;
+import java.util.Map;
+
+import javax.security.auth.kerberos.KerberosKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +42,7 @@ public class Pac {
     private PacSignature kdcSignature;
 
 
-    public Pac ( byte[] data, Key key ) throws PACDecodingException {
+    public Pac ( byte[] data, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
         byte[] checksumData = data.clone();
         try {
             PacDataInputStream pacStream = new PacDataInputStream(new DataInputStream(new ByteArrayInputStream(data)));
@@ -121,14 +123,13 @@ public class Pac {
         if ( log.isTraceEnabled() ) {
             log.trace(
                 String.format(
-                    "Checksum data %s type %d signature %s key %s",
+                    "Checksum data %s type %d signature %s",
                     Hexdump.toHexString(checksumData),
                     this.serverSignature.getType(),
-                    Hexdump.toHexString(this.serverSignature.getChecksum()),
-                    Hexdump.toHexString(key.getEncoded())));
+                    Hexdump.toHexString(this.serverSignature.getChecksum())));
         }
 
-        byte checksum[] = PacMac.calculateMac(this.serverSignature.getType(), key.getEncoded(), checksumData);
+        byte checksum[] = PacMac.calculateMac(this.serverSignature.getType(), keys, checksumData);
         if ( !MessageDigest.isEqual(this.serverSignature.getChecksum(), checksum) ) {
             if ( log.isDebugEnabled() ) {
                 log.debug(
@@ -140,7 +141,7 @@ public class Pac {
                         data.length));
             }
             if ( log.isTraceEnabled() ) {
-                log.trace(String.format("Checksum data %s key %s", Hexdump.toHexString(checksumData), Hexdump.toHexString(key.getEncoded())));
+                log.trace(String.format("Checksum data %s", Hexdump.toHexString(checksumData)));
             }
             throw new PACDecodingException("Invalid PAC signature");
         }

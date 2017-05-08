@@ -19,10 +19,12 @@ package jcifs.pac.kerberos;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
+
+import javax.security.auth.kerberos.KerberosKey;
 
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Integer;
@@ -40,7 +42,7 @@ public class KerberosRelevantAuthData extends KerberosAuthData {
     private List<KerberosAuthData> authorizations;
 
 
-    public KerberosRelevantAuthData ( byte[] token, Key key ) throws PACDecodingException {
+    public KerberosRelevantAuthData ( byte[] token, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
         DLSequence authSequence;
         try {
             try ( ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token)) ) {
@@ -58,7 +60,7 @@ public class KerberosRelevantAuthData extends KerberosAuthData {
             ASN1Integer authType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(DERTaggedObject.class, authElement, 0));
             DEROctetString authData = ASN1Util.as(DEROctetString.class, ASN1Util.as(DERTaggedObject.class, authElement, 1));
 
-            this.authorizations.addAll(KerberosAuthData.parse(authType.getValue().intValue(), authData.getOctets(), key));
+            this.authorizations.addAll(KerberosAuthData.parse(authType.getValue().intValue(), authData.getOctets(), keys));
         }
     }
 

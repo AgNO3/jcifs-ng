@@ -29,6 +29,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -38,6 +39,7 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.kerberos.KerberosKey;
 
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Integer;
@@ -62,7 +64,7 @@ public class KerberosEncData {
     private List<KerberosAuthData> userAuthorizations;
 
 
-    public KerberosEncData ( byte[] token, Key key ) throws PACDecodingException {
+    public KerberosEncData ( byte[] token, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
         ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token));
         DERApplicationSpecific derToken;
         try {
@@ -160,7 +162,7 @@ public class KerberosEncData {
                     ASN1Integer authType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(DERTaggedObject.class, authElement, 0));
                     DEROctetString authData = ASN1Util.as(DEROctetString.class, ASN1Util.as(DERTaggedObject.class, authElement, 1));
 
-                    this.userAuthorizations.addAll(KerberosAuthData.parse(authType.getValue().intValue(), authData.getOctets(), key));
+                    this.userAuthorizations.addAll(KerberosAuthData.parse(authType.getValue().intValue(), authData.getOctets(), keys));
                 }
                 break;
             default:

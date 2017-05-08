@@ -29,6 +29,10 @@ public class PacSignature {
     public static final int HMAC_SHA1_96_AES128 = 0x0000000F;
     public static final int HMAC_SHA1_96_AES256 = 0x00000010;
 
+    public static final int ETYPE_ARCFOUR_HMAC = 23;
+    public static final int ETYPE_AES128_CTS_HMAC_SHA1_96 = 17;
+    public static final int ETYPE_AES256_CTS_HMAC_SHA1_96 = 18;
+
     private int type;
     private byte[] checksum;
 

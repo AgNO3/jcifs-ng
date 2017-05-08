@@ -17,9 +17,11 @@
 package jcifs.pac.kerberos;
 
 
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import javax.security.auth.kerberos.KerberosKey;
 
 import jcifs.pac.PACDecodingException;
 
@@ -27,16 +29,16 @@ import jcifs.pac.PACDecodingException;
 @SuppressWarnings ( "javadoc" )
 public abstract class KerberosAuthData {
 
-    public static List<KerberosAuthData> parse ( int authType, byte[] token, Key key ) throws PACDecodingException {
+    public static List<KerberosAuthData> parse ( int authType, byte[] token, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
 
         List<KerberosAuthData> authorizations = new ArrayList<>();
 
         switch ( authType ) {
         case KerberosConstants.AUTH_DATA_RELEVANT:
-            authorizations = new KerberosRelevantAuthData(token, key).getAuthorizations();
+            authorizations = new KerberosRelevantAuthData(token, keys).getAuthorizations();
             break;
         case KerberosConstants.AUTH_DATA_PAC:
-            authorizations.add(new KerberosPacAuthData(token, key));
+            authorizations.add(new KerberosPacAuthData(token, keys));
             break;
         default:
         }

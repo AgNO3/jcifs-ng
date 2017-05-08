@@ -17,7 +17,9 @@
 package jcifs.pac.kerberos;
 
 
-import java.security.Key;
+import java.util.Map;
+
+import javax.security.auth.kerberos.KerberosKey;
 
 import jcifs.pac.PACDecodingException;
 import jcifs.pac.Pac;
@@ -29,8 +31,8 @@ public class KerberosPacAuthData extends KerberosAuthData {
     private Pac pac;
 
 
-    public KerberosPacAuthData ( byte[] token, Key key ) throws PACDecodingException {
-        this.pac = new Pac(token, key);
+    public KerberosPacAuthData ( byte[] token, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
+        this.pac = new Pac(token, keys);
     }
 
 

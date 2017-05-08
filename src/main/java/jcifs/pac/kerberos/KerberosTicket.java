@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.security.auth.kerberos.KerberosKey;
 import javax.security.auth.login.LoginException;
@@ -104,19 +106,19 @@ public class KerberosTicket {
                     }
                 }
 
-                KerberosKey serverKey = null;
+                Map<Integer, KerberosKey> keysByAlgo = new HashMap<>();
                 for ( KerberosKey key : keys ) {
-                    if ( key.getKeyType() == encType.getValue().intValue() )
-                        serverKey = key;
+                    keysByAlgo.put(key.getKeyType(), key);
                 }
 
-                if ( serverKey == null ) {
+                KerberosKey serverKey = keysByAlgo.get(encType.getValue().intValue());
+                if ( keysByAlgo.isEmpty() || serverKey == null ) {
                     throw new PACDecodingException("Kerberos key not found for eType " + encType.getValue());
                 }
 
                 try {
                     byte[] decrypted = KerberosEncData.decrypt(crypt, serverKey, serverKey.getKeyType());
-                    this.encData = new KerberosEncData(decrypted, serverKey);
+                    this.encData = new KerberosEncData(decrypted, keysByAlgo);
                 }
                 catch ( GeneralSecurityException e ) {
                     throw new PACDecodingException("Decryption failed " + serverKey.getKeyType(), e);
