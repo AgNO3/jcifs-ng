@@ -84,6 +84,14 @@ public interface Configuration {
 
 
     /**
+     * Enable experimental SMB2 support
+     * 
+     * @return whether to enable experimental SMB2+ support
+     */
+    boolean isEnableSMB2 ();
+
+
+    /**
      * 
      * Property <tt>jcifs.smb.client.useUnicode</tt> (boolean, default true)
      * 

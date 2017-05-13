@@ -163,6 +163,15 @@ public class AllTests {
                 return cfg;
             }
         });
+
+        MUTATIONS.put("smb2", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.enableSMB2", "true");
+                return cfg;
+            }
+        });
     }
 
 
