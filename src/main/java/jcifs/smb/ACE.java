@@ -17,6 +17,7 @@
 package jcifs.smb;
 
 
+import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
 
 

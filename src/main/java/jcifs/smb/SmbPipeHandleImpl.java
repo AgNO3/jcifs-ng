@@ -25,6 +25,8 @@ import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbPipeHandle;
 import jcifs.SmbPipeResource;
+import jcifs.internal.smb1.trans.TransWaitNamedPipe;
+import jcifs.internal.smb1.trans.TransWaitNamedPipeResponse;
 
 
 /**

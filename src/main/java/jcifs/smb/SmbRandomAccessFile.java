@@ -27,6 +27,13 @@ import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbFileHandle;
 import jcifs.SmbRandomAccess;
+import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.SmbComReadAndX;
+import jcifs.internal.smb1.com.SmbComReadAndXResponse;
+import jcifs.internal.smb1.com.SmbComWrite;
+import jcifs.internal.smb1.com.SmbComWriteAndX;
+import jcifs.internal.smb1.com.SmbComWriteAndXResponse;
+import jcifs.internal.smb1.com.SmbComWriteResponse;
 import jcifs.util.Encdec;
 
 
@@ -225,8 +232,8 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
                 ServerMessageBlock andX = null;
                 SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fh.getFid(), this.fp, r, andX);
                 if ( this.largeReadX ) {
-                    request.maxCount = r & 0xFFFF;
-                    request.openTimeout = ( r >> 16 ) & 0xFFFF;
+                    request.setMaxCount(r & 0xFFFF);
+                    request.setOpenTimeout( ( r >> 16 ) & 0xFFFF);
                 }
 
                 try {
@@ -235,12 +242,12 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
                 catch ( CIFSException e ) {
                     throw SmbException.wrap(e);
                 }
-                if ( ( n = response.dataLength ) <= 0 ) {
+                if ( ( n = response.getDataLength() ) <= 0 ) {
                     return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
                 }
                 this.fp += n;
                 len -= n;
-                response.off += n;
+                response.adjustOffset(n);
             }
             while ( len > 0 && n == r );
 
@@ -315,9 +322,10 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
                 catch ( CIFSException e ) {
                     throw SmbException.wrap(e);
                 }
-                this.fp += this.write_andx_resp.count;
-                len -= this.write_andx_resp.count;
-                off += this.write_andx_resp.count;
+                long cnt = this.write_andx_resp.getCount();
+                this.fp += cnt;
+                len -= cnt;
+                off += cnt;
             }
             while ( len > 0 );
         }

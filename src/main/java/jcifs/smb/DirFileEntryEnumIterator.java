@@ -25,6 +25,12 @@ import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbResource;
+import jcifs.internal.smb1.com.SmbComBlankResponse;
+import jcifs.internal.smb1.com.SmbComFindClose2;
+import jcifs.internal.smb1.trans.SmbComTransaction;
+import jcifs.internal.smb1.trans2.Trans2FindFirst2;
+import jcifs.internal.smb1.trans2.Trans2FindFirst2Response;
+import jcifs.internal.smb1.trans2.Trans2FindNext2;
 
 
 class DirFileEntryEnumIterator implements CloseableIterator<FileEntry> {
@@ -75,12 +81,12 @@ class DirFileEntryEnumIterator implements CloseableIterator<FileEntry> {
 
         this.nextRequest = new Trans2FindNext2(
             th.getConfig(),
-            this.response.sid,
-            this.response.resumeKey,
-            this.response.lastName,
+            this.response.getSid(),
+            this.response.getResumeKey(),
+            this.response.getLastName(),
             batchCount,
             batchSize);
-        this.response.subCommand = SmbComTransaction.TRANS2_FIND_NEXT2;
+        this.response.setSubCommand(SmbComTransaction.TRANS2_FIND_NEXT2);
     }
 
 
@@ -95,16 +101,16 @@ class DirFileEntryEnumIterator implements CloseableIterator<FileEntry> {
 
 
     private final FileEntry advance () throws CIFSException {
-        while ( this.ridx < this.response.numEntries ) {
-            FileEntry itm = this.response.results[ this.ridx ];
+        while ( this.ridx < this.response.getNumEntries() ) {
+            FileEntry itm = this.response.getResults()[ this.ridx ];
             this.ridx++;
             if ( filter(itm) ) {
                 return itm;
             }
         }
 
-        if ( !this.response.isEndOfSearch ) {
-            this.nextRequest.reset(this.response.resumeKey, this.response.lastName);
+        if ( !this.response.isEndOfSearch() ) {
+            this.nextRequest.reset(this.response.getResumeKey(), this.response.getLastName());
             this.response.reset();
             this.treeHandle.send(this.nextRequest, this.response);
             this.ridx = 0;
@@ -192,8 +198,9 @@ class DirFileEntryEnumIterator implements CloseableIterator<FileEntry> {
      */
     private void doClose () throws CIFSException {
         try {
-            this.treeHandle
-                    .send(new SmbComFindClose2(this.treeHandle.getConfig(), this.response.sid), new SmbComBlankResponse(this.treeHandle.getConfig()));
+            this.treeHandle.send(
+                new SmbComFindClose2(this.treeHandle.getConfig(), this.response.getSid()),
+                new SmbComBlankResponse(this.treeHandle.getConfig()));
         }
         catch ( SmbException se ) {
             log.debug("SmbComFindClose2 failed", se);

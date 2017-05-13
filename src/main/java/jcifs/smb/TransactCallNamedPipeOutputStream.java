@@ -22,6 +22,9 @@ package jcifs.smb;
 import java.io.IOException;
 
 import jcifs.CIFSException;
+import jcifs.internal.smb1.trans.TransCallNamedPipe;
+import jcifs.internal.smb1.trans.TransWaitNamedPipe;
+import jcifs.internal.smb1.trans.TransWaitNamedPipeResponse;
 
 
 class TransactCallNamedPipeOutputStream extends SmbPipeOutputStream {

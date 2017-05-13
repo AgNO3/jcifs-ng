@@ -47,7 +47,13 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
     private static final long serialVersionUID = 484863569441792249L;
 
 
-    static String getMessageByCode ( int errcode ) {
+    /**
+     * 
+     * @param errcode
+     * @return message for NT STATUS code
+     * @internal
+     */
+    public static String getMessageByCode ( int errcode ) {
         /*
          * Note there's a signedness error here because 0xC0000000 based values are
          * negative so it with NT_STATUS_SUCCESS (0) the binary search will not be
@@ -135,22 +141,39 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
     private int status;
 
 
-    SmbException () {}
+    /**
+     * 
+     */
+    public SmbException () {}
 
 
-    SmbException ( int errcode, Throwable rootCause ) {
+    /**
+     * 
+     * @param errcode
+     * @param rootCause
+     */
+    public SmbException ( int errcode, Throwable rootCause ) {
         super(getMessageByCode(errcode), rootCause);
         this.status = getStatusByCode(errcode);
     }
 
 
-    SmbException ( String msg ) {
+    /**
+     * 
+     * @param msg
+     */
+    public SmbException ( String msg ) {
         super(msg);
         this.status = NT_STATUS_UNSUCCESSFUL;
     }
 
 
-    SmbException ( String msg, Throwable rootCause ) {
+    /**
+     * 
+     * @param msg
+     * @param rootCause
+     */
+    public SmbException ( String msg, Throwable rootCause ) {
         super(msg, rootCause);
         this.status = NT_STATUS_UNSUCCESSFUL;
     }

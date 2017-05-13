@@ -20,8 +20,8 @@
 package jcifs.dcerpc.msrpc;
 
 
+import jcifs.internal.smb1.net.SmbShareInfo;
 import jcifs.smb.FileEntry;
-import jcifs.smb.SmbShareInfo;
 
 
 @SuppressWarnings ( "javadoc" )

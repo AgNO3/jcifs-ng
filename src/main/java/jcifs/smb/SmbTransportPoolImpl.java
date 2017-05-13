@@ -32,6 +32,7 @@ import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTransport;
 import jcifs.SmbTransportPool;
+import jcifs.internal.smb1.com.SmbComNegotiate;
 
 
 /**
@@ -99,7 +100,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                          * method is changed, we need to re-create the transport to
                          * re-negotiate with server.
                          */
-                        if ( conn.getNegotiateRequest().flags2 != negotiate.flags2 ) {
+                        if ( conn.getNegotiateRequest().getFlags2() != negotiate.getFlags2() ) {
                             continue;
                         }
 

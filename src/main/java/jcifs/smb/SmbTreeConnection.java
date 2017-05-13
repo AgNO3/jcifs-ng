@@ -38,7 +38,12 @@ import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbResourceLocator;
 import jcifs.SmbTreeHandle;
-import jcifs.smb.SmbTransportImpl.ServerData;
+import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.ServerData;
+import jcifs.internal.smb1.com.SmbComClose;
+import jcifs.internal.smb1.com.SmbComFindClose2;
+import jcifs.internal.smb1.trans.SmbComTransaction;
+import jcifs.internal.smb1.trans.nt.NtTransQuerySecurityDesc;
 import jcifs.util.transport.TransportException;
 
 
@@ -285,7 +290,7 @@ class SmbTreeConnection {
 
     void send ( SmbResourceLocatorImpl loc, ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws CIFSException {
         SmbException last = null;
-        String savedPath = ( request != null ) ? request.path : null;
+        String savedPath = ( request != null ) ? request.getPath() : null;
         int maxRetries = this.ctx.getConfig().getMaxRequestRetries();
         for ( int retries = 1; retries <= maxRetries; retries++ ) {
             try {
@@ -330,7 +335,7 @@ class SmbTreeConnection {
                 // I want to restore it before retrying. request.reset()
                 // restores almost everything that was modified, except the path.
                 request.reset();
-                request.path = savedPath;
+                request.setPath(savedPath);
             }
             if ( response != null )
                 response.reset();
@@ -606,10 +611,10 @@ class SmbTreeConnection {
                 String service = t != null ? t.getService() : null;
 
                 if ( request != null ) {
-                    switch ( request.command ) {
+                    switch ( request.getCommand() ) {
                     case ServerMessageBlock.SMB_COM_TRANSACTION:
                     case ServerMessageBlock.SMB_COM_TRANSACTION2:
-                        switch ( ( (SmbComTransaction) request ).subCommand & 0xFF ) {
+                        switch ( ( (SmbComTransaction) request ).getSubCommand() & 0xFF ) {
                         case SmbComTransaction.TRANS2_GET_DFS_REFERRAL:
                             break;
                         default:
@@ -621,11 +626,13 @@ class SmbTreeConnection {
                     }
                 }
 
-                String dunc = loc.handleDFSReferral(followReferrals(loc, dr, service), request != null && request.path != null ? request.path : null);
+                String dunc = loc.handleDFSReferral(
+                    followReferrals(loc, dr, service),
+                    ( request != null && request.getPath() != null ) ? request.getPath() : null);
 
                 if ( request != null ) {
-                    request.path = dunc;
-                    request.flags2 |= SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
+                    request.setPath(dunc);
+                    request.addFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
                 }
 
                 return loc;
@@ -639,8 +646,9 @@ class SmbTreeConnection {
             }
             else {
                 log.trace("Not in DFS");
-                if ( request != null )
-                    request.flags2 &= ~SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
+                if ( request != null ) {
+                    request.remFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
+                }
 
                 return loc;
             }

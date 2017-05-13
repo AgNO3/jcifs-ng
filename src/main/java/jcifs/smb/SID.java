@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.dcerpc.rpc;
+import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
 
 

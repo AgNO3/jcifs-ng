@@ -28,7 +28,8 @@ import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbTreeHandle;
-import jcifs.smb.SmbTransportImpl.ServerData;
+import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.ServerData;
 
 
 /**

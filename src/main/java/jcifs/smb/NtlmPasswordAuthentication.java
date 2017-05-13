@@ -440,7 +440,9 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
     /**
      * Calculates the effective user session key.
      *
-     * @param challenge
+     * @param tc
+     *            context to use
+     * @param chlng
      *            The server challenge.
      * @param dest
      *            The destination array in which the user session key will be
@@ -448,8 +450,9 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
      * @param offset
      *            The offset in the destination array at which the
      *            session key will start.
+     * @throws SmbException
      */
-    void getUserSessionKey ( CIFSContext tc, byte[] chlng, byte[] dest, int offset ) throws SmbException {
+    public void getUserSessionKey ( CIFSContext tc, byte[] chlng, byte[] dest, int offset ) throws SmbException {
         if ( this.hashesExternal )
             return;
         try {

@@ -21,6 +21,8 @@ package jcifs.smb;
 
 import java.io.IOException;
 
+import jcifs.internal.util.SMBUtil;
+
 
 /**
  * Internal use only
@@ -58,7 +60,15 @@ public class SecurityDescriptor {
     }
 
 
-    protected int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
+    /**
+     * 
+     * @param buffer
+     * @param bufferIndex
+     * @param len
+     * @return decoded data length
+     * @throws IOException
+     */
+    public int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
         int start = bufferIndex;
 
         bufferIndex++; // revision

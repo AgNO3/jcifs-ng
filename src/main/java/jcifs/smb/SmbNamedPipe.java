@@ -25,6 +25,8 @@ import java.net.MalformedURLException;
 import jcifs.CIFSContext;
 import jcifs.SmbPipeHandle;
 import jcifs.SmbPipeResource;
+import jcifs.internal.smb1.com.SmbComNTCreateAndX;
+import jcifs.internal.smb1.com.SmbComNTCreateAndXResponse;
 
 
 /**
@@ -158,12 +160,13 @@ public class SmbNamedPipe extends SmbFile implements SmbPipeResource {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbFile#customizeCreate(jcifs.smb.SmbComNTCreateAndX, jcifs.smb.SmbComNTCreateAndXResponse)
+     * @see jcifs.smb.SmbFile#customizeCreate(jcifs.internal.smb1.com.SmbComNTCreateAndX,
+     *      jcifs.internal.smb1.com.SmbComNTCreateAndXResponse)
      */
     @Override
     protected void customizeCreate ( SmbComNTCreateAndX request, SmbComNTCreateAndXResponse response ) {
-        request.flags0 |= 0x16;
-        response.isExtended = true;
+        request.addFlags0(0x16);
+        response.setExtended(true);
     }
 
 

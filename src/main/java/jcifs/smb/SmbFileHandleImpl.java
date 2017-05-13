@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.SmbFileHandle;
+import jcifs.internal.smb1.com.SmbComBlankResponse;
+import jcifs.internal.smb1.com.SmbComClose;
 
 
 /**

@@ -42,6 +42,19 @@ import jcifs.DfsReferralData;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTransport;
+import jcifs.internal.smb1.AndXServerMessageBlock;
+import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.ServerData;
+import jcifs.internal.smb1.com.SmbComBlankResponse;
+import jcifs.internal.smb1.com.SmbComNegotiate;
+import jcifs.internal.smb1.com.SmbComNegotiateResponse;
+import jcifs.internal.smb1.com.SmbComReadAndXResponse;
+import jcifs.internal.smb1.trans.SmbComTransaction;
+import jcifs.internal.smb1.trans.SmbComTransactionResponse;
+import jcifs.internal.smb1.trans2.Referral;
+import jcifs.internal.smb1.trans2.Trans2GetDfsReferral;
+import jcifs.internal.smb1.trans2.Trans2GetDfsReferralResponse;
+import jcifs.internal.util.SigningDigest;
 import jcifs.netbios.Name;
 import jcifs.netbios.NbtException;
 import jcifs.netbios.SessionRequestPacket;
@@ -60,29 +73,6 @@ import jcifs.util.transport.TransportException;
 class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbConstants {
 
     private static Logger log = LoggerFactory.getLogger(SmbTransportImpl.class);
-
-    class ServerData {
-
-        byte sflags;
-        int sflags2;
-        int smaxMpxCount;
-        int maxBufferSize;
-        int sessKey;
-        int scapabilities;
-        String oemDomainName;
-        int securityMode;
-        int security;
-        boolean encryptedPasswords;
-        boolean signaturesEnabled;
-        boolean signaturesRequired;
-        int maxNumberVcs;
-        int maxRawSize;
-        long serverTime;
-        int serverTimeZone;
-        int encryptionKeyLength;
-        byte[] encryptionKey;
-        byte[] guid;
-    }
 
     private final SmbComNegotiate NEGOTIATE_REQUEST;
     private boolean smb2 = false;
@@ -119,7 +109,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         this.transportContext = tc;
         this.key = new SmbComBlankResponse(tc.getConfig());
         this.NEGOTIATE_REQUEST = nego;
-        this.flags2 = this.NEGOTIATE_REQUEST.flags2;
+        this.flags2 = this.NEGOTIATE_REQUEST.getFlags2();
         this.signingEnforced = forceSigning || this.getContext().getConfig().isSigningEnforced();
         this.sessionExpiration = System.currentTimeMillis() + tc.getConfig().getSessionTimeout();
         this.capabilities = tc.getConfig().getCapabilities();
@@ -372,7 +362,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
             if ( ++this.mid == 32000 )
                 this.mid = 1;
-            this.NEGOTIATE_REQUEST.mid = this.mid;
+            this.NEGOTIATE_REQUEST.setMid(this.mid);
             int n = this.NEGOTIATE_REQUEST.encode(this.sbuf, 4);
             Encdec.enc_uint32be(n & 0xFFFF, this.sbuf, 0); /* 4 byte ssn msg header */
 
@@ -456,7 +446,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             resp = negotiate(this.port);
         }
 
-        if ( resp.dialectIndex > 10 ) {
+        if ( resp.getDialectIndex() > 10 ) {
             throw new SmbException("This client does not support the negotiated dialect.");
         }
         if ( ( this.server.scapabilities & CAP_EXTENDED_SECURITY ) != CAP_EXTENDED_SECURITY && this.server.encryptionKeyLength != 8
@@ -594,7 +584,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         /* The request *is* the key */
         if ( ++this.mid == 32000 )
             this.mid = 1;
-        ( (ServerMessageBlock) request ).mid = this.mid;
+        ( (ServerMessageBlock) request ).setMid(this.mid);
     }
 
 
@@ -641,7 +631,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             this.sbuf[ 35 ] = (byte) b;
         }
 
-        this.key.mid = Encdec.dec_uint16le(this.sbuf, 34) & 0xFFFF;
+        this.key.setMid(Encdec.dec_uint16le(this.sbuf, 34) & 0xFFFF);
 
         /*
          * Unless key returned is null or invalid Transport.loop() always
@@ -666,7 +656,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 do {
                     log.trace(smb.toString());
                 }
-                while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).andx ) != null );
+                while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).getAndx() ) != null );
                 log.trace(Hexdump.toHexString(buffer, 4, n));
 
             }
@@ -705,7 +695,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     @Override
     protected void doRecv ( Response response ) throws IOException {
         ServerMessageBlock resp = (ServerMessageBlock) response;
-        resp.useUnicode = this.useUnicode;
+        resp.setUseUnicode(this.useUnicode);
         byte[] buffer = this.getContext().getBufferCache().getBuffer();
         try {
             int size;
@@ -716,7 +706,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     throw new IOException("Invalid payload size: " + size);
                 }
                 int errorCode = Encdec.dec_uint32le(buffer, 9) & 0xFFFFFFFF;
-                if ( resp.command == ServerMessageBlock.SMB_COM_READ_ANDX && ( errorCode == 0 || errorCode == 0x80000005 ) ) {
+                if ( resp.getCommand() == ServerMessageBlock.SMB_COM_READ_ANDX && ( errorCode == 0 || errorCode == 0x80000005 ) ) {
                     // overflow indicator normal for pipe
 
                     SmbComReadAndXResponse r = (SmbComReadAndXResponse) resp;
@@ -726,12 +716,12 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     off += 27;
                     resp.decode(buffer, 4);
                     /* EMC can send pad w/o data */
-                    int pad = r.dataOffset - off;
-                    if ( r.byteCount > 0 && pad > 0 && pad < 4 )
+                    int pad = r.getDataOffset() - off;
+                    if ( r.getByteCount() > 0 && pad > 0 && pad < 4 )
                         readn(this.in, buffer, 4 + off, pad);
 
-                    if ( r.dataLength > 0 ) {
-                        readn(this.in, r.b, r.off, r.dataLength); /* read direct */
+                    if ( r.getDataLength() > 0 ) {
+                        readn(this.in, r.getData(), r.getOffset(), r.getDataLength()); /* read direct */
                     }
                 }
                 else {
@@ -748,9 +738,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
              * suggests MS doesn't compute the signature (correctly) for error responses
              * (perhaps for DOS reasons).
              */
-            if ( this.digest != null && resp.errorCode == 0 ) {
+            if ( this.digest != null && resp.getErrorCode() == 0 ) {
                 this.digest.verify(buffer, 4, resp);
-                if ( resp.verifyFailed ) {
+                if ( resp.isVerifyFailed() ) {
                     throw new TransportException("Signature verification failed");
                 }
             }
@@ -786,14 +776,14 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
 
     void checkStatus ( ServerMessageBlock req, ServerMessageBlock resp ) throws SmbException {
-        if ( resp.errorCode == 0x30002 ) {
+        if ( resp.getErrorCode() == 0x30002 ) {
             // if using DOS error codes this indicates a DFS referral
-            resp.errorCode = NtStatus.NT_STATUS_PATH_NOT_COVERED;
+            resp.setErrorCode(NtStatus.NT_STATUS_PATH_NOT_COVERED);
         }
         else {
-            resp.errorCode = SmbException.getStatusByCode(resp.errorCode);
+            resp.setErrorCode(SmbException.getStatusByCode(resp.getErrorCode()));
         }
-        switch ( resp.errorCode ) {
+        switch ( resp.getErrorCode() ) {
         case NtStatus.NT_STATUS_OK:
             break;
         case NtStatus.NT_STATUS_ACCESS_DENIED:
@@ -806,25 +796,25 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         case NtStatus.NT_STATUS_ACCOUNT_DISABLED:
         case NtStatus.NT_STATUS_ACCOUNT_LOCKED_OUT:
         case NtStatus.NT_STATUS_TRUSTED_DOMAIN_FAILURE:
-            throw new SmbAuthException(resp.errorCode);
+            throw new SmbAuthException(resp.getErrorCode());
         case NtStatus.NT_STATUS_PATH_NOT_COVERED:
             // samba fails to report the proper status for some operations
         case 0xC00000A2: // NT_STATUS_MEDIA_WRITE_PROTECTED
             DfsReferralData dr = null;
             if ( !getContext().getConfig().isDfsDisabled() ) {
-                dr = getDfsReferrals(getContext(), req.path, 1);
+                dr = getDfsReferrals(getContext(), req.getPath(), 1);
             }
             if ( dr == null ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8));
+                    log.debug("Error code: 0x" + Hexdump.toHexString(resp.getErrorCode(), 8));
                 }
-                throw new SmbException(resp.errorCode, null);
+                throw new SmbException(resp.getErrorCode(), null);
             }
 
             if ( log.isDebugEnabled() ) {
                 log.debug("Got referral " + dr);
             }
-            getContext().getDfs().cache(getContext(), req.path, dr);
+            getContext().getDfs().cache(getContext(), req.getPath(), dr);
             throw new DfsReferral(dr);
         case 0x80000005: /* STATUS_BUFFER_OVERFLOW */
             break; /* normal for DCERPC named pipes */
@@ -832,11 +822,11 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             break; /* normal for NTLMSSP */
         default:
             if ( log.isDebugEnabled() ) {
-                log.debug("Error code: 0x" + Hexdump.toHexString(resp.errorCode, 8) + " for " + req.getClass().getSimpleName());
+                log.debug("Error code: 0x" + Hexdump.toHexString(resp.getErrorCode(), 8) + " for " + req.getClass().getSimpleName());
             }
-            throw new SmbException(resp.errorCode, null);
+            throw new SmbException(resp.getErrorCode(), null);
         }
-        if ( resp.verifyFailed ) {
+        if ( resp.isVerifyFailed() ) {
             throw new SmbException("Signature verification failed.");
         }
     }
@@ -851,14 +841,14 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
         ensureConnected(); /* must negotiate before we can test flags2, useUnicode, etc */
 
-        request.flags2 |= this.flags2;
-        request.useUnicode = request.forceUnicode || this.useUnicode;
-        if ( request.useUnicode ) {
-            request.flags2 |= SmbConstants.FLAGS2_UNICODE;
+        request.addFlags2(this.flags2);
+        request.setUseUnicode(request.isForceUnicode() || this.useUnicode);
+        if ( request.isUseUnicode() ) {
+            request.addFlags2(SmbConstants.FLAGS2_UNICODE);
         }
-        request.response = response; /* needed by sign */
-        if ( request.digest == null )
-            request.digest = this.digest; /* for sign called in encode */
+        request.setResponse(response); /* needed by sign */
+        if ( request.getDigest() == null )
+            request.setDigest(this.digest); /* for sign called in encode */
 
         try {
             if ( log.isTraceEnabled() ) {
@@ -869,11 +859,11 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 return;
             }
             else if ( request instanceof SmbComTransaction ) {
-                response.command = request.command;
+                response.setCommand(request.getCommand());
                 SmbComTransaction req = (SmbComTransaction) request;
                 SmbComTransactionResponse resp = (SmbComTransactionResponse) response;
 
-                req.maxBufferSize = this.snd_buf_size;
+                req.setMaxBufferSize(this.snd_buf_size);
                 resp.reset();
 
                 try {
@@ -889,7 +879,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                             req,
                             interim,
                             !params.contains(RequestParam.NO_TIMEOUT) ? (long) this.transportContext.getConfig().getResponseTimeout() : 0);
-                        if ( interim.errorCode != 0 ) {
+                        if ( interim.getErrorCode() != 0 ) {
                             checkStatus(req, interim);
                         }
                         req.nextElement();
@@ -899,7 +889,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     }
 
                     synchronized ( this ) {
-                        response.received = false;
+                        response.setReceived(false);
                         resp.isReceived = false;
                         try {
                             long timeout = this.transportContext.getConfig().getResponseTimeout();
@@ -943,7 +933,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                                 }
                             }
 
-                            if ( response.errorCode != 0 ) {
+                            if ( response.getErrorCode() != 0 ) {
                                 checkStatus(req, resp);
                             }
                         }
@@ -956,13 +946,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     }
                 }
                 finally {
-                    this.getContext().getBufferCache().releaseBuffer(req.txn_buf);
-                    this.getContext().getBufferCache().releaseBuffer(resp.txn_buf);
+                    this.getContext().getBufferCache().releaseBuffer(req.releaseBuffer());
+                    this.getContext().getBufferCache().releaseBuffer(resp.releaseBuffer());
                 }
 
             }
             else {
-                response.command = request.command;
+                response.setCommand(request.getCommand());
                 super.sendrecv(
                     request,
                     response,
@@ -984,8 +974,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
 
     void setupBuffers ( SmbComTransaction req, SmbComTransactionResponse rsp ) {
-        req.txn_buf = getContext().getBufferCache().getBuffer();
-        rsp.txn_buf = getContext().getBufferCache().getBuffer();
+        req.setBuffer(getContext().getBufferCache().getBuffer());
+        rsp.setBuffer(getContext().getBufferCache().getBuffer());
     }
 
 
@@ -1019,11 +1009,11 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
             ipc.send(new Trans2GetDfsReferral(ctx.getConfig(), path), resp);
 
-            if ( resp.numReferrals == 0 ) {
+            if ( resp.getNumReferrals() == 0 ) {
                 return null;
             }
-            else if ( rn == 0 || resp.numReferrals < rn ) {
-                rn = resp.numReferrals;
+            else if ( rn == 0 || resp.getNumReferrals() < rn ) {
+                rn = resp.getNumReferrals();
             }
 
             DfsReferralDataImpl dr = new DfsReferralDataImpl();
@@ -1042,35 +1032,38 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     dr.resolveHashes = ntlmCreds.areHashesExternal();
                 }
 
-                dr.ttl = resp.referrals[ di ].ttl;
-                dr.rflags = resp.referrals[ di ].rflags;
+                Referral[] refs = resp.getReferrals();
+
+                dr.ttl = refs[ di ].getTtl();
+                dr.rflags = refs[ di ].getRFlags();
                 dr.expiration = expiration;
                 if ( ( dr.rflags
                         & Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) == Trans2GetDfsReferralResponse.FLAGS_NAME_LIST_REFERRAL ) {
-                    if ( resp.referrals[ di ].expandedNames.length > 0 ) {
-                        dr.server = resp.referrals[ di ].expandedNames[ 0 ].substring(1).toLowerCase();
+                    String[] expandedNames = refs[ di ].getExpandedNames();
+                    if ( expandedNames.length > 0 ) {
+                        dr.server = expandedNames[ 0 ].substring(1).toLowerCase();
                     }
                     else {
-                        dr.server = resp.referrals[ di ].specialName.substring(1).toLowerCase();
+                        dr.server = refs[ di ].getSpecialName().substring(1).toLowerCase();
                     }
                     if ( log.isDebugEnabled() ) {
                         log.debug(
-                            "Server " + dr.server + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
-                                    + resp.pathConsumed);
+                            "Server " + dr.server + " path " + path + " remain " + path.substring(resp.getPathConsumed()) + " path consumed "
+                                    + resp.getPathConsumed());
                     }
                 }
                 else {
                     if ( log.isDebugEnabled() ) {
                         log.debug(
-                            "Node " + resp.referrals[ di ].node + " path " + path + " remain " + path.substring(resp.pathConsumed) + " path consumed "
-                                    + resp.pathConsumed);
+                            "Node " + refs[ di ].getNode() + " path " + path + " remain " + path.substring(resp.getPathConsumed()) + " path consumed "
+                                    + resp.getPathConsumed());
                     }
-                    dfsPathSplit(resp.referrals[ di ].node, arr);
+                    dfsPathSplit(refs[ di ].getNode(), arr);
                     dr.server = arr[ 1 ];
                     dr.share = arr[ 2 ];
                     dr.path = arr[ 3 ];
                 }
-                dr.pathConsumed = resp.pathConsumed;
+                dr.pathConsumed = resp.getPathConsumed();
 
                 di++;
                 if ( di == rn )

@@ -27,9 +27,15 @@ import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.SmbResourceLocator;
+import jcifs.internal.smb1.net.NetServerEnum2;
+import jcifs.internal.smb1.net.NetServerEnum2Response;
+import jcifs.internal.smb1.trans.SmbComTransaction;
 
 
-class NetServerEnumIterator implements CloseableIterator<FileEntry> {
+/**
+ *
+ */
+public class NetServerEnumIterator implements CloseableIterator<FileEntry> {
 
     private static final Logger log = LoggerFactory.getLogger(NetServerEnumIterator.class);
 
@@ -97,7 +103,7 @@ class NetServerEnumIterator implements CloseableIterator<FileEntry> {
      * @throws SmbException
      */
     private void checkStatus () throws SmbException {
-        int status = this.response.status;
+        int status = this.response.getStatus();
         if ( status != WinError.ERROR_SUCCESS && status != WinError.ERROR_MORE_DATA ) {
             throw new SmbException(status, true);
         }
@@ -105,19 +111,19 @@ class NetServerEnumIterator implements CloseableIterator<FileEntry> {
 
 
     private FileEntry advance () throws CIFSException {
-        int n = this.response.status == WinError.ERROR_MORE_DATA ? this.response.numEntries - 1 : this.response.numEntries;
+        int n = this.response.getStatus() == WinError.ERROR_MORE_DATA ? this.response.getNumEntries() - 1 : this.response.getNumEntries();
         while ( this.ridx < n ) {
-            FileEntry itm = this.response.results[ this.ridx ];
+            FileEntry itm = this.response.getResults()[ this.ridx ];
             this.ridx++;
             if ( filter(itm) ) {
                 return itm;
             }
         }
 
-        if ( this.workgroup && this.response.status == WinError.ERROR_MORE_DATA ) {
-            this.request.reset(0, this.response.lastName);
+        if ( this.workgroup && this.response.getStatus() == WinError.ERROR_MORE_DATA ) {
+            this.request.reset(0, this.response.getLastName());
             this.response.reset();
-            this.request.subCommand = (byte) SmbComTransaction.NET_SERVER_ENUM3;
+            this.request.setSubCommand(SmbComTransaction.NET_SERVER_ENUM3);
             this.treeHandle.send(this.request, this.response);
             checkStatus();
             this.ridx = 0;

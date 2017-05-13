@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.SmbPipeHandle;
+import jcifs.internal.smb1.trans.SmbComTransactionResponse;
 
 
 class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
@@ -43,38 +44,38 @@ class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
 
 
     @Override
-    int writeSetupWireFormat ( byte[] dst, int dstIndex ) {
+    protected int writeSetupWireFormat ( byte[] dst, int dstIndex ) {
         return 0;
     }
 
 
     @Override
-    int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
+    protected int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
         return 0;
     }
 
 
     @Override
-    int writeDataWireFormat ( byte[] dst, int dstIndex ) {
+    protected int writeDataWireFormat ( byte[] dst, int dstIndex ) {
         return 0;
     }
 
 
     @Override
-    int readSetupWireFormat ( byte[] buffer, int bufferIndex, int len ) {
+    protected int readSetupWireFormat ( byte[] buffer, int bufferIndex, int len ) {
         return 0;
     }
 
 
     @Override
-    int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len ) {
+    protected int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len ) {
         return 0;
     }
 
 
     @SuppressWarnings ( "resource" )
     @Override
-    int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
+    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
         InputStream input;
         try {
             input = this.pipe.getInput();

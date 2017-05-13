@@ -34,6 +34,13 @@ import jcifs.CIFSContext;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTree;
+import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.SmbComTreeConnectAndX;
+import jcifs.internal.smb1.com.SmbComTreeConnectAndXResponse;
+import jcifs.internal.smb1.com.SmbComTreeDisconnect;
+import jcifs.internal.smb1.trans.SmbComTransaction;
+import jcifs.internal.smb1.trans2.Trans2FindFirst2;
+import jcifs.internal.smb1.trans2.Trans2FindFirst2Response;
 
 
 class SmbTreeImpl implements SmbTreeInternal {
@@ -338,7 +345,7 @@ class SmbTreeImpl implements SmbTreeInternal {
               SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
                 if ( response != null ) {
-                    response.received = false;
+                    response.setReceived(false);
                 }
 
                 // try TreeConnectAndX with the request
@@ -346,7 +353,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                 if ( ! ( request instanceof SmbComTreeDisconnect ) ) {
                     treeConnect(request, response);
                 }
-                if ( request == null || ( response != null && response.received ) ) {
+                if ( request == null || ( response != null && response.isReceived() ) ) {
                     return;
                 }
 
@@ -362,8 +369,8 @@ class SmbTreeImpl implements SmbTreeInternal {
                 }
 
                 checkRequest(transport, request, svc);
-                request.tid = this.tid;
-                if ( this.inDfs && !svc.equals("IPC") && request.path != null && request.path.length() > 0 ) {
+                request.setTid(this.tid);
+                if ( this.inDfs && !svc.equals("IPC") && request.getPath() != null && request.getPath().length() > 0 ) {
                     /*
                      * When DFS is in action all request paths are
                      * full UNC paths minus the first backslash like
@@ -371,8 +378,8 @@ class SmbTreeImpl implements SmbTreeInternal {
                      * as opposed to normally
                      * \path\to\file
                      */
-                    request.flags2 |= SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
-                    request.path = '\\' + transport.getRemoteHostName() + '\\' + this.share + request.path;
+                    request.addFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
+                    request.setPath('\\' + transport.getRemoteHostName() + '\\' + this.share + request.getPath());
                 }
                 try {
                     sess.send(request, response, params);
@@ -401,7 +408,7 @@ class SmbTreeImpl implements SmbTreeInternal {
      */
     private static void checkRequest ( SmbTransportImpl transport, ServerMessageBlock request, String svc ) throws SmbException {
         if ( !"A:".equals(svc) ) {
-            switch ( request.command ) {
+            switch ( request.getCommand() ) {
             case ServerMessageBlock.SMB_COM_OPEN_ANDX:
             case ServerMessageBlock.SMB_COM_NT_CREATE_ANDX:
             case ServerMessageBlock.SMB_COM_READ_ANDX:
@@ -411,7 +418,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                 break;
             case ServerMessageBlock.SMB_COM_TRANSACTION:
             case ServerMessageBlock.SMB_COM_TRANSACTION2:
-                switch ( ( (SmbComTransaction) request ).subCommand & 0xFF ) {
+                switch ( ( (SmbComTransaction) request ).getSubCommand() & 0xFF ) {
                 case SmbComTransaction.NET_SHARE_ENUM:
                 case SmbComTransaction.NET_SERVER_ENUM2:
                 case SmbComTransaction.NET_SERVER_ENUM3:
@@ -489,17 +496,17 @@ class SmbTreeImpl implements SmbTreeInternal {
                     }
 
                     SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(sess.getConfig(), andxResponse);
-                    SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess, unc, svc, andx);
+                    SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess.getContext(), transport.server, unc, svc, andx);
 
                     sess.send(request, response);
 
-                    this.tid = response.tid;
-                    String rsvc = response.service;
+                    this.tid = response.getTid();
+                    String rsvc = response.getService();
                     if ( rsvc == null ) {
                         throw new SmbException("Service is NULL");
                     }
                     this.service = rsvc;
-                    this.inDfs = response.shareIsInDfs;
+                    this.inDfs = response.isShareIsInDfs();
                     this.tree_num = TREE_CONN_COUNTER.incrementAndGet();
 
                     this.connectionState.set(2); // connected

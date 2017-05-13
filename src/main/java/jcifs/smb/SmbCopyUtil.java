@@ -28,6 +28,10 @@ import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.internal.smb1.com.SmbComSetInformation;
+import jcifs.internal.smb1.com.SmbComSetInformationResponse;
+import jcifs.internal.smb1.trans2.Trans2SetFileInformation;
+import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
 
 
 /**

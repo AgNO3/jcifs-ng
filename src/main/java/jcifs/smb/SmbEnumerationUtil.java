@@ -40,6 +40,10 @@ import jcifs.SmbResourceLocator;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcDfsRootEnum;
 import jcifs.dcerpc.msrpc.MsrpcShareEnum;
+import jcifs.internal.smb1.net.NetShareEnum;
+import jcifs.internal.smb1.net.NetShareEnumResponse;
+import jcifs.internal.smb1.trans.SmbComTransaction;
+import jcifs.internal.smb1.trans.SmbComTransactionResponse;
 
 
 /**
@@ -91,10 +95,10 @@ final class SmbEnumerationUtil {
         SmbComTransaction req = new NetShareEnum(th.getConfig());
         SmbComTransactionResponse resp = new NetShareEnumResponse(th.getConfig());
         th.send(req, resp);
-        if ( resp.status != WinError.ERROR_SUCCESS )
-            throw new SmbException(resp.status, true);
+        if ( resp.getStatus() != WinError.ERROR_SUCCESS )
+            throw new SmbException(resp.getStatus(), true);
 
-        return resp.results;
+        return resp.getResults();
     }
 
 

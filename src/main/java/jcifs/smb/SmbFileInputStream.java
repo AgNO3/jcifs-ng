@@ -31,6 +31,8 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbFileHandle;
+import jcifs.internal.smb1.com.SmbComReadAndX;
+import jcifs.internal.smb1.com.SmbComReadAndXResponse;
 import jcifs.util.transport.TransportException;
 
 
@@ -296,10 +298,6 @@ public class SmbFileInputStream extends InputStream {
             SmbComReadAndXResponse response = new SmbComReadAndXResponse(th.getConfig(), b, off);
 
             int type = this.file.getType();
-            if ( type == SmbConstants.TYPE_NAMED_PIPE ) {
-                response.responseTimeout = 0;
-            }
-
             int r, n;
             int blockSize = ( type == SmbConstants.TYPE_FILESYSTEM ) ? this.readSizeFile : this.readSize;
             do {
@@ -312,11 +310,13 @@ public class SmbFileInputStream extends InputStream {
                 try {
                     SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fd.getFid(), this.fp, r, null);
                     if ( type == SmbConstants.TYPE_NAMED_PIPE ) {
-                        request.minCount = request.maxCount = request.remaining = 1024;
+                        request.setMinCount(1024);
+                        request.setMaxCount(1024);
+                        request.setRemaining(1024);
                     }
                     else if ( this.largeReadX ) {
-                        request.maxCount = r & 0xFFFF;
-                        request.openTimeout = ( r >> 16 ) & 0xFFFF;
+                        request.setMaxCount(r & 0xFFFF);
+                        request.setOpenTimeout( ( r >> 16 ) & 0xFFFF);
                     }
                     th.send(request, response, RequestParam.NO_RETRY);
                 }
@@ -326,12 +326,12 @@ public class SmbFileInputStream extends InputStream {
                     }
                     throw seToIoe(se);
                 }
-                if ( ( n = response.dataLength ) <= 0 ) {
+                if ( ( n = response.getDataLength() ) <= 0 ) {
                     return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
                 }
                 this.fp += n;
                 len -= n;
-                response.off += n;
+                response.adjustOffset(n);
             }
             while ( len > blockSize && n == r );
             // this used to be len > 0, but this is BS:

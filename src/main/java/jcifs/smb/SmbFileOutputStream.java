@@ -28,6 +28,10 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbFileHandle;
+import jcifs.internal.smb1.com.SmbComWrite;
+import jcifs.internal.smb1.com.SmbComWriteAndX;
+import jcifs.internal.smb1.com.SmbComWriteAndXResponse;
+import jcifs.internal.smb1.com.SmbComWriteResponse;
 
 
 /**
@@ -306,16 +310,17 @@ public class SmbFileOutputStream extends OutputStream {
                     this.reqx.setParam(fh.getFid(), this.fp, len - w, b, off, w);
                     if ( ( flags & 1 ) != 0 ) {
                         this.reqx.setParam(fh.getFid(), this.fp, len, b, off, w);
-                        this.reqx.writeMode = 0x8;
+                        this.reqx.setWriteMode(0x8);
                     }
                     else {
-                        this.reqx.writeMode = 0;
+                        this.reqx.setWriteMode(0);
                     }
 
                     th.send(this.reqx, this.rspx, RequestParam.NO_RETRY);
-                    this.fp += this.rspx.count;
-                    len -= this.rspx.count;
-                    off += this.rspx.count;
+                    long cnt = this.rspx.getCount();
+                    this.fp += cnt;
+                    len -= cnt;
+                    off += cnt;
                 }
                 else {
                     if ( log.isTraceEnabled() ) {
@@ -323,9 +328,10 @@ public class SmbFileOutputStream extends OutputStream {
                     }
                     this.req.setParam(fh.getFid(), this.fp, len - w, b, off, w);
                     th.send(this.req, this.rsp);
-                    this.fp += this.rsp.count;
-                    len -= this.rsp.count;
-                    off += this.rsp.count;
+                    long cnt = this.rsp.getCount();
+                    this.fp += cnt;
+                    len -= cnt;
+                    off += cnt;
                     if ( log.isTraceEnabled() ) {
                         log.trace(String.format("Wrote at %d remain %d off %d len %d", this.fp, len - w, off, w));
                     }

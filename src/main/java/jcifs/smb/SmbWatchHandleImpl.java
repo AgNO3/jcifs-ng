@@ -27,6 +27,8 @@ import jcifs.CIFSException;
 import jcifs.FileNotifyInformation;
 import jcifs.SmbConstants;
 import jcifs.SmbWatchHandle;
+import jcifs.internal.smb1.trans.nt.NtTransNotifyChange;
+import jcifs.internal.smb1.trans.nt.NtTransNotifyChangeResponse;
 
 
 /**
@@ -82,15 +84,15 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
             }
             th.send(request, response, RequestParam.NO_TIMEOUT, RequestParam.NO_RETRY);
             if ( log.isTraceEnabled() ) {
-                log.trace("Returned from NtTransNotifyChange " + response.status);
+                log.trace("Returned from NtTransNotifyChange " + response.getStatus());
             }
-            if ( response.status == 0x0000010B ) {
+            if ( response.getStatus() == 0x0000010B ) {
                 this.handle.markClosed();
             }
-            if ( response.status == 0x0000010C ) {
-                response.notifyInformation.clear();
+            if ( response.getStatus() == 0x0000010C ) {
+                response.getNotifyInformation().clear();
             }
-            return response.notifyInformation;
+            return response.getNotifyInformation();
         }
     }
 

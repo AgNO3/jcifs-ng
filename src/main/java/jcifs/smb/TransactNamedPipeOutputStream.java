@@ -23,6 +23,7 @@ import java.io.IOException;
 
 import jcifs.CIFSException;
 import jcifs.SmbPipeResource;
+import jcifs.internal.smb1.trans.TransTransactNamedPipe;
 
 
 class TransactNamedPipeOutputStream extends SmbPipeOutputStream {
@@ -60,7 +61,7 @@ class TransactNamedPipeOutputStream extends SmbPipeOutputStream {
               SmbTreeHandleImpl th = fh.getTree() ) {
             TransTransactNamedPipe req = new TransTransactNamedPipe(th.getConfig(), fh.getFid(), b, off, len);
             if ( this.dcePipe ) {
-                req.maxDataCount = 1024;
+                req.setMaxDataCount(1024);
             }
             th.send(req, new TransTransactNamedPipeResponse(th.getConfig(), getHandle()), RequestParam.NO_RETRY);
         }

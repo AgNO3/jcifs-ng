@@ -45,6 +45,28 @@ import jcifs.SmbWatchHandle;
 import jcifs.context.SingletonContext;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
+import jcifs.internal.SmbBasicFileInfo;
+import jcifs.internal.smb1.com.SmbComBlankResponse;
+import jcifs.internal.smb1.com.SmbComCreateDirectory;
+import jcifs.internal.smb1.com.SmbComDelete;
+import jcifs.internal.smb1.com.SmbComDeleteDirectory;
+import jcifs.internal.smb1.com.SmbComNTCreateAndX;
+import jcifs.internal.smb1.com.SmbComNTCreateAndXResponse;
+import jcifs.internal.smb1.com.SmbComOpenAndX;
+import jcifs.internal.smb1.com.SmbComOpenAndXResponse;
+import jcifs.internal.smb1.com.SmbComQueryInformation;
+import jcifs.internal.smb1.com.SmbComQueryInformationResponse;
+import jcifs.internal.smb1.com.SmbComRename;
+import jcifs.internal.smb1.com.SmbComSetInformation;
+import jcifs.internal.smb1.com.SmbComSetInformationResponse;
+import jcifs.internal.smb1.trans.nt.NtTransQuerySecurityDesc;
+import jcifs.internal.smb1.trans.nt.NtTransQuerySecurityDescResponse;
+import jcifs.internal.smb1.trans2.Trans2QueryFSInformation;
+import jcifs.internal.smb1.trans2.Trans2QueryFSInformationResponse;
+import jcifs.internal.smb1.trans2.Trans2QueryPathInformation;
+import jcifs.internal.smb1.trans2.Trans2QueryPathInformationResponse;
+import jcifs.internal.smb1.trans2.Trans2SetFileInformation;
+import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
 
 
 /**
@@ -666,26 +688,26 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
                 h.send(request, response);
 
-                this.fileLocator.updateType(response.fileType);
-                this.createTime = response.creationTime;
-                this.lastModified = response.lastWriteTime;
-                this.lastAccess = response.lastAccessTime;
-                this.size = response.allocationSize;
-                this.attributes = response.extFileAttributes & ATTR_GET_MASK;
+                this.fileLocator.updateType(response.getFileType());
+                this.createTime = response.getCreationTime();
+                this.lastModified = response.getLastWriteTime();
+                this.lastAccess = response.getLastAccessTime();
+                this.size = response.getAllocationSize();
+                this.attributes = response.getExtFileAttributes() & ATTR_GET_MASK;
                 this.attrExpiration = System.currentTimeMillis() + config.getAttributeCacheTimeout();
                 this.isExists = true;
-                fh = new SmbFileHandleImpl(config, response.fid, h, uncPath, flags, access, attrs, options);
+                fh = new SmbFileHandleImpl(config, response.getFid(), h, uncPath, flags, access, attrs, options);
             }
             else {
                 SmbComOpenAndXResponse response = new SmbComOpenAndXResponse(config);
                 h.send(new SmbComOpenAndX(config, uncPath, access, sharing, flags, null), response);
-                this.fileLocator.updateType(response.fileType);
-                this.lastModified = response.lastWriteTime + h.getServerTimeZoneOffset();
-                this.size = response.dataSize;
-                this.attributes = response.fileAttributes & ATTR_GET_MASK;
+                this.fileLocator.updateType(response.getFileType());
+                this.lastModified = response.getLastWriteTime() + h.getServerTimeZoneOffset();
+                this.size = response.getDataSize();
+                this.attributes = response.getFileAttributes() & ATTR_GET_MASK;
                 this.attrExpiration = System.currentTimeMillis() + config.getAttributeCacheTimeout();
                 this.isExists = true;
-                fh = new SmbFileHandleImpl(config, response.fid, h, uncPath, flags, access, 0, 0);
+                fh = new SmbFileHandleImpl(config, response.getFid(), h, uncPath, flags, access, 0, 0);
             }
             return fh;
         }
@@ -707,7 +729,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     protected void customizeCreate ( SmbComNTCreateAndX request, SmbComNTCreateAndXResponse response ) {}
 
 
-    Info queryPath ( String path, int infoLevel ) throws CIFSException {
+    SmbBasicFileInfo queryPath ( String path, int infoLevel ) throws CIFSException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
 
             if ( log.isDebugEnabled() ) {
@@ -732,7 +754,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 if ( log.isDebugEnabled() ) {
                     log.debug("Path information " + response);
                 }
-                return response.info;
+                return response.getInfo();
             }
 
             /*
@@ -777,7 +799,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 try ( SmbTreeHandle th = this.ensureTreeConnected() ) {}
             }
             else {
-                Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
+                SmbBasicFileInfo info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
                 this.attributes = info.getAttributes();
                 this.createTime = info.getCreateTime();
                 this.lastModified = info.getLastWriteTime();
@@ -1285,7 +1307,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             this.lastModified = 0L;
             this.isExists = false;
 
-            Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
+            SmbBasicFileInfo info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
             this.attributes = info.getAttributes();
             this.createTime = info.getCreateTime();
             this.lastModified = info.getLastWriteTime();
@@ -1415,7 +1437,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 this.lastAccess = 0L;
                 this.isExists = false;
 
-                Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
+                SmbBasicFileInfo info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_BASIC_INFO);
                 this.attributes = info.getAttributes();
                 this.createTime = info.getCreateTime();
                 this.lastModified = info.getLastWriteTime();
@@ -1491,11 +1513,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     Trans2QueryFSInformationResponse response = new Trans2QueryFSInformationResponse(th.getConfig(), level);
                     th.send(new Trans2QueryFSInformation(th.getConfig(), level), response);
 
-                    this.size = response.info.getCapacity();
+                    this.size = response.getInfo().getCapacity();
                 }
             }
             else if ( !this.fileLocator.isRoot() && t != TYPE_NAMED_PIPE ) {
-                Info info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_STANDARD_INFO);
+                SmbBasicFileInfo info = queryPath(this.fileLocator.getUNCPath(), Trans2QueryPathInformationResponse.SMB_QUERY_FILE_STANDARD_INFO);
                 this.size = info.getSize();
             }
             else {
@@ -1545,11 +1567,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             th.send(new Trans2QueryFSInformation(th.getConfig(), level), response);
 
             if ( getType() == TYPE_SHARE ) {
-                this.size = response.info.getCapacity();
+                this.size = response.getInfo().getCapacity();
                 this.sizeExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
             }
 
-            return response.info.getFree();
+            return response.getInfo().getFree();
         }
     }
 
@@ -2043,7 +2065,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 th.send(request, response, RequestParam.NO_RETRY);
             }
 
-            aces = response.securityDescriptor.aces;
+            aces = response.getSecurityDescriptor().aces;
             if ( aces != null )
                 processAces(aces, resolveSids);
 
@@ -2074,7 +2096,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 th.send(request, response, RequestParam.NO_RETRY);
             }
 
-            SID ownerUser = response.securityDescriptor.owner_user;
+            SID ownerUser = response.getSecurityDescriptor().owner_user;
             if ( ownerUser == null ) {
                 return null;
             }
@@ -2110,7 +2132,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 th.send(request, response, RequestParam.NO_RETRY);
             }
 
-            SID ownerGroup = response.securityDescriptor.owner_group;
+            SID ownerGroup = response.getSecurityDescriptor().owner_group;
             if ( ownerGroup == null ) {
                 return null;
             }

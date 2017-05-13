@@ -21,6 +21,8 @@ package jcifs.smb;
 import java.io.IOException;
 
 import jcifs.CIFSException;
+import jcifs.internal.smb1.trans.TransPeekNamedPipe;
+import jcifs.internal.smb1.trans.TransPeekNamedPipeResponse;
 
 
 /**
@@ -68,12 +70,12 @@ public class SmbPipeInputStream extends SmbFileInputStream {
             TransPeekNamedPipe req = new TransPeekNamedPipe(th.getConfig(), this.handle.getUncPath(), fd.getFid());
             TransPeekNamedPipeResponse resp = new TransPeekNamedPipeResponse(th.getConfig());
             th.send(req, resp, RequestParam.NO_RETRY);
-            if ( resp.status == TransPeekNamedPipeResponse.STATUS_DISCONNECTED
-                    || resp.status == TransPeekNamedPipeResponse.STATUS_SERVER_END_CLOSED ) {
+            if ( resp.getStatus() == TransPeekNamedPipeResponse.STATUS_DISCONNECTED
+                    || resp.getStatus() == TransPeekNamedPipeResponse.STATUS_SERVER_END_CLOSED ) {
                 fd.markClosed();
                 return 0;
             }
-            return resp.available;
+            return resp.getAvailable();
         }
         catch ( SmbException se ) {
             throw seToIoe(se);
