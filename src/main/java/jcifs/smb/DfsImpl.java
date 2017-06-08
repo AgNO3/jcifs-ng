@@ -45,6 +45,8 @@ import jcifs.internal.dfs.DfsReferralDataInternal;
  */
 public class DfsImpl implements DfsResolver {
 
+    private static final DfsReferralDataImpl NEGATIVE_ENTRY = new DfsReferralDataImpl();
+
     private static class CacheEntry <T> {
 
         long expiration;
@@ -176,7 +178,10 @@ public class DfsImpl implements DfsResolver {
                 ce = null;
             }
             if ( ce != null ) {
-                return ce.map.get(DC_ENTRY);
+                DfsReferralDataInternal ri = ce.map.get(DC_ENTRY);
+                if ( ri != NEGATIVE_ENTRY ) {
+                    return ri;
+                }
             }
             ce = new CacheEntry<>(tf.getConfig().getDfsTtl());
             try {
@@ -201,15 +206,16 @@ public class DfsImpl implements DfsResolver {
                 if ( log.isDebugEnabled() ) {
                     log.debug(String.format("Getting domain controller for %s failed", domain), ioe);
                 }
-                ce.map.put(DC_ENTRY, null);
+                ce.map.put(DC_ENTRY, NEGATIVE_ENTRY);
                 if ( tf.getConfig().isDfsStrictView() && ioe instanceof SmbAuthException ) {
                     throw (SmbAuthException) ioe;
                 }
             }
-            ce.map.put(DC_ENTRY, null);
+            ce.map.put(DC_ENTRY, NEGATIVE_ENTRY);
             this.dcCache.put(dom, ce);
             return null;
         }
+
     }
 
 
