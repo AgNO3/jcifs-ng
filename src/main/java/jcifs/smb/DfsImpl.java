@@ -179,9 +179,10 @@ public class DfsImpl implements DfsResolver {
             }
             if ( ce != null ) {
                 DfsReferralDataInternal ri = ce.map.get(DC_ENTRY);
-                if ( ri != NEGATIVE_ENTRY ) {
-                    return ri;
+                if ( ri == NEGATIVE_ENTRY ) {
+                    return null;
                 }
+                return ri;
             }
             ce = new CacheEntry<>(tf.getConfig().getDfsTtl());
             try {
