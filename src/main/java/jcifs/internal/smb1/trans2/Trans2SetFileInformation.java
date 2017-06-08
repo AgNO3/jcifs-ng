@@ -20,6 +20,8 @@ package jcifs.internal.smb1.trans2;
 
 
 import jcifs.Configuration;
+import jcifs.internal.fscc.FileBasicInfo;
+import jcifs.internal.fscc.FileInformation;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.util.SMBUtil;
 
@@ -29,11 +31,24 @@ import jcifs.internal.util.SMBUtil;
  */
 public class Trans2SetFileInformation extends SmbComTransaction {
 
-    static final int SMB_FILE_BASIC_INFO = 0x101;
+    private final int fid;
+    private final FileInformation info;
 
-    private int fid;
-    private int attributes;
-    private long createTime, lastWriteTime, lastAccessTime;
+
+    /**
+     * @param config
+     * @param fid
+     * @param info
+     * 
+     */
+    public Trans2SetFileInformation ( Configuration config, int fid, FileInformation info ) {
+        super(config, SMB_COM_TRANSACTION2, TRANS2_SET_FILE_INFORMATION);
+        this.fid = fid;
+        this.info = info;
+        this.maxParameterCount = 6;
+        this.maxDataCount = 0;
+        this.maxSetupCount = (byte) 0x00;
+    }
 
 
     /**
@@ -46,15 +61,7 @@ public class Trans2SetFileInformation extends SmbComTransaction {
      * @param lastAccessTime
      */
     public Trans2SetFileInformation ( Configuration config, int fid, int attributes, long createTime, long lastWriteTime, long lastAccessTime ) {
-        super(config, SMB_COM_TRANSACTION2, TRANS2_SET_FILE_INFORMATION);
-        this.fid = fid;
-        this.attributes = attributes;
-        this.createTime = createTime;
-        this.lastWriteTime = lastWriteTime;
-        this.lastAccessTime = lastAccessTime;
-        this.maxParameterCount = 6;
-        this.maxDataCount = 0;
-        this.maxSetupCount = (byte) 0x00;
+        this(config, fid, new FileBasicInfo(createTime, lastAccessTime, lastWriteTime, 0L, attributes | 0x80));
     }
 
 
@@ -72,7 +79,7 @@ public class Trans2SetFileInformation extends SmbComTransaction {
 
         SMBUtil.writeInt2(this.fid, dst, dstIndex);
         dstIndex += 2;
-        SMBUtil.writeInt2(SMB_FILE_BASIC_INFO, dst, dstIndex);
+        SMBUtil.writeInt2(Trans2QueryPathInformation.mapInformationLevel(this.info.getFileInformationLevel()), dst, dstIndex);
         dstIndex += 2;
         SMBUtil.writeInt2(0, dst, dstIndex);
         dstIndex += 2;
@@ -84,20 +91,8 @@ public class Trans2SetFileInformation extends SmbComTransaction {
     @Override
     protected int writeDataWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
+        dstIndex += this.info.encode(dst, dstIndex);
 
-        SMBUtil.writeTime(this.createTime, dst, dstIndex);
-        dstIndex += 8;
-        SMBUtil.writeTime(this.lastAccessTime, dst, dstIndex);
-        dstIndex += 8;
-        SMBUtil.writeTime(this.lastWriteTime, dst, dstIndex);
-        dstIndex += 8;
-        SMBUtil.writeInt8(0L, dst, dstIndex);
-        dstIndex += 8;
-        /*
-         * Samba 2.2.7 needs ATTR_NORMAL
-         */
-        SMBUtil.writeInt2(0x80 | this.attributes, dst, dstIndex);
-        dstIndex += 2;
         /* 6 zeros observed with NT */
         SMBUtil.writeInt8(0L, dst, dstIndex);
         dstIndex += 6;

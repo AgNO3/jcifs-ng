@@ -86,6 +86,11 @@ public interface Configuration {
     /**
      * Enable experimental SMB2 support
      * 
+     * Property <tt>jcifs.smb.client.enableSMB2</tt> (boolean, default false)
+     * 
+     * This enables announcement of SMB2 support.
+     * SMB2 might still be chosen if the server rejects SMB1 and answers with a SMB2 negotiation response.
+     * 
      * @return whether to enable experimental SMB2+ support
      */
     boolean isEnableSMB2 ();
@@ -101,7 +106,7 @@ public interface Configuration {
 
 
     /**
-     * 
+     *
      * Property <tt>jcifs.smb.client.forceUnicode</tt> (boolean, default false)
      * 
      * @return whether to use unicode, even if the server does not announce it
@@ -527,6 +532,13 @@ public interface Configuration {
 
     /**
      * 
+     * @return the maximum size of IO buffers, limits the maximum message size
+     */
+    int getMaximumBufferSize ();
+
+
+    /**
+     * 
      * Property <tt>jcifs.smb.client.transaction_buf_size</tt> (int, default 65535)
      * 
      * @return maximum data size for SMB transactions
@@ -634,5 +646,12 @@ public interface Configuration {
      * @return whether to track the locations from which resources were created
      */
     boolean isTraceResourceUsage ();
+
+
+    /**
+     * @param command
+     * @return whether to allow creating compound requests with that command
+     */
+    boolean isAllowCompound ( String command );
 
 }

@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -36,11 +37,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.junit.After;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,12 @@ public class WatchTest extends BaseCIFSTest {
 
     public WatchTest ( String name, Map<String, String> properties ) {
         super(name, properties);
+    }
+
+
+    @Parameters ( name = "{0}" )
+    public static Collection<Object> configs () {
+        return getConfigs("smb2");
     }
 
 
@@ -130,6 +137,7 @@ public class WatchTest extends BaseCIFSTest {
 
     @Test
     public void testWatchModified () throws InterruptedException, ExecutionException, IOException {
+        // samba 4 starting with some version does not seem to handle this correctly :(
         try ( SmbWatchHandle w = this.base
                 .watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES | FileNotifyInformation.FILE_NOTIFY_CHANGE_LAST_WRITE, false) ) {
             try ( SmbFile cr = new SmbFile(this.base, "modified") ) {
@@ -175,17 +183,13 @@ public class WatchTest extends BaseCIFSTest {
 
 
     @Test
-    public void testWatchClose () throws InterruptedException, ExecutionException, IOException {
+    public void testWatchClose () throws InterruptedException, ExecutionException, IOException, TimeoutException {
         try ( SmbWatchHandle w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_ATTRIBUTES, false) ) {
             setupWatch(w);
             w.close();
             Future<List<FileNotifyInformation>> f = this.future;
             assertNotNull(f);
-            f.get(1, TimeUnit.SECONDS);
-        }
-        catch ( TimeoutException e ) {
-            // this is not really expected but samba does not seem to properly handle this
-            Assume.assumeTrue("Server did not react to close", false);
+            f.get(5, TimeUnit.SECONDS);
         }
     }
 
@@ -206,7 +210,7 @@ public class WatchTest extends BaseCIFSTest {
         if ( !found ) {
             log.info("Notifications " + infos);
         }
-        assertTrue("Notification found", found);
+        assertTrue("No notification found", found);
     }
 
 

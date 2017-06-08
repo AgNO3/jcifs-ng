@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -29,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Configuration;
@@ -38,11 +38,12 @@ import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbResourceLocator;
 import jcifs.SmbTreeHandle;
-import jcifs.internal.smb1.ServerMessageBlock;
-import jcifs.internal.smb1.com.ServerData;
+import jcifs.internal.CommonServerMessageBlockRequest;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.RequestWithPath;
+import jcifs.internal.dfs.DfsReferralDataInternal;
 import jcifs.internal.smb1.com.SmbComClose;
 import jcifs.internal.smb1.com.SmbComFindClose2;
-import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans.nt.NtTransQuerySecurityDesc;
 import jcifs.util.transport.TransportException;
 
@@ -268,12 +269,16 @@ class SmbTreeConnection {
             synchronized ( transport ) {
                 SmbTreeImpl t = getTreeInternal();
                 if ( t != null ) {
-                    t.treeDisconnect(inError, true);
-                    if ( inError ) {
-                        session.logoff(inError, true);
+                    try {
+                        t.treeDisconnect(inError, true);
+                        if ( inError ) {
+                            // session.logoff(inError, true);
+                        }
                     }
-                    this.tree = null;
-                    this.treeAcquired = false;
+                    finally {
+                        this.tree = null;
+                        this.treeAcquired = false;
+                    }
                 }
                 else {
                     this.delegate.disconnect(inError);
@@ -283,19 +288,28 @@ class SmbTreeConnection {
     }
 
 
-    void send ( SmbResourceLocatorImpl loc, ServerMessageBlock request, ServerMessageBlock response, RequestParam... params ) throws CIFSException {
-        send(loc, request, response, params.length == 0 ? EnumSet.noneOf(RequestParam.class) : EnumSet.copyOf(Arrays.asList(params)));
+    <T extends CommonServerMessageBlockResponse> T send ( SmbResourceLocatorImpl loc, CommonServerMessageBlockRequest request, T response,
+            RequestParam... params ) throws CIFSException {
+        return send(loc, request, response, params.length == 0 ? EnumSet.noneOf(RequestParam.class) : EnumSet.copyOf(Arrays.asList(params)));
     }
 
 
-    void send ( SmbResourceLocatorImpl loc, ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws CIFSException {
+    <T extends CommonServerMessageBlockResponse> T send ( SmbResourceLocatorImpl loc, CommonServerMessageBlockRequest request, T response,
+            Set<RequestParam> params ) throws CIFSException {
         SmbException last = null;
-        String savedPath = ( request != null ) ? request.getPath() : null;
+        RequestWithPath rpath = ( request instanceof RequestWithPath ) ? (RequestWithPath) request : null;
+        String savedPath = rpath != null ? rpath.getPath() : null;
+        String savedFullPath = rpath != null ? rpath.getFullUNCPath() : null;
+
+        if ( rpath != null ) {
+            String fullPath = "\\" + loc.getServer() + "\\" + loc.getShare() + loc.getUNCPath();
+            rpath.setFullUNCPath(null, null, fullPath);
+        }
+
         int maxRetries = this.ctx.getConfig().getMaxRequestRetries();
         for ( int retries = 1; retries <= maxRetries; retries++ ) {
             try {
-                send0(loc, request, response, params);
-                return;
+                return send0(loc, request, response, params);
             }
             catch ( SmbException smbe ) {
                 // Retrying only makes sense if the invalid parameter is an tree id. If we have a stale file descriptor
@@ -308,15 +322,22 @@ class SmbTreeConnection {
                 log.debug("send", smbe);
                 last = smbe;
             }
+            catch ( IOException e ) {
+                log.debug("send", e);
+            }
             // If we get here, we got the 'The Parameter is incorrect' error or a transport exception
             // Disconnect and try again from scratch.
 
             if ( log.isDebugEnabled() ) {
                 log.debug(String.format("Retrying (%d/%d) request %s", retries, maxRetries, request));
             }
+
+            // should we disconnect the transport here? otherwise we make an additional attempt to detect that if the
+            // server closed the connection as a result
+            log.debug("Disconnecting tree on send retry", last);
             disconnect(true);
 
-            if ( retries == maxRetries ) {
+            if ( retries >= maxRetries ) {
                 break;
             }
 
@@ -330,12 +351,16 @@ class SmbTreeConnection {
             catch ( InterruptedException e ) {
                 log.debug("interrupted sleep in send", e);
             }
+
             if ( request != null ) {
+                request.reset();
+            }
+            if ( rpath != null ) {
                 // resolveDfs() and tree.send() modify the request packet.
                 // I want to restore it before retrying. request.reset()
                 // restores almost everything that was modified, except the path.
-                request.reset();
-                request.setPath(savedPath);
+                rpath.setPath(savedPath);
+                rpath.setFullUNCPath(rpath.getDomain(), rpath.getServer(), savedFullPath);
             }
             if ( response != null )
                 response.reset();
@@ -348,20 +373,26 @@ class SmbTreeConnection {
                 last = e;
             }
         }
+
         if ( last != null ) {
             log.debug("All attempts have failed, last exception", last);
             throw last;
         }
+        throw new SmbException("All attempts failed, but no exception");
     }
 
 
-    private void send0 ( SmbResourceLocatorImpl loc, ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params )
-            throws CIFSException, DfsReferral {
-        for ( ;; ) {
-            ensureDFSResolved(loc, request);
+    private <T extends CommonServerMessageBlockResponse> T send0 ( SmbResourceLocatorImpl loc, CommonServerMessageBlockRequest request, T response,
+            Set<RequestParam> params ) throws CIFSException, DfsReferral {
+        for ( int limit = 10; limit > 0; limit-- ) {
+            if ( request instanceof RequestWithPath ) {
+                ensureDFSResolved(loc, (RequestWithPath) request);
+            }
             try ( SmbTreeImpl t = getTree() ) {
-                t.send(request, response, params);
-                break;
+                if ( t == null ) {
+                    throw new CIFSException("Failed to get tree connection");
+                };
+                return t.send(request, response, params);
             }
             catch ( DfsReferral dre ) {
                 if ( dre.getData().unwrap(DfsReferralDataInternal.class).isResolveHashes() ) {
@@ -371,6 +402,8 @@ class SmbTreeConnection {
                 log.trace("send0", dre);
             }
         }
+
+        throw new CIFSException("Loop in DFS referrals");
     }
 
 
@@ -404,7 +437,7 @@ class SmbTreeConnection {
         try ( SmbSessionImpl session = getSession() ) {
             if ( isConnected() ) {
                 try ( SmbTransportImpl transport = session.getTransport() ) {
-                    if ( transport.getRemoteHostName() == null ) {
+                    if ( transport.isDisconnected() || transport.getRemoteHostName() == null ) {
                         /*
                          * Tree/session thinks it is connected but transport disconnected
                          * under it, reset tree to reflect the truth.
@@ -420,20 +453,7 @@ class SmbTreeConnection {
                 return new SmbTreeHandleImpl(loc, this);
             }
 
-            Address addr = loc.getFirstAddress();
-            for ( ;; ) {
-                try {
-                    return connectHost(loc, addr);
-                }
-                catch ( SmbAuthException sae ) {
-                    throw sae; // Prevents account lockout on servers with multiple IPs
-                }
-                catch ( SmbException se ) {
-                    if ( ( addr = loc.getNextAddress() ) == null )
-                        throw se;
-                    log.debug("Connect failed", se);
-                }
-            }
+            return connectHost(loc, loc.getServerWithDfs());
         }
 
     }
@@ -452,48 +472,98 @@ class SmbTreeConnection {
     /**
      * 
      * @param loc
-     * @param addr
+     * @param host
      * @return tree handle
      * @throws IOException
      */
-    public synchronized SmbTreeHandleImpl connectHost ( SmbResourceLocatorImpl loc, Address addr ) throws IOException {
+    public synchronized SmbTreeHandleImpl connectHost ( SmbResourceLocatorImpl loc, String host ) throws IOException {
+        String targetDomain = null;
         try ( SmbTreeImpl t = getTree() ) {
             if ( t != null ) {
                 if ( log.isDebugEnabled() ) {
                     log.debug("Tree is " + t);
                 }
-                try ( SmbSessionImpl session = t.getSession();
-                      SmbTransportImpl trans = session.getTransport();
-                      SmbTreeImpl ct = connectTree(loc, addr, trans, t) ) {
-                    switchTree(ct);
-                    return new SmbTreeHandleImpl(loc, this);
+
+                if ( loc.getShare().equals(t.getShare()) ) {
+                    try ( SmbSessionImpl session = t.getSession() ) {
+                        targetDomain = session.getTargetDomain();
+                        if ( !session.isFailed() ) {
+                            try ( SmbTransportImpl trans = session.getTransport();
+                                  SmbTreeImpl ct = connectTree(loc, host, t.getShare(), trans, t, null) ) {
+                                switchTree(ct);
+                                return new SmbTreeHandleImpl(loc, this);
+                            }
+                        }
+                        log.debug("Session no longer valid");
+                    }
                 }
             }
         }
 
-        if ( this.nonPooled ) {
-            if ( log.isDebugEnabled() ) {
-                log.debug("Using exclusive transport for " + this);
+        String hostName = loc.getServerWithDfs();
+        String path = ( loc.getType() == SmbConstants.TYPE_SHARE || loc.getUNCPath() == null || "\\".equals(loc.getUNCPath()) ) ? null
+                : loc.getUNCPath();
+        String share = loc.getShare();
+        DfsReferralData start = this.ctx.getDfs().resolve(this.ctx, hostName, loc.getShare(), path);
+        DfsReferralData dr = start;
+        IOException last = null;
+        do {
+            if ( dr != null ) {
+                targetDomain = dr.getDomain();
+                host = dr.getServer().toLowerCase(Locale.ROOT);
+                share = dr.getShare();
             }
-            this.exclusiveTransport = this.ctx.getTransportPool().getSmbTransport(this.ctx, addr, loc.getPort(), true, loc.shouldForceSigning())
-                    .unwrap(SmbTransportInternal.class);
-            SmbTransportInternal trans = this.exclusiveTransport;
-            try ( SmbSessionInternal smbSession = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
-                  SmbTreeImpl uct = smbSession.getSmbTree(loc.getShare(), null).unwrap(SmbTreeImpl.class);
-                  SmbTreeImpl ct = connectTree(loc, addr, trans, uct) ) {
-                switchTree(ct);
-                return new SmbTreeHandleImpl(loc, this);
-            }
-        }
 
-        try ( SmbTransportInternal trans = this.ctx.getTransportPool().getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning())
-                .unwrap(SmbTransportInternal.class);
-              SmbSessionInternal smbSession = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
-              SmbTreeImpl uct = smbSession.getSmbTree(loc.getShare(), null).unwrap(SmbTreeImpl.class);
-              SmbTreeImpl ct = connectTree(loc, addr, trans, uct) ) {
-            switchTree(ct);
-            return new SmbTreeHandleImpl(loc, this);
+            try {
+
+                if ( this.nonPooled ) {
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Using exclusive transport for " + this);
+                    }
+                    this.exclusiveTransport = this.ctx.getTransportPool()
+                            .getSmbTransport(this.ctx, host, loc.getPort(), true, loc.shouldForceSigning()).unwrap(SmbTransportInternal.class);
+                    SmbTransportInternal trans = this.exclusiveTransport;
+                    try ( SmbSessionInternal smbSession = trans.getSmbSession(this.ctx, host, targetDomain).unwrap(SmbSessionInternal.class);
+                          SmbTreeImpl uct = smbSession.getSmbTree(share, null).unwrap(SmbTreeImpl.class);
+                          SmbTreeImpl ct = connectTree(loc, host, share, trans, uct, dr) ) {
+
+                        if ( dr != null ) {
+                            ct.setTreeReferral(dr);
+                            if ( dr != start ) {
+                                dr.unwrap(DfsReferralDataInternal.class).replaceCache();
+                            }
+                        }
+                        switchTree(ct);
+                        return new SmbTreeHandleImpl(loc, this);
+                    }
+                }
+
+                try ( SmbTransportInternal trans = this.ctx.getTransportPool()
+                        .getSmbTransport(this.ctx, host, loc.getPort(), false, loc.shouldForceSigning()).unwrap(SmbTransportInternal.class);
+                      SmbSessionInternal smbSession = trans.getSmbSession(this.ctx, host, targetDomain).unwrap(SmbSessionInternal.class);
+                      SmbTreeImpl uct = smbSession.getSmbTree(share, null).unwrap(SmbTreeImpl.class);
+                      SmbTreeImpl ct = connectTree(loc, host, share, trans, uct, dr) ) {
+                    if ( dr != null ) {
+                        ct.setTreeReferral(dr);
+                        if ( dr != start ) {
+                            dr.unwrap(DfsReferralDataInternal.class).replaceCache();
+                        }
+                    }
+                    switchTree(ct);
+                    return new SmbTreeHandleImpl(loc, this);
+                }
+            }
+            catch ( IOException e ) {
+                last = e;
+                log.warn("Referral failed, trying next", e);
+            }
+
+            if ( dr != null ) {
+                dr = dr.next();
+            }
         }
+        while ( dr != start );
+        throw last;
     }
 
 
@@ -504,18 +574,14 @@ class SmbTreeConnection {
      * @param t
      * @throws CIFSException
      */
-    private SmbTreeImpl connectTree ( SmbResourceLocator loc, Address addr, SmbTransportInternal trans, SmbTreeImpl t ) throws CIFSException {
+    private SmbTreeImpl connectTree ( SmbResourceLocator loc, String addr, String share, SmbTransportInternal trans, SmbTreeImpl t,
+            DfsReferralData referral ) throws CIFSException {
         if ( log.isDebugEnabled() && trans.isSigningOptional() && !loc.isIPC() && !this.ctx.getConfig().isSigningEnforced() ) {
             log.debug("Signatures for file enabled but not required " + this);
         }
 
-        String hostName = loc.getServerWithDfs();
-        DfsReferralData referral = this.ctx.getDfs().resolve(this.ctx, hostName, t.getShare(), null);
-        if ( referral != null ) {
+        if ( referral != null && referral.getShare() != t.getShare() ) {
             t.markDomainDfs();
-            // make sure transport is connected
-            trans.ensureConnected();
-            t.markConnected();
         }
 
         try {
@@ -537,10 +603,9 @@ class SmbTreeConnection {
             else if ( this.ctx.renewCredentials(loc.getURL().toString(), sae) ) {
                 log.debug("Trying to renew credentials after auth error");
                 try ( SmbSessionInternal s = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
-                      SmbTreeImpl tr = s.getSmbTree(loc.getShare(), null).unwrap(SmbTreeImpl.class) ) {
-                    if ( referral != null ) {
+                      SmbTreeImpl tr = s.getSmbTree(share, null).unwrap(SmbTreeImpl.class) ) {
+                    if ( referral != null && referral.getShare() != t.getShare() ) {
                         tr.markDomainDfs();
-                        tr.markConnected();
                     }
                     tr.treeConnect(null, null);
                     return tr.acquire();
@@ -558,7 +623,7 @@ class SmbTreeConnection {
     }
 
 
-    SmbResourceLocator ensureDFSResolved ( SmbResourceLocatorImpl loc, ServerMessageBlock request ) throws CIFSException {
+    SmbResourceLocator ensureDFSResolved ( SmbResourceLocatorImpl loc, RequestWithPath request ) throws CIFSException {
         if ( request instanceof SmbComClose )
             return loc;
 
@@ -566,14 +631,9 @@ class SmbTreeConnection {
             try {
                 return resolveDfs0(loc, request);
             }
-            catch ( NullPointerException npe ) {
-                // Bug where transport or tconHostName is null indicates
-                // failed to clean up properly from dropped connection.
-                log.debug("resolveDfs", npe);
-            }
             catch ( SmbException smbe ) {
                 // The connection may have been dropped?
-                if ( smbe.getNtStatus() != NtStatus.NT_STATUS_NOT_FOUND ) {
+                if ( smbe.getNtStatus() != NtStatus.NT_STATUS_NOT_FOUND && ! ( smbe.getCause() instanceof TransportException ) ) {
                     throw smbe;
                 }
                 log.debug("resolveDfs", smbe);
@@ -583,6 +643,7 @@ class SmbTreeConnection {
             if ( log.isDebugEnabled() ) {
                 log.debug("Retrying (" + retries + ") resolveDfs: " + request);
             }
+            log.debug("Disconnecting tree on DFS retry");
             disconnect(true);
             try {
                 Thread.sleep(500 + RAND.nextInt(5000));
@@ -598,41 +659,74 @@ class SmbTreeConnection {
     }
 
 
-    private SmbResourceLocator resolveDfs0 ( SmbResourceLocatorImpl loc, ServerMessageBlock request ) throws CIFSException {
+    private SmbResourceLocator resolveDfs0 ( SmbResourceLocatorImpl loc, RequestWithPath request ) throws CIFSException {
         try ( SmbTreeHandleImpl th = connectWrapException(loc);
               SmbSessionImpl session = th.getSession();
               SmbTransportImpl transport = session.getTransport();
               SmbTreeImpl t = getTree() ) {
-            DfsReferralData dr = this.ctx.getDfs().resolve(this.ctx, transport.getRemoteHostName(), loc.getShare(), loc.getUNCPath());
+            transport.ensureConnected();
+
+            String rpath = request != null ? request.getPath() : loc.getUNCPath();
+            String rfullpath = request != null ? request.getFullUNCPath() : ( '\\' + loc.getServer() + '\\' + loc.getShare() + loc.getUNCPath() );
+            if ( !t.isPossiblyDfs() ) {
+                if ( t.isInDomainDfs() ) {
+                    // need to adjust request path
+                    DfsReferralData dr = t.getTreeReferral();
+                    if ( dr != null ) {
+                        if ( log.isDebugEnabled() ) {
+                            log.debug(String.format("Need to adjust request path %s (full: %s) -> %s", rpath, rfullpath, dr));
+                        }
+                        String dunc = loc.handleDFSReferral(dr, rpath);
+                        if ( request != null ) {
+                            request.setPath(dunc);
+                        }
+                        return loc;
+                    }
+
+                    // fallthrough to normal handling
+                    log.debug("No tree referral but in DFS");
+                }
+                else {
+                    log.trace("Not in DFS");
+                    return loc;
+                }
+            }
+
+            if ( request != null ) {
+                request.setFullUNCPath(session.getTargetDomain(), session.getTargetHost(), rfullpath);
+            }
+
+            // for standalone DFS we could be checking for a referral here, too
+            DfsReferralData dr = this.ctx.getDfs().resolve(this.ctx, loc.getServer(), loc.getShare(), loc.getUNCPath());
             if ( dr != null ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Info " + transport.getRemoteHostName() + "\\" + loc.getShare() + loc.getUNCPath() + " -> " + dr);
-                }
-                String service = t != null ? t.getService() : null;
-
-                if ( request != null ) {
-                    switch ( request.getCommand() ) {
-                    case ServerMessageBlock.SMB_COM_TRANSACTION:
-                    case ServerMessageBlock.SMB_COM_TRANSACTION2:
-                        switch ( ( (SmbComTransaction) request ).getSubCommand() & 0xFF ) {
-                        case SmbComTransaction.TRANS2_GET_DFS_REFERRAL:
-                            break;
-                        default:
-                            service = "A:";
-                        }
-                        break;
-                    default:
-                        service = "A:";
-                    }
+                    log.debug("Resolved " + rfullpath + " -> " + dr);
                 }
 
-                String dunc = loc.handleDFSReferral(
-                    followReferrals(loc, dr, service),
-                    ( request != null && request.getPath() != null ) ? request.getPath() : null);
-
+                String dunc = loc.handleDFSReferral(dr, rpath);
                 if ( request != null ) {
                     request.setPath(dunc);
-                    request.addFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
+                }
+                if ( !t.getShare().equals(loc.getShare()) ) {
+                    // this should only happen for standalone roots
+                    IOException last;
+                    DfsReferralData start = dr;
+                    do {
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Need to switch tree for " + dr);
+                        }
+                        try ( SmbTreeHandleImpl nt = connectHost(loc, session.getTargetHost()) ) {
+                            log.debug("Switched tree");
+                            return loc;
+                        }
+                        catch ( IOException e ) {
+                            log.debug("Failed to connect tree", e);
+                            last = e;
+                        }
+                        dr = dr.next();
+                    }
+                    while ( dr != start );
+                    throw new CIFSException("All referral tree connections failed", last);
                 }
 
                 return loc;
@@ -640,99 +734,15 @@ class SmbTreeConnection {
             else if ( t.isInDomainDfs() && ! ( request instanceof NtTransQuerySecurityDesc ) && ! ( request instanceof SmbComClose )
                     && ! ( request instanceof SmbComFindClose2 ) ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("No referral available for  " + transport.getRemoteHostName() + "\\" + loc.getShare() + loc.getUNCPath());
+                    log.debug("No referral available for  " + rfullpath);
                 }
-                throw new SmbException(NtStatus.NT_STATUS_NOT_FOUND, false);
+                throw new CIFSException("No referral but in domain DFS " + rfullpath);
             }
             else {
                 log.trace("Not in DFS");
-                if ( request != null ) {
-                    request.remFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
-                }
-
                 return loc;
             }
         }
-    }
-
-
-    /**
-     * @param loc
-     * @param dr
-     * @param service
-     * @return final referral
-     * @throws SmbException
-     */
-    private DfsReferralData followReferrals ( SmbResourceLocatorInternal loc, DfsReferralData dr, String service ) throws SmbException {
-        SmbException se = null;
-        DfsReferralData start = dr;
-        do {
-            try {
-                if ( log.isTraceEnabled() ) {
-                    log.trace("DFS redirect: " + dr);
-                }
-
-                Address[] addrs = this.ctx.getNameServiceClient().getAllByName(dr.getServer(), false);
-
-                if ( addrs == null || addrs.length == 0 ) {
-                    se = new SmbException("Could not resolve name for " + dr.getServer());
-                }
-                else {
-                    for ( Address addr : addrs ) {
-                        try ( SmbTransportInternal trans = this.ctx.getTransportPool()
-                                .getSmbTransport(this.ctx, addr, loc.getPort(), false, loc.shouldForceSigning())
-                                .unwrap(SmbTransportInternal.class) ) {
-
-                            synchronized ( trans ) {
-                                /*
-                                 * This is a key point. This is where we set the "tree" of this file which
-                                 * is like changing the rug out from underneath our feet.
-                                 */
-                                /*
-                                 * Technically we should also try to authenticate here but that means doing the session
-                                 * setup
-                                 * and
-                                 * tree connect separately. For now a simple connect will at least tell us if the host
-                                 * is
-                                 * alive.
-                                 * That should be sufficient for 99% of the cases. We can revisit this again for 2.0.
-                                 */
-                                trans.ensureConnected();
-                                try ( SmbSessionInternal smbSession = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
-                                      SmbTreeImpl t = smbSession.getSmbTree(dr.getShare(), service).unwrap(SmbTreeImpl.class) ) {
-                                    switchTree(t);
-                                }
-                                if ( dr != start ) {
-                                    dr.unwrap(DfsReferralDataInternal.class).replaceCache();
-                                }
-                            }
-                        }
-                        catch ( IOException e ) {
-                            log.debug("Connection attempt failed", e);
-                            continue;
-                        }
-                        se = null;
-                        break;
-                    }
-                }
-            }
-            catch ( IOException ioe ) {
-                log.debug("Error checking dfs root", ioe);
-                if ( ioe instanceof SmbException ) {
-                    se = (SmbException) ioe;
-                }
-                else {
-                    se = new SmbException("Failed to connect to server " + dr.getServer(), ioe);
-                }
-            }
-
-            dr = dr.next();
-        }
-        while ( dr != start );
-
-        if ( se != null )
-            throw se;
-        return dr;
     }
 
 
@@ -800,28 +810,13 @@ class SmbTreeConnection {
 
 
     /**
-     * 
      * Only call this method while holding a tree handle
      * 
-     * @return server data provided during negotiation
+     * @return the connected tree type
      */
-    public ServerData getServerData () {
-        try ( SmbSessionImpl session = getSession();
-              SmbTransportImpl transport = session.getTransport() ) {
-            return transport.server;
-        }
-    }
-
-
-    /**
-     * 
-     * Only call this method while holding a tree handle
-     * 
-     * @return the service we are connected to
-     */
-    public String getConnectedService () {
+    public int getTreeType () {
         try ( SmbTreeImpl t = getTree() ) {
-            return t.getService();
+            return t.getTreeType();
         }
     }
 

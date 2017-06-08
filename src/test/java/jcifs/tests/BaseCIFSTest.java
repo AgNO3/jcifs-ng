@@ -129,9 +129,9 @@ public abstract class BaseCIFSTest {
 
     @After
     public void tearDown () throws Exception {
-        // System.gc();
-        // System.gc();
-        // System.runFinalization();
+        System.gc();
+        System.gc();
+        System.runFinalization();
     }
 
 
@@ -175,9 +175,9 @@ public abstract class BaseCIFSTest {
 
 
     protected String getTestDomain () {
-        String testServer = getProperties().get(TestProperties.TEST_DOMAIN);
-        Assume.assumeNotNull(testServer);
-        return testServer;
+        String testDomain = getProperties().get(TestProperties.TEST_DOMAIN);
+        Assume.assumeNotNull(testDomain);
+        return testDomain;
     }
 
 

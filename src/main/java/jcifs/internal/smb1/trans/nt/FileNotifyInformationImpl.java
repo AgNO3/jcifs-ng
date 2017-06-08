@@ -21,7 +21,9 @@ package jcifs.internal.smb1.trans.nt;
 
 import java.io.IOException;
 
+import jcifs.Decodable;
 import jcifs.FileNotifyInformation;
+import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
 import jcifs.util.Strings;
@@ -34,7 +36,7 @@ import jcifs.util.Strings;
  * @author mbechler
  *
  */
-class FileNotifyInformationImpl implements FileNotifyInformation {
+public class FileNotifyInformationImpl implements FileNotifyInformation, Decodable {
 
     int nextEntryOffset;
     int action;
@@ -61,6 +63,14 @@ class FileNotifyInformationImpl implements FileNotifyInformation {
 
 
     /**
+     * @return the nextEntryOffset
+     */
+    public int getNextEntryOffset () {
+        return this.nextEntryOffset;
+    }
+
+
+    /**
      * 
      * @param buffer
      * @param bufferIndex
@@ -68,18 +78,19 @@ class FileNotifyInformationImpl implements FileNotifyInformation {
      * @throws IOException
      */
     public FileNotifyInformationImpl ( byte[] buffer, int bufferIndex, int len ) throws IOException {
-        this.decode(buffer, bufferIndex, len);
+        decode(buffer, bufferIndex, len);
     }
 
 
-    protected int decode ( byte[] buffer, int bufferIndex, int len ) throws IOException {
+    @Override
+    public int decode ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException {
         int start = bufferIndex;
 
         this.nextEntryOffset = SMBUtil.readInt4(buffer, bufferIndex);
         bufferIndex += 4;
 
         if ( ( this.nextEntryOffset % 4 ) != 0 ) {
-            throw new IOException("Non aligned nextEntryOffset");
+            throw new SMBProtocolDecodingException("Non aligned nextEntryOffset");
         }
 
         this.action = SMBUtil.readInt4(buffer, bufferIndex);
@@ -89,7 +100,7 @@ class FileNotifyInformationImpl implements FileNotifyInformation {
         bufferIndex += 4;
 
         this.fileName = Strings.fromUNIBytes(buffer, bufferIndex, this.fileNameLength);
-        bufferIndex += this.fileNameLength * 2;
+        bufferIndex += this.fileNameLength;
         return bufferIndex - start;
     }
 

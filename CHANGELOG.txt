@@ -1,4 +1,14 @@
-jcifs-ng 1.6.0
+jcifs-ng 2.0.0
+- Add SMB2 support (2.02 protocol level), optional for now (jcifs.smb.client.enableSMB2)
+- Some work on the DFS code, improving efficiency and fixing some bugs. 
+- Honor CIFS request multiplexing limits
+- Improved multi-address retry logic (prefer a working connection over a broken one)
+- Further refactoring, some more tests
+- Server-side copy support (SMB2 only)
+- Fix busy looping of disconnected transports.
+- Cancel notify requests using cancel command (so that it properly works with samba, too)
+
+jcifs-ng 1.6.0 (unreleased)
 - Completely overhaul the way SMB resources are used
  - Idle disconnects will no longer break active resources (by default this means file descriptors), that behavior induced 
    a wide range of potential bugs, including broken file locks and race conditions resulting in SMB errors.

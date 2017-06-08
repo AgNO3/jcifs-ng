@@ -22,6 +22,7 @@ package jcifs.internal.smb1.com;
 import java.io.UnsupportedEncodingException;
 
 import jcifs.Configuration;
+import jcifs.internal.TreeConnectResponse;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.smb1.ServerMessageBlock;
 
@@ -31,7 +32,7 @@ import jcifs.internal.smb1.ServerMessageBlock;
  * @author mbechler
  *
  */
-public class SmbComTreeConnectAndXResponse extends AndXServerMessageBlock {
+public class SmbComTreeConnectAndXResponse extends AndXServerMessageBlock implements TreeConnectResponse {
 
     private static final int SMB_SUPPORT_SEARCH_BITS = 0x0001;
     private static final int SMB_SHARE_IS_IN_DFS = 0x0002;
@@ -53,6 +54,7 @@ public class SmbComTreeConnectAndXResponse extends AndXServerMessageBlock {
     /**
      * @return the service
      */
+    @Override
     public final String getService () {
         return this.service;
     }
@@ -77,7 +79,8 @@ public class SmbComTreeConnectAndXResponse extends AndXServerMessageBlock {
     /**
      * @return the shareIsInDfs
      */
-    public final boolean isShareIsInDfs () {
+    @Override
+    public final boolean isShareDfs () {
         return this.shareIsInDfs;
     }
 

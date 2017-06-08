@@ -65,7 +65,7 @@ public class RandomAccessFileTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs");
+        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs", "smb2");
     }
 
 
@@ -75,6 +75,25 @@ public class RandomAccessFileTest extends BaseCIFSTest {
             try {
                 long newLength = 4096L;
                 try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "rw") ) {
+                    raf.setLength(newLength);
+                }
+                assertEquals(newLength, f.length());
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testSetLengthTruncate () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                long newLength = 1024L;
+                try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "rw") ) {
+                    raf.seek(4096);
+                    raf.write(0);
                     raf.setLength(newLength);
                 }
                 assertEquals(newLength, f.length());

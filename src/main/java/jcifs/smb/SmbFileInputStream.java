@@ -33,6 +33,8 @@ import jcifs.SmbConstants;
 import jcifs.SmbFileHandle;
 import jcifs.internal.smb1.com.SmbComReadAndX;
 import jcifs.internal.smb1.com.SmbComReadAndXResponse;
+import jcifs.internal.smb2.io.Smb2ReadRequest;
+import jcifs.internal.smb2.io.Smb2ReadResponse;
 import jcifs.util.transport.TransportException;
 
 
@@ -53,6 +55,8 @@ public class SmbFileInputStream extends InputStream {
     private boolean largeReadX;
 
     private final boolean unsharedFile;
+
+    private boolean smb2;
 
 
     /**
@@ -90,6 +94,7 @@ public class SmbFileInputStream extends InputStream {
         this.access = access;
 
         try ( SmbTreeHandleInternal th = file.ensureTreeConnected() ) {
+            this.smb2 = th.isSMB2();
             if ( file.getType() != SmbConstants.TYPE_NAMED_PIPE ) {
                 try ( SmbFileHandle h = ensureOpen() ) {}
                 this.openFlags &= ~ ( SmbConstants.O_CREAT | SmbConstants.O_TRUNC );
@@ -111,6 +116,7 @@ public class SmbFileInputStream extends InputStream {
         this.file = file;
         this.handle = fh;
         this.unsharedFile = false;
+        this.smb2 = th.isSMB2();
         try {
             init(th);
         }
@@ -126,6 +132,12 @@ public class SmbFileInputStream extends InputStream {
      * @throws SmbException
      */
     private void init ( SmbTreeHandleInternal th ) throws CIFSException {
+        if ( this.smb2 ) {
+            this.readSize = th.getReceiveBufferSize();
+            this.readSizeFile = th.getReceiveBufferSize();
+            return;
+        }
+
         this.readSize = Math.min(th.getReceiveBufferSize() - 70, th.getMaximumBufferSize() - 70);
 
         if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
@@ -308,6 +320,35 @@ public class SmbFileInputStream extends InputStream {
                 }
 
                 try {
+
+                    if ( th.isSMB2() ) {
+                        Smb2ReadRequest request = new Smb2ReadRequest(th.getConfig(), fd.getFileId(), b, off);
+                        request.setOffset(type == SmbConstants.TYPE_NAMED_PIPE ? 0 : this.fp);
+                        request.setReadLength(r);
+                        request.setRemainingBytes(len - r);
+
+                        try {
+                            Smb2ReadResponse resp = th.send(request, RequestParam.NO_RETRY);
+                            n = resp.getDataLength();
+                        }
+                        catch ( SmbException e ) {
+                            if ( e.getNtStatus() == 0xC0000011 ) {
+                                log.debug("Reached end of file", e);
+                                n = -1;
+                            }
+                            else {
+                                throw e;
+                            }
+                        }
+                        if ( n <= 0 ) {
+                            return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
+                        }
+                        this.fp += n;
+                        off += n;
+                        len -= n;
+                        continue;
+                    }
+
                     SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fd.getFid(), this.fp, r, null);
                     if ( type == SmbConstants.TYPE_NAMED_PIPE ) {
                         request.setMinCount(1024);
@@ -319,6 +360,7 @@ public class SmbFileInputStream extends InputStream {
                         request.setOpenTimeout( ( r >> 16 ) & 0xFFFF);
                     }
                     th.send(request, response, RequestParam.NO_RETRY);
+                    n = response.getDataLength();
                 }
                 catch ( SmbException se ) {
                     if ( type == SmbConstants.TYPE_NAMED_PIPE && se.getNtStatus() == NtStatus.NT_STATUS_PIPE_BROKEN ) {
@@ -326,7 +368,7 @@ public class SmbFileInputStream extends InputStream {
                     }
                     throw seToIoe(se);
                 }
-                if ( ( n = response.getDataLength() ) <= 0 ) {
+                if ( n <= 0 ) {
                     return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
                 }
                 this.fp += n;

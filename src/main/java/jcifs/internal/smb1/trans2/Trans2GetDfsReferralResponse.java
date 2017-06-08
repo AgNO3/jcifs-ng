@@ -19,12 +19,10 @@
 package jcifs.internal.smb1.trans2;
 
 
-import java.util.Arrays;
-
 import jcifs.Configuration;
+import jcifs.internal.dfs.DfsReferralResponseBuffer;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans.SmbComTransactionResponse;
-import jcifs.internal.util.SMBUtil;
 
 
 /**
@@ -49,10 +47,7 @@ public class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
      */
     public static final int TYPE_NON_ROOT_TARGETS = 0x1;
 
-    private int pathConsumed;
-    private int numReferrals;
-    private int tflags;
-    private Referral[] referrals;
+    private final DfsReferralResponseBuffer dfsResponse = new DfsReferralResponseBuffer();
 
 
     /**
@@ -66,34 +61,10 @@ public class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
 
 
     /**
-     * @return the pathConsumed
+     * @return the buffer
      */
-    public int getPathConsumed () {
-        return this.pathConsumed;
-    }
-
-
-    /**
-     * @return the numReferrals
-     */
-    public int getNumReferrals () {
-        return this.numReferrals;
-    }
-
-
-    /**
-     * @return the tflags
-     */
-    public int getTFlags () {
-        return this.tflags;
-    }
-
-
-    /**
-     * @return the referrals
-     */
-    public Referral[] getReferrals () {
-        return this.referrals;
+    public DfsReferralResponseBuffer getDfsResponse () {
+        return this.dfsResponse;
     }
 
 
@@ -136,42 +107,13 @@ public class Trans2GetDfsReferralResponse extends SmbComTransactionResponse {
     @Override
     protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
         int start = bufferIndex;
-
-        this.pathConsumed = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-
-        /*
-         * old:
-         * Samba 2.2.8a will reply with Unicode paths even though
-         * ASCII is negotiated so we must use flags2 (probably
-         * should anyway).
-         * 
-         * No, TRANS2_GET_DFS_REFERRAL just does not seem to allow non unicode requests,
-         * (at least recent) windows servers will reply with incorrect function if unicode flag2 is not set.
-         */
-        boolean unicode = true;
-        if ( unicode ) {
-            this.pathConsumed /= 2;
-        }
-        this.numReferrals = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-        this.tflags = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        this.referrals = new Referral[this.numReferrals];
-        for ( int ri = 0; ri < this.numReferrals; ri++ ) {
-            this.referrals[ ri ] = new Referral();
-            bufferIndex += this.referrals[ ri ].readWireFormat(this, buffer, bufferIndex, len, unicode);
-        }
-
+        bufferIndex += this.dfsResponse.decode(buffer, bufferIndex, len);
         return bufferIndex - start;
     }
 
 
     @Override
     public String toString () {
-        return new String(
-            "Trans2GetDfsReferralResponse[" + super.toString() + ",pathConsumed=" + this.pathConsumed + ",numReferrals=" + this.numReferrals
-                    + ",flags=" + this.tflags + "]:\n " + Arrays.toString(this.referrals));
+        return new String("Trans2GetDfsReferralResponse[" + super.toString() + ",buffer=" + this.dfsResponse + "]");
     }
 }

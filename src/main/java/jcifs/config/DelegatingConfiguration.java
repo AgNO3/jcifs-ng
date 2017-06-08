@@ -169,6 +169,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getMaximumBufferSize()
+     */
+    @Override
+    public int getMaximumBufferSize () {
+        return this.delegate.getMaximumBufferSize();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getRecieveBufferSize()
      */
@@ -702,6 +713,17 @@ public class DelegatingConfiguration implements Configuration {
     @Override
     public int getBatchLimit ( String cmd ) {
         return this.delegate.getBatchLimit(cmd);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isAllowCompound(java.lang.String)
+     */
+    @Override
+    public boolean isAllowCompound ( String command ) {
+        return this.delegate.isAllowCompound(command);
     }
 
 

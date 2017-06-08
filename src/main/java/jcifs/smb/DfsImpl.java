@@ -25,15 +25,17 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.DfsReferralData;
 import jcifs.DfsResolver;
 import jcifs.SmbTransport;
+import jcifs.internal.dfs.DfsReferralDataImpl;
+import jcifs.internal.dfs.DfsReferralDataInternal;
 
 
 /**
@@ -51,7 +53,7 @@ public class DfsImpl implements DfsResolver {
 
         CacheEntry ( long ttl ) {
             this.expiration = System.currentTimeMillis() + ttl * 1000L;
-            this.map = new HashMap<>();
+            this.map = new ConcurrentHashMap<>();
         }
     }
 
@@ -74,7 +76,7 @@ public class DfsImpl implements DfsResolver {
                                                                                            */
     private final Object domainsLock = new Object();
 
-    private Map<String, CacheEntry<DfsReferralDataInternal>> _dcs = new HashMap<>();
+    private final Map<String, CacheEntry<DfsReferralDataInternal>> dcCache = new HashMap<>();
     private final Object dcLock = new Object();
 
     private CacheEntry<DfsReferralDataInternal> referrals = null;
@@ -112,7 +114,7 @@ public class DfsImpl implements DfsResolver {
                 SmbTransportInternal trans = dc != null ? dc.unwrap(SmbTransportInternal.class) : null;
                 if ( trans != null ) {
                     // get domain referral
-                    initial = trans.getDfsReferrals(tf, "", 0);
+                    initial = trans.getDfsReferrals(tf.withAnonymousCredentials(), "", trans.getRemoteHostName(), authDomain, 0);
                 }
                 if ( initial != null ) {
                     DfsReferralDataInternal start = initial.unwrap(DfsReferralDataInternal.class);
@@ -169,7 +171,7 @@ public class DfsImpl implements DfsResolver {
             return null;
         String dom = domain.toLowerCase(Locale.ROOT);
         synchronized ( this.dcLock ) {
-            CacheEntry<DfsReferralDataInternal> ce = this._dcs.get(dom);
+            CacheEntry<DfsReferralDataInternal> ce = this.dcCache.get(dom);
             if ( ce != null && System.currentTimeMillis() > ce.expiration ) {
                 ce = null;
             }
@@ -178,29 +180,21 @@ public class DfsImpl implements DfsResolver {
             }
             ce = new CacheEntry<>(tf.getConfig().getDfsTtl());
             try {
-                IOException se = null;
-                Address[] addrs = tf.getNameServiceClient().getAllByName(domain, true);
-                for ( Address addr : addrs ) {
-                    try ( SmbTransportInternal trans = tf.getTransportPool().getSmbTransport(tf, addr, 0, false)
-                            .unwrap(SmbTransportInternal.class) ) {
-                        synchronized ( trans ) {
-                            DfsReferralDataInternal dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + domain, 1)
-                                    .unwrap(DfsReferralDataInternal.class);
+                try ( SmbTransportInternal trans = tf.getTransportPool().getSmbTransport(tf, domain, 0, false, false)
+                        .unwrap(SmbTransportInternal.class) ) {
+                    synchronized ( trans ) {
+                        DfsReferralData dr = trans.getDfsReferrals(tf.withAnonymousCredentials(), "\\" + dom, domain, dom, 1);
+
+                        if ( dr != null ) {
                             if ( log.isDebugEnabled() ) {
                                 log.debug("Got DC referral " + dr);
                             }
-                            ce.map.put(DC_ENTRY, dr);
+                            DfsReferralDataInternal dri = dr.unwrap(DfsReferralDataInternal.class);
+                            ce.map.put(DC_ENTRY, dri);
+                            this.dcCache.put(dom, ce);
                             return dr;
                         }
                     }
-                    catch ( IOException e ) {
-                        log.debug("Failed to get DC referral for " + domain, e);
-                        se = e;
-                        continue;
-                    }
-                }
-                if ( se != null ) {
-                    throw se;
                 }
             }
             catch ( IOException ioe ) {
@@ -213,7 +207,7 @@ public class DfsImpl implements DfsResolver {
                 }
             }
             ce.map.put(DC_ENTRY, null);
-            this._dcs.put(dom, ce);
+            this.dcCache.put(dom, ce);
             return null;
         }
     }
@@ -235,26 +229,31 @@ public class DfsImpl implements DfsResolver {
                 DfsReferralData start = dr;
                 IOException e = null;
                 do {
-                    try {
-                        if ( dr.getServer() != null && !dr.getServer().isEmpty() ) {
-                            return tf.getTransportPool().getSmbTransport(
-                                tf,
-                                tf.getNameServiceClient().getByName(dr.getServer()),
-                                0,
-                                false,
-                                !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced());
+                    if ( dr.getServer() != null && !dr.getServer().isEmpty() ) {
+                        try {
+                            SmbTransportImpl transport = tf.getTransportPool()
+                                    .getSmbTransport(
+                                        tf,
+                                        dr.getServer(),
+                                        0,
+                                        false,
+                                        !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced())
+                                    .unwrap(SmbTransportImpl.class);
+                            transport.ensureConnected();
+                            return transport;
                         }
-                        log.debug("No server name in referral");
-                        return null;
-                    }
-                    catch ( IOException ioe ) {
-                        e = ioe;
+                        catch ( IOException ex ) {
+                            log.debug("Connection failed " + dr.getServer(), ex);
+                            e = ex;
+                            dr = dr.next();
+                            continue;
+                        }
                     }
 
-                    dr = dr.next();
+                    log.debug("No server name in referral");
+                    return null;
                 }
                 while ( dr != start );
-
                 throw e;
             }
         }
@@ -270,20 +269,26 @@ public class DfsImpl implements DfsResolver {
     }
 
 
-    protected DfsReferralDataInternal getReferral ( CIFSContext tf, SmbTransportInternal trans, String domain, String root, String path )
-            throws SmbAuthException {
+    protected DfsReferralDataInternal getReferral ( CIFSContext tf, SmbTransportInternal trans, String target, String targetDomain, String targetHost,
+            String root, String path ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
 
-        String p = "\\" + domain + "\\" + root;
-        if ( path != null )
+        String p = "\\" + target + "\\" + root;
+        if ( path != null ) {
             p += path;
+        }
         try {
             if ( log.isDebugEnabled() ) {
                 log.debug("Fetching referral for " + p);
             }
-            DfsReferralData dr = trans.getDfsReferrals(tf, p, 0);
+            DfsReferralData dr = trans.getDfsReferrals(tf, p, targetHost, targetDomain, 0);
             if ( dr != null ) {
+
+                if ( log.isDebugEnabled() ) {
+                    log.debug(String.format("Referral for %s: %s", p, dr));
+                }
+
                 return dr.unwrap(DfsReferralDataInternal.class);
             }
         }
@@ -315,6 +320,8 @@ public class DfsImpl implements DfsResolver {
         if ( domain == null ) {
             return null;
         }
+
+        domain = domain.toLowerCase();
 
         if ( log.isTraceEnabled() ) {
             log.trace(String.format("Resolving \\%s\\%s%s", domain, root, path != null ? path : ""));
@@ -349,7 +356,7 @@ public class DfsImpl implements DfsResolver {
                         }
                     }
                 }
-                domain = domain.toLowerCase();
+
                 /*
                  * domain-based DFS root shares to links for each
                  */
@@ -399,18 +406,18 @@ public class DfsImpl implements DfsResolver {
                                     trans.ensureConnected();
                                     refServerName = trans.getRemoteHostName();
                                 }
-                                catch ( SmbException e ) {
+                                catch ( IOException e ) {
                                     log.warn("Failed to connect to domain controller", e);
                                 }
-                                dr = getReferral(tf, trans, refServerName, root, path);
+                                dr = getReferral(tf, trans, domain, domain, refServerName, root, path);
                             }
                         }
 
                         if ( log.isTraceEnabled() ) {
-                            log.trace("Have referral " + dr);
+                            log.trace("Have loaded referral " + dr);
                         }
 
-                        if ( path == null && domain.equals(dr.getServer()) && root.equals(dr.getShare()) ) {
+                        if ( dr != null && path == null && domain.equals(dr.getServer()) && root.equals(dr.getShare()) ) {
                             // If we do cache these we never get to the properly cached
                             // standalone referral we might have.
                             log.warn("Dropping self-referential referral " + dr);
@@ -418,12 +425,10 @@ public class DfsImpl implements DfsResolver {
                         }
 
                         if ( dr != null ) {
-                            int len = 1 + refServerName.length() + 1 + root.length();
-
                             links = new CacheEntry<>(tf.getConfig().getDfsTtl());
-
                             DfsReferralDataInternal tmp = dr;
                             do {
+                                int consumedRoot = 1 + domain.length() + 1 + root.length();
                                 if ( path == null ) {
 
                                     if ( log.isTraceEnabled() ) {
@@ -439,7 +444,16 @@ public class DfsImpl implements DfsResolver {
                                     tmp.setCacheMap(links.map);
                                     tmp.setKey("\\");
                                 }
-                                tmp.stripPathConsumed(len);
+                                log.debug("Stripping " + consumedRoot + " root " + root + " domain " + domain + " referral " + tmp);
+                                tmp.stripPathConsumed(consumedRoot);
+
+                                if ( path != null && tmp.getPathConsumed() > 0 ) {
+                                    int actualPathConsumed = tmp.getPathConsumed();
+                                    String link = path.substring(0, actualPathConsumed);
+                                    tmp.setKey(link);
+                                    links.map.put(dr.getKey(), dr);
+                                }
+
                                 tmp = tmp.next();
                             }
                             while ( tmp != dr );
@@ -447,9 +461,6 @@ public class DfsImpl implements DfsResolver {
                             if ( log.isDebugEnabled() ) {
                                 log.debug("Have referral " + dr);
                             }
-
-                            if ( dr.getKey() != null )
-                                links.map.put(dr.getKey(), dr);
 
                             roots.put(root, links);
                         }
@@ -462,13 +473,52 @@ public class DfsImpl implements DfsResolver {
                     }
 
                     if ( links != null ) {
-                        String link = "\\";
+                        String link;
 
-                        /*
-                         * Lookup the domain based DFS root target referral. Note the
-                         * path is just "\" and not "\example.com\root".
-                         */
-                        dr = links.map.get(link);
+                        if ( path == null || path.length() <= 1 ) {
+                            /*
+                             * Lookup the domain based DFS root target referral. Note the
+                             * path is just "\" and not "\example.com\root".
+                             */
+                            link = "\\";
+                        }
+                        else if ( path.charAt(path.length() - 1) == '\\' ) {
+                            // strip trailing slash
+                            link = path.substring(0, path.length() - 1);
+                        }
+                        else {
+                            link = path;
+                        }
+
+                        if ( log.isTraceEnabled() ) {
+                            log.trace("Initial link is " + link);
+                        }
+
+                        if ( dr == null || !link.equals(dr.getLink()) ) {
+                            while ( true ) {
+                                dr = links.map.get(link);
+
+                                if ( dr != null ) {
+                                    if ( log.isTraceEnabled() ) {
+                                        log.trace("Found at " + link);
+                                    }
+                                    break;
+                                }
+
+                                // walk up trying to find a match, do not go up to the root
+                                int nextSep = link.lastIndexOf('\\');
+                                if ( nextSep > 0 ) {
+                                    link = link.substring(0, nextSep);
+                                }
+                                else {
+                                    if ( log.isTraceEnabled() ) {
+                                        log.trace("Not found " + link);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+
                         if ( dr != null && now > dr.getExpiration() ) {
                             if ( log.isTraceEnabled() ) {
                                 log.trace("Expiring links " + link);
@@ -482,10 +532,20 @@ public class DfsImpl implements DfsResolver {
                                 if ( trans == null )
                                     return null;
 
-                                dr = getReferral(tf, trans, domain, root, path);
+                                dr = getReferral(tf, trans, domain, domain, trans.getRemoteHostName(), root, path);
                                 if ( dr != null ) {
 
+                                    if ( tf.getConfig().isDfsConvertToFQDN() && dr instanceof DfsReferralDataImpl ) {
+                                        ( (DfsReferralDataImpl) dr ).fixupDomain(domain);
+                                    }
+
                                     dr.stripPathConsumed(1 + domain.length() + 1 + root.length());
+
+                                    if ( dr.getPathConsumed() > ( path != null ? path.length() : 0 ) ) {
+                                        log.error("Consumed more than we provided");
+                                    }
+
+                                    link = path != null && dr.getPathConsumed() > 0 ? path.substring(0, dr.getPathConsumed()) : "\\";
                                     dr.setLink(link);
                                     if ( log.isTraceEnabled() ) {
                                         log.trace("Have referral " + dr);
@@ -498,7 +558,7 @@ public class DfsImpl implements DfsResolver {
                             }
                         }
                         else if ( log.isTraceEnabled() ) {
-                            log.trace("Have cached referral " + dr);
+                            log.trace("Have cached referral for " + dr.getLink() + " " + dr);
                         }
                     }
                 }
@@ -509,7 +569,9 @@ public class DfsImpl implements DfsResolver {
             }
         }
 
-        if ( dr == null && path != null ) {
+        if ( dr == null && path != null )
+
+        {
             if ( log.isTraceEnabled() ) {
                 log.trace("No match for domain based root, checking standalone " + domain);
             }
@@ -517,18 +579,27 @@ public class DfsImpl implements DfsResolver {
              * We did not match a domain based root. Now try to match the
              * longest path in the list of stand-alone referrals.
              */
-            if ( this.referrals != null && now > this.referrals.expiration ) {
-                this.referrals = null;
-            }
-            if ( this.referrals == null ) {
-                this.referrals = new CacheEntry<>(0);
+
+            CacheEntry<DfsReferralDataInternal> refs;
+            synchronized ( this.referralsLock ) {
+                refs = this.referrals;
+                if ( refs == null || now > refs.expiration ) {
+                    refs = new CacheEntry<>(0);
+                }
+                this.referrals = refs;
             }
             String key = "\\" + domain + "\\" + root;
-            if ( !path.equals("\\") )
+            if ( !path.equals("\\") ) {
                 key += path;
+            }
+
+            if ( key.charAt(key.length() - 1) == '\\' ) {
+                key = key.substring(0, key.length() - 1);
+            }
+
             key = key.toLowerCase();
 
-            Iterator<String> iter = this.referrals.map.keySet().iterator();
+            Iterator<String> iter = refs.map.keySet().iterator();
             while ( iter.hasNext() ) {
                 String _key = iter.next();
                 int _klen = _key.length();
@@ -541,18 +612,19 @@ public class DfsImpl implements DfsResolver {
                     match = _key.regionMatches(0, key, 0, _klen) && key.charAt(_klen) == '\\';
                 }
 
-                if ( match )
-                    dr = this.referrals.map.get(_key);
+                if ( match ) {
+                    dr = refs.map.get(_key);
+                }
             }
         }
 
         return dr;
+
     }
 
 
     @Override
     public synchronized void cache ( CIFSContext tc, String path, DfsReferralData dr ) {
-
         if ( tc.getConfig().isDfsDisabled() || ! ( dr instanceof DfsReferralDataInternal ) ) {
             return;
         }
@@ -569,21 +641,6 @@ public class DfsImpl implements DfsResolver {
 
         DfsReferralDataInternal dri = (DfsReferralDataInternal) dr;
 
-        /*
-         * Samba has a tendency to return referral paths and pathConsumed values
-         * in such a way that there can be a slash at the end of the path. This
-         * causes problems matching keys in resolve() where an extra slash causes
-         * a mismatch. This strips trailing slashes from all keys to eliminate
-         * this problem.
-         */
-        int ki = key.length();
-        while ( ki > 1 && key.charAt(ki - 1) == '\\' ) {
-            ki--;
-        }
-        if ( ki < key.length() ) {
-            key = key.substring(0, ki);
-        }
-
         if ( tc.getConfig().isDfsConvertToFQDN() ) {
             dri.fixupHost(server);
         }
@@ -599,15 +656,13 @@ public class DfsImpl implements DfsResolver {
          */
         dri.stripPathConsumed(1 + server.length() + 1 + share.length());
 
+        CacheEntry<DfsReferralDataInternal> refs = this.referrals;
         synchronized ( this.referralsLock ) {
-            if ( this.referrals != null && ( System.currentTimeMillis() + 10000 ) > this.referrals.expiration ) {
-                this.referrals = null;
+            if ( refs == null || ( System.currentTimeMillis() + 10000 ) > refs.expiration ) {
+                refs = new CacheEntry<>(tc.getConfig().getDfsTtl());
             }
-            if ( this.referrals == null ) {
-                this.referrals = new CacheEntry<>(tc.getConfig().getDfsTtl());
-            }
-            this.referrals.map.put(key, dri);
+            this.referrals = refs;
         }
-
+        refs.map.put(key, dri);
     }
 }

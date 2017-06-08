@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.security.Principal;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
@@ -68,6 +70,12 @@ public class KerberosTest extends BaseCIFSTest {
      */
     public KerberosTest ( String name, Map<String, String> properties ) {
         super(name, properties);
+    }
+
+
+    @Parameters ( name = "{0}" )
+    public static Collection<Object> configs () {
+        return getConfigs("smb2");
     }
 
 

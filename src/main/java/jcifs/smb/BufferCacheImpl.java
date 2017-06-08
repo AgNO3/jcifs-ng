@@ -33,8 +33,8 @@ import jcifs.Configuration;
 public class BufferCacheImpl implements BufferCache {
 
     private final Object[] cache;
+    private final int bufferSize;
     private int freeBuffers = 0;
-    private int bufferSize = 0xFFFF;
 
 
     /**
@@ -42,16 +42,18 @@ public class BufferCacheImpl implements BufferCache {
      * @param cfg
      */
     public BufferCacheImpl ( Configuration cfg ) {
-        this(cfg.getBufferCacheSize());
+        this(cfg.getBufferCacheSize(), cfg.getMaximumBufferSize());
     }
 
 
     /**
      * @param maxBuffers
+     * @param maxSize
      * 
      */
-    public BufferCacheImpl ( int maxBuffers ) {
+    public BufferCacheImpl ( int maxBuffers, int maxSize ) {
         this.cache = new Object[maxBuffers];
+        this.bufferSize = maxSize;
     }
 
 

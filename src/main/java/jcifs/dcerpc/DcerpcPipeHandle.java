@@ -28,8 +28,6 @@ import jcifs.CIFSException;
 import jcifs.SmbPipeResource;
 import jcifs.smb.SmbNamedPipe;
 import jcifs.smb.SmbPipeHandleInternal;
-import jcifs.smb.SmbPipeInputStream;
-import jcifs.smb.SmbPipeOutputStream;
 import jcifs.util.Encdec;
 
 
@@ -43,7 +41,6 @@ public class DcerpcPipeHandle extends DcerpcHandle {
 
     private SmbNamedPipe pipe;
     private SmbPipeHandleInternal handle;
-    private boolean isStart = true;
 
 
     /**
@@ -102,55 +99,50 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     }
 
 
-    @SuppressWarnings ( "resource" )
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.dcerpc.DcerpcHandle#doSendReceiveFragment(byte[], int, int, byte[])
+     */
     @Override
-    protected void doSendFragment ( byte[] buf, int off, int length, boolean isDirect ) throws IOException {
-        SmbPipeOutputStream out = this.handle.getOutput();
-
+    protected int doSendReceiveFragment ( byte[] buf, int off, int length, byte[] inB ) throws IOException {
         if ( this.handle.isStale() ) {
             throw new IOException("DCERPC pipe is no longer open");
         }
 
-        if ( isDirect ) {
-            out.writeDirect(buf, off, length, 1);
-        }
-        else {
-            out.write(buf, off, length);
-        }
+        return this.handle.sendrecv(buf, off, length, inB);
     }
 
 
-    @SuppressWarnings ( "resource" )
     @Override
-    protected void doReceiveFragment ( byte[] buf, boolean isDirect ) throws IOException {
-        int off, flags, length;
+    protected void doSendFragment ( byte[] buf, int off, int length ) throws IOException {
+        if ( this.handle.isStale() ) {
+            throw new IOException("DCERPC pipe is no longer open");
+        }
+        this.handle.send(buf, off, length);
+    }
 
-        if ( buf.length < this.getMaxRecv() )
+
+    @Override
+    protected int doReceiveFragment ( byte[] buf ) throws IOException {
+        if ( buf.length < getMaxRecv() ) {
             throw new IllegalArgumentException("buffer too small");
-
-        SmbPipeInputStream in = this.handle.getInput();
-
-        if ( this.isStart && !isDirect ) { // start of new frag, do trans
-            off = in.read(buf, 0, 1024);
-        }
-        else {
-            off = in.readDirect(buf, 0, buf.length);
         }
 
-        if ( buf[ 0 ] != 5 && buf[ 1 ] != 0 )
+        int off = this.handle.recv(buf, 0, buf.length);
+        if ( buf[ 0 ] != 5 && buf[ 1 ] != 0 ) {
             throw new IOException("Unexpected DCERPC PDU header");
+        }
 
-        flags = buf[ 3 ] & 0xFF;
-        // next read is start of new frag
-        this.isStart = ( flags & DCERPC_LAST_FRAG ) == DCERPC_LAST_FRAG;
-
-        length = Encdec.dec_uint16le(buf, 8);
-        if ( length > this.getMaxRecv() )
+        int length = Encdec.dec_uint16le(buf, 8);
+        if ( length > getMaxRecv() ) {
             throw new IOException("Unexpected fragment length: " + length);
+        }
 
         while ( off < length ) {
-            off += in.readDirect(buf, off, length - off);
+            off += this.handle.recv(buf, off, length - off);
         }
+        return off;
     }
 
 

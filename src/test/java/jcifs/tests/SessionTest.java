@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -31,7 +32,10 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.SmbResource;
+import jcifs.SmbTransport;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSessionInternal;
 import jcifs.smb.SmbTransportInternal;
@@ -62,7 +66,7 @@ public class SessionTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noSigning", "forceSigning", "legacyAuth", "noUnicode", "forceUnicode", "noNTStatus");
+        return getConfigs("noSigning", "forceSigning", "legacyAuth", "noUnicode", "forceUnicode", "noNTStatus", "smb2");
     }
 
 
@@ -70,6 +74,7 @@ public class SessionTest extends BaseCIFSTest {
     public void logonUser () throws IOException {
         try ( SmbResource f = getDefaultShareRoot() ) {
             checkConnection(f);
+            f.resolve("test").exists();
         }
     }
 
@@ -112,6 +117,56 @@ public class SessionTest extends BaseCIFSTest {
             log.error("Exception", e);
             throw e;
         }
+    }
+
+
+    @Test
+    public void transportReuseSimple () throws CIFSException {
+        CIFSContext ctx = withTestNTLMCredentials(getContext());
+        String loc = getTestShareURL();
+        try ( SmbResource f1 = ctx.get(loc) ) {
+            f1.exists();
+            try ( SmbResource f2 = ctx.get(loc) ) {
+                f2.exists();
+                connectionMatches(f1, f2);
+            }
+        }
+    }
+
+
+    @Test
+    public void transportReuseAnon () throws CIFSException {
+        CIFSContext ctx1 = withTestNTLMCredentials(getContext());
+        CIFSContext ctx2 = withAnonymousCredentials();
+        String loc = getTestShareGuestURL();
+        try ( SmbResource f1 = ctx1.get(loc) ) {
+            f1.exists();
+            try ( SmbResource f2 = ctx2.get(loc) ) {
+                f2.exists();
+                connectionMatches(f1, f2);
+            }
+        }
+    }
+
+
+    /**
+     * @param f1
+     * @param f2
+     * @throws CIFSException
+     */
+    private static void connectionMatches ( SmbResource f1, SmbResource f2 ) throws CIFSException {
+        Assert.assertTrue(f1 instanceof SmbFile);
+        Assert.assertTrue(f2 instanceof SmbFile);
+        try ( SmbTreeHandleInternal th1 = (SmbTreeHandleInternal) ( (SmbFile) f1 ).getTreeHandle();
+              SmbTreeHandleInternal th2 = (SmbTreeHandleInternal) ( (SmbFile) f2 ).getTreeHandle();
+              SmbSessionInternal sess1 = th1.getSession().unwrap(SmbSessionInternal.class);
+              SmbSessionInternal sess2 = th2.getSession().unwrap(SmbSessionInternal.class);
+              SmbTransport t1 = sess1.getTransport();
+              SmbTransport t2 = sess2.getTransport() ) {
+
+            Assert.assertEquals(t1, t2);
+        }
+
     }
 
 }

@@ -4,6 +4,7 @@ A cleaned-up and improved version of the jCIFS library
 
 ### Changes
 
+ * SMB2 (2.02 protocol level) support
  * Remove global state
  * Allow per context configuration
  * Logging through SLF4J
@@ -18,7 +19,15 @@ A cleaned-up and improved version of the jCIFS library
  
 ### Migration
 
-#### jcifs-ng 1.6
+#### jcifs-ng 2.0
+
+This release features SMB2 support (2.02 protocol level), for now 
+SMB2 support is only announced if configured ``jcifs.smb.client.enableSMB2``
+but may also be chosen if the server does not support SMB1 dialects.
+
+Users are encouraged to enable it and test thoroughly.
+
+#### jcifs-ng 1.6 (unreleased)
 
 This release is not binary compatible and depending on your usage you will
 encounter source incompatibilities as well (mostly custom SmbNamedPipes or

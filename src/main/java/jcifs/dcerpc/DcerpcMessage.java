@@ -93,15 +93,18 @@ public abstract class DcerpcMessage extends NdrObject implements DcerpcConstants
 
     void decode_header ( NdrBuffer buf ) throws NdrException {
         /* RPC major / minor version */
-        if ( buf.dec_ndr_small() != 5 || buf.dec_ndr_small() != 0 )
+        if ( buf.dec_ndr_small() != 5 || buf.dec_ndr_small() != 0 ) {
             throw new NdrException("DCERPC version not supported");
+        }
         this.ptype = buf.dec_ndr_small();
         this.flags = buf.dec_ndr_small();
-        if ( buf.dec_ndr_long() != 0x00000010 ) /* Little-endian / ASCII / IEEE */
+        if ( buf.dec_ndr_long() != 0x00000010 ) { /* Little-endian / ASCII / IEEE */
             throw new NdrException("Data representation not supported");
+        }
         this.length = buf.dec_ndr_short();
-        if ( buf.dec_ndr_short() != 0 )
+        if ( buf.dec_ndr_short() != 0 ) {
             throw new NdrException("DCERPC authentication not supported");
+        }
         this.call_id = buf.dec_ndr_long();
     }
 

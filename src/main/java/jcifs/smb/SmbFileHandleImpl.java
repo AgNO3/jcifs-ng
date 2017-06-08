@@ -29,6 +29,8 @@ import jcifs.Configuration;
 import jcifs.SmbFileHandle;
 import jcifs.internal.smb1.com.SmbComBlankResponse;
 import jcifs.internal.smb1.com.SmbComClose;
+import jcifs.internal.smb2.create.Smb2CloseRequest;
+import jcifs.util.Hexdump;
 
 
 /**
@@ -41,6 +43,7 @@ class SmbFileHandleImpl implements SmbFileHandle {
 
     private final Configuration cfg;
     private final int fid;
+    private final byte[] fileId;
     private boolean open = true;
     private final long tree_num; // for checking whether the tree changed
     private SmbTreeHandleImpl tree;
@@ -54,6 +57,8 @@ class SmbFileHandleImpl implements SmbFileHandle {
 
     private final StackTraceElement[] creationBacktrace;
 
+    private long initialSize;
+
 
     /**
      * @param cfg
@@ -64,10 +69,48 @@ class SmbFileHandleImpl implements SmbFileHandle {
      * @param attrs
      * @param access
      * @param flags
+     * @param initialSize
      */
-    public SmbFileHandleImpl ( Configuration cfg, int fid, SmbTreeHandleImpl tree, String unc, int flags, int access, int attrs, int options ) {
+    public SmbFileHandleImpl ( Configuration cfg, byte[] fid, SmbTreeHandleImpl tree, String unc, int flags, int access, int attrs, int options,
+            long initialSize ) {
+        this.cfg = cfg;
+        this.fileId = fid;
+        this.initialSize = initialSize;
+        this.fid = 0;
+        this.unc = unc;
+        this.flags = flags;
+        this.access = access;
+        this.attrs = attrs;
+        this.options = options;
+        this.tree = tree.acquire();
+        this.tree_num = tree.getTreeId();
+
+        if ( cfg.isTraceResourceUsage() ) {
+            this.creationBacktrace = Thread.currentThread().getStackTrace();
+        }
+        else {
+            this.creationBacktrace = null;
+        }
+    }
+
+
+    /**
+     * @param cfg
+     * @param fid
+     * @param tree
+     * @param unc
+     * @param options
+     * @param attrs
+     * @param access
+     * @param flags
+     * @param initialSize
+     */
+    public SmbFileHandleImpl ( Configuration cfg, int fid, SmbTreeHandleImpl tree, String unc, int flags, int access, int attrs, int options,
+            long initialSize ) {
         this.cfg = cfg;
         this.fid = fid;
+        this.initialSize = initialSize;
+        this.fileId = null;
         this.unc = unc;
         this.flags = flags;
         this.access = access;
@@ -94,6 +137,23 @@ class SmbFileHandleImpl implements SmbFileHandle {
             throw new SmbException("Descriptor is no longer valid");
         }
         return this.fid;
+    }
+
+
+    public byte[] getFileId () throws SmbException {
+        if ( !isValid() ) {
+            throw new SmbException("Descriptor is no longer valid");
+        }
+        return this.fileId;
+    }
+
+
+    /**
+     * @return the initialSize
+     */
+    @Override
+    public long getInitialSize () {
+        return this.initialSize;
     }
 
 
@@ -141,7 +201,14 @@ class SmbFileHandleImpl implements SmbFileHandle {
                 if ( log.isDebugEnabled() ) {
                     log.debug("Closing file handle " + this);
                 }
-                t.send(new SmbComClose(this.cfg, this.fid, lastWriteTime), new SmbComBlankResponse(this.cfg), RequestParam.NO_RETRY);
+
+                if ( t.isSMB2() ) {
+                    Smb2CloseRequest req = new Smb2CloseRequest(this.cfg, this.fileId);
+                    t.send(req, RequestParam.NO_RETRY);
+                }
+                else {
+                    t.send(new SmbComClose(this.cfg, this.fid, lastWriteTime), new SmbComBlankResponse(this.cfg), RequestParam.NO_RETRY);
+                }
             }
         }
         finally {
@@ -229,9 +296,9 @@ class SmbFileHandleImpl implements SmbFileHandle {
     @Override
     public String toString () {
         return String.format(
-            "FileHandle %s [fid=%d,tree=%d,flags=%x,access=%x,attrs=%x,options=%x]",
+            "FileHandle %s [fid=%s,tree=%d,flags=%x,access=%x,attrs=%x,options=%x]",
             this.unc,
-            this.fid,
+            this.fileId != null ? Hexdump.toHexString(this.fileId) : this.fid,
             this.tree_num,
             this.flags,
             this.access,
@@ -247,6 +314,9 @@ class SmbFileHandleImpl implements SmbFileHandle {
      */
     @Override
     public int hashCode () {
+        if ( this.fileId != null ) {
+            return (int) ( Arrays.hashCode(this.fileId) + 3 * this.tree_num );
+        }
         return (int) ( this.fid + 3 * this.tree_num );
     }
 
@@ -262,6 +332,10 @@ class SmbFileHandleImpl implements SmbFileHandle {
             return false;
         }
         SmbFileHandleImpl o = (SmbFileHandleImpl) obj;
+
+        if ( this.fileId != null ) {
+            return Arrays.equals(this.fileId, o.fileId) && this.tree_num == o.tree_num;
+        }
         return this.fid == o.fid && this.tree_num == o.tree_num;
     }
 

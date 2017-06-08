@@ -5,7 +5,7 @@
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
-	<version>1.6.0-SNAPSHOT</version>
+	<version>2.0.0-SNAPSHOT</version>
 
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>
@@ -50,6 +50,8 @@
 		<project.scm.id>github</project.scm.id>
 		<osgi.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</osgi.version>
 		<osgi.pkg.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</osgi.pkg.version>
+		<!-- <osgi.version>2.0.0</osgi.version>
+		<osgi.pkg.version>2.0.0</osgi.pkg.version> -->
 	</properties>
 
 	<dependencies>
@@ -114,6 +116,7 @@
 						<Bundle-Vendor>AgNO3 GmbH &amp; Co. KG</Bundle-Vendor>
 						<Bundle-SymbolicName>eu.agno3.jcifsng</Bundle-SymbolicName>
 						<Export-Package>
+							jcifs.internal*;version="${osgi.pkg.version}";x-internal:=true,
 							jcifs*;version="${osgi.pkg.version}",
 						</Export-Package>
 						<Private-Package />
@@ -121,6 +124,7 @@
 							javax.servlet*;resolution:=optional,
 							com.sun.security.jgss;resolution:=optional,
 							org.bouncycastle*;version="1.54",
+							!jcifs.internal*,
 							*
 						</Import-Package>
 					</instructions>

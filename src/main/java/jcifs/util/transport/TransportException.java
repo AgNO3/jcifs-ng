@@ -17,13 +17,13 @@
 package jcifs.util.transport;
 
 
-import java.io.IOException;
+import jcifs.CIFSException;
 
 
 /**
  *
  */
-public class TransportException extends IOException {
+public class TransportException extends CIFSException {
 
     /**
      * 

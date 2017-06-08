@@ -20,8 +20,8 @@ package jcifs.internal.smb1.trans2;
 
 
 import jcifs.Configuration;
+import jcifs.internal.dfs.DfsReferralRequestBuffer;
 import jcifs.internal.smb1.trans.SmbComTransaction;
-import jcifs.internal.util.SMBUtil;
 
 
 /**
@@ -31,6 +31,8 @@ public class Trans2GetDfsReferral extends SmbComTransaction {
 
     private int maxReferralLevel = 3;
 
+    private final DfsReferralRequestBuffer request;
+
 
     /**
      * 
@@ -39,7 +41,7 @@ public class Trans2GetDfsReferral extends SmbComTransaction {
      */
     public Trans2GetDfsReferral ( Configuration config, String filename ) {
         super(config, SMB_COM_TRANSACTION2, TRANS2_GET_DFS_REFERRAL);
-        this.path = filename;
+        this.request = new DfsReferralRequestBuffer(filename, 3);
         this.totalDataCount = 0;
         this.maxParameterCount = 0;
         this.maxDataCount = 4096;
@@ -47,6 +49,11 @@ public class Trans2GetDfsReferral extends SmbComTransaction {
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb1.ServerMessageBlock#isForceUnicode()
+     */
     @Override
     public boolean isForceUnicode () {
         return true;
@@ -64,11 +71,7 @@ public class Trans2GetDfsReferral extends SmbComTransaction {
     @Override
     protected int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
-
-        SMBUtil.writeInt2(this.maxReferralLevel, dst, dstIndex);
-        dstIndex += 2;
-        dstIndex += writeString(this.path, dst, dstIndex);
-
+        dstIndex += this.request.encode(dst, dstIndex);
         return dstIndex - start;
     }
 

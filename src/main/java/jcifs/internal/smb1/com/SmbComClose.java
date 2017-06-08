@@ -23,9 +23,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
+import jcifs.internal.smb1.SMB1SigningDigest;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
-import jcifs.internal.util.SigningDigest;
 
 
 /**
@@ -58,7 +58,7 @@ public class SmbComClose extends ServerMessageBlock {
         SMBUtil.writeInt2(this.fid, dst, dstIndex);
         dstIndex += 2;
         if ( this.digest != null ) {
-            SigningDigest.writeUTime(getConfig(), this.lastWriteTime, dst, dstIndex);
+            SMB1SigningDigest.writeUTime(getConfig(), this.lastWriteTime, dst, dstIndex);
         }
         else {
             log.trace("SmbComClose without a digest");

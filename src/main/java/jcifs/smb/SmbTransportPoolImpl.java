@@ -20,8 +20,13 @@ package jcifs.smb;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +37,7 @@ import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTransport;
 import jcifs.SmbTransportPool;
-import jcifs.internal.smb1.com.SmbComNegotiate;
+import jcifs.util.transport.TransportException;
 
 
 /**
@@ -45,6 +50,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     private final List<SmbTransportImpl> connections = new LinkedList<>();
     private final List<SmbTransportImpl> nonPooledConnections = new LinkedList<>();
+    final Map<String, Integer> failCounts = new ConcurrentHashMap<>();
 
 
     @Override
@@ -73,45 +79,16 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             port = SmbConstants.DEFAULT_PORT;
         }
         synchronized ( this.connections ) {
-            SmbComNegotiate negotiate = new SmbComNegotiate(tc.getConfig());
             if ( log.isTraceEnabled() ) {
                 log.trace("Exclusive " + nonPooled + " enforced signing " + forceSigning);
             }
             if ( !nonPooled && tc.getConfig().getSessionLimit() != 1 ) {
-                for ( SmbTransportImpl conn : this.connections ) {
-                    if ( conn.matches(address, port, localAddr, localPort, hostName)
-                            && ( tc.getConfig().getSessionLimit() == 0 || conn.sessions.size() < tc.getConfig().getSessionLimit() ) ) {
-
-                        if ( forceSigning && !conn.signingEnforced ) {
-                            // if signing is enforced and was not on the connection, skip
-                            continue;
-                        }
-
-                        if ( !forceSigning && !tc.getConfig().isSigningEnforced() && conn.signingEnforced ) {
-                            // if signing is not enforced, dont use connections that have signing enforced
-                            // for purposes that dont require it.
-                            continue;
-                        }
-
-                        /*
-                         * Compare the flags2 field in SMB block to decide
-                         * whether the authentication method is changed. Because one
-                         * tranport can only negotiate only once, if authentication
-                         * method is changed, we need to re-create the transport to
-                         * re-negotiate with server.
-                         */
-                        if ( conn.getNegotiateRequest().getFlags2() != negotiate.getFlags2() ) {
-                            continue;
-                        }
-
-                        if ( log.isTraceEnabled() ) {
-                            log.trace("Reusing transport connection " + conn);
-                        }
-                        return conn.acquire();
-                    }
+                SmbTransportImpl existing = findConnection(tc, address, port, localAddr, localPort, hostName, forceSigning, false);
+                if ( existing != null ) {
+                    return existing;
                 }
             }
-            SmbTransportImpl conn = new SmbTransportImpl(tc, negotiate, address, port, localAddr, localPort, forceSigning);
+            SmbTransportImpl conn = new SmbTransportImpl(tc, address, port, localAddr, localPort, forceSigning);
             if ( log.isDebugEnabled() ) {
                 log.debug("New transport connection " + conn);
             }
@@ -123,6 +100,129 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             }
             return conn;
         }
+    }
+
+
+    /**
+     * @param tc
+     * @param address
+     * @param port
+     * @param localAddr
+     * @param localPort
+     * @param hostName
+     * @param forceSigning
+     * @return
+     */
+    private SmbTransportImpl findConnection ( CIFSContext tc, Address address, int port, InetAddress localAddr, int localPort, String hostName,
+            boolean forceSigning, boolean connectedOnly ) {
+        for ( SmbTransportImpl conn : this.connections ) {
+            if ( conn.matches(address, port, localAddr, localPort, hostName)
+                    && ( tc.getConfig().getSessionLimit() == 0 || conn.getNumSessions() < tc.getConfig().getSessionLimit() ) ) {
+                try {
+                    if ( connectedOnly && conn.isDisconnected() ) {
+                        continue;
+                    }
+
+                    if ( forceSigning && !conn.isSigningEnforced() ) {
+                        // if signing is enforced and was not on the connection, skip
+                        if ( log.isTraceEnabled() ) {
+                            log.debug("Cannot reuse, signing enforced but connection does not have it enabled " + conn);
+                        }
+                        continue;
+                    }
+
+                    if ( !forceSigning && !tc.getConfig().isSigningEnforced() && conn.isSigningEnforced()
+                            && !conn.getNegotiateResponse().isSigningRequired() ) {
+                        // if signing is not enforced, dont use connections that have signing enforced
+                        // for purposes that dont require it.
+                        if ( log.isTraceEnabled() ) {
+                            log.debug("Cannot reuse, signing enforced on connection " + conn);
+                        }
+                        continue;
+                    }
+
+                    if ( !conn.getNegotiateResponse().canReuse(tc, forceSigning) ) {
+                        if ( log.isTraceEnabled() ) {
+                            log.trace("Cannot reuse, different config " + conn);
+                        }
+                        continue;
+                    }
+                }
+                catch ( CIFSException e ) {
+                    log.debug("Error while checking for reuse", e);
+                    continue;
+                }
+
+                if ( log.isTraceEnabled() ) {
+                    log.trace("Reusing transport connection " + conn);
+                }
+                return conn.acquire();
+            }
+        }
+
+        return null;
+    }
+
+
+    @Override
+    public SmbTransportImpl getSmbTransport ( CIFSContext tf, String name, int port, boolean exclusive, boolean forceSigning ) throws IOException {
+
+        Address[] addrs = tf.getNameServiceClient().getAllByName(name, true);
+
+        if ( addrs == null || addrs.length == 0 ) {
+            throw new UnknownHostException(name);
+        }
+
+        Arrays.sort(addrs, new Comparator<Address>() {
+
+            @Override
+            public int compare ( Address o1, Address o2 ) {
+                int fail1 = SmbTransportPoolImpl.this.failCounts.getOrDefault(o1.getHostAddress(), 0);
+                int fail2 = SmbTransportPoolImpl.this.failCounts.getOrDefault(o2.getHostAddress(), 0);
+                return Integer.compare(fail1, fail2);
+            }
+
+        });
+
+        for ( Address addr : addrs ) {
+            SmbTransportImpl found = findConnection(
+                tf,
+                addr,
+                port,
+                tf.getConfig().getLocalAddr(),
+                tf.getConfig().getLocalPort(),
+                name,
+                forceSigning,
+                true);
+            if ( found != null ) {
+                return found;
+            }
+
+        }
+
+        IOException ex = null;
+        for ( Address addr : addrs ) {
+            try ( SmbTransportImpl trans = getSmbTransport(tf, addr, port, exclusive, forceSigning).unwrap(SmbTransportImpl.class) ) {
+                try {
+                    trans.ensureConnected();
+                }
+                catch ( IOException e ) {
+                    removeTransport(trans);
+                    throw e;
+                }
+                return trans.acquire();
+            }
+            catch ( IOException e ) {
+                String hostAddress = addr.getHostAddress();
+                this.failCounts.put(hostAddress, this.failCounts.getOrDefault(hostAddress, 0) + 1);
+                ex = e;
+            }
+        }
+
+        if ( ex != null ) {
+            throw ex;
+        }
+        throw new TransportException("All connection attempts failed");
     }
 
 
@@ -156,14 +256,15 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
      * @see jcifs.SmbTransportPool#close()
      */
     @Override
-    public void close () throws CIFSException {
+    public boolean close () throws CIFSException {
+        boolean inUse = false;
         synchronized ( this.connections ) {
             log.debug("Closing pool");
             List<SmbTransportImpl> toClose = new LinkedList<>(this.connections);
             toClose.addAll(this.nonPooledConnections);
             for ( SmbTransportImpl conn : toClose ) {
                 try {
-                    conn.disconnect(false, false);
+                    inUse |= conn.disconnect(false, false);
                 }
                 catch ( IOException e ) {
                     log.warn("Failed to close connection", e);
@@ -172,6 +273,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             this.connections.clear();
             this.nonPooledConnections.clear();
         }
+        return inUse;
     }
 
 
@@ -188,6 +290,12 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
                 .unwrap(SmbTransportInternal.class) ) {
             trans.ensureConnected();
             return trans.getServerEncryptionKey();
+        }
+        catch ( SmbException e ) {
+            throw e;
+        }
+        catch ( IOException e ) {
+            throw new SmbException("Connection failed", e);
         }
     }
 

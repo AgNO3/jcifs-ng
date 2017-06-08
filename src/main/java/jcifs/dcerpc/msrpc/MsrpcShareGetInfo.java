@@ -22,8 +22,8 @@ package jcifs.dcerpc.msrpc;
 
 import java.io.IOException;
 
-import jcifs.smb.ACE;
-import jcifs.smb.SecurityDescriptor;
+import jcifs.internal.dtyp.ACE;
+import jcifs.internal.dtyp.SecurityDescriptor;
 
 
 @SuppressWarnings ( "javadoc" )
@@ -41,7 +41,7 @@ public class MsrpcShareGetInfo extends srvsvc.ShareGetInfo {
         if ( info502.security_descriptor != null ) {
             SecurityDescriptor sd;
             sd = new SecurityDescriptor(info502.security_descriptor, 0, info502.sd_size);
-            return sd.aces;
+            return sd.getAces();
         }
         return null;
     }

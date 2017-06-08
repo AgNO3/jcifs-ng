@@ -22,6 +22,7 @@ package jcifs.internal.smb1.com;
 import java.util.Date;
 
 import jcifs.Configuration;
+import jcifs.internal.SmbBasicFileInfo;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
@@ -31,7 +32,7 @@ import jcifs.util.Hexdump;
  * 
  * 
  */
-public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock {
+public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock implements SmbBasicFileInfo {
 
     static final int EXCLUSIVE_OPLOCK_GRANTED = 1;
     static final int BATCH_OPLOCK_GRANTED = 2;
@@ -111,6 +112,17 @@ public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getAttributes()
+     */
+    @Override
+    public int getAttributes () {
+        return getExtFileAttributes();
+    }
+
+
+    /**
      * @return the deviceState
      */
     public final int getDeviceState () {
@@ -127,8 +139,20 @@ public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getCreateTime()
+     */
+    @Override
+    public long getCreateTime () {
+        return getCreationTime();
+    }
+
+
+    /**
      * @return the lastAccessTime
      */
+    @Override
     public final long getLastAccessTime () {
         return this.lastAccessTime;
     }
@@ -137,6 +161,7 @@ public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock {
     /**
      * @return the lastWriteTime
      */
+    @Override
     public final long getLastWriteTime () {
         return this.lastWriteTime;
     }
@@ -147,6 +172,25 @@ public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock {
      */
     public final long getAllocationSize () {
         return this.allocationSize;
+    }
+
+
+    /**
+     * @return the endOfFile
+     */
+    public final long getEndOfFile () {
+        return this.endOfFile;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getSize()
+     */
+    @Override
+    public long getSize () {
+        return getEndOfFile();
     }
 
 
@@ -190,7 +234,6 @@ public class SmbComNTCreateAndXResponse extends AndXServerMessageBlock {
         this.deviceState = SMBUtil.readInt2(buffer, bufferIndex);
         bufferIndex += 2;
         this.directory = ( buffer[ bufferIndex++ ] & 0xFF ) > 0;
-
         return bufferIndex - start;
     }
 

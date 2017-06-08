@@ -99,7 +99,7 @@ public class NegTokenTarg extends SpnegoToken {
             ASN1EncodableVector fields = new ASN1EncodableVector();
             int res = getResult();
             if ( res != UNSPECIFIED_RESULT ) {
-                fields.add(new DERTaggedObject(true, 0, ASN1Enumerated.getInstance(res)));
+                fields.add(new DERTaggedObject(true, 0, new ASN1Enumerated(res)));
             }
             Oid mech = getMechanism();
             if ( mech != null ) {

@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
+import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.smb1.trans.nt.SmbComNtTransactionResponse;
 import jcifs.internal.util.SMBUtil;
@@ -221,6 +222,19 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb1.ServerMessageBlock#decode(byte[], int)
+     */
+    @Override
+    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
+        int len = super.decode(buffer, bufferIndex);
+        nextElement();
+        return len;
+    }
+
+
     @Override
     protected int readParameterWordsWireFormat ( byte[] buffer, int bufferIndex ) {
         int start = bufferIndex;
@@ -257,7 +271,7 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
 
 
     @Override
-    protected int readBytesWireFormat ( byte[] buffer, int bufferIndex ) {
+    protected int readBytesWireFormat ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         this.pad = this.pad1 = 0;
         if ( this.parameterCount > 0 ) {
             bufferIndex += this.pad = this.parameterOffset - ( bufferIndex - this.headerStart );
@@ -305,10 +319,10 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
     protected abstract int readSetupWireFormat ( byte[] buffer, int bufferIndex, int len );
 
 
-    protected abstract int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len );
+    protected abstract int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException;
 
 
-    protected abstract int readDataWireFormat ( byte[] buffer, int bufferIndex, int len );
+    protected abstract int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException;
 
 
     @Override

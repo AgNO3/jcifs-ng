@@ -63,7 +63,7 @@ public class FileAttributesTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs");
+        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs", "smb2");
     }
 
 

@@ -53,26 +53,31 @@ public interface SmbTreeHandleInternal extends SmbTreeHandle {
 
     /**
      * @return the send buffer size of the underlying connection
+     * @throws CIFSException
      */
-    int getSendBufferSize ();
+    int getSendBufferSize () throws CIFSException;
 
 
     /**
      * @return the receive buffer size of the underlying connection
+     * @throws CIFSException
      */
-    int getReceiveBufferSize ();
+    int getReceiveBufferSize () throws CIFSException;
 
 
     /**
      * @return the maximum buffer size reported by the server
+     * @throws CIFSException
      */
-    int getMaximumBufferSize ();
+    int getMaximumBufferSize () throws CIFSException;
 
 
     /**
      * @return whether the session uses SMB signing
+     * @throws CIFSException
+     * @throws SmbException
      */
-    boolean areSignaturesActive ();
+    boolean areSignaturesActive () throws CIFSException;
 
 
     /**

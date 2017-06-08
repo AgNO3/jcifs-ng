@@ -25,9 +25,11 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.security.auth.Subject;
@@ -41,12 +43,25 @@ import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbSession;
+import jcifs.internal.CommonServerMessageBlock;
+import jcifs.internal.CommonServerMessageBlockRequest;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.RequestWithPath;
+import jcifs.internal.SMBSigningDigest;
+import jcifs.internal.smb1.SMB1SigningDigest;
 import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.SmbComBlankResponse;
 import jcifs.internal.smb1.com.SmbComLogoffAndX;
+import jcifs.internal.smb1.com.SmbComNegotiateResponse;
 import jcifs.internal.smb1.com.SmbComSessionSetupAndX;
 import jcifs.internal.smb1.com.SmbComSessionSetupAndXResponse;
 import jcifs.internal.smb1.com.SmbComTreeConnectAndX;
-import jcifs.internal.util.SigningDigest;
+import jcifs.internal.smb2.ServerMessageBlock2Request;
+import jcifs.internal.smb2.Smb2SigningDigest;
+import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
+import jcifs.internal.smb2.session.Smb2LogoffRequest;
+import jcifs.internal.smb2.session.Smb2SessionSetupRequest;
+import jcifs.internal.smb2.session.Smb2SessionSetupResponse;
 
 
 /**
@@ -62,7 +77,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
      * 2 - connected
      * 3 - disconnecting
      */
-    private int connectionState;
+    private final AtomicInteger connectionState = new AtomicInteger();
     private int uid;
     private List<SmbTreeImpl> trees;
 
@@ -79,12 +94,20 @@ final class SmbSessionImpl implements SmbSessionInternal {
     private final AtomicLong usageCount = new AtomicLong(1);
     private boolean transportAcquired = true;
 
+    private long sessionId;
 
-    SmbSessionImpl ( CIFSContext tf, SmbTransportImpl transport ) {
+    private SMBSigningDigest digest;
+
+    private final String targetDomain;
+    private final String targetHost;
+
+
+    SmbSessionImpl ( CIFSContext tf, String targetHost, String targetDomain, SmbTransportImpl transport ) {
         this.transportContext = tf;
+        this.targetDomain = targetDomain;
+        this.targetHost = targetHost;
         this.transport = transport.acquire();
         this.trees = new ArrayList<>();
-        this.connectionState = 0;
         this.credentials = tf.getCredentials().unwrap(CredentialsInternal.class).clone();
     }
 
@@ -93,8 +116,24 @@ final class SmbSessionImpl implements SmbSessionInternal {
      * @return the configuration used by this session
      */
     @Override
-    public Configuration getConfig () {
+    public final Configuration getConfig () {
         return this.transportContext.getConfig();
+    }
+
+
+    /**
+     * @return the targetDomain
+     */
+    public final String getTargetDomain () {
+        return this.targetDomain;
+    }
+
+
+    /**
+     * @return the targetHost
+     */
+    public final String getTargetHost () {
+        return this.targetHost;
     }
 
 
@@ -239,105 +278,163 @@ final class SmbSessionImpl implements SmbSessionInternal {
         try ( SmbTreeImpl t = getSmbTree(logonShare, null) ) {
             t.treeConnect(null, null);
         }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
+    }
+
+
+    boolean isSignatureSetupRequired () throws SmbException {
+        SMBSigningDigest cur = getDigest();
+        if ( cur != null ) {
+            return false;
+        }
+        else if ( this.transport.isSigningEnforced() ) {
+            return true;
+        }
+        return this.transport.getNegotiateResponse().isSigningNegotiated();
+    }
+
+
+    /**
+     * @param digest
+     *            the digest to set
+     * @throws SmbException
+     */
+    private void setDigest ( SMBSigningDigest digest ) throws SmbException {
+        if ( this.transport.isSMB2() ) {
+            this.digest = digest;
+        }
+        else {
+            this.transport.setDigest(digest);
+        }
+    }
+
+
+    /**
+     * @return the digest
+     * @throws SmbException
+     */
+    public SMBSigningDigest getDigest () throws SmbException {
+        if ( this.digest != null ) {
+            return this.digest;
+        }
+        return this.transport.getDigest();
     }
 
 
     /**
      * @param tf
+     * @param tdom
+     * @param thost
      * @return
      */
-    protected boolean matches ( CIFSContext tf ) {
-        return Objects.equals(this.getCredentials(), tf.getCredentials());
+    protected boolean matches ( CIFSContext tf, String thost, String tdom ) {
+        return Objects.equals(this.getCredentials(), tf.getCredentials()) && Objects.equals(this.targetHost, thost)
+                && Objects.equals(this.targetDomain, tdom);
     }
 
 
-    void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
-        send(request, response, Collections.EMPTY_SET);
+    <T extends CommonServerMessageBlockResponse> T send ( CommonServerMessageBlockRequest request, T response ) throws CIFSException {
+        return send(request, response, Collections.<RequestParam> emptySet());
     }
 
 
-    void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws SmbException {
+    <T extends CommonServerMessageBlockResponse> T send ( CommonServerMessageBlockRequest request, T response, Set<RequestParam> params )
+            throws CIFSException {
         try ( SmbTransportImpl trans = getTransport() ) {
-            synchronized ( trans ) {
-                if ( response != null ) {
-                    response.setReceived(false);
-                    response.setExtendedSecurity(this.extendedSecurity);
+            if ( response != null ) {
+                response.clearReceived();
+                response.setExtendedSecurity(this.extendedSecurity);
+            }
+
+            try {
+                if ( params.contains(RequestParam.NO_TIMEOUT) ) {
+                    this.expiration = -1;
+                }
+                else {
+                    this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
+                }
+
+                T chainedResponse;
+                try {
+                    chainedResponse = sessionSetup(request, response);
+                }
+                catch ( GeneralSecurityException e ) {
+                    throw new SmbException("Session setup failed", e);
+                }
+
+                if ( chainedResponse != null && chainedResponse.isReceived() ) {
+                    return chainedResponse;
+                }
+
+                if ( request instanceof SmbComTreeConnectAndX ) {
+                    SmbComTreeConnectAndX tcax = (SmbComTreeConnectAndX) request;
+                    if ( this.netbiosName != null && tcax.getPath().endsWith("\\IPC$") ) {
+                        /*
+                         * Some pipes may require that the hostname in the tree connect
+                         * be the netbios name. So if we have the netbios server name
+                         * from the NTLMSSP type 2 message, and the share is IPC$, we
+                         * assert that the tree connect path uses the netbios hostname.
+                         */
+                        tcax.setPath("\\\\" + this.netbiosName + "\\IPC$");
+                    }
+                }
+
+                request.setSessionId(this.sessionId);
+                request.setUid(this.uid);
+
+                if ( request.getDigest() == null ) {
+                    request.setDigest(getDigest());
+                }
+
+                if ( request instanceof RequestWithPath ) {
+                    RequestWithPath rpath = (RequestWithPath) request;
+                    ( (RequestWithPath) request ).setFullUNCPath(getTargetDomain(), getTargetHost(), rpath.getFullUNCPath());
                 }
 
                 try {
-                    if ( params.contains(RequestParam.NO_TIMEOUT) ) {
-                        this.expiration = -1;
+                    if ( log.isTraceEnabled() ) {
+                        log.trace("Request " + request);
                     }
-                    else {
-                        this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
+                    response = this.transport.send(request, response, params);
+                    if ( log.isTraceEnabled() ) {
+                        log.trace("Response " + response);
                     }
-                    try {
-                        sessionSetup(request, response);
+                    return response;
+                }
+                catch ( DfsReferral r ) {
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Have referral " + r);
                     }
-                    catch ( GeneralSecurityException e ) {
-                        throw new SmbException("Session setup failed", e);
-                    }
-
-                    if ( response != null && response.isReceived() ) {
-                        return;
-                    }
-
-                    if ( request instanceof SmbComTreeConnectAndX ) {
-                        SmbComTreeConnectAndX tcax = (SmbComTreeConnectAndX) request;
-                        if ( this.netbiosName != null && tcax.getPath().endsWith("\\IPC$") ) {
-                            /*
-                             * Some pipes may require that the hostname in the tree connect
-                             * be the netbios name. So if we have the netbios server name
-                             * from the NTLMSSP type 2 message, and the share is IPC$, we
-                             * assert that the tree connect path uses the netbios hostname.
-                             */
-                            tcax.setPath("\\\\" + this.netbiosName + "\\IPC$");
-                        }
-                    }
-
-                    request.setUid(this.uid);
-                    try {
-                        if ( log.isTraceEnabled() ) {
-                            log.trace("Request " + request);
-                        }
-                        this.transport.send(request, response, params);
-                        if ( log.isTraceEnabled() ) {
-                            log.trace("Response " + response);
-                        }
-                    }
-                    catch ( DfsReferral r ) {
-                        if ( log.isDebugEnabled() ) {
-                            log.debug("Have referral " + r);
-                        }
-                        request.setDigest(null);
-                        throw r;
-                    }
-                    catch ( SmbException se ) {
+                    throw r;
+                }
+                catch ( SmbException se ) {
+                    if ( log.isTraceEnabled() ) {
                         log.trace("Send failed", se);
                         log.trace("Request: " + request);
                         log.trace("Response: " + response);
-                        if ( request instanceof SmbComTreeConnectAndX ) {
-                            logoff(true, true);
-                        }
-                        request.setDigest(null);
-                        throw se;
                     }
+                    throw se;
                 }
-                finally {
-                    this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
-                }
+            }
+            finally {
+                request.setDigest(null);
+                this.expiration = System.currentTimeMillis() + this.transportContext.getConfig().getSoTimeout();
             }
         }
     }
 
 
-    void sessionSetup ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException, GeneralSecurityException {
+    <T extends CommonServerMessageBlock> T sessionSetup ( CommonServerMessageBlockRequest chained, T chainedResponse )
+            throws CIFSException, GeneralSecurityException {
         try ( SmbTransportImpl trans = getTransport() ) {
             synchronized ( trans ) {
 
-                while ( this.connectionState != 0 ) {
-                    if ( this.connectionState == 2 || this.connectionState == 3 ) // connected or disconnecting
-                        return;
+                while ( !this.connectionState.compareAndSet(0, 1) ) {
+                    int st = this.connectionState.get();
+                    if ( st == 2 || st == 3 ) // connected or disconnecting
+                        return chainedResponse;
                     try {
                         this.transport.wait();
                     }
@@ -345,7 +442,6 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         throw new SmbException(ie.getMessage(), ie);
                     }
                 }
-                this.connectionState = 1; // trying ...
 
                 try {
                     trans.ensureConnected();
@@ -366,12 +462,20 @@ final class SmbSessionImpl implements SmbSessionInternal {
                      */
                     this.uid = 0;
 
-                    sessionSetup2(trans, andx, andxResponse);
+                    if ( trans.isSMB2() ) {
+                        return sessionSetupSMB2(trans, this.targetDomain, (ServerMessageBlock2Request<?>) chained, chainedResponse);
+                    }
+
+                    sessionSetupSMB1(trans, this.targetDomain, (ServerMessageBlock) chained, (ServerMessageBlock) chainedResponse);
+                    return chainedResponse;
                 }
-                catch ( SmbException se ) {
+                catch ( CIFSException se ) {
                     log.debug("Session setup failed", se);
-                    logoff(true, true);
-                    this.connectionState = 0;
+                    if ( this.connectionState.compareAndSet(1, 0) ) {
+                        // only try to logoff if we have not completed the session setup, ignore errors from chained
+                        // responses
+                        logoff(true, true);
+                    }
                     throw se;
                 }
                 finally {
@@ -384,17 +488,199 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
     /**
      * @param trans
+     * @param chain
+     * @param andxResponse
+     * @throws SmbException
+     */
+    @SuppressWarnings ( "unchecked" )
+    private <T extends CommonServerMessageBlock> T sessionSetupSMB2 ( SmbTransportImpl trans, final String tdomain,
+            ServerMessageBlock2Request<?> chain, T andxResponse ) throws SmbException, GeneralSecurityException {
+        final Smb2NegotiateResponse negoResp = (Smb2NegotiateResponse) trans.getNegotiateResponse();
+        Smb2SessionSetupRequest request = null;
+        Smb2SessionSetupResponse response = null;
+        SmbException ex = null;
+        boolean anonymous = this.credentials.isAnonymous();
+        SSPContext ctx = null;
+        byte[] token = negoResp.getSecurityBlob();
+        final int securityMode = negoResp.getSecurityMode();
+        final boolean doSigning = securityMode != 0 && !anonymous;
+        long sessId = 0;
+
+        while ( true ) {
+            Subject s = this.credentials.getSubject();
+            final byte[] curToken = token;
+            if ( ctx == null ) {
+                String host = trans.getRemoteAddress().getHostAddress();
+                try {
+                    host = trans.getRemoteAddress().getHostName();
+                }
+                catch ( Exception e ) {
+                    log.debug("Failed to resolve host name", e);
+                }
+
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Remote host is " + host);
+                }
+
+                if ( s == null ) {
+                    ctx = this.credentials.createContext(getContext(), tdomain, host, negoResp.getSecurityBlob(), doSigning);
+                }
+                else {
+                    try {
+                        final String hostName = host;
+                        ctx = Subject.doAs(s, new PrivilegedExceptionAction<SSPContext>() {
+
+                            @Override
+                            public SSPContext run () throws Exception {
+                                return getCredentials().createContext(getContext(), tdomain, hostName, negoResp.getSecurityBlob(), doSigning);
+                            }
+
+                        });
+                    }
+                    catch ( PrivilegedActionException e ) {
+                        if ( e.getException() instanceof SmbException ) {
+                            throw (SmbException) e.getException();
+                        }
+                        throw new SmbException("Unexpected exception during context initialization", e);
+                    }
+                }
+            }
+
+            final SSPContext curCtx = ctx;
+
+            if ( log.isTraceEnabled() ) {
+                log.trace(ctx.toString());
+            }
+
+            if ( s != null ) {
+                try {
+                    token = Subject.doAs(s, new PrivilegedExceptionAction<byte[]>() {
+
+                        @Override
+                        public byte[] run () throws Exception {
+                            return curCtx.initSecContext(curToken, 0, curToken == null ? 0 : curToken.length);
+                        }
+
+                    });
+                }
+                catch (
+
+                PrivilegedActionException e )
+
+                {
+                    if ( e.getException() instanceof SmbException ) {
+                        throw (SmbException) e.getException();
+                    }
+                    throw new SmbException("Unexpected exception during context initialization", e);
+                }
+            }
+            else {
+                token = ctx.initSecContext(token, 0, token == null ? 0 : token.length);
+            }
+
+            if ( token != null ) {
+                request = new Smb2SessionSetupRequest(this.getContext(), securityMode, 0, 0, token);
+                // here, messages are rejected with NOT_SUPPORTED if we start signing as soon as we can, wait until
+                // session setup complete
+
+                request.setSessionId(sessId);
+
+                // we can only chain if we don't sign or already have a signing key
+                byte[] sk = ctx.isEstablished() ? ctx.getSigningKey() : null;
+                if ( chain != null && ( anonymous || !isSignatureSetupRequired() || sk != null ) ) {
+                    request.chain(chain);
+                    if ( sk != null && !anonymous && isSignatureSetupRequired() ) {
+                        // session key is truncated to 16 bytes, right padded with 0 if shorter
+                        byte[] key = new byte[16];
+                        System.arraycopy(sk, 0, key, 0, Math.min(16, sk.length));
+                        chain.setDigest(new Smb2SigningDigest(key, negoResp.getDialectRevision()));
+                    }
+                }
+
+                try {
+                    response = trans.send(request, null, EnumSet.of(RequestParam.RETAIN_PAYLOAD));
+                    sessId = response.getSessionId();
+                }
+                catch ( SmbAuthException sae ) {
+                    throw sae;
+                }
+                catch ( SmbException e ) {
+                    Smb2SessionSetupResponse sessResponse = request.getResponse();
+                    if ( !sessResponse.isReceived() || sessResponse.isError() || ( sessResponse.getStatus() != NtStatus.NT_STATUS_OK
+                            && sessResponse.getStatus() != NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED ) ) {
+                        throw e;
+                    }
+                    ex = e;
+                    response = sessResponse;
+                }
+
+                if ( response.isLoggedInAsGuest() && !this.credentials.isGuest() ) {
+                    throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
+                }
+
+                if ( request.getDigest() != null ) {
+                    /* success - install the signing digest */
+                    log.debug("Setting digest");
+                    setDigest(request.getDigest());
+                }
+
+                token = response.getBlob();
+            }
+
+            if ( ctx.isEstablished() ) {
+                log.debug("Context is established");
+                setNetbiosName(ctx.getNetbiosName());
+                byte[] sk = ctx.getSigningKey();
+                if ( sk != null ) {
+                    // session key is truncated to 16 bytes, right padded with 0 if shorter
+                    byte[] key = new byte[16];
+                    System.arraycopy(sk, 0, key, 0, Math.min(16, sk.length));
+                    this.sessionKey = key;
+                }
+                if ( !anonymous && isSignatureSetupRequired() ) {
+                    byte[] signingKey = ctx.getSigningKey();
+                    if ( signingKey != null && response != null ) {
+                        Smb2SigningDigest dgst = new Smb2SigningDigest(this.sessionKey, negoResp.getDialectRevision());
+                        // verify the server signature here, this is not done automatically as we don't set the request
+                        // digest
+                        response.setDigest(dgst);
+                        byte[] payload = response.getRawPayload();
+                        if ( !response.verifySignature(payload, 0, payload.length) ) {
+                            throw new SmbException("Signature validation failed");
+                        }
+                        setDigest(dgst);
+                    }
+                    else {
+                        throw new SmbException("Signing required but no session key available");
+                    }
+                }
+                else if ( log.isDebugEnabled() ) {
+                    log.debug("No digest setup " + anonymous + " B " + isSignatureSetupRequired());
+                }
+                setSessionSetup(response);
+                if ( ex != null ) {
+                    throw ex;
+                }
+                return (T) ( response != null ? response.getNextResponse() : null );
+            }
+        }
+    }
+
+
+    /**
+     * @param trans
      * @param andx
      * @param andxResponse
      */
-    private void sessionSetup2 ( final SmbTransportImpl trans, ServerMessageBlock andx, ServerMessageBlock andxResponse )
-            throws SmbException, GeneralSecurityException {
+    private void sessionSetupSMB1 ( final SmbTransportImpl trans, final String tdomain, ServerMessageBlock andx, ServerMessageBlock andxResponse )
+            throws CIFSException, GeneralSecurityException {
         SmbException ex = null;
         SmbComSessionSetupAndX request = null;
         SmbComSessionSetupAndXResponse response = null;
         SSPContext ctx = null;
         byte[] token = new byte[0];
         int state = 10;
+        final SmbComNegotiateResponse negoResp = (SmbComNegotiateResponse) trans.getNegotiateResponse();
         boolean anonymous = this.credentials.isAnonymous();
         do {
             switch ( state ) {
@@ -416,15 +702,9 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 NtlmPasswordAuthentication npa = (NtlmPasswordAuthentication) this.credentials;
 
-                request = new SmbComSessionSetupAndX(
-                    this.getContext(),
-                    trans.sessionKey,
-                    trans.capabilities,
-                    trans.snd_buf_size,
-                    trans.maxMpxCount,
-                    trans.server,
-                    andx,
-                    getCredentials());
+                request = new SmbComSessionSetupAndX(this.getContext(), negoResp, andx, getCredentials());
+                // if the connection already has a digest set up this needs to be used
+                request.setDigest(getDigest());
                 response = new SmbComSessionSetupAndXResponse(getContext().getConfig(), andxResponse);
                 response.setExtendedSecurity(false);
 
@@ -433,7 +713,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                  * Only the first SMB_COM_SESSION_SETUP_ANX with non-null or
                  * blank password initializes signing.
                  */
-                if ( !anonymous && trans.isSignatureSetupRequired() ) {
+                if ( !anonymous && isSignatureSetupRequired() ) {
                     if ( npa.areHashesExternal() && getContext().getConfig().getDefaultPassword() != null ) {
                         /*
                          * preauthentication
@@ -445,11 +725,11 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     }
                     else {
                         log.debug("Initialize signing");
-                        byte[] signingKey = npa.getSigningKey(getContext(), trans.server.encryptionKey);
+                        byte[] signingKey = npa.getSigningKey(getContext(), negoResp.getServerData().encryptionKey);
                         if ( signingKey == null ) {
                             throw new SmbException("Need a signature key but the server did not provide one");
                         }
-                        request.setDigest(new SigningDigest(signingKey, false));
+                        request.setDigest(new SMB1SigningDigest(signingKey, false));
                     }
                 }
 
@@ -463,7 +743,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     ex = se;
                 }
 
-                if ( response.isLoggedInAsGuest() && trans.server.security != SmbConstants.SECURITY_SHARE && !anonymous ) {
+                if ( response.isLoggedInAsGuest() && negoResp.getServerData().security != SmbConstants.SECURITY_SHARE && !anonymous ) {
                     throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                 }
 
@@ -474,26 +754,30 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 if ( request.getDigest() != null ) {
                     /* success - install the signing digest */
-                    trans.digest = request.getDigest();
+                    setDigest(request.getDigest());
                 }
-                else if ( !anonymous && trans.isSignatureSetupRequired() ) {
+                else if ( !anonymous && isSignatureSetupRequired() ) {
                     throw new SmbException("Signing required but no session key available");
                 }
 
-                this.setSessionSetup(response);
+                setSessionSetup(response);
                 state = 0;
                 break;
             case 20: /* NTLMSSP */
                 Subject s = this.credentials.getSubject();
-                final boolean doSigning = !anonymous && ( trans.flags2 & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
+                final boolean doSigning = !anonymous && ( negoResp.getNegotiatedFlags2() & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
                 final byte[] curToken = token;
                 if ( ctx == null ) {
-                    String host = trans.address.getHostAddress();
-                    try {
-                        host = trans.address.getHostName();
-                    }
-                    catch ( Exception e ) {
-                        log.debug("Failed to resolve host name", e);
+
+                    String host = this.getTargetHost();
+                    if ( host == null ) {
+                        host = trans.getRemoteAddress().getHostAddress();
+                        try {
+                            host = trans.getRemoteAddress().getHostName();
+                        }
+                        catch ( Exception e ) {
+                            log.debug("Failed to resolve host name", e);
+                        }
                     }
 
                     if ( log.isDebugEnabled() ) {
@@ -501,7 +785,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     }
 
                     if ( s == null ) {
-                        ctx = this.credentials.createContext(getContext(), host, trans.server.encryptionKey, doSigning);
+                        ctx = this.credentials.createContext(getContext(), tdomain, host, negoResp.getServerData().encryptionKey, doSigning);
                     }
                     else {
                         try {
@@ -510,7 +794,8 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                                 @Override
                                 public SSPContext run () throws Exception {
-                                    return getCredentials().createContext(getContext(), hostName, trans.server.encryptionKey, doSigning);
+                                    return getCredentials()
+                                            .createContext(getContext(), tdomain, hostName, negoResp.getServerData().encryptionKey, doSigning);
                                 }
 
                             });
@@ -532,7 +817,6 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 try {
                     if ( s != null ) {
-
                         try {
                             token = Subject.doAs(s, new PrivilegedExceptionAction<byte[]>() {
 
@@ -543,8 +827,12 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                             });
                         }
-                        catch ( PrivilegedActionException e ) {
-                            if ( e.getException() instanceof SmbException ) {
+                        catch (
+
+                        PrivilegedActionException e ) {
+                            if ( e.getException() instanceof SmbException )
+
+                            {
                                 throw (SmbException) e.getException();
                             }
                             throw new SmbException("Unexpected exception during context initialization", e);
@@ -572,19 +860,13 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 }
 
                 if ( token != null ) {
-                    request = new SmbComSessionSetupAndX(
-                        this.getContext(),
-                        trans.sessionKey,
-                        trans.capabilities,
-                        trans.snd_buf_size,
-                        trans.maxMpxCount,
-                        trans.server,
-                        null,
-                        token);
-                    if ( doSigning && ctx.isEstablished() && trans.isSignatureSetupRequired() ) {
+                    request = new SmbComSessionSetupAndX(this.getContext(), negoResp, null, token);
+                    // if the connection already has a digest set up this needs to be used
+                    request.setDigest(getDigest());
+                    if ( doSigning && ctx.isEstablished() && isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null ) {
-                            request.setDigest(new SigningDigest(signingKey));
+                            request.setDigest(new SMB1SigningDigest(signingKey));
                         }
                         this.sessionKey = signingKey;
                     }
@@ -594,7 +876,6 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                     response = new SmbComSessionSetupAndXResponse(getContext().getConfig(), null);
                     response.setExtendedSecurity(true);
-
                     request.setUid(getUid());
                     this.setUid(0);
 
@@ -621,7 +902,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         }
                     }
 
-                    if ( response.isLoggedInAsGuest() && this.credentials.isGuest() == false ) {
+                    if ( response.isLoggedInAsGuest() && !this.credentials.isGuest() ) {
                         throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                     }
 
@@ -633,7 +914,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     if ( request.getDigest() != null ) {
                         /* success - install the signing digest */
                         log.debug("Setting digest");
-                        trans.digest = request.getDigest();
+                        setDigest(request.getDigest());
                     }
 
                     token = response.getBlob();
@@ -641,41 +922,42 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 if ( ctx.isEstablished() ) {
                     log.debug("Context is established");
-                    this.setNetbiosName(ctx.getNetbiosName());
+                    setNetbiosName(ctx.getNetbiosName());
                     this.sessionKey = ctx.getSigningKey();
                     if ( request != null && request.getDigest() != null ) {
                         /* success - install the signing digest */
-                        trans.digest = request.getDigest();
+                        setDigest(request.getDigest());
                     }
-                    else if ( !anonymous && trans.isSignatureSetupRequired() ) {
+                    else if ( !anonymous && isSignatureSetupRequired() ) {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null && response != null )
-                            trans.digest = new SigningDigest(signingKey, 2);
+                            setDigest(new SMB1SigningDigest(signingKey, 2));
                         else {
                             throw new SmbException("Signing required but no session key available");
                         }
                         this.sessionKey = signingKey;
                     }
-                    this.setSessionSetup(response);
+                    setSessionSetup(response);
                     state = 0;
                     break;
                 }
                 break;
             default:
                 throw new SmbException("Unexpected session setup state: " + state);
+
             }
         }
         while ( state != 0 );
     }
 
 
-    void logoff ( boolean inError, boolean inUse ) {
+    boolean logoff ( boolean inError, boolean inUse ) {
+        boolean wasInUse = false;
         try ( SmbTransportImpl trans = getTransport() ) {
             synchronized ( trans ) {
-
-                if ( this.connectionState != 2 ) // not-connected
-                    return;
-                this.connectionState = 3; // disconnecting
+                if ( !this.connectionState.compareAndSet(2, 3) ) { // not-connected
+                    return false;
+                }
 
                 if ( log.isDebugEnabled() ) {
                     log.debug("Logging off session on " + trans);
@@ -686,45 +968,65 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 long us = this.usageCount.get();
                 if ( ( inUse && us != 1 ) || ( !inUse && us > 0 ) ) {
                     log.warn("Logging off session while still in use " + this + ":" + this.trees);
+                    wasInUse = true;
                 }
 
                 for ( SmbTreeImpl t : this.trees ) {
                     try {
-                        t.treeDisconnect(inError, false);
+                        log.debug("Disconnect tree on logoff");
+                        wasInUse |= t.treeDisconnect(inError, false);
                     }
                     catch ( Exception e ) {
                         log.warn("Failed to disconnect tree " + t, e);
                     }
                 }
 
-                if ( !inError && this.transport.server.security != SmbConstants.SECURITY_SHARE ) {
-                    /*
-                     * Logoff And X Request / Response
-                     */
-
-                    SmbComLogoffAndX request = new SmbComLogoffAndX(this.getConfig(), null);
-                    request.setUid(getUid());
+                if ( !inError && trans.isSMB2() ) {
+                    Smb2LogoffRequest request = new Smb2LogoffRequest(getConfig());
+                    request.setDigest(getDigest());
+                    request.setSessionId(this.sessionId);
                     try {
-                        this.transport.send(request, null);
+                        this.transport.send(request.ignoreDisconnect(), null);
                     }
                     catch ( SmbException se ) {
-                        log.debug("SmbComLogoffAndX failed", se);
+                        log.debug("Smb2LogoffRequest failed", se);
                     }
-                    this.uid = 0;
+                }
+                else if ( !inError ) {
+                    boolean shareSecurity = ( (SmbComNegotiateResponse) trans.getNegotiateResponse() )
+                            .getServerData().security == SmbConstants.SECURITY_SHARE;
+                    if ( !shareSecurity ) {
+                        SmbComLogoffAndX request = new SmbComLogoffAndX(getConfig(), null);
+                        request.setDigest(getDigest());
+                        request.setUid(getUid());
+                        try {
+                            this.transport.send(request, new SmbComBlankResponse(getConfig()));
+                        }
+                        catch ( SmbException se ) {
+                            log.debug("SmbComLogoffAndX failed", se);
+                        }
+                        this.uid = 0;
+                    }
                 }
 
-                this.connectionState = 0;
-                this.transport.notifyAll();
             }
-
         }
+        catch ( SmbException e ) {
+            log.warn("Error in logoff", e);
+        }
+        finally {
+            this.connectionState.set(0);
+            this.digest = null;
+            this.transport.notifyAll();
+        }
+        return wasInUse;
     }
 
 
     @Override
     public String toString () {
-        return "SmbSession[credentials=" + this.transportContext.getCredentials() + ",uid=" + this.uid + ",connectionState=" + this.connectionState
-                + ",usage=" + this.usageCount.get() + "]";
+        return "SmbSession[credentials=" + this.transportContext.getCredentials() + ",targetHost=" + this.targetHost + ",targetDomain="
+                + this.targetDomain + ",uid=" + this.uid + ",connectionState=" + this.connectionState + ",usage=" + this.usageCount.get() + "]";
     }
 
 
@@ -733,9 +1035,16 @@ final class SmbSessionImpl implements SmbSessionInternal {
     }
 
 
+    void setSessionSetup ( Smb2SessionSetupResponse response ) {
+        this.extendedSecurity = true;
+        this.connectionState.set(2);
+        this.sessionId = response.getSessionId();
+    }
+
+
     void setSessionSetup ( SmbComSessionSetupAndXResponse response ) {
         this.extendedSecurity = response.isExtendedSecurity();
-        this.connectionState = 2;
+        this.connectionState.set(2);
     }
 
 
@@ -790,7 +1099,15 @@ final class SmbSessionImpl implements SmbSessionInternal {
      * @return whether the session is connected
      */
     public boolean isConnected () {
-        return !this.transport.isDisconnected() && this.connectionState == 2;
+        return !this.transport.isDisconnected() && this.connectionState.get() == 2;
+    }
+
+
+    /**
+     * @return whether the session has been lost
+     */
+    public boolean isFailed () {
+        return this.transport.isFailed();
     }
 
 }

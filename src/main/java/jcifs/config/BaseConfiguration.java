@@ -23,9 +23,12 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 
@@ -113,6 +116,7 @@ public class BaseConfiguration implements Configuration {
     protected InetAddress[] winsServer = new InetAddress[0];
     protected InetAddress broadcastAddress;
     protected List<ResolverType> resolverOrder;
+    protected int maximumBufferSize = 0xFFFF;
     protected int transactionBufferSize = 0xFFFF - 512;
     protected int bufferCacheSize = 16;
     protected int smbListSize = 65535;
@@ -123,6 +127,7 @@ public class BaseConfiguration implements Configuration {
     protected String[] supportedDialects;
     protected boolean traceResourceUsage;
     protected boolean strictResourceLifecycle;
+    protected Set<String> disallowCompound;
 
 
     /**
@@ -472,6 +477,12 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
+    public int getMaximumBufferSize () {
+        return this.maximumBufferSize;
+    }
+
+
+    @Override
     public int getBufferCacheSize () {
         return this.bufferCacheSize;
     }
@@ -572,6 +583,20 @@ public class BaseConfiguration implements Configuration {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isAllowCompound(java.lang.String)
+     */
+    @Override
+    public boolean isAllowCompound ( String command ) {
+        if ( this.disallowCompound == null ) {
+            return true;
+        }
+        return !this.disallowCompound.contains(command);
+    }
+
+
+    /**
      * @param cmd
      * @return
      */
@@ -626,6 +651,19 @@ public class BaseConfiguration implements Configuration {
                 }
             }
         }
+    }
+
+
+    protected void initDisallowCompound ( String prop ) {
+        if ( prop == null ) {
+            return;
+        }
+        Set<String> disallow = new HashSet<>();
+        StringTokenizer st = new StringTokenizer(prop, ",");
+        while ( st.hasMoreTokens() ) {
+            disallow.add(st.nextToken().trim());
+        }
+        this.disallowCompound = disallow;
     }
 
 
@@ -686,6 +724,13 @@ public class BaseConfiguration implements Configuration {
                     "NT LM 0.12"
                 };
             }
+        }
+
+        if ( this.disallowCompound == null ) {
+            // Samba woes on these
+            // Smb2SessionSetupRequest + X -> INTERNAL_ERROR
+            // Smb2TreeConnectRequest + IoCtl -> NETWORK_NAME_DELETED
+            this.disallowCompound = new HashSet<>(Arrays.asList("Smb2SessionSetupRequest", "Smb2TreeConnectRequest"));
         }
     }
 

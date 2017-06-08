@@ -18,7 +18,10 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
+
 import jcifs.CIFSException;
+import jcifs.SmbFileHandle;
 import jcifs.SmbPipeHandle;
 
 
@@ -58,4 +61,52 @@ public interface SmbPipeHandleInternal extends SmbPipeHandle {
      */
     @Override
     SmbPipeOutputStream getOutput () throws CIFSException;
+
+
+    /**
+     * @return tree connection
+     * @throws SmbException
+     * @throws CIFSException
+     */
+    SmbTreeHandleInternal ensureTreeConnected () throws CIFSException;
+
+
+    /**
+     * @return file handle
+     * @throws CIFSException
+     */
+    SmbFileHandle ensureOpen () throws CIFSException;
+
+
+    /**
+     * @param buf
+     * @param off
+     * @param length
+     * @param direct
+     * @return received bytes
+     * @throws CIFSException
+     * @throws IOException
+     */
+    int recv ( byte[] buf, int off, int length ) throws IOException;
+
+
+    /**
+     * @param buf
+     * @param off
+     * @param length
+     * @param direct
+     * @throws IOException
+     */
+    void send ( byte[] buf, int off, int length ) throws IOException;
+
+
+    /**
+     * @param buf
+     * @param off
+     * @param length
+     * @param inB
+     * @return len
+     * @throws IOException
+     */
+    int sendrecv ( byte[] buf, int off, int length, byte[] inB ) throws IOException;
 }

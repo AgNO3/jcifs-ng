@@ -19,11 +19,16 @@
 package jcifs.internal.smb1.trans2;
 
 
+import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.internal.AllocInfo;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.fscc.FileFsFullSizeInformation;
+import jcifs.internal.fscc.FileFsSizeInformation;
+import jcifs.internal.fscc.FileSystemInformation;
+import jcifs.internal.fscc.SmbInfoAllocation;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans.SmbComTransactionResponse;
-import jcifs.internal.util.SMBUtil;
 
 
 /**
@@ -31,22 +36,8 @@ import jcifs.internal.util.SMBUtil;
  */
 public class Trans2QueryFSInformationResponse extends SmbComTransactionResponse {
 
-    // information levels
-    /**
-     * 
-     */
-    public static final int SMB_INFO_ALLOCATION = 1;
-    /**
-     * 
-     */
-    public static final int SMB_QUERY_FS_SIZE_INFO = 0x103;
-    /**
-     * 
-     */
-    public static final int SMB_FS_FULL_SIZE_INFORMATION = 1007;
-
     private int informationLevel;
-    private AllocInfo info;
+    private FileSystemInformation info;
 
 
     /**
@@ -71,10 +62,24 @@ public class Trans2QueryFSInformationResponse extends SmbComTransactionResponse 
 
 
     /**
-     * @return the info
+     * @return the filesystem info
      */
-    public AllocInfo getInfo () {
+    public FileSystemInformation getInfo () {
         return this.info;
+    }
+
+
+    /**
+     * @param clazz
+     * @return the filesystem info
+     * @throws CIFSException
+     */
+    @SuppressWarnings ( "unchecked" )
+    public <T extends FileSystemInformation> T getInfo ( Class<T> clazz ) throws CIFSException {
+        if ( !clazz.isAssignableFrom(this.info.getClass()) ) {
+            throw new CIFSException("Incompatible file information class");
+        }
+        return (T) getInfo();
     }
 
 
@@ -109,93 +114,36 @@ public class Trans2QueryFSInformationResponse extends SmbComTransactionResponse 
 
 
     @Override
-    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        switch ( this.informationLevel ) {
-        case SMB_INFO_ALLOCATION:
-            return readSmbInfoAllocationWireFormat(buffer, bufferIndex);
-        case SMB_QUERY_FS_SIZE_INFO:
-            return readSmbQueryFSSizeInfoWireFormat(buffer, bufferIndex);
-        case SMB_FS_FULL_SIZE_INFORMATION:
-            return readFsFullSizeInformationWireFormat(buffer, bufferIndex);
-        default:
-            return 0;
+    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException {
+        int start = bufferIndex;
+        AllocInfo inf = createInfo();
+        if ( inf != null ) {
+            bufferIndex += inf.decode(buffer, bufferIndex, getDataCount());
+            this.info = inf;
         }
-    }
-
-
-    int readSmbInfoAllocationWireFormat ( byte[] buffer, int bufferIndex ) {
-        int start = bufferIndex;
-
-        SmbInfoAllocation inf = new SmbInfoAllocation();
-
-        bufferIndex += 4; // skip idFileSystem
-
-        inf.sectPerAlloc = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        inf.alloc = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        inf.free = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        inf.bytesPerSect = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        this.info = inf;
-
         return bufferIndex - start;
     }
 
 
-    int readSmbQueryFSSizeInfoWireFormat ( byte[] buffer, int bufferIndex ) {
-        int start = bufferIndex;
-
-        SmbInfoAllocation inf = new SmbInfoAllocation();
-
-        inf.alloc = SMBUtil.readInt8(buffer, bufferIndex);
-        bufferIndex += 8;
-
-        inf.free = SMBUtil.readInt8(buffer, bufferIndex);
-        bufferIndex += 8;
-
-        inf.sectPerAlloc = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        inf.bytesPerSect = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        this.info = inf;
-
-        return bufferIndex - start;
-    }
-
-
-    int readFsFullSizeInformationWireFormat ( byte[] buffer, int bufferIndex ) {
-        int start = bufferIndex;
-
-        SmbInfoAllocation inf = new SmbInfoAllocation();
-
-        // Read total allocation units.
-        inf.alloc = SMBUtil.readInt8(buffer, bufferIndex);
-        bufferIndex += 8;
-
-        // read caller available allocation units
-        inf.free = SMBUtil.readInt8(buffer, bufferIndex);
-        bufferIndex += 8;
-
-        // skip actual free units
-        bufferIndex += 8;
-
-        inf.sectPerAlloc = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        inf.bytesPerSect = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-
-        this.info = inf;
-
-        return bufferIndex - start;
+    /**
+     * @return
+     */
+    private AllocInfo createInfo () {
+        AllocInfo inf;
+        switch ( this.informationLevel ) {
+        case FileSystemInformation.SMB_INFO_ALLOCATION:
+            inf = new SmbInfoAllocation();
+            break;
+        case FileSystemInformation.FS_SIZE_INFO:
+            inf = new FileFsSizeInformation();
+            break;
+        case FileSystemInformation.FS_FULL_SIZE_INFO:
+            inf = new FileFsFullSizeInformation();
+            break;
+        default:
+            return null;
+        }
+        return inf;
     }
 
 
@@ -203,4 +151,5 @@ public class Trans2QueryFSInformationResponse extends SmbComTransactionResponse 
     public String toString () {
         return new String("Trans2QueryFSInformationResponse[" + super.toString() + "]");
     }
+
 }

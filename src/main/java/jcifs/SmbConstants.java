@@ -147,7 +147,7 @@ public interface SmbConstants {
     static final int FLAGS_OFFSET = 9;
     static final int SIGNATURE_OFFSET = 14;
     static final int TID_OFFSET = 24;
-    static final int HEADER_LENGTH = 32;
+    static final int SMB1_HEADER_LENGTH = 32;
 
     static final long MILLISECONDS_BETWEEN_1970_AND_1601 = 11644473600000L;
 

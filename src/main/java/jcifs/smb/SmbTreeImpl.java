@@ -19,6 +19,7 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -31,16 +32,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
+import jcifs.DfsReferralData;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTree;
+import jcifs.internal.CommonServerMessageBlockRequest;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.RequestWithPath;
+import jcifs.internal.SmbNegotiationResponse;
+import jcifs.internal.TreeConnectResponse;
 import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.smb1.com.SmbComBlankResponse;
+import jcifs.internal.smb1.com.SmbComNegotiateResponse;
 import jcifs.internal.smb1.com.SmbComTreeConnectAndX;
 import jcifs.internal.smb1.com.SmbComTreeConnectAndXResponse;
 import jcifs.internal.smb1.com.SmbComTreeDisconnect;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans2.Trans2FindFirst2;
 import jcifs.internal.smb1.trans2.Trans2FindFirst2Response;
+import jcifs.internal.smb2.ServerMessageBlock2;
+import jcifs.internal.smb2.tree.Smb2TreeConnectRequest;
+import jcifs.internal.smb2.tree.Smb2TreeDisconnectRequest;
 
 
 class SmbTreeImpl implements SmbTreeInternal {
@@ -64,7 +77,7 @@ class SmbTreeImpl implements SmbTreeInternal {
     private volatile int tid;
     private volatile String service = "?????";
     private volatile boolean inDfs, inDomainDfs;
-    private volatile long tree_num; // used by SmbFile.isOpen
+    private volatile long treeNum; // used by SmbFile.isOpen
 
     private final AtomicLong usageCount = new AtomicLong(0);
     private boolean sessionAcquired = true;
@@ -72,6 +85,8 @@ class SmbTreeImpl implements SmbTreeInternal {
     private final boolean traceResource;
     private final List<StackTraceElement[]> acquires;
     private final List<StackTraceElement[]> releases;
+
+    private DfsReferralData treeReferral;
 
 
     SmbTreeImpl ( SmbSessionImpl session, String share, String service ) {
@@ -251,7 +266,22 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @return whether the tree is connected
      */
     public boolean isConnected () {
-        return this.session.isConnected() && this.connectionState.get() == 2;
+        return this.tid != 0 && this.session.isConnected() && this.connectionState.get() == 2;
+    }
+
+
+    /**
+     * @return the type of this tree
+     */
+    public int getTreeType () {
+        String connectedService = getService();
+        if ( "LPT1:".equals(connectedService) ) {
+            return SmbConstants.TYPE_PRINTER;
+        }
+        else if ( "COMM".equals(connectedService) ) {
+            return SmbConstants.TYPE_COMM;
+        }
+        return SmbConstants.TYPE_SHARE;
     }
 
 
@@ -272,18 +302,57 @@ class SmbTreeImpl implements SmbTreeInternal {
 
 
     /**
-     * @return the inDfs
+     * @return whether this is a DFS share
      */
-    public boolean isInDfs () {
+    public boolean isDfs () {
         return this.inDfs;
     }
 
 
     /**
-     * @return the inDomainDfs
+     * 
+     */
+    void markDomainDfs () {
+        this.inDomainDfs = true;
+    }
+
+
+    /**
+     * @return whether this tree was accessed using domain DFS
      */
     public boolean isInDomainDfs () {
         return this.inDomainDfs;
+    }
+
+
+    /**
+     * @param referral
+     */
+    public void setTreeReferral ( DfsReferralData referral ) {
+        this.treeReferral = referral;
+    }
+
+
+    /**
+     * @return the treeReferral
+     */
+    public DfsReferralData getTreeReferral () {
+        return this.treeReferral;
+    }
+
+
+    /**
+     * @return whether this tree may be a DFS share
+     * @throws SmbException
+     */
+    public boolean isPossiblyDfs () throws SmbException {
+        if ( this.connectionState.get() == 2 ) {
+            // we are connected, so we know
+            return isDfs();
+        }
+        try ( SmbTransportImpl transport = this.session.getTransport() ) {
+            return transport.getNegotiateResponse().isDFSSupported();
+        }
     }
 
 
@@ -307,20 +376,7 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @return the tree_num (monotoincally increasing counter to track reconnects)
      */
     public long getTreeNum () {
-        return this.tree_num;
-    }
-
-
-    /**
-     * 
-     */
-    void markDomainDfs () {
-        this.inDomainDfs = true;
-    }
-
-
-    void markConnected () {
-        this.connectionState.set(2);
+        return this.treeNum;
     }
 
 
@@ -335,67 +391,85 @@ class SmbTreeImpl implements SmbTreeInternal {
     }
 
 
-    void send ( ServerMessageBlock request, ServerMessageBlock response ) throws SmbException {
-        send(request, response, Collections.EMPTY_SET);
+    <T extends CommonServerMessageBlockResponse> T send ( jcifs.internal.Request<T> request ) throws CIFSException {
+        return send((CommonServerMessageBlockRequest) request, null, Collections.<RequestParam> emptySet());
     }
 
 
-    void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws SmbException {
+    <T extends CommonServerMessageBlockResponse> T send ( CommonServerMessageBlockRequest request, T response ) throws CIFSException {
+        return send(request, response, Collections.<RequestParam> emptySet());
+    }
+
+
+    <T extends CommonServerMessageBlockResponse> T send ( CommonServerMessageBlockRequest request, T response, Set<RequestParam> params )
+            throws CIFSException {
         try ( SmbSessionImpl sess = getSession();
               SmbTransportImpl transport = sess.getTransport() ) {
-            synchronized ( transport ) {
-                if ( response != null ) {
-                    response.setReceived(false);
-                }
+            if ( response != null ) {
+                response.clearReceived();
+            }
 
-                // try TreeConnectAndX with the request
-                // this does not make any sense if we are disconnecting right now
-                if ( ! ( request instanceof SmbComTreeDisconnect ) ) {
-                    treeConnect(request, response);
-                }
-                if ( request == null || ( response != null && response.isReceived() ) ) {
-                    return;
-                }
+            // try TreeConnectAndX with the request
+            // this does not make any sense if we are disconnecting right now
+            T chainedResponse = null;
+            if ( ! ( request instanceof SmbComTreeDisconnect ) && ! ( request instanceof Smb2TreeDisconnectRequest ) ) {
+                chainedResponse = treeConnect(request, response);
+            }
+            if ( request == null || ( chainedResponse != null && chainedResponse.isReceived() ) ) {
+                return chainedResponse;
+            }
 
-                // fall trough if the tree connection is already established
-                // and send it as a separate request instread
+            // fall trough if the tree connection is already established
+            // and send it as a separate request instread
+            String svc = null;
+            int t = this.tid;
+            if ( t == 0 ) {
+                throw new SmbException("Tree id is 0");
+            }
+            request.setTid(t);
 
-                String svc = this.service;
-
+            if ( !transport.isSMB2() ) {
+                ServerMessageBlock req = (ServerMessageBlock) request;
+                svc = this.service;
                 if ( svc == null ) {
                     // there still is some kind of race condition, where?
                     // this used to trigger "invalid operation..."
                     throw new SmbException("Service is null in state " + this.connectionState.get());
                 }
+                checkRequest(transport, req, svc);
 
-                checkRequest(transport, request, svc);
-                request.setTid(this.tid);
-                if ( this.inDfs && !svc.equals("IPC") && request.getPath() != null && request.getPath().length() > 0 ) {
+            }
+
+            if ( this.inDfs && !"IPC".equals(svc) && request instanceof RequestWithPath ) {
+                /*
+                 * When DFS is in action all request paths are
+                 * full UNC paths minus the first backslash like
+                 * \server\share\path\to\file
+                 * as opposed to normally
+                 * \path\to\file
+                 */
+                RequestWithPath preq = (RequestWithPath) request;
+                if ( preq.getPath() != null && preq.getPath().length() > 0 ) {
+                    preq.setResolveInDfs(true);
+                    preq.setPath(preq.getFullUNCPath());
+                }
+            }
+
+            try {
+                return sess.send(request, response, params);
+            }
+            catch ( SmbException se ) {
+                if ( se.getNtStatus() == NtStatus.NT_STATUS_NETWORK_NAME_DELETED ) {
                     /*
-                     * When DFS is in action all request paths are
-                     * full UNC paths minus the first backslash like
-                     * \server\share\path\to\file
-                     * as opposed to normally
-                     * \path\to\file
+                     * Someone removed the share while we were
+                     * connected. Bastards! Disconnect this tree
+                     * so that it reconnects cleanly should the share
+                     * reappear in this client's lifetime.
                      */
-                    request.addFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
-                    request.setPath('\\' + transport.getRemoteHostName() + '\\' + this.share + request.getPath());
+                    log.debug("Disconnect tree on NT_STATUS_NETWORK_NAME_DELETED");
+                    treeDisconnect(true, true);
                 }
-                try {
-                    sess.send(request, response, params);
-                }
-                catch ( SmbException se ) {
-                    if ( se.getNtStatus() == NtStatus.NT_STATUS_NETWORK_NAME_DELETED ) {
-                        /*
-                         * Someone removed the share while we were
-                         * connected. Bastards! Disconnect this tree
-                         * so that it reconnects cleanly should the share
-                         * reappear in this client's lifetime.
-                         */
-                        treeDisconnect(true, true);
-                    }
-                    throw se;
-                }
+                throw se;
             }
         }
     }
@@ -439,7 +513,10 @@ class SmbTreeImpl implements SmbTreeInternal {
     }
 
 
-    void treeConnect ( ServerMessageBlock andx, ServerMessageBlock andxResponse ) throws SmbException {
+    @SuppressWarnings ( "unchecked" )
+    <T extends CommonServerMessageBlockResponse> T treeConnect ( CommonServerMessageBlockRequest andx, T andxResponse ) throws CIFSException {
+        CommonServerMessageBlockRequest request = null;
+        TreeConnectResponse response = null;
         try ( SmbSessionImpl sess = getSession();
               SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
@@ -449,21 +526,21 @@ class SmbTreeImpl implements SmbTreeInternal {
 
                 if ( waitForState(transport) == 2 ) {
                     // already connected
-                    return;
+                    return null;
                 }
                 int before = this.connectionState.getAndSet(1);
                 if ( before == 1 ) {
                     // concurrent connection attempt
                     if ( waitForState(transport) == 2 ) {
                         // finished connecting
-                        return;
+                        return null;
                     }
                     // failure to connect
                     throw new SmbException("Tree disconnected while waiting for connection");
                 }
                 else if ( before == 2 ) {
                     // concurrently connected
-                    return;
+                    return null;
                 }
 
                 try {
@@ -473,11 +550,13 @@ class SmbTreeImpl implements SmbTreeInternal {
                      * established.
                      */
 
-                    String tconHostName = transport.getRemoteHostName();
+                    String tconHostName = sess.getTargetHost();
 
                     if ( tconHostName == null ) {
                         throw new SmbException("Transport disconnected while waiting for connection");
                     }
+
+                    SmbNegotiationResponse nego = transport.getNegotiateResponse();
 
                     String unc = "\\\\" + tconHostName + '\\' + this.share;
 
@@ -491,28 +570,51 @@ class SmbTreeImpl implements SmbTreeInternal {
                      * Tree Connect And X Request / Response
                      */
 
-                    if ( log.isTraceEnabled() ) {
-                        log.trace("treeConnect: unc=" + unc + ",service=" + svc);
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("treeConnect: unc=" + unc + ",service=" + svc);
                     }
 
-                    SmbComTreeConnectAndXResponse response = new SmbComTreeConnectAndXResponse(sess.getConfig(), andxResponse);
-                    SmbComTreeConnectAndX request = new SmbComTreeConnectAndX(sess.getContext(), transport.server, unc, svc, andx);
-
-                    sess.send(request, response);
-
-                    this.tid = response.getTid();
-                    String rsvc = response.getService();
-                    if ( rsvc == null ) {
-                        throw new SmbException("Service is NULL");
+                    if ( transport.isSMB2() ) {
+                        Smb2TreeConnectRequest req = new Smb2TreeConnectRequest(sess.getConfig(), unc);
+                        if ( andx != null ) {
+                            req.chain((ServerMessageBlock2) andx);
+                        }
+                        request = req;
                     }
-                    this.service = rsvc;
-                    this.inDfs = response.isShareIsInDfs();
-                    this.tree_num = TREE_CONN_COUNTER.incrementAndGet();
+                    else {
+                        response = new SmbComTreeConnectAndXResponse(sess.getConfig(), (ServerMessageBlock) andxResponse);
+                        request = new SmbComTreeConnectAndX(
+                            sess.getContext(),
+                            ( (SmbComNegotiateResponse) nego ).getServerData(),
+                            unc,
+                            svc,
+                            (ServerMessageBlock) andx);
+                    }
 
-                    this.connectionState.set(2); // connected
+                    response = sess.send(request, response);
+                    treeConnected(transport, response);
+
+                    if ( andxResponse != null && andxResponse.isReceived() ) {
+                        return andxResponse;
+                    }
+                    else if ( transport.isSMB2() ) {
+                        return (T) response.getNextResponse();
+                    }
+                    return null;
                 }
-                catch ( SmbException se ) {
+                catch ( IOException se ) {
+                    if ( request != null && request.getResponse() != null ) {
+                        // tree connect might still have succeeded
+                        response = (TreeConnectResponse) request.getResponse();
+                        if ( response.isReceived() && !response.isError() && response.getErrorCode() == NtStatus.NT_STATUS_OK ) {
+                            if ( !transport.isDisconnected() ) {
+                                treeConnected(transport, response);
+                            }
+                            throw se;
+                        }
+                    }
                     try {
+                        log.debug("Disconnect tree on treeConnectFailure", se);
                         treeDisconnect(true, true);
                     }
                     finally {
@@ -525,6 +627,29 @@ class SmbTreeImpl implements SmbTreeInternal {
                 }
             }
         }
+    }
+
+
+    /**
+     * @param transport
+     * @param response
+     * @throws SmbException
+     */
+    private void treeConnected ( SmbTransportImpl transport, TreeConnectResponse response ) throws SmbException {
+        int treeId = response.getTid();
+        if ( treeId == 0 ) {
+            throw new SmbException("TreeID is NULL");
+        }
+        this.tid = treeId;
+        String rsvc = response.getService();
+        if ( rsvc == null && !transport.isSMB2() ) {
+            throw new SmbException("Service is NULL");
+        }
+        this.service = rsvc;
+        this.inDfs = response.isShareDfs();
+        this.treeNum = TREE_CONN_COUNTER.incrementAndGet();
+
+        this.connectionState.set(2); // connected
     }
 
 
@@ -563,7 +688,12 @@ class SmbTreeImpl implements SmbTreeInternal {
     @Override
     public void connectLogon ( CIFSContext tf ) throws SmbException {
         if ( tf.getConfig().getLogonShare() == null ) {
-            treeConnect(null, null);
+            try {
+                treeConnect(null, null);
+            }
+            catch ( CIFSException e ) {
+                SmbException.wrap(e);
+            }
         }
         else {
             Trans2FindFirst2 req = new Trans2FindFirst2(
@@ -574,12 +704,21 @@ class SmbTreeImpl implements SmbTreeInternal {
                 tf.getConfig().getListCount(),
                 tf.getConfig().getListSize());
             Trans2FindFirst2Response resp = new Trans2FindFirst2Response(tf.getConfig());
-            send(req, resp);
+            try {
+                send(req, resp);
+            }
+            catch ( SmbException e ) {
+                throw e;
+            }
+            catch ( CIFSException e ) {
+                throw new SmbException("Logon share connection failed", e);
+            }
         }
     }
 
 
-    void treeDisconnect ( boolean inError, boolean inUse ) {
+    boolean treeDisconnect ( boolean inError, boolean inUse ) {
+        boolean wasInUse = false;
         try ( SmbSessionImpl sess = getSession();
               SmbTransportImpl transport = sess.getTransport() ) {
             synchronized ( transport ) {
@@ -589,6 +728,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                     if ( ( inUse && l != 1 ) || ( !inUse && l > 0 ) ) {
                         log.warn("Disconnected tree while still in use " + this);
                         dumpResource();
+                        wasInUse = true;
                         if ( sess.getConfig().isTraceResourceUsage() ) {
                             throw new RuntimeCIFSException("Disconnected tree while still in use");
                         }
@@ -596,10 +736,16 @@ class SmbTreeImpl implements SmbTreeInternal {
 
                     if ( !inError && this.tid != 0 ) {
                         try {
-                            send(new SmbComTreeDisconnect(sess.getConfig()), null);
+                            if ( transport.isSMB2() ) {
+                                Smb2TreeDisconnectRequest req = new Smb2TreeDisconnectRequest(sess.getConfig());
+                                send(req.ignoreDisconnect());
+                            }
+                            else {
+                                send(new SmbComTreeDisconnect(sess.getConfig()), new SmbComBlankResponse(sess.getConfig()));
+                            }
                         }
-                        catch ( SmbException se ) {
-                            log.error("SmbComTreeDisconnect failed", se);
+                        catch ( CIFSException se ) {
+                            log.error("Tree disconnect failed", se);
                         }
                     }
                 }
@@ -609,6 +755,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                 transport.notifyAll();
             }
         }
+        return wasInUse;
     }
 
 

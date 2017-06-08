@@ -28,8 +28,10 @@ import jcifs.CIFSException;
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbTreeHandle;
-import jcifs.internal.smb1.ServerMessageBlock;
-import jcifs.internal.smb1.com.ServerData;
+import jcifs.internal.CommonServerMessageBlockRequest;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.SmbNegotiationResponse;
+import jcifs.internal.smb1.com.SmbComNegotiateResponse;
 
 
 /**
@@ -105,13 +107,27 @@ class SmbTreeHandleImpl implements SmbTreeHandleInternal {
 
 
     /**
+     * 
+     * @param req
+     * @param params
+     * @return response
+     * @throws CIFSException
+     */
+    public <T extends CommonServerMessageBlockResponse> T send ( jcifs.internal.Request<T> req, RequestParam... params ) throws CIFSException {
+        return send(req, null, params);
+    }
+
+
+    /**
      * @param request
      * @param response
      * @param params
+     * @return response
      * @throws CIFSException
      */
-    public void send ( ServerMessageBlock request, ServerMessageBlock response, RequestParam... params ) throws CIFSException {
-        this.treeConnection.send(this.resourceLoc, request, response, params);
+    public <T extends CommonServerMessageBlockResponse> T send ( CommonServerMessageBlockRequest request, T response, RequestParam... params )
+            throws CIFSException {
+        return this.treeConnection.send(this.resourceLoc, request, response, params);
     }
 
 
@@ -120,10 +136,12 @@ class SmbTreeHandleImpl implements SmbTreeHandleInternal {
      * @param request
      * @param response
      * @param params
+     * @return response
      * @throws CIFSException
      */
-    public void send ( ServerMessageBlock request, ServerMessageBlock response, Set<RequestParam> params ) throws CIFSException {
-        this.treeConnection.send(this.resourceLoc, request, response, params);
+    public <T extends CommonServerMessageBlockResponse> T send ( CommonServerMessageBlockRequest request, T response, Set<RequestParam> params )
+            throws CIFSException {
+        return this.treeConnection.send(this.resourceLoc, request, response, params);
     }
 
 
@@ -177,33 +195,65 @@ class SmbTreeHandleImpl implements SmbTreeHandleInternal {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.SmbTreeHandle#getServerTimeZoneOffset()
+     * @see jcifs.SmbTreeHandle#getRemoteHostName()
      */
     @Override
-    public long getServerTimeZoneOffset () {
-        return this.treeConnection.getServerData().serverTimeZone * 1000 * 60L;
+    public String getRemoteHostName () {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            return transport.getRemoteHostName();
+        }
     }
 
 
     /**
      * {@inheritDoc}
+     * 
+     * @throws SmbException
+     *
+     * @see jcifs.SmbTreeHandle#getServerTimeZoneOffset()
+     */
+    @Override
+    public long getServerTimeZoneOffset () throws SmbException {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            SmbNegotiationResponse nego = transport.getNegotiateResponse();
+            if ( nego instanceof SmbComNegotiateResponse ) {
+                return ( (SmbComNegotiateResponse) nego ).getServerData().serverTimeZone * 1000 * 60L;
+            }
+            return 0;
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws SmbException
      *
      * @see jcifs.SmbTreeHandle#getOEMDomainName()
      */
     @Override
-    public String getOEMDomainName () {
-        return this.treeConnection.getServerData().oemDomainName;
+    public String getOEMDomainName () throws SmbException {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            SmbNegotiationResponse nego = transport.getNegotiateResponse();
+            if ( nego instanceof SmbComNegotiateResponse ) {
+                return ( (SmbComNegotiateResponse) nego ).getServerData().oemDomainName;
+            }
+            return null;
+        }
     }
 
 
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.SmbTreeHandle#getConnectedService()
+     * @see jcifs.SmbTreeHandle#getTreeType()
      */
     @Override
-    public String getConnectedService () {
-        return this.treeConnection.getConnectedService();
+    public int getTreeType () {
+        return this.treeConnection.getTreeType();
     }
 
 
@@ -234,33 +284,54 @@ class SmbTreeHandleImpl implements SmbTreeHandleInternal {
 
 
     @Override
-    public int getSendBufferSize () {
+    public int getSendBufferSize () throws SmbException {
         try ( SmbSessionImpl session = this.treeConnection.getSession();
               SmbTransportImpl transport = session.getTransport() ) {
-            return transport.snd_buf_size;
+            return transport.getNegotiateResponse().getSendBufferSize();
         }
     }
 
 
     @Override
-    public int getReceiveBufferSize () {
+    public int getReceiveBufferSize () throws SmbException {
         try ( SmbSessionImpl session = this.treeConnection.getSession();
               SmbTransportImpl transport = session.getTransport() ) {
-            return transport.rcv_buf_size;
+            return transport.getNegotiateResponse().getReceiveBufferSize();
         }
     }
 
 
     @Override
-    public int getMaximumBufferSize () {
-        return this.treeConnection.getServerData().maxBufferSize;
+    public int getMaximumBufferSize () throws SmbException {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            return transport.getNegotiateResponse().getTransactionBufferSize();
+        }
     }
 
 
     @Override
-    public boolean areSignaturesActive () {
-        ServerData serverData = this.treeConnection.getServerData();
-        return serverData.signaturesRequired || ( serverData.signaturesEnabled && getConfig().isSigningEnabled() );
+    public boolean areSignaturesActive () throws SmbException {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            return transport.getNegotiateResponse().isSigningNegotiated();
+        }
+    }
+
+
+    /**
+     * @return whether this tree handle uses SMB2
+     */
+    @Override
+    public boolean isSMB2 () {
+        try ( SmbSessionImpl session = this.treeConnection.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            return transport.isSMB2();
+        }
+        catch ( SmbException e ) {
+            log.debug("Failed to connect for determining SMB2 support", e);
+            return false;
+        }
     }
 
 }

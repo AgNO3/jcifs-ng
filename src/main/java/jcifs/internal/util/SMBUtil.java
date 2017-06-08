@@ -102,7 +102,7 @@ public class SMBUtil {
         (byte) 0x00, (byte) 0x00
     };
 
-    public static final byte[] SMB2_HEADER_SYNC = {
+    public static final byte[] SMB2_HEADER = {
         (byte) 0xFE, (byte) 'S', (byte) 'M', (byte) 'B', // ProtocolId
         (byte) 64, (byte) 0x00, // StructureSize (LE)
         (byte) 0x00, (byte) 0x00, // CreditCharge (reserved 2.0.2)

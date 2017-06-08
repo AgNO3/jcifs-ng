@@ -18,6 +18,8 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,8 +27,15 @@ import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbPipeHandle;
 import jcifs.SmbPipeResource;
+import jcifs.internal.smb1.trans.TransCallNamedPipe;
+import jcifs.internal.smb1.trans.TransCallNamedPipeResponse;
+import jcifs.internal.smb1.trans.TransTransactNamedPipe;
+import jcifs.internal.smb1.trans.TransTransactNamedPipeResponse;
 import jcifs.internal.smb1.trans.TransWaitNamedPipe;
 import jcifs.internal.smb1.trans.TransWaitNamedPipeResponse;
+import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
+import jcifs.util.ByteEncodable;
 
 
 /**
@@ -95,7 +104,8 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
     }
 
 
-    SmbTreeHandleImpl ensureTreeConnected () throws SmbException {
+    @Override
+    public SmbTreeHandleImpl ensureTreeConnected () throws CIFSException {
         if ( this.treeHandle == null ) {
             // extra acquire to keep the tree alive
             this.treeHandle = this.pipe.ensureTreeConnected();
@@ -146,13 +156,20 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
     }
 
 
-    synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
+    @Override
+    public synchronized SmbFileHandleImpl ensureOpen () throws CIFSException {
         if ( !this.open ) {
             throw new SmbException("Pipe handle already closed");
         }
 
         if ( !isOpen() ) {
             try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
+
+                if ( th.isSMB2() ) {
+                    this.handle = this.pipe.openUnshared(this.uncPath, this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0);
+                    return this.handle.acquire();
+                }
+
                 // TODO: wait for pipe, still not sure when this needs to be called exactly
                 if ( this.uncPath.startsWith("\\pipe\\") ) {
                     th.send(new TransWaitNamedPipe(th.getConfig(), this.uncPath), new TransWaitNamedPipeResponse(th.getConfig()));
@@ -193,15 +210,7 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
         }
 
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
-            if ( this.transact ) {
-                this.input = new TransactNamedPipeInputStream(this, th);
-            }
-            else if ( this.call ) {
-                this.input = new TransactNamedPipeInputStream(this, th);
-            }
-            else {
-                this.input = new SmbPipeInputStream(this, th);
-            }
+            this.input = new SmbPipeInputStream(this, th);
         }
         return this.input;
     }
@@ -223,17 +232,66 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
         }
 
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
-            if ( this.transact ) {
-                this.output = new TransactNamedPipeOutputStream(this, th);
-            }
-            else if ( this.call ) {
-                this.output = new TransactCallNamedPipeOutputStream(this, th);
-            }
-            else {
-                this.output = new SmbPipeOutputStream(this, th);
-            }
+            this.output = new SmbPipeOutputStream(this, th);
         }
         return this.output;
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SmbPipeHandleInternal#sendrecv(byte[], int, int, byte[])
+     */
+    @SuppressWarnings ( "resource" )
+    @Override
+    public int sendrecv ( byte[] buf, int off, int length, byte[] inB ) throws IOException {
+        try ( SmbFileHandleImpl fh = ensureOpen();
+              SmbTreeHandleImpl th = fh.getTree() ) {
+
+            if ( th.isSMB2() ) {
+                Smb2IoctlRequest req = new Smb2IoctlRequest(th.getConfig(), Smb2IoctlRequest.FSCTL_PIPE_TRANSCEIVE, fh.getFileId(), inB);
+                req.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+                req.setInputData(new ByteEncodable(buf, off, length));
+                Smb2IoctlResponse resp = th.send(req);
+                return resp.getOutputLength();
+            }
+            else if ( this.transact ) {
+                TransTransactNamedPipe req = new TransTransactNamedPipe(th.getConfig(), fh.getFid(), buf, off, length);
+                TransTransactNamedPipeResponse resp = new TransTransactNamedPipeResponse(th.getConfig(), inB);
+                if ( ( getPipeType() & SmbPipeResource.PIPE_TYPE_DCE_TRANSACT ) == SmbPipeResource.PIPE_TYPE_DCE_TRANSACT ) {
+                    req.setMaxDataCount(1024);
+                }
+                th.send(req, resp, RequestParam.NO_RETRY);
+                return resp.getByteCount();
+            }
+            else if ( this.call ) {
+                th.send(new TransWaitNamedPipe(th.getConfig(), this.uncPath), new TransWaitNamedPipeResponse(th.getConfig()));
+                TransCallNamedPipeResponse resp = new TransCallNamedPipeResponse(th.getConfig(), inB);
+                th.send(new TransCallNamedPipe(th.getConfig(), this.uncPath, buf, off, length), resp);
+                return resp.getByteCount();
+            }
+            else {
+                SmbPipeOutputStream out = getOutput();
+                SmbPipeInputStream in = getInput();
+                out.write(buf, off, length);
+                return in.read(inB);
+            }
+        }
+    }
+
+
+    @Override
+    public int recv ( byte[] buf, int off, int len ) throws IOException {
+        return getInput().readDirect(buf, off, len);
+
+    }
+
+
+    @Override
+    public void send ( byte[] buf, int off, int length ) throws IOException {
+        getOutput().writeDirect(buf, off, length, 1);
     }
 
 

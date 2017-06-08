@@ -222,12 +222,15 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.CredentialsInternal#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
+     * @see jcifs.smb.CredentialsInternal#createContext(jcifs.CIFSContext, java.lang.String, java.lang.String, byte[],
+     *      boolean)
      */
     @Override
-    public SSPContext createContext ( CIFSContext transportContext, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+    public SSPContext createContext ( CIFSContext transportContext, String targetDomain, String host, byte[] initialToken, boolean doSigning )
+            throws SmbException {
         return new NtlmContext(transportContext, this, doSigning);
     }
 

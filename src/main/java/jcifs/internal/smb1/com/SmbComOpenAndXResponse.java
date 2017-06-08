@@ -20,6 +20,7 @@ package jcifs.internal.smb1.com;
 
 
 import jcifs.Configuration;
+import jcifs.internal.SmbBasicFileInfo;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
 
@@ -27,9 +28,9 @@ import jcifs.internal.util.SMBUtil;
 /**
  * 
  */
-public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
+public class SmbComOpenAndXResponse extends AndXServerMessageBlock implements SmbBasicFileInfo {
 
-    private int fid, fileAttributes, dataSize, grantedAccess, fileType, deviceState, action, serverFid;
+    private int fid, fileAttributes, fileDataSize, grantedAccess, fileType, deviceState, action, serverFid;
     private long lastWriteTime;
 
 
@@ -39,6 +40,15 @@ public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
      */
     public SmbComOpenAndXResponse ( Configuration config ) {
         super(config);
+    }
+
+
+    /**
+     * @param config
+     * @param andxResp
+     */
+    public SmbComOpenAndXResponse ( Configuration config, SmbComSeekResponse andxResp ) {
+        super(config, andxResp);
     }
 
 
@@ -54,7 +64,18 @@ public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
      * @return the dataSize
      */
     public final int getDataSize () {
-        return this.dataSize;
+        return this.fileDataSize;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getSize()
+     */
+    @Override
+    public long getSize () {
+        return getDataSize();
     }
 
 
@@ -71,6 +92,17 @@ public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
      */
     public final int getFileAttributes () {
         return this.fileAttributes;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getAttributes()
+     */
+    @Override
+    public int getAttributes () {
+        return getFileAttributes();
     }
 
 
@@ -109,8 +141,31 @@ public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
     /**
      * @return the lastWriteTime
      */
+    @Override
     public final long getLastWriteTime () {
         return this.lastWriteTime;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getCreateTime()
+     */
+    @Override
+    public long getCreateTime () {
+        return 0;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbBasicFileInfo#getLastAccessTime()
+     */
+    @Override
+    public long getLastAccessTime () {
+        return 0;
     }
 
 
@@ -136,7 +191,7 @@ public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
         bufferIndex += 2;
         this.lastWriteTime = SMBUtil.readUTime(buffer, bufferIndex);
         bufferIndex += 4;
-        this.dataSize = SMBUtil.readInt4(buffer, bufferIndex);
+        this.fileDataSize = SMBUtil.readInt4(buffer, bufferIndex);
         bufferIndex += 4;
         this.grantedAccess = SMBUtil.readInt2(buffer, bufferIndex);
         bufferIndex += 2;
@@ -163,7 +218,7 @@ public class SmbComOpenAndXResponse extends AndXServerMessageBlock {
     public String toString () {
         return new String(
             "SmbComOpenAndXResponse[" + super.toString() + ",fid=" + this.fid + ",fileAttributes=" + this.fileAttributes + ",lastWriteTime="
-                    + this.lastWriteTime + ",dataSize=" + this.dataSize + ",grantedAccess=" + this.grantedAccess + ",fileType=" + this.fileType
+                    + this.lastWriteTime + ",dataSize=" + this.fileDataSize + ",grantedAccess=" + this.grantedAccess + ",fileType=" + this.fileType
                     + ",deviceState=" + this.deviceState + ",action=" + this.action + ",serverFid=" + this.serverFid + "]");
     }
 }

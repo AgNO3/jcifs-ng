@@ -29,6 +29,7 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -36,7 +37,9 @@ import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.CIFSException;
 import jcifs.SmbResource;
+import jcifs.SmbTreeHandle;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbRandomAccessFile;
 
 
 /**
@@ -54,7 +57,7 @@ public class FileOperationsTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs");
+        return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs", "smb2");
     }
 
 
@@ -167,8 +170,30 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
+    public void testCopyEmpty () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try ( SmbFile d1 = createTestDirectory();
+                  SmbFile t = new SmbFile(d1, makeRandomName()) ) {
+                try {
+                    f.copyTo(t);
+                    assertTrue(f.exists());
+                    assertEquals(f.length(), t.length());
+                    assertEquals(f.getAttributes(), t.getAttributes());
+                }
+                finally {
+                    d1.delete();
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
     public void testCopyFile () throws IOException {
-        int bufSize = 4096;
+        int bufSize = 65536;
         long length = 4096 * 16;
         try ( SmbFile f = createTestFile() ) {
             try ( SmbFile d1 = createTestDirectory();
@@ -199,8 +224,73 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
+    public void testCopyFileLarge () throws IOException {
+        long length = 4096 * 16 * 1024;
+        try ( SmbFile f = createTestFile();
+              SmbTreeHandle treeHandle = f.getTreeHandle() ) {
+            // this is tremendously slow on SMB1
+            try {
+                Assume.assumeTrue("Not SMB2", treeHandle.isSMB2());
+
+                try ( SmbFile d1 = createTestDirectory();
+                      SmbFile t = new SmbFile(d1, makeRandomName()) ) {
+                    try {
+                        try ( SmbRandomAccessFile ra = f.openRandomAccess("rw") ) {
+                            ra.setLength(length);
+                        }
+
+                        f.copyTo(t);
+                        assertTrue(f.exists());
+                        assertEquals(f.length(), t.length());
+                        assertEquals(f.getAttributes(), t.getAttributes());
+                    }
+                    finally {
+                        d1.delete();
+                    }
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testCopyFileLargeNoAlign () throws IOException {
+        long length = 4096 * 16 * 1024 + 13;
+        try ( SmbFile f = createTestFile();
+              SmbTreeHandle treeHandle = f.getTreeHandle() ) {
+            // this is tremendously slow on SMB1
+            try {
+                Assume.assumeTrue("Not SMB2", treeHandle.isSMB2());
+                try ( SmbFile d1 = createTestDirectory();
+                      SmbFile t = new SmbFile(d1, makeRandomName()) ) {
+                    try {
+                        try ( SmbRandomAccessFile ra = f.openRandomAccess("rw") ) {
+                            ra.setLength(length);
+                        }
+
+                        f.copyTo(t);
+                        assertTrue(f.exists());
+                        assertEquals(f.length(), t.length());
+                        assertEquals(f.getAttributes(), t.getAttributes());
+                    }
+                    finally {
+                        d1.delete();
+                    }
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
     public void testCopyFileUnresolved () throws IOException {
-        int bufSize = 4096;
+        int bufSize = 65536;
         long length = 4096 * 16 + 512;
         try ( SmbFile d = createTestDirectory();
               SmbFile f = new SmbFile(d, makeRandomName()) ) {
@@ -232,10 +322,17 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
-    public void testCopyDir () throws CIFSException, MalformedURLException, UnknownHostException {
+    public void testCopyDir () throws IOException {
+        int bufSize = 65536;
+        long length = 4096 * 16 + 512;
         try ( SmbFile f = createTestDirectory();
               SmbResource e = new SmbFile(f, "test") ) {
             e.createNewFile();
+
+            try ( OutputStream os = e.openOutputStream() ) {
+                ReadWriteTest.writeRandom(bufSize, length, os);
+            }
+
             try ( SmbFile d1 = createTestDirectory();
                   SmbFile t = new SmbFile(d1, makeRandomName()) ) {
                 try {
@@ -244,6 +341,9 @@ public class FileOperationsTest extends BaseCIFSTest {
 
                     try ( SmbResource e2 = new SmbFile(t, "test") ) {
                         assertTrue(e2.exists());
+                        try ( InputStream is = e2.openInputStream() ) {
+                            ReadWriteTest.verifyRandom(bufSize, length, is);
+                        }
                     }
                 }
                 finally {

@@ -49,4 +49,16 @@ public interface SmbTransport extends AutoCloseable {
     @Override
     public void close ();
 
+
+    /**
+     * @return the connected address
+     */
+    Address getRemoteAddress ();
+
+
+    /**
+     * @return the connected host name
+     */
+    String getRemoteHostName ();
+
 }

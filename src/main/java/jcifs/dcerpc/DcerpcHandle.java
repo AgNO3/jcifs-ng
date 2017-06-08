@@ -22,10 +22,12 @@ package jcifs.dcerpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.dcerpc.ndr.NdrBuffer;
+import jcifs.dcerpc.ndr.NdrException;
 
 
 /**
@@ -112,12 +114,13 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
         return binding;
     }
 
+    private static final AtomicInteger call_id = new AtomicInteger(1);
+
     private final DcerpcBinding binding;
     private int max_xmit = 4280;
     private int max_recv = this.max_xmit;
     private int state = 0;
     private DcerpcSecurityProvider securityProvider = null;
-    private static int call_id = 1;
     private CIFSContext transportContext;
 
 
@@ -227,125 +230,166 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      * @throws IOException
      */
     public void sendrecv ( DcerpcMessage msg ) throws DcerpcException, IOException {
-        byte[] stub, frag;
-        NdrBuffer buf, fbuf;
-        boolean isDirect;
-        DcerpcException de;
-
         if ( this.state == 0 ) {
             bind();
         }
-
-        isDirect = true;
-
-        stub = this.transportContext.getBufferCache().getBuffer();
+        byte[] inB = this.transportContext.getBufferCache().getBuffer();
+        byte[] out = this.transportContext.getBufferCache().getBuffer();
         try {
-            int off, tot, n;
+            NdrBuffer buf = encodeMessage(msg, out);
+            int off = sendFragments(msg, out, buf);
 
-            buf = new NdrBuffer(stub, 0);
+            // last fragment gets written (possibly) using transact/call semantics
+            int have = doSendReceiveFragment(out, off, msg.length, inB);
 
-            msg.flags = DCERPC_FIRST_FRAG | DCERPC_LAST_FRAG;
-            msg.call_id = call_id++;
-
-            msg.encode(buf);
-
-            if ( this.securityProvider != null ) {
+            if ( have != 0 ) {
+                setupReceivedFragment(buf);
                 buf.setIndex(0);
-                this.securityProvider.wrap(buf);
+                msg.decode_header(buf);
             }
 
-            tot = buf.getLength() - 24;
-            off = 0;
-
-            while ( off < tot ) {
-                n = tot - off;
-
-                if ( ( 24 + n ) > this.max_xmit ) {
-                    msg.flags &= ~DCERPC_LAST_FRAG;
-                    n = this.max_xmit - 24;
-                }
-                else {
-                    msg.flags |= DCERPC_LAST_FRAG;
-                    isDirect = false;
-                    msg.alloc_hint = n;
-                }
-
-                msg.length = 24 + n;
-
-                if ( off > 0 )
-                    msg.flags &= ~DCERPC_FIRST_FRAG;
-
-                if ( ( msg.flags & ( DCERPC_FIRST_FRAG | DCERPC_LAST_FRAG ) ) != ( DCERPC_FIRST_FRAG | DCERPC_LAST_FRAG ) ) {
-                    buf.start = off;
-                    buf.reset();
-                    msg.encode_header(buf);
-                    buf.enc_ndr_long(msg.alloc_hint);
-                    buf.enc_ndr_short(0); /* context id */
-                    buf.enc_ndr_short(msg.getOpnum());
-                }
-
-                doSendFragment(stub, off, msg.length, isDirect);
-                off += n;
+            NdrBuffer msgBuf;
+            if ( have == 0 || !msg.isFlagSet(DCERPC_LAST_FRAG) ) {
+                msgBuf = new NdrBuffer(receiveMoreFragments(msg, inB), 0);
             }
-
-            doReceiveFragment(stub, isDirect);
-            buf.reset();
-            buf.setIndex(8);
-            buf.setLength(buf.dec_ndr_short());
-
-            if ( this.securityProvider != null )
-                this.securityProvider.unwrap(buf);
-
-            buf.setIndex(0);
-
-            msg.decode_header(buf);
-
-            off = 24;
-            if ( msg.ptype == 2 && msg.isFlagSet(DCERPC_LAST_FRAG) == false )
-                off = msg.length;
-
-            frag = null;
-            fbuf = null;
-            while ( msg.isFlagSet(DCERPC_LAST_FRAG) == false ) {
-                int stub_frag_len;
-
-                if ( frag == null || fbuf == null ) {
-                    frag = new byte[this.max_recv];
-                    fbuf = new NdrBuffer(frag, 0);
-                }
-
-                doReceiveFragment(frag, isDirect);
-                fbuf.reset();
-                fbuf.setIndex(8);
-                fbuf.setLength(fbuf.dec_ndr_short());
-
-                if ( this.securityProvider != null )
-                    this.securityProvider.unwrap(fbuf);
-
-                fbuf.reset();
-                msg.decode_header(fbuf);
-                stub_frag_len = msg.length - 24;
-
-                if ( ( off + stub_frag_len ) > stub.length ) {
-                    // shouldn't happen if alloc_hint is correct or greater
-                    byte[] tmp = new byte[off + stub_frag_len];
-                    System.arraycopy(stub, 0, tmp, 0, off);
-                    stub = tmp;
-                }
-
-                System.arraycopy(frag, 24, stub, off, stub_frag_len);
-                off += stub_frag_len;
+            else {
+                msgBuf = new NdrBuffer(inB, 0);
             }
-
-            buf = new NdrBuffer(stub, 0);
-            msg.decode(buf);
+            msg.decode(msgBuf);
         }
         finally {
-            this.transportContext.getBufferCache().releaseBuffer(stub);
+            this.transportContext.getBufferCache().releaseBuffer(inB);
+            this.transportContext.getBufferCache().releaseBuffer(out);
         }
 
-        if ( ( de = msg.getResult() ) != null )
+        DcerpcException de;
+        if ( ( de = msg.getResult() ) != null ) {
             throw de;
+        }
+    }
+
+
+    /**
+     * @param msg
+     * @param out
+     * @param buf
+     * @param off
+     * @param tot
+     * @return
+     * @throws IOException
+     */
+    private int sendFragments ( DcerpcMessage msg, byte[] out, NdrBuffer buf ) throws IOException {
+        int off = 0;
+        int tot = buf.getLength() - 24;
+        while ( off < tot ) {
+            int fragSize = tot - off;
+            if ( ( 24 + fragSize ) > this.max_xmit ) {
+                // need fragementation
+                msg.flags &= ~DCERPC_LAST_FRAG;
+                fragSize = this.max_xmit - 24;
+            }
+            else {
+                msg.flags |= DCERPC_LAST_FRAG;
+                msg.alloc_hint = fragSize;
+            }
+
+            msg.length = 24 + fragSize;
+
+            if ( off > 0 ) {
+                msg.flags &= ~DCERPC_FIRST_FRAG;
+            }
+
+            if ( ( msg.flags & ( DCERPC_FIRST_FRAG | DCERPC_LAST_FRAG ) ) != ( DCERPC_FIRST_FRAG | DCERPC_LAST_FRAG ) ) {
+                buf.start = off;
+                buf.reset();
+                msg.encode_header(buf);
+                buf.enc_ndr_long(msg.alloc_hint);
+                buf.enc_ndr_short(0); /* context id */
+                buf.enc_ndr_short(msg.getOpnum());
+            }
+
+            if ( ( msg.flags & DCERPC_LAST_FRAG ) != DCERPC_LAST_FRAG ) {
+                // all fragment but the last get written using read/write semantics
+                doSendFragment(out, off, msg.length);
+                off += fragSize;
+            }
+            else {
+                return off;
+            }
+        }
+        throw new IOException();
+    }
+
+
+    /**
+     * @param msg
+     * @param in
+     * @param off
+     * @param isDirect
+     * @return
+     * @throws IOException
+     * @throws DcerpcException
+     * @throws NdrException
+     */
+    private byte[] receiveMoreFragments ( DcerpcMessage msg, byte[] in ) throws IOException, DcerpcException, NdrException {
+        int off = 0;
+        int len = msg.ptype == 2 ? msg.length : 24;
+        byte[] fragBytes = new byte[this.max_recv];
+        NdrBuffer fragBuf = new NdrBuffer(fragBytes, 0);
+        while ( !msg.isFlagSet(DCERPC_LAST_FRAG) ) {
+            doReceiveFragment(fragBytes);
+            setupReceivedFragment(fragBuf);
+            fragBuf.reset();
+            msg.decode_header(fragBuf);
+            int stub_frag_len = msg.length - 24;
+            if ( ( off + stub_frag_len ) > in.length ) {
+                // shouldn't happen if alloc_hint is correct or greater
+                byte[] tmp = new byte[off + stub_frag_len];
+                System.arraycopy(in, 0, tmp, 0, len);
+                in = tmp;
+            }
+            System.arraycopy(fragBytes, 24, in, len, stub_frag_len);
+            len += stub_frag_len;
+        }
+        return in;
+    }
+
+
+    /**
+     * @param fbuf
+     * @throws DcerpcException
+     */
+    private void setupReceivedFragment ( NdrBuffer fbuf ) throws DcerpcException {
+        fbuf.reset();
+        fbuf.setIndex(8);
+        fbuf.setLength(fbuf.dec_ndr_short());
+
+        if ( this.securityProvider != null ) {
+            this.securityProvider.unwrap(fbuf);
+        }
+    }
+
+
+    /**
+     * @param msg
+     * @param out
+     * @return
+     * @throws NdrException
+     * @throws DcerpcException
+     */
+    private NdrBuffer encodeMessage ( DcerpcMessage msg, byte[] out ) throws NdrException, DcerpcException {
+        NdrBuffer buf = new NdrBuffer(out, 0);
+
+        msg.flags = DCERPC_FIRST_FRAG | DCERPC_LAST_FRAG;
+        msg.call_id = call_id.incrementAndGet();
+
+        msg.encode(buf);
+
+        if ( this.securityProvider != null ) {
+            buf.setIndex(0);
+            this.securityProvider.wrap(buf);
+        }
+        return buf;
     }
 
 
@@ -391,10 +435,13 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     }
 
 
-    protected abstract void doSendFragment ( byte[] buf, int off, int length, boolean isDirect ) throws IOException;
+    protected abstract void doSendFragment ( byte[] buf, int off, int length ) throws IOException;
 
 
-    protected abstract void doReceiveFragment ( byte[] buf, boolean isDirect ) throws IOException;
+    protected abstract int doReceiveFragment ( byte[] buf ) throws IOException;
+
+
+    protected abstract int doSendReceiveFragment ( byte[] out, int off, int length, byte[] inB ) throws IOException;
 
 
     @Override

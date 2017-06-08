@@ -37,34 +37,26 @@ import jcifs.smb.SmbException;
 public class SmbComSessionSetupAndX extends AndXServerMessageBlock {
 
     private byte[] lmHash, ntHash, blob = null;
-    private int sessionKey, capabilities;
     private String accountName, primaryDomain;
-    private long sndBufSize;
-    private long maxMpxCount;
+    private SmbComNegotiateResponse negotiated;
+    private int capabilities;
 
 
     /**
      * 
      * @param tc
-     * @param sessionKey
-     * @param capabilities
-     * @param sndBufSize
-     * @param maxMpxCount
-     * @param server
+     * @param negotiated
      * @param andx
      * @param cred
      * @throws SmbException
      * @throws GeneralSecurityException
      */
-    public SmbComSessionSetupAndX ( CIFSContext tc, int sessionKey, int capabilities, long sndBufSize, long maxMpxCount, ServerData server,
-            ServerMessageBlock andx, Object cred ) throws SmbException, GeneralSecurityException {
+    public SmbComSessionSetupAndX ( CIFSContext tc, SmbComNegotiateResponse negotiated, ServerMessageBlock andx, Object cred )
+            throws SmbException, GeneralSecurityException {
         super(tc.getConfig(), SMB_COM_SESSION_SETUP_ANDX, andx);
-
-        this.sessionKey = sessionKey;
-        this.capabilities = capabilities;
-        this.sndBufSize = sndBufSize;
-        this.maxMpxCount = maxMpxCount;
-
+        this.negotiated = negotiated;
+        this.capabilities = negotiated.getNegotiatedCapabilities();
+        ServerData server = negotiated.getServerData();
         if ( server.security == SmbConstants.SECURITY_USER ) {
             if ( cred instanceof NtlmPasswordAuthentication ) {
                 NtlmPasswordAuthentication a = (NtlmPasswordAuthentication) cred;
@@ -152,13 +144,13 @@ public class SmbComSessionSetupAndX extends AndXServerMessageBlock {
     protected int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
 
-        SMBUtil.writeInt2(this.sndBufSize, dst, dstIndex);
+        SMBUtil.writeInt2(this.negotiated.getNegotiatedSendBufferSize(), dst, dstIndex);
         dstIndex += 2;
-        SMBUtil.writeInt2(this.maxMpxCount, dst, dstIndex);
+        SMBUtil.writeInt2(this.negotiated.getNegotiatedMpxCount(), dst, dstIndex);
         dstIndex += 2;
         SMBUtil.writeInt2(getConfig().getVcNumber(), dst, dstIndex);
         dstIndex += 2;
-        SMBUtil.writeInt4(this.sessionKey, dst, dstIndex);
+        SMBUtil.writeInt4(this.negotiated.getNegotiatedSessionKey(), dst, dstIndex);
         dstIndex += 4;
         if ( this.blob != null ) {
             SMBUtil.writeInt2(this.blob.length, dst, dstIndex);
@@ -220,11 +212,12 @@ public class SmbComSessionSetupAndX extends AndXServerMessageBlock {
     @Override
     public String toString () {
         String result = new String(
-            "SmbComSessionSetupAndX[" + super.toString() + ",snd_buf_size=" + this.sndBufSize + ",maxMpxCount=" + this.maxMpxCount + ",VC_NUMBER="
-                    + getConfig().getVcNumber() + ",sessionKey=" + this.sessionKey + ",lmHash.length="
-                    + ( this.lmHash == null ? 0 : this.lmHash.length ) + ",ntHash.length=" + ( this.ntHash == null ? 0 : this.ntHash.length )
-                    + ",capabilities=" + this.capabilities + ",accountName=" + this.accountName + ",primaryDomain=" + this.primaryDomain
-                    + ",NATIVE_OS=" + getConfig().getNativeOs() + ",NATIVE_LANMAN=" + getConfig().getNativeLanman() + "]");
+            "SmbComSessionSetupAndX[" + super.toString() + ",snd_buf_size=" + this.negotiated.getNegotiatedSendBufferSize() + ",maxMpxCount="
+                    + this.negotiated.getNegotiatedMpxCount() + ",VC_NUMBER=" + getConfig().getVcNumber() + ",sessionKey="
+                    + this.negotiated.getNegotiatedSessionKey() + ",lmHash.length=" + ( this.lmHash == null ? 0 : this.lmHash.length )
+                    + ",ntHash.length=" + ( this.ntHash == null ? 0 : this.ntHash.length ) + ",capabilities=" + this.capabilities + ",accountName="
+                    + this.accountName + ",primaryDomain=" + this.primaryDomain + ",NATIVE_OS=" + getConfig().getNativeOs() + ",NATIVE_LANMAN="
+                    + getConfig().getNativeLanman() + "]");
         return result;
     }
 }

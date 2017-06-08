@@ -25,20 +25,22 @@ import org.slf4j.LoggerFactory;
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.internal.CommonServerMessageBlockRequest;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.RequestWithPath;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.SMBSigningDigest;
 import jcifs.internal.util.SMBUtil;
-import jcifs.internal.util.SigningDigest;
 import jcifs.smb.SmbException;
 import jcifs.util.Hexdump;
 import jcifs.util.Strings;
-import jcifs.util.transport.Request;
-import jcifs.util.transport.Response;
 
 
 /**
  * 
  * 
  */
-public abstract class ServerMessageBlock extends Response implements Request {
+public abstract class ServerMessageBlock implements CommonServerMessageBlockRequest, CommonServerMessageBlockResponse, RequestWithPath {
 
     private static final Logger log = LoggerFactory.getLogger(ServerMessageBlock.class);
 
@@ -96,6 +98,11 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * 
      */
     public static final byte SMB_COM_CHECK_DIRECTORY = (byte) 0x10;
+
+    /**
+     * 
+     */
+    public static final byte SMB_COM_SEEK = (byte) 0x12;
 
     /**
      * 
@@ -175,6 +182,11 @@ public abstract class ServerMessageBlock extends Response implements Request {
     /**
      * 
      */
+    public static final byte SMB_COM_NT_CANCEL = (byte) 0xA4;
+
+    /**
+     * 
+     */
     public static final byte SMB_COM_NT_TRANSACT_SECONDARY = (byte) 0xA1;
 
     /**
@@ -201,10 +213,24 @@ public abstract class ServerMessageBlock extends Response implements Request {
     private int signSeq;
     private boolean verifyFailed;
     protected String path;
-    protected SigningDigest digest = null;
+    protected SMB1SigningDigest digest = null;
     private ServerMessageBlock response;
 
     private Configuration config;
+
+    private Long expiration;
+
+    private Exception exception;
+
+    private boolean isError;
+
+    private byte[] rawPayload;
+
+    private boolean retainPayload;
+
+    private String fullPath;
+    private String server;
+    private String domain;
 
 
     protected ServerMessageBlock ( Configuration config ) {
@@ -228,9 +254,143 @@ public abstract class ServerMessageBlock extends Response implements Request {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#size()
+     */
+    @Override
+    public int size () {
+        return 0;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockResponse#isAsync()
+     */
+    @Override
+    public boolean isAsync () {
+        return false;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#isResponseAsync()
+     */
+    @Override
+    public boolean isResponseAsync () {
+        return false;
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#getNext()
+     */
+    @Override
+    public ServerMessageBlock getNext () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#allowChain(jcifs.internal.CommonServerMessageBlockRequest)
+     */
+    @Override
+    public boolean allowChain ( CommonServerMessageBlockRequest next ) {
+        return false;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#split()
+     */
+    @Override
+    public CommonServerMessageBlockRequest split () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#createCancel()
+     */
+    @Override
+    public CommonServerMessageBlockRequest createCancel () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockResponse#getNextResponse()
+     */
+    @Override
+    public CommonServerMessageBlockResponse getNextResponse () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockResponse#prepare(jcifs.internal.CommonServerMessageBlockRequest)
+     */
+    @Override
+    public void prepare ( CommonServerMessageBlockRequest next ) {
+
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Request#getCreditCost()
+     */
+    @Override
+    public int getCreditCost () {
+        return 1;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#getGrantedCredits()
+     */
+    @Override
+    public int getGrantedCredits () {
+        return 1;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Request#setRequestCredits(int)
+     */
+    @Override
+    public void setRequestCredits ( int credits ) {
+
+    }
+
+
+    /**
      * @return the command
      */
-    public final byte getCommand () {
+    @Override
+    public final int getCommand () {
         return this.command;
     }
 
@@ -239,8 +399,9 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param command
      *            the command to set
      */
-    public final void setCommand ( byte command ) {
-        this.command = command;
+    @Override
+    public final void setCommand ( int command ) {
+        this.command = (byte) command;
     }
 
 
@@ -320,8 +481,36 @@ public abstract class ServerMessageBlock extends Response implements Request {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.RequestWithPath#setResolveInDfs(boolean)
+     */
+    @Override
+    public void setResolveInDfs ( boolean resolve ) {
+        if ( resolve ) {
+            addFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
+        }
+        else {
+            remFlags2(SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS);
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.RequestWithPath#isResolveInDfs()
+     */
+    @Override
+    public boolean isResolveInDfs () {
+        return ( getFlags() & SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS ) == SmbConstants.FLAGS2_RESOLVE_PATHS_IN_DFS;
+    }
+
+
+    /**
      * @return the errorCode
      */
+    @Override
     public final int getErrorCode () {
         return this.errorCode;
     }
@@ -339,8 +528,56 @@ public abstract class ServerMessageBlock extends Response implements Request {
     /**
      * @return the path
      */
+    @Override
     public final String getPath () {
         return this.path;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.RequestWithPath#getFullUNCPath()
+     */
+    @Override
+    public String getFullUNCPath () {
+        return this.fullPath;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.RequestWithPath#getDomain()
+     */
+    @Override
+    public String getDomain () {
+        return this.domain;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.RequestWithPath#getServer()
+     */
+    @Override
+    public String getServer () {
+        return this.server;
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.RequestWithPath#setFullUNCPath(java.lang.String, java.lang.String, java.lang.String)
+     */
+    @Override
+    public void setFullUNCPath ( String domain, String server, String fullPath ) {
+        this.domain = domain;
+        this.server = server;
+        this.fullPath = fullPath;
     }
 
 
@@ -348,6 +585,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param path
      *            the path to set
      */
+    @Override
     public final void setPath ( String path ) {
         this.path = path;
     }
@@ -356,7 +594,8 @@ public abstract class ServerMessageBlock extends Response implements Request {
     /**
      * @return the digest
      */
-    public final SigningDigest getDigest () {
+    @Override
+    public final SMB1SigningDigest getDigest () {
         return this.digest;
     }
 
@@ -365,8 +604,9 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param digest
      *            the digest to set
      */
-    public final void setDigest ( SigningDigest digest ) {
-        this.digest = digest;
+    @Override
+    public final void setDigest ( SMBSigningDigest digest ) {
+        this.digest = (SMB1SigningDigest) digest;
     }
 
 
@@ -378,10 +618,17 @@ public abstract class ServerMessageBlock extends Response implements Request {
     }
 
 
+    @Override
+    public final void setSessionId ( long sessionId ) {
+        // ignore
+    }
+
+
     /**
      * @param extendedSecurity
      *            the extendedSecurity to set
      */
+    @Override
     public void setExtendedSecurity ( boolean extendedSecurity ) {
         this.extendedSecurity = extendedSecurity;
     }
@@ -407,23 +654,64 @@ public abstract class ServerMessageBlock extends Response implements Request {
     /**
      * @return the received
      */
+    @Override
     public final boolean isReceived () {
         return this.received;
     }
 
 
+    @Override
+    public final void clearReceived () {
+        this.received = false;
+    }
+
+
     /**
-     * @param received
-     *            the received to set
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#received()
      */
-    public final void setReceived ( boolean received ) {
-        this.received = received;
+    @Override
+    public void received () {
+        this.received = true;
+        synchronized ( this ) {
+            notifyAll();
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#exception(java.lang.Exception)
+     */
+    @Override
+    public void exception ( Exception e ) {
+        this.exception = e;
+        synchronized ( this ) {
+            notifyAll();
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#error()
+     */
+    @Override
+    public void error () {
+        this.isError = true;
+        synchronized ( this ) {
+            notifyAll();
+        }
     }
 
 
     /**
      * @return the response
      */
+    @Override
     public final ServerMessageBlock getResponse () {
         return this.response;
     }
@@ -433,8 +721,23 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param response
      *            the response to set
      */
-    public final void setResponse ( ServerMessageBlock response ) {
-        this.response = response;
+    @Override
+    public final void setResponse ( CommonServerMessageBlockResponse response ) {
+        if ( ! ( response instanceof ServerMessageBlock ) ) {
+            throw new IllegalArgumentException();
+        }
+        this.response = (ServerMessageBlock) response;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Request#isCancel()
+     */
+    @Override
+    public boolean isCancel () {
+        return false;
     }
 
 
@@ -450,8 +753,9 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param mid
      *            the mid to set
      */
-    public final void setMid ( int mid ) {
-        this.mid = mid;
+    @Override
+    public final void setMid ( long mid ) {
+        this.mid = (int) mid;
     }
 
 
@@ -467,6 +771,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param tid
      *            the tid to set
      */
+    @Override
     public final void setTid ( int tid ) {
         this.tid = tid;
     }
@@ -501,6 +806,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
      * @param uid
      *            the uid to set
      */
+    @Override
     public final void setUid ( int uid ) {
         this.uid = uid;
     }
@@ -526,18 +832,97 @@ public abstract class ServerMessageBlock extends Response implements Request {
     /**
      * @return the verifyFailed
      */
+    @Override
     public boolean isVerifyFailed () {
         return this.verifyFailed;
     }
 
 
     /**
-     * @param verifyFailed
-     *            the verifyFailed to set
-     * @return verification status
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#getException()
      */
-    public boolean setVerifyFailed ( boolean verifyFailed ) {
-        return this.verifyFailed = verifyFailed;
+    @Override
+    public Exception getException () {
+        return this.exception;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#isError()
+     */
+    @Override
+    public boolean isError () {
+        return this.isError;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#getRawPayload()
+     */
+    @Override
+    public byte[] getRawPayload () {
+        return this.rawPayload;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#setRawPayload(byte[])
+     */
+    @Override
+    public void setRawPayload ( byte[] rawPayload ) {
+        this.rawPayload = rawPayload;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#isRetainPayload()
+     */
+    @Override
+    public boolean isRetainPayload () {
+        return this.retainPayload;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#retainPayload()
+     */
+    @Override
+    public void retainPayload () {
+        this.retainPayload = true;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#getExpiration()
+     */
+    @Override
+    public Long getExpiration () {
+        return this.expiration;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#setExpiration(java.lang.Long)
+     */
+    @Override
+    public void setExpiration ( Long exp ) {
+        this.expiration = exp;
     }
 
 
@@ -552,12 +937,50 @@ public abstract class ServerMessageBlock extends Response implements Request {
     /**
      * 
      */
+    @Override
     public void reset () {
         this.flags = (byte) ( SmbConstants.FLAGS_PATH_NAMES_CASELESS | SmbConstants.FLAGS_PATH_NAMES_CANONICALIZED );
         this.flags2 = 0;
         this.errorCode = 0;
         this.received = false;
         this.digest = null;
+        this.uid = 0;
+        this.tid = 0;
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.util.transport.Response#verifySignature(byte[], int, int)
+     */
+    @Override
+    public boolean verifySignature ( byte[] buffer, int i, int size ) {
+        /*
+         * Verification fails (w/ W2K3 server at least) if status is not 0. This
+         * suggests MS doesn't compute the signature (correctly) for error responses
+         * (perhaps for DOS reasons).
+         */
+        /*
+         * Looks like the failure case also is just reflecting back the signature we sent
+         */
+
+        /**
+         * Maybe this is related:
+         * 
+         * If signing is not active, the SecuritySignature field of the SMB Header for all messages sent, except
+         * the SMB_COM_SESSION_SETUP_ANDX Response (section 2.2.4.53.2), MUST be set to
+         * 0x0000000000000000. For the SMB_COM_SESSION_SETUP_ANDX Response, the SecuritySignature
+         * field of the SMB Header SHOULD<226> be set to the SecuritySignature received in the
+         * SMB_COM_SESSION_SETUP_ANDX Request (section 2.2.4.53.1).
+         */
+        if ( this.digest != null && getErrorCode() == 0 ) {
+            boolean verify = this.digest.verify(buffer, i, size, this);
+            this.verifyFailed = verify;
+            return !verify;
+        }
+        return true;
     }
 
 
@@ -669,13 +1092,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
     }
 
 
-    /**
-     * Encode message from the data
-     * 
-     * @param dst
-     * @param dstIndex
-     * @return message length
-     */
+    @Override
     public int encode ( byte[] dst, int dstIndex ) {
         int start = this.headerStart = dstIndex;
 
@@ -699,14 +1116,8 @@ public abstract class ServerMessageBlock extends Response implements Request {
     }
 
 
-    /**
-     * Decode message data from the given byte array
-     * 
-     * @param buffer
-     * @param bufferIndex
-     * @return message length
-     */
-    public int decode ( byte[] buffer, int bufferIndex ) {
+    @Override
+    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int start = this.headerStart = bufferIndex;
 
         bufferIndex += readHeaderWireFormat(buffer, bufferIndex);
@@ -738,8 +1149,20 @@ public abstract class ServerMessageBlock extends Response implements Request {
             bufferIndex += this.byteCount;
         }
 
-        this.length = bufferIndex - start;
-        return this.length;
+        int len = bufferIndex - start;
+        this.length = len;
+
+        if ( isRetainPayload() ) {
+            byte[] payload = new byte[len];
+            System.arraycopy(buffer, 4, payload, 0, len);
+            setRawPayload(payload);
+        }
+
+        if ( !verifySignature(buffer, 4, len) ) {
+            throw new SMBProtocolDecodingException("Signature verification failed for " + this.getClass().getName());
+        }
+
+        return len;
     }
 
 
@@ -753,7 +1176,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
         SMBUtil.writeInt2(this.pid, dst, dstIndex + 2);
         SMBUtil.writeInt2(this.uid, dst, dstIndex + 4);
         SMBUtil.writeInt2(this.mid, dst, dstIndex + 6);
-        return SmbConstants.HEADER_LENGTH;
+        return SmbConstants.SMB1_HEADER_LENGTH;
     }
 
 
@@ -766,7 +1189,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
         this.pid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET + 2);
         this.uid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET + 4);
         this.mid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET + 6);
-        return SmbConstants.HEADER_LENGTH;
+        return SmbConstants.SMB1_HEADER_LENGTH;
     }
 
 
@@ -805,7 +1228,7 @@ public abstract class ServerMessageBlock extends Response implements Request {
     protected abstract int readParameterWordsWireFormat ( byte[] buffer, int bufferIndex );
 
 
-    protected abstract int readBytesWireFormat ( byte[] buffer, int bufferIndex );
+    protected abstract int readBytesWireFormat ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException;
 
 
     @Override

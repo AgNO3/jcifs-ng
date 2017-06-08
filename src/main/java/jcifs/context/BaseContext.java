@@ -202,9 +202,10 @@ public class BaseContext extends AbstractCIFSContext {
      * @see jcifs.CIFSContext#close()
      */
     @Override
-    public void close () throws CIFSException {
-        super.close();
-        this.transportPool.close();
+    public boolean close () throws CIFSException {
+        boolean inUse = super.close();
+        inUse |= this.transportPool.close();
+        return inUse;
     }
 
 }

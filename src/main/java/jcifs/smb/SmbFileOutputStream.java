@@ -27,11 +27,14 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
-import jcifs.SmbFileHandle;
+import jcifs.internal.fscc.FileEndOfFileInformation;
 import jcifs.internal.smb1.com.SmbComWrite;
 import jcifs.internal.smb1.com.SmbComWriteAndX;
 import jcifs.internal.smb1.com.SmbComWriteAndXResponse;
 import jcifs.internal.smb1.com.SmbComWriteResponse;
+import jcifs.internal.smb2.info.Smb2SetInfoRequest;
+import jcifs.internal.smb2.io.Smb2WriteRequest;
+import jcifs.internal.smb2.io.Smb2WriteResponse;
 
 
 /**
@@ -55,6 +58,8 @@ public class SmbFileOutputStream extends OutputStream {
     private SmbFileHandleImpl handle;
 
     private int sharing;
+
+    private final boolean smb2;
 
 
     /**
@@ -105,28 +110,22 @@ public class SmbFileOutputStream extends OutputStream {
         this.access = access | SmbConstants.FILE_WRITE_DATA;
 
         try ( SmbTreeHandleImpl th = file.ensureTreeConnected() ) {
-            try ( SmbFileHandle h = ensureOpen() ) {
+            this.smb2 = th.isSMB2();
+            try ( SmbFileHandleImpl fh = ensureOpen() ) {
                 if ( append ) {
-                    // do this after file.open so we get the actual position (and also don't waste another call)
-                    try {
-                        this.fp = file.length();
-                        if ( log.isDebugEnabled() ) {
-                            log.debug("File pointer is at " + this.fp);
-                        }
-                    }
-                    catch ( SmbAuthException sae ) {
-                        throw sae;
-                    }
-                    catch ( SmbException se ) {
-                        log.warn("Error determining length in append mode", se);
-                        this.fp = 0L;
-                    }
+                    this.fp = fh.getInitialSize();
                 }
                 init(th);
+                if ( !append && this.smb2 ) {
+                    // no open option for truncating, need to truncate the file
+                    Smb2SetInfoRequest treq = new Smb2SetInfoRequest(th.getConfig(), fh.getFileId());
+                    treq.setFileInformation(new FileEndOfFileInformation(0));
+                    th.send(treq, RequestParam.NO_RETRY);
+                }
             }
-            catch ( CIFSException e ) {
-                throw SmbException.wrap(e);
-            }
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
         }
     }
 
@@ -139,6 +138,7 @@ public class SmbFileOutputStream extends OutputStream {
         this.access = access;
         this.sharing = sharing;
         this.append = false;
+        this.smb2 = th.isSMB2();
         init(th);
     }
 
@@ -148,8 +148,15 @@ public class SmbFileOutputStream extends OutputStream {
      * @throws SmbException
      */
     protected final void init ( SmbTreeHandleImpl th ) throws CIFSException {
+        int sendBufferSize = th.getSendBufferSize();
+        if ( this.smb2 ) {
+            this.writeSize = sendBufferSize;
+            this.writeSizeFile = sendBufferSize;
+            return;
+        }
+
         this.openFlags &= ~ ( SmbConstants.O_CREAT | SmbConstants.O_TRUNC ); /* in case we close and reopen */
-        this.writeSize = th.getSendBufferSize() - 70;
+        this.writeSize = sendBufferSize - 70;
 
         this.useNTSmbs = th.hasCapability(SmbConstants.CAP_NT_SMBS);
         if ( !this.useNTSmbs ) {
@@ -159,7 +166,7 @@ public class SmbFileOutputStream extends OutputStream {
         // there seems to be a bug with some servers that causes corruption if using signatures +
         // CAP_LARGE_WRITE
         if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
-            this.writeSizeFile = Math.min(th.getSendBufferSize() - 70, 0xFFFF - 70);
+            this.writeSizeFile = Math.min(sendBufferSize - 70, 0xFFFF - 70);
         }
         else {
             log.debug("No support or SMB signing is enabled, not enabling large writes");
@@ -197,6 +204,7 @@ public class SmbFileOutputStream extends OutputStream {
             }
         }
         finally {
+            this.file.clearAttributeCache();
             this.tmp = null;
         }
     }
@@ -243,7 +251,7 @@ public class SmbFileOutputStream extends OutputStream {
             // one extra acquire to keep this open till the stream is released
             this.handle = this.file.openUnshared(this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0).acquire();
             if ( this.append ) {
-                this.fp = this.file.length();
+                this.fp = this.handle.getInitialSize();
                 if ( log.isDebugEnabled() ) {
                     log.debug("File pointer is at " + this.fp);
                 }
@@ -306,7 +314,18 @@ public class SmbFileOutputStream extends OutputStream {
                 int blockSize = ( this.file.getType() == SmbConstants.TYPE_FILESYSTEM ) ? this.writeSizeFile : this.writeSize;
                 w = len > blockSize ? blockSize : len;
 
-                if ( this.useNTSmbs ) {
+                if ( this.smb2 ) {
+                    Smb2WriteRequest wr = new Smb2WriteRequest(th.getConfig(), fh.getFileId());
+                    wr.setOffset(this.fp);
+                    wr.setData(b, off, w);
+
+                    Smb2WriteResponse resp = th.send(wr, RequestParam.NO_RETRY);
+                    long cnt = resp.getCount();
+                    this.fp += cnt;
+                    len -= cnt;
+                    off += cnt;
+                }
+                else if ( this.useNTSmbs ) {
                     this.reqx.setParam(fh.getFid(), this.fp, len - w, b, off, w);
                     if ( ( flags & 1 ) != 0 ) {
                         this.reqx.setParam(fh.getFid(), this.fp, len, b, off, w);

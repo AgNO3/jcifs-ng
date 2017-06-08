@@ -20,6 +20,7 @@ package jcifs.internal.smb1.trans2;
 
 
 import jcifs.Configuration;
+import jcifs.internal.fscc.FileSystemInformation;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
@@ -61,7 +62,7 @@ public class Trans2QueryFSInformation extends SmbComTransaction {
     protected int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
 
-        SMBUtil.writeInt2(this.informationLevel, dst, dstIndex);
+        SMBUtil.writeInt2(mapInformationLevel(this.informationLevel), dst, dstIndex);
         dstIndex += 2;
 
         /*
@@ -73,6 +74,21 @@ public class Trans2QueryFSInformation extends SmbComTransaction {
          */
 
         return dstIndex - start;
+    }
+
+
+    /**
+     * @param il
+     * @return
+     */
+    private static int mapInformationLevel ( int il ) {
+        switch ( il ) {
+        case FileSystemInformation.SMB_INFO_ALLOCATION:
+            return 0x1;
+        case FileSystemInformation.FS_SIZE_INFO:
+            return 0x103;
+        }
+        throw new IllegalArgumentException("Unhandled information level");
     }
 
 

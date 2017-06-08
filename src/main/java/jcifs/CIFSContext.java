@@ -66,9 +66,10 @@ public interface CIFSContext {
 
     /**
      * 
+     * @return whether any connection was still in use
      * @throws CIFSException
      */
-    void close () throws CIFSException;
+    boolean close () throws CIFSException;
 
 
     /**

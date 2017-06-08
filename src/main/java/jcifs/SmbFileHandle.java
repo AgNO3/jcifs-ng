@@ -60,4 +60,10 @@ public interface SmbFileHandle extends AutoCloseable {
      */
     void release () throws CIFSException;
 
+
+    /**
+     * @return the file size when it was opened
+     */
+    long getInitialSize ();
+
 }

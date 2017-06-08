@@ -132,6 +132,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.strictResourceLifecycle = Config.getBoolean(p, "jcifs.smb.client.strictResourceLifecycle", false);
 
         initResolverOrder(p.getProperty("jcifs.resolveOrder"));
+        initDisallowCompound(p.getProperty("jcifs.smb.client.disallowCompound"));
         initDefaults();
     }
 }

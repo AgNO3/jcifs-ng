@@ -130,14 +130,16 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
 
     /**
      * {@inheritDoc}
+     * 
      *
      * @see jcifs.CIFSContext#close()
      */
     @Override
-    public void close () throws CIFSException {
+    public boolean close () throws CIFSException {
         if ( !this.closed ) {
             Runtime.getRuntime().removeShutdownHook(this);
         }
+        return false;
     }
 
 

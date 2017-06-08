@@ -39,5 +39,10 @@ public enum RequestParam {
     /**
      * Do not retry request on failure
      */
-    NO_RETRY
+    NO_RETRY,
+
+    /**
+     * Save the raw payload for further inspection
+     */
+    RETAIN_PAYLOAD
 }

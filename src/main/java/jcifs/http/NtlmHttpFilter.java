@@ -340,6 +340,12 @@ public class NtlmHttpFilter implements Filter {
             }
             return new NtlmChallenge(trans.getServerEncryptionKey(), dc);
         }
+        catch ( SmbException e ) {
+            throw e;
+        }
+        catch ( IOException e ) {
+            throw new SmbException("Connection failed", e);
+        }
     }
 
 

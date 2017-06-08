@@ -19,6 +19,7 @@ package jcifs.smb;
 
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +28,11 @@ import jcifs.CIFSException;
 import jcifs.FileNotifyInformation;
 import jcifs.SmbConstants;
 import jcifs.SmbWatchHandle;
+import jcifs.internal.CommonServerMessageBlockRequest;
+import jcifs.internal.NotifyResponse;
 import jcifs.internal.smb1.trans.nt.NtTransNotifyChange;
 import jcifs.internal.smb1.trans.nt.NtTransNotifyChangeResponse;
+import jcifs.internal.smb2.notify.Smb2ChangeNotifyRequest;
 
 
 /**
@@ -42,6 +46,7 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     private final SmbFileHandleImpl handle;
     private final int filter;
     private final boolean recursive;
+    private AtomicReference<CommonServerMessageBlockRequest> lastRequest = new AtomicReference<>();
 
 
     /**
@@ -69,30 +74,59 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
         }
         try ( SmbTreeHandleImpl th = this.handle.getTree() ) {
 
-            if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
-                throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
+            CommonServerMessageBlockRequest req;
+            NotifyResponse resp = null;
+            if ( th.isSMB2() ) {
+                Smb2ChangeNotifyRequest r = new Smb2ChangeNotifyRequest(th.getConfig(), this.handle.getFileId());
+                r.setCompletionFilter(this.filter);
+                r.setNotifyFlags(this.recursive ? Smb2ChangeNotifyRequest.SMB2_WATCH_TREE : 0);
+                req = r;
             }
+            else {
+                if ( !th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
+                    throw new SmbUnsupportedOperationException("Not supported without CAP_NT_SMBS");
+                }
 
-            /*
-             * NtTrans Notify Change Request / Response
-             */
-            NtTransNotifyChange request = new NtTransNotifyChange(th.getConfig(), this.handle.getFid(), this.filter, this.recursive);
-            NtTransNotifyChangeResponse response = new NtTransNotifyChangeResponse(th.getConfig());
+                /*
+                 * NtTrans Notify Change Request / Response
+                 */
+                req = new NtTransNotifyChange(th.getConfig(), this.handle.getFid(), this.filter, this.recursive);
+                resp = new NtTransNotifyChangeResponse(th.getConfig());
+            }
 
             if ( log.isTraceEnabled() ) {
                 log.trace("Sending NtTransNotifyChange for " + this.handle);
             }
-            th.send(request, response, RequestParam.NO_TIMEOUT, RequestParam.NO_RETRY);
-            if ( log.isTraceEnabled() ) {
-                log.trace("Returned from NtTransNotifyChange " + response.getStatus());
+            this.lastRequest.set(req);
+            try {
+                resp = th.send(req, resp, RequestParam.NO_TIMEOUT, RequestParam.NO_RETRY);
             }
-            if ( response.getStatus() == 0x0000010B ) {
+            catch ( SmbException e ) {
+                if ( e.getNtStatus() == 0xC0000120 ) {
+                    // cancelled
+                    log.debug("Request was cancelled", e);
+                    return null;
+                }
+                throw e;
+            }
+            finally {
+                this.lastRequest.set(null);
+            }
+            if ( log.isTraceEnabled() ) {
+                log.trace("Returned from NtTransNotifyChange " + resp.getErrorCode());
+            }
+
+            if ( !resp.isReceived() ) {
+                throw new CIFSException("Did not receive response");
+            }
+
+            if ( resp.getErrorCode() == 0x10B ) {
                 this.handle.markClosed();
             }
-            if ( response.getStatus() == 0x0000010C ) {
-                response.getNotifyInformation().clear();
+            if ( resp.getErrorCode() == 0x10C ) {
+                resp.getNotifyInformation().clear();
             }
-            return response.getNotifyInformation();
+            return resp.getNotifyInformation();
         }
     }
 
@@ -116,7 +150,23 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     @Override
     public void close () throws CIFSException {
         if ( this.handle.isValid() ) {
-            this.handle.close(0L);
+            try {
+                CommonServerMessageBlockRequest lastReq = this.lastRequest.getAndSet(null);
+                if ( lastReq != null && !lastReq.getResponse().isReceived() ) {
+                    CommonServerMessageBlockRequest cancel = lastReq.createCancel();
+                    if ( cancel != null ) {
+                        try ( SmbTreeHandleImpl th = this.handle.getTree() ) {
+                            th.send(cancel, null);
+                        }
+                        catch ( SmbException e ) {
+                            log.debug("Cancel failed", e);
+                        }
+                    }
+                }
+            }
+            finally {
+                this.handle.close(0L);
+            }
         }
     }
 }

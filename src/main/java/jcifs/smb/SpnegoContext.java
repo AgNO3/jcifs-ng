@@ -196,6 +196,10 @@ class SpnegoContext implements SSPContext {
 
             Oid currentMech = null;
             byte[] mechToken = spToken.getMechanismToken();
+            if ( mechToken == null ) {
+                return initialToken();
+            }
+
             mechToken = this.mechContext.initSecContext(mechToken, 0, mechToken.length);
             if ( mechToken != null ) {
                 int result = NegTokenTarg.ACCEPT_INCOMPLETE;

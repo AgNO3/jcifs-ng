@@ -82,7 +82,7 @@ public class ReadWriteTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noLargeReadWrite", "noNTSmbs", "forceSigning");
+        return getConfigs("noLargeReadWrite", "noNTSmbs", "forceSigning", "smb2");
     }
 
 
@@ -113,6 +113,55 @@ public class ReadWriteTest extends BaseCIFSTest {
     @Test
     public void testLargeBufExact () throws IOException {
         runReadWriteTest(65465, 65465);
+    }
+
+
+    @Test
+    public void testTrucation () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                try ( OutputStream os = f.openOutputStream() ) {
+                    writeRandom(4096, 3072, os);
+                }
+
+                // this should truncate
+                try ( OutputStream os = f.openOutputStream() ) {
+                    writeRandom(4096, 1024, os);
+                }
+
+                try ( InputStream is = f.getInputStream() ) {
+                    verifyRandom(4096, 1024, true, is);
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testAppend () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                try ( OutputStream os = f.openOutputStream() ) {
+                    writeRandom(4096, 3072, os);
+                }
+
+                // this should NOT truncate
+                try ( OutputStream os = f.openOutputStream(true) ) {
+                    writeRandom(4096, 1024, os);
+                }
+
+                try ( InputStream is = f.getInputStream() ) {
+                    verifyRandom(4096, 3072, false, is);
+                    verifyRandom(4096, 1024, true, is);
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
     }
 
 
@@ -337,7 +386,7 @@ public class ReadWriteTest extends BaseCIFSTest {
             int rs = Math.min(bufSize, (int) ( length - p ));
             int read = is.read(buffer, 0, rs);
             if ( read < 0 ) {
-                fail("Unexpected EOF");
+                fail("Unexpected EOF at " + p);
             }
 
             byte verify[] = new byte[read];

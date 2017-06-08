@@ -109,7 +109,6 @@ final class SmbEnumerationUtil {
         CIFSContext tc = parent.getContext();
         URL u = locator.getURL();
 
-        IOException last = null;
         FileEntry[] entries;
 
         if ( u.getPath().lastIndexOf('/') != ( u.getPath().length() - 1 ) )
@@ -140,37 +139,34 @@ final class SmbEnumerationUtil {
         }
 
         SmbTreeConnection treeConn = new SmbTreeConnection(tc);
-        Address addr = locator.getFirstAddress();
-        while ( addr != null ) {
-            try ( SmbTreeHandleImpl th = treeConn.connectHost(locator, addr) ) {
-                try {
-                    entries = doMsrpcShareEnum(tc, locator.getURL().getHost(), addr);
-                }
-                catch ( IOException ioe ) {
-                    log.debug("doMsrpcShareEnum failed", ioe);
-                    entries = doNetShareEnum(th);
-                }
-                for ( int ei = 0; ei < entries.length; ei++ ) {
-                    FileEntry e = entries[ ei ];
-                    if ( !set.contains(e) && ( fnf == null || fnf.accept(parent, e.getName()) ) ) {
-                        set.add(e);
-                    }
-                }
-                break;
+        try ( SmbTreeHandleImpl th = treeConn.connectHost(locator, locator.getServerWithDfs());
+              SmbSessionImpl session = th.getSession();
+              SmbTransportImpl transport = session.getTransport() ) {
+            try {
+                entries = doMsrpcShareEnum(tc, locator.getURL().getHost(), transport.getRemoteAddress());
             }
             catch ( IOException ioe ) {
-                log.debug("doNetShareEnum failed", ioe);
-                last = ioe;
+                if ( th.isSMB2() ) {
+                    throw ioe;
+                }
+                log.debug("doMsrpcShareEnum failed", ioe);
+                entries = doNetShareEnum(th);
             }
-            addr = locator.getNextAddress();
-        }
+            for ( int ei = 0; ei < entries.length; ei++ ) {
+                FileEntry e = entries[ ei ];
+                if ( !set.contains(e) && ( fnf == null || fnf.accept(parent, e.getName()) ) ) {
+                    set.add(e);
+                }
+            }
 
-        if ( last != null && set.isEmpty() ) {
-            if ( ! ( last instanceof SmbException ) )
-                throw new SmbException(u.toString(), last);
-            throw (SmbException) last;
         }
-
+        catch ( SmbException e ) {
+            throw e;
+        }
+        catch ( IOException ioe ) {
+            log.debug("doNetShareEnum failed", ioe);
+            throw new SmbException(u.toString(), ioe);
+        }
         return new ShareEnumIterator(parent, set.iterator(), ff);
     }
 
@@ -195,17 +191,10 @@ final class SmbEnumerationUtil {
         }
 
         try ( SmbTreeHandleImpl th = parent.ensureTreeConnected() ) {
-            return new DirFileEntryAdapterIterator(
-                parent,
-                new DirFileEntryEnumIterator(
-                    th,
-                    parent,
-                    wildcard,
-                    fnf,
-                    searchAttributes,
-                    th.getConfig().getListCount(),
-                    th.getConfig().getListSize()),
-                ff);
+            if ( th.isSMB2() ) {
+                return new DirFileEntryAdapterIterator(parent, new DirFileEntryEnumIterator2(th, parent, wildcard, fnf, searchAttributes), ff);
+            }
+            return new DirFileEntryAdapterIterator(parent, new DirFileEntryEnumIterator1(th, parent, wildcard, fnf, searchAttributes), ff);
         }
     }
 

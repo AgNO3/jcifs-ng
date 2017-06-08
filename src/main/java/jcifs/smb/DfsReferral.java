@@ -39,16 +39,16 @@ public class DfsReferral extends SmbException {
     private final DfsReferralData data;
 
 
-    public DfsReferralData getData () {
-        return this.data;
-    }
-
-
     /**
      * @param dr
      */
     public DfsReferral ( DfsReferralData data ) {
         this.data = data;
+    }
+
+
+    public DfsReferralData getData () {
+        return this.data;
     }
 
 

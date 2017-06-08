@@ -19,11 +19,15 @@
 package jcifs.internal.smb1.trans2;
 
 
+import jcifs.CIFSException;
 import jcifs.Configuration;
-import jcifs.internal.SmbBasicFileInfo;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.fscc.FileBasicInfo;
+import jcifs.internal.fscc.FileInformation;
+import jcifs.internal.fscc.FileInternalInfo;
+import jcifs.internal.fscc.FileStandardInfo;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans.SmbComTransactionResponse;
-import jcifs.internal.util.SMBUtil;
 
 
 /**
@@ -31,19 +35,8 @@ import jcifs.internal.util.SMBUtil;
  */
 public class Trans2QueryPathInformationResponse extends SmbComTransactionResponse {
 
-    // information levels
-    /**
-     * 
-     */
-    public static final int SMB_QUERY_FILE_BASIC_INFO = 0x101;
-    /**
-     * 
-     */
-    public static final int SMB_QUERY_FILE_STANDARD_INFO = 0x102;
-
-    private int informationLevel;
-
-    private SmbBasicFileInfo info;
+    private final int informationLevel;
+    private FileInformation info;
 
 
     /**
@@ -61,8 +54,23 @@ public class Trans2QueryPathInformationResponse extends SmbComTransactionRespons
     /**
      * @return the info
      */
-    public final SmbBasicFileInfo getInfo () {
+    public final FileInformation getInfo () {
         return this.info;
+    }
+
+
+    /**
+     * 
+     * @param type
+     * @return the info
+     * @throws CIFSException
+     */
+    @SuppressWarnings ( "unchecked" )
+    public <T extends FileInformation> T getInfo ( Class<T> type ) throws CIFSException {
+        if ( !type.isAssignableFrom(this.info.getClass()) ) {
+            throw new CIFSException("Incompatible file information class");
+        }
+        return (T) this.info;
     }
 
 
@@ -98,52 +106,33 @@ public class Trans2QueryPathInformationResponse extends SmbComTransactionRespons
 
 
     @Override
-    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        switch ( this.informationLevel ) {
-        case SMB_QUERY_FILE_BASIC_INFO:
-            return readSmbQueryFileBasicInfoWireFormat(buffer, bufferIndex);
-        case SMB_QUERY_FILE_STANDARD_INFO:
-            return readSmbQueryFileStandardInfoWireFormat(buffer, bufferIndex);
-        default:
-            return 0;
+    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException {
+        int start = bufferIndex;
+        FileInformation inf = createFileInformation();
+        if ( inf != null ) {
+            bufferIndex += inf.decode(buffer, bufferIndex, getDataCount());
+            this.info = inf;
         }
-    }
-
-
-    int readSmbQueryFileStandardInfoWireFormat ( byte[] buffer, int bufferIndex ) {
-        int start = bufferIndex;
-        SmbQueryFileStandardInfo inf = new SmbQueryFileStandardInfo();
-        inf.allocationSize = SMBUtil.readInt8(buffer, bufferIndex);
-        bufferIndex += 8;
-        inf.endOfFile = SMBUtil.readInt8(buffer, bufferIndex);
-        bufferIndex += 8;
-        inf.numberOfLinks = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
-        inf.deletePending = ( buffer[ bufferIndex++ ] & 0xFF ) > 0;
-        inf.directory = ( buffer[ bufferIndex++ ] & 0xFF ) > 0;
-        this.info = inf;
-
         return bufferIndex - start;
     }
 
 
-    int readSmbQueryFileBasicInfoWireFormat ( byte[] buffer, int bufferIndex ) {
-        int start = bufferIndex;
-
-        SmbQueryFileBasicInfo inf = new SmbQueryFileBasicInfo();
-        inf.createTime = SMBUtil.readTime(buffer, bufferIndex);
-        bufferIndex += 8;
-        inf.lastAccessTime = SMBUtil.readTime(buffer, bufferIndex);
-        bufferIndex += 8;
-        inf.lastWriteTime = SMBUtil.readTime(buffer, bufferIndex);
-        bufferIndex += 8;
-        inf.changeTime = SMBUtil.readTime(buffer, bufferIndex);
-        bufferIndex += 8;
-        inf.attributes = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-        this.info = inf;
-
-        return bufferIndex - start;
+    private FileInformation createFileInformation () {
+        FileInformation inf;
+        switch ( this.informationLevel ) {
+        case FileInformation.FILE_BASIC_INFO:
+            inf = new FileBasicInfo();
+            break;
+        case FileInformation.FILE_STANDARD_INFO:
+            inf = new FileStandardInfo();
+            break;
+        case FileInformation.FILE_INTERNAL_INFO:
+            inf = new FileInternalInfo();
+            break;
+        default:
+            return null;
+        }
+        return inf;
     }
 
 

@@ -20,6 +20,7 @@ package jcifs.internal.smb1.trans.nt;
 
 
 import jcifs.Configuration;
+import jcifs.internal.CommonServerMessageBlockRequest;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.util.SMBUtil;
 
@@ -51,6 +52,16 @@ public abstract class SmbComNtTransaction extends SmbComTransaction {
         this.function = function;
         this.primarySetupOffset = NTT_PRIMARY_SETUP_OFFSET;
         this.secondaryParameterOffset = NTT_SECONDARY_PARAMETER_OFFSET;
+    }
+
+
+    /**
+     * 
+     * @return a cancel request
+     */
+    @Override
+    public CommonServerMessageBlockRequest createCancel () {
+        return new SmbComNtCancel(getConfig(), getMid());
     }
 
 

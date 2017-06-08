@@ -108,10 +108,11 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.NtlmPasswordAuthentication#createContext(jcifs.CIFSContext, java.lang.String, byte[], boolean)
+     * @see jcifs.smb.NtlmPasswordAuthentication#createContext(jcifs.CIFSContext, java.lang.String, java.lang.String,
+     *      byte[], boolean)
      */
     @Override
-    public SSPContext createContext ( CIFSContext tc, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+    public SSPContext createContext ( CIFSContext tc, String targetDomain, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
         if ( host.indexOf('.') < 0 && host.toUpperCase(Locale.ROOT).equals(host) ) {
             // this is not too good, propably should better pass the address and check that it is a netbios one.
             // While we could look up the domain controller/KDC we cannot really make the java kerberos implementation
@@ -133,7 +134,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
                 }
                 if ( !foundKerberos && this.canFallback && tc.getConfig().isAllowNTLMFallback() ) {
                     log.debug("Falling back to NTLM authentication");
-                    return super.createContext(tc, host, initialToken, doSigning);
+                    return super.createContext(tc, targetDomain, host, initialToken, doSigning);
                 }
                 else if ( !foundKerberos ) {
                     throw new SmbUnsupportedOperationException("Server does not support kerberos authentication");
@@ -145,7 +146,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
         }
 
         try {
-            return createContext(host);
+            return createContext(targetDomain, host);
         }
         catch ( GSSException e ) {
             throw new SmbException("Context setup failed", e);
@@ -322,8 +323,15 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     }
 
 
-    private SpnegoContext createContext ( String host ) throws GSSException {
-        return new SpnegoContext(new Kerb5Context(host, this.service, this.user, this.userLifetime, this.contextLifetime, this.realm));
+    private SpnegoContext createContext ( String targetDomain, String host ) throws GSSException {
+        return new SpnegoContext(
+            new Kerb5Context(
+                host,
+                this.service,
+                this.user,
+                this.userLifetime,
+                this.contextLifetime,
+                targetDomain != null ? targetDomain.toUpperCase(Locale.ROOT) : null));
     }
 
 

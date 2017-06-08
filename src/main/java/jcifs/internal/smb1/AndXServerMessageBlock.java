@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
+import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.smb1.com.SmbComNTCreateAndXResponse;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
@@ -50,7 +51,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
         super(config, command, name);
         this.andx = andx;
         if ( andx != null ) {
-            this.andxCommand = andx.getCommand();
+            this.andxCommand = (byte) andx.getCommand();
         }
     }
 
@@ -64,7 +65,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
         super(config, command);
         this.andx = andx;
         if ( andx != null ) {
-            this.andxCommand = andx.getCommand();
+            this.andxCommand = (byte) andx.getCommand();
         }
     }
 
@@ -78,7 +79,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
         super(config);
         this.andx = andx;
         if ( andx != null ) {
-            this.andxCommand = andx.getCommand();
+            this.andxCommand = (byte) andx.getCommand();
         }
     }
 
@@ -87,6 +88,28 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
      * @return the andx
      */
     public final ServerMessageBlock getAndx () {
+        return this.andx;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb1.ServerMessageBlock#getNext()
+     */
+    @Override
+    public ServerMessageBlock getNext () {
+        return this.andx;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockResponse#getNextResponse()
+     */
+    @Override
+    public ServerMessageBlock getNextResponse () {
         return this.andx;
     }
 
@@ -133,14 +156,25 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
      */
 
     @Override
-    public int decode ( byte[] buffer, int bufferIndex ) {
+    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int start = this.headerStart = bufferIndex;
 
         bufferIndex += readHeaderWireFormat(buffer, bufferIndex);
         bufferIndex += readAndXWireFormat(buffer, bufferIndex);
 
-        this.length = bufferIndex - start;
-        return this.length;
+        int len = bufferIndex - start;
+        this.length = len;
+
+        if ( isRetainPayload() ) {
+            byte[] payload = new byte[len];
+            System.arraycopy(buffer, 4, payload, 0, len);
+            setRawPayload(payload);
+        }
+
+        if ( !verifySignature(buffer, 4, len) ) {
+            throw new SMBProtocolDecodingException("Signature verification failed for " + this.getClass().getName());
+        }
+        return len;
     }
 
 
@@ -169,7 +203,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
          * very indirect and simple batching control mechanism.
          */
 
-        if ( this.andx == null || getConfig().isUseBatching() || this.batchLevel >= getBatchLimit(getConfig(), this.andx.getCommand()) ) {
+        if ( this.andx == null || getConfig().isUseBatching() || this.batchLevel >= getBatchLimit(getConfig(), (byte) this.andx.getCommand()) ) {
             this.andxCommand = (byte) 0xFF;
             this.andx = null;
 
@@ -239,7 +273,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
     }
 
 
-    protected int readAndXWireFormat ( byte[] buffer, int bufferIndex ) {
+    protected int readAndXWireFormat ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int start = bufferIndex;
 
         this.wordCount = buffer[ bufferIndex++ ];
@@ -357,7 +391,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
                     bufferIndex += this.andx.byteCount;
                 }
             }
-            this.andx.setReceived(true);
+            this.andx.received();
         }
 
         return bufferIndex - start;

@@ -31,9 +31,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
+import org.junit.AfterClass;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
@@ -52,10 +54,11 @@ import jcifs.context.BaseContext;
  */
 @RunWith ( Suite.class )
 @SuiteClasses ( {
-    ContextConfigTest.class, KerberosTest.class, SessionTest.class, SidTest.class, FileAttributesTest.class, FileOperationsTest.class,
-    NamingTest.class, WatchTest.class, ReadWriteTest.class, ConcurrencyTest.class, TimeoutTest.class, EnumTest.class, PipeTest.class,
-    RandomAccessFileTest.class, PACTest.class
+    ContextConfigTest.class, PACTest.class, FileLocationTest.class, SessionTest.class, KerberosTest.class, TimeoutTest.class, SidTest.class,
+    NamingTest.class, DfsTest.class, FileAttributesTest.class, EnumTest.class, PipeTest.class, FileOperationsTest.class, WatchTest.class,
+    ReadWriteTest.class, ConcurrencyTest.class, RandomAccessFileTest.class,
 } )
+
 public class AllTests {
 
     private static final Logger log = LoggerFactory.getLogger(AllTests.class);
@@ -172,6 +175,19 @@ public class AllTests {
                 return cfg;
             }
         });
+    }
+
+
+    /**
+     * @throws CIFSException
+     */
+    @AfterClass
+    public static void closeContexts () throws CIFSException {
+        for ( Entry<String, CIFSContext> ctx : CONTEXT_CACHE.entrySet() ) {
+            if ( ctx.getValue().close() ) {
+                log.error("Context was still in use " + ctx.getKey());
+            }
+        }
     }
 
 

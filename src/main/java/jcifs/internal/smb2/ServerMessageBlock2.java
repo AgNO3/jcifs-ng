@@ -1,5 +1,5 @@
-/* jcifs smb client library in Java
- * Copyright (C) 2000  "Michael B. Allen" <jcifs at samba dot org>
+/*
+ * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -15,28 +15,25 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
 package jcifs.internal.smb2;
 
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jcifs.Configuration;
-import jcifs.RuntimeCIFSException;
-import jcifs.SmbConstants;
+import jcifs.internal.CommonServerMessageBlock;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.SMBSigningDigest;
 import jcifs.internal.util.SMBUtil;
-import jcifs.internal.util.SigningDigest;
 import jcifs.smb.SmbException;
 import jcifs.util.Hexdump;
-import jcifs.util.Strings;
-import jcifs.util.transport.Request;
-import jcifs.util.transport.Response;
 
 
-abstract class ServerMessageBlock2 extends Response implements Request {
-
-    private static final Logger log = LoggerFactory.getLogger(ServerMessageBlock2.class);
+/**
+ * 
+ * @author mbechler
+ *
+ */
+public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
 
     /*
      * These are all the smbs supported by this library. This includes requests
@@ -48,65 +45,85 @@ abstract class ServerMessageBlock2 extends Response implements Request {
      * implementation.
      */
 
-    static final short SMB2_NEGOTIATE = 0x00;
-    static final short SMB2_SESSION_SETUP = 0x01;
-    static final short SMB2_LOGOFF = 0x02;
-    static final short SMB2_TREE_CONNECT = 0x0003;
-    static final short SMB2_TREE_DISCONNECT = 0x0004;
-    static final short SMB2_CREATE = 0x0005;
-    static final short SMB2_CLOSE = 0x0006;
-    static final short SMB2_FLUSH = 0x0007;
-    static final short SMB2_READ = 0x0008;
-    static final short SMB2_WRITE = 0x0009;
-    static final short SMB2_LOCK = 0x000A;
-    static final short SMB2_IOCTL = 0x000B;
-    static final short SMB2_CANCEL = 0x000C;
-    static final short SMB2_ECHO = 0x000D;
-    static final short SMB2_QUERY_DIRECTORY = 0x000E;
-    static final short SMB2_CHANGE_NOTIFY = 0x000F;
-    static final short SMB2_QUERY_INFO = 0x0010;
-    static final short SMB2_SET_INFO = 0x0011;
-    static final short SMB2_OPLOCK_BREAK = 0x0012;
+    protected static final short SMB2_NEGOTIATE = 0x00;
+    protected static final short SMB2_SESSION_SETUP = 0x01;
+    protected static final short SMB2_LOGOFF = 0x02;
+    protected static final short SMB2_TREE_CONNECT = 0x0003;
+    protected static final short SMB2_TREE_DISCONNECT = 0x0004;
+    protected static final short SMB2_CREATE = 0x0005;
+    protected static final short SMB2_CLOSE = 0x0006;
+    protected static final short SMB2_FLUSH = 0x0007;
+    protected static final short SMB2_READ = 0x0008;
+    protected static final short SMB2_WRITE = 0x0009;
+    protected static final short SMB2_LOCK = 0x000A;
+    protected static final short SMB2_IOCTL = 0x000B;
+    protected static final short SMB2_CANCEL = 0x000C;
+    protected static final short SMB2_ECHO = 0x000D;
+    protected static final short SMB2_QUERY_DIRECTORY = 0x000E;
+    protected static final short SMB2_CHANGE_NOTIFY = 0x000F;
+    protected static final short SMB2_QUERY_INFO = 0x0010;
+    protected static final short SMB2_SET_INFO = 0x0011;
+    protected static final short SMB2_OPLOCK_BREAK = 0x0012;
 
-    static final int SMB2_FLAGS_SERVER_TO_REDIR = 0x00000001;
-    static final int SMB2_FLAGS_ASYNC_COMMAND = 0x00000002;
-    static final int SMB2_FLAGS_RELATED_OPERATIONS = 0x00000004;
-    static final int SMB2_FLAGS_SIGNED = 0x00000008;
-    static final int SMB2_FLAGS_PRIORITY_MASK = 0x00000070;
-    static final int SMB2_FLAGS_DFS_OPERATIONS = 0x10000000;
-    static final int SMB2_FLAGS_REPLAY_OPERATION = 0x20000000;
-
-    /*
-     * Some fields specify the offset from the beginning of the header. This
-     * field should be used for calculating that. This would likely be zero
-     * but an implemantation that encorporates the transport header(for
-     * efficiency) might use a different initial bufferIndex. For example,
-     * to eliminate copying data when writing NbtSession data one might
-     * manage that 4 byte header specifically and therefore the initial
-     * bufferIndex, and thus headerStart, would be 4).(NOTE: If one where
-     * looking for a way to improve perfomance this is precisly what you
-     * would want to do as the jcifs.netbios.SocketXxxputStream classes
-     * arraycopy all data read or written into a new buffer shifted over 4!)
+    /**
+     * 
      */
+    public static final int SMB2_FLAGS_SERVER_TO_REDIR = 0x00000001;
+    /**
+     * 
+     */
+    public static final int SMB2_FLAGS_ASYNC_COMMAND = 0x00000002;
+    /**
+     * 
+     */
+    public static final int SMB2_FLAGS_RELATED_OPERATIONS = 0x00000004;
+    /**
+     * 
+     */
+    public static final int SMB2_FLAGS_SIGNED = 0x00000008;
+    /**
+     * 
+     */
+    public static final int SMB2_FLAGS_PRIORITY_MASK = 0x00000070;
+    /**
+     * 
+     */
+    public static final int SMB2_FLAGS_DFS_OPERATIONS = 0x10000000;
+    /**
+     * 
+     */
+    public static final int SMB2_FLAGS_REPLAY_OPERATION = 0x20000000;
 
-    short command, flags;
-    int headerStart, length, batchLevel, errorCode, flags2, tid, pid, uid, mid, wordCount, byteCount;
-    boolean useUnicode, received, extendedSecurity;
-    long responseTimeout = 1;
-    int signSeq;
-    boolean verifyFailed;
-    String path;
-    SigningDigest digest = null;
-    ServerMessageBlock2 response;
+    private int command;
+    private int flags;
+    private int length, headerStart, wordCount, byteCount;
+
+    private byte[] signature = new byte[16];
+    private Smb2SigningDigest digest = null;
 
     private Configuration config;
 
+    private int creditCharge;
+    private int status;
+    private int credit;
+    private int nextCommand;
+    private boolean async;
+    private int treeId;
+    private long mid, asyncId, sessionId;
+    private byte errorContextCount;
+    private byte[] errorData;
 
-    ServerMessageBlock2 ( Configuration config ) {
+    private ServerMessageBlock2 next;
+
+
+    protected ServerMessageBlock2 ( Configuration config ) {
         this.config = config;
-        this.flags = (byte) ( SmbConstants.FLAGS_PATH_NAMES_CASELESS | SmbConstants.FLAGS_PATH_NAMES_CANONICALIZED );
-        this.pid = config.getPid();
-        this.batchLevel = 0;
+    }
+
+
+    protected ServerMessageBlock2 ( Configuration config, int command ) {
+        this.config = config;
+        this.command = command;
     }
 
 
@@ -118,222 +135,540 @@ abstract class ServerMessageBlock2 extends Response implements Request {
     }
 
 
-    void reset () {
-        this.flags = (byte) ( SmbConstants.FLAGS_PATH_NAMES_CASELESS | SmbConstants.FLAGS_PATH_NAMES_CANONICALIZED );
-        this.flags2 = 0;
-        this.errorCode = 0;
-        this.received = false;
+    @Override
+    public void reset () {
+        this.flags = 0;
         this.digest = null;
+        this.sessionId = 0;
+        this.treeId = 0;
     }
 
 
-    int writeString ( String str, byte[] dst, int dstIndex ) {
-        return writeString(str, dst, dstIndex, this.useUnicode);
+    /**
+     * @return the command
+     */
+    @Override
+    public final int getCommand () {
+        return this.command;
     }
 
 
-    int writeString ( String str, byte[] dst, int dstIndex, boolean unicode ) {
-        int start = dstIndex;
-        if ( unicode ) {
-            // Unicode requires word alignment
-            if ( ( ( dstIndex - this.headerStart ) % 2 ) != 0 ) {
-                dst[ dstIndex++ ] = (byte) '\0';
-            }
-            System.arraycopy(Strings.getUNIBytes(str), 0, dst, dstIndex, str.length() * 2);
-            dstIndex += str.length() * 2;
-            dst[ dstIndex++ ] = (byte) '\0';
-            dst[ dstIndex++ ] = (byte) '\0';
+    /**
+     * @return offset to next compound command
+     */
+    public final int getNextCommandOffset () {
+        return this.nextCommand;
+    }
+
+
+    /**
+     * @return the async
+     */
+    public boolean isAsync () {
+        return this.async;
+    }
+
+
+    /**
+     * @param command
+     *            the command to set
+     */
+    @Override
+    public final void setCommand ( int command ) {
+        this.command = command;
+    }
+
+
+    /**
+     * @return the treeId
+     */
+    public final int getTreeId () {
+        return this.treeId;
+    }
+
+
+    /**
+     * @param treeId
+     *            the treeId to set
+     */
+    public final void setTreeId ( int treeId ) {
+        this.treeId = treeId;
+        if ( this.next != null ) {
+            this.next.setTreeId(treeId);
         }
-        else {
-            byte[] b = Strings.getOEMBytes(str, this.getConfig());
-            System.arraycopy(b, 0, dst, dstIndex, b.length);
-            dstIndex += b.length;
-            dst[ dstIndex++ ] = (byte) '\0';
+    }
+
+
+    /**
+     * @return the asyncId
+     */
+    public final long getAsyncId () {
+        return this.asyncId;
+    }
+
+
+    /**
+     * @param asyncId
+     *            the asyncId to set
+     */
+    public final void setAsyncId ( long asyncId ) {
+        this.asyncId = asyncId;
+    }
+
+
+    /**
+     * @return the credit
+     */
+    public final int getCredit () {
+        return this.credit;
+    }
+
+
+    /**
+     * @param credit
+     *            the credit to set
+     */
+    public final void setCredit ( int credit ) {
+        this.credit = credit;
+    }
+
+
+    /**
+     * @return the creditCharge
+     */
+    public final int getCreditCharge () {
+        return this.creditCharge;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlock#getDigest()
+     */
+    @Override
+    public Smb2SigningDigest getDigest () {
+        return this.digest;
+    }
+
+
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlock#setDigest(jcifs.internal.SMBSigningDigest)
+     */
+    @Override
+    public void setDigest ( SMBSigningDigest digest ) {
+        this.digest = (Smb2SigningDigest) digest;
+        if ( this.next != null ) {
+            this.next.setDigest(digest);
         }
-        return dstIndex - start;
     }
 
 
-    String readString ( byte[] src, int srcIndex ) {
-        return readString(src, srcIndex, 256, this.useUnicode);
+    /**
+     * @return the status
+     */
+    public final int getStatus () {
+        return this.status;
     }
 
 
-    String readString ( byte[] src, int srcIndex, int maxLen, boolean unicode ) {
-        if ( unicode ) {
-            // Unicode requires word alignment
-            if ( ( ( srcIndex - this.headerStart ) % 2 ) != 0 ) {
-                srcIndex++;
-            }
-            return Strings.fromUNIBytes(src, srcIndex, Strings.findUNITermination(src, srcIndex, maxLen));
+    /**
+     * @return the sessionId
+     */
+    public long getSessionId () {
+        return this.sessionId;
+    }
+
+
+    /**
+     * @param sessionId
+     *            the sessionId to set
+     */
+    @Override
+    public final void setSessionId ( long sessionId ) {
+        this.sessionId = sessionId;
+        if ( this.next != null ) {
+            this.next.setSessionId(sessionId);
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlock#setExtendedSecurity(boolean)
+     */
+    @Override
+    public void setExtendedSecurity ( boolean extendedSecurity ) {
+        // ignore
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlock#setUid(int)
+     */
+    @Override
+    public void setUid ( int uid ) {
+        // ignore
+    }
+
+
+    /**
+     * @return the flags
+     */
+    public final int getFlags () {
+        return this.flags;
+    }
+
+
+    /**
+     * 
+     * @param flag
+     */
+    public final void addFlags ( int flag ) {
+        this.flags |= flag;
+    }
+
+
+    /**
+     * 
+     * @param flag
+     */
+    public final void clearFlags ( int flag ) {
+        this.flags &= ~flag;
+    }
+
+
+    /**
+     * @return the mid
+     */
+    public final long getMid () {
+        return this.mid;
+    }
+
+
+    /**
+     * @param mid
+     *            the mid to set
+     */
+    @Override
+    public final void setMid ( long mid ) {
+        this.mid = mid;
+    }
+
+
+    /**
+     * @param n
+     * @return whether chaining was successful
+     */
+    public boolean chain ( ServerMessageBlock2 n ) {
+        if ( this.next != null ) {
+            return this.next.chain(n);
         }
 
-        return Strings.fromOEMBytes(src, srcIndex, Strings.findTermination(src, srcIndex, maxLen), getConfig());
+        n.addFlags(SMB2_FLAGS_RELATED_OPERATIONS);
+        this.next = n;
+        return true;
     }
 
 
-    String readString ( byte[] src, int srcIndex, int srcEnd, int maxLen, boolean unicode ) {
-        if ( unicode ) {
-            // Unicode requires word alignment
-            if ( ( ( srcIndex - this.headerStart ) % 2 ) != 0 ) {
-                srcIndex++;
-            }
-            return Strings.fromUNIBytes(src, srcIndex, Strings.findUNITermination(src, srcIndex, maxLen));
-        }
-
-        return Strings.fromOEMBytes(src, srcIndex, Strings.findTermination(src, srcIndex, maxLen), getConfig());
+    protected ServerMessageBlock2 getNext () {
+        return this.next;
     }
 
 
-    int stringWireLength ( String str, int offset ) {
-        int len = str.length() + 1;
-        if ( this.useUnicode ) {
-            len = str.length() * 2 + 2;
-            len = ( offset % 2 ) != 0 ? len + 1 : len;
-        }
-        return len;
+    protected void setNext ( ServerMessageBlock2 n ) {
+        this.next = n;
     }
 
 
-    int readStringLength ( byte[] src, int srcIndex, int max ) {
-        int len = 0;
-        while ( src[ srcIndex + len ] != (byte) 0x00 ) {
-            if ( len++ > max ) {
-                throw new RuntimeCIFSException("zero termination not found: " + this);
-            }
-        }
-        return len;
+    /**
+     * @return the response
+     */
+    @Override
+    public ServerMessageBlock2Response getResponse () {
+        return null;
     }
 
 
-    int encode ( byte[] dst, int dstIndex ) {
+    /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlock#setResponse(jcifs.internal.CommonServerMessageBlockResponse)
+     */
+    @Override
+    public void setResponse ( CommonServerMessageBlockResponse msg ) {
+
+    }
+
+
+    /**
+     * @return the errorData
+     */
+    public final byte[] getErrorData () {
+        return this.errorData;
+    }
+
+
+    /**
+     * @return the errorContextCount
+     */
+    public final byte getErrorContextCount () {
+        return this.errorContextCount;
+    }
+
+
+    /**
+     * @return the headerStart
+     */
+    public final int getHeaderStart () {
+        return this.headerStart;
+    }
+
+
+    /**
+     * @return the length
+     */
+    public final int getLength () {
+        return this.length;
+    }
+
+
+    @Override
+    public int encode ( byte[] dst, int dstIndex ) {
         int start = this.headerStart = dstIndex;
-
         dstIndex += writeHeaderWireFormat(dst, dstIndex);
-        this.wordCount = writeParameterWordsWireFormat(dst, dstIndex + 1);
-        dst[ dstIndex++ ] = (byte) ( ( this.wordCount / 2 ) & 0xFF );
-        dstIndex += this.wordCount;
-        this.wordCount /= 2;
-        this.byteCount = writeBytesWireFormat(dst, dstIndex + 2);
-        dst[ dstIndex++ ] = (byte) ( this.byteCount & 0xFF );
-        dst[ dstIndex++ ] = (byte) ( ( this.byteCount >> 8 ) & 0xFF );
+
+        this.byteCount = writeBytesWireFormat(dst, dstIndex);
         dstIndex += this.byteCount;
+        dstIndex += pad8(dstIndex);
 
         this.length = dstIndex - start;
 
-        // if ( this.digest != null ) {
-        // this.digest.sign(dst, this.headerStart, this.length, this, this.response);
-        // }
+        int len = this.length;
 
-        return this.length;
+        if ( this.next != null ) {
+            int nextStart = dstIndex;
+            dstIndex += this.next.encode(dst, dstIndex);
+            int off = nextStart - start;
+            SMBUtil.writeInt4(off, dst, start + 20);
+            len += dstIndex - nextStart;
+        }
+
+        if ( this.digest != null ) {
+            this.digest.sign(dst, this.headerStart, this.length, this, getResponse());
+        }
+
+        return len;
     }
 
 
-    int decode ( byte[] buffer, int bufferIndex ) {
-        int start = this.headerStart = bufferIndex;
+    protected static final int size8 ( int size ) {
+        return size8(size, 0);
+    }
 
-        bufferIndex += readHeaderWireFormat(buffer, bufferIndex);
 
-        this.wordCount = buffer[ bufferIndex++ ];
-        if ( this.wordCount != 0 ) {
-            int n;
-            if ( ( n = readParameterWordsWireFormat(buffer, bufferIndex) ) != this.wordCount * 2 ) {
-                if ( log.isTraceEnabled() ) {
-                    log.trace("wordCount * 2=" + ( this.wordCount * 2 ) + " but readParameterWordsWireFormat returned " + n);
-                }
-            }
-            bufferIndex += this.wordCount * 2;
+    protected static final int size8 ( int size, int align ) {
+
+        int rem = size % 8 - align;
+        if ( rem == 0 ) {
+            return size;
         }
+        if ( rem < 0 ) {
+            rem = 8 + rem;
+        }
+        return size + 8 - rem;
+    }
 
-        this.byteCount = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
 
-        if ( this.byteCount != 0 ) {
-            int n;
-            if ( ( n = readBytesWireFormat(buffer, bufferIndex) ) != this.byteCount ) {
-                if ( log.isTraceEnabled() ) {
-                    log.trace("byteCount=" + this.byteCount + " but readBytesWireFormat returned " + n);
-                }
-            }
-            // Don't think we can rely on n being correct here. Must use byteCount.
-            // Last paragraph of section 3.13.3 eludes to this.
+    /**
+     * @param dstIndex
+     * @return
+     */
+    protected final int pad8 ( int dstIndex ) {
+        int fromHdr = dstIndex - this.headerStart;
+        int rem = fromHdr % 8;
+        if ( rem == 0 ) {
+            return 0;
+        }
+        return 8 - rem;
+    }
 
-            bufferIndex += this.byteCount;
+
+    @Override
+    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
+        return decode(buffer, bufferIndex, false);
+    }
+
+
+    /**
+     * @param buffer
+     * @param bufferIndex
+     * @param compound
+     * @return decoded length
+     * @throws SMBProtocolDecodingException
+     */
+    public int decode ( byte[] buffer, int bufferIndex, boolean compound ) throws SMBProtocolDecodingException {
+        int start = this.headerStart = bufferIndex;
+        bufferIndex += readHeaderWireFormat(buffer, bufferIndex);
+        if ( isErrorResponseStatus() ) {
+            bufferIndex += readErrorResponse(buffer, bufferIndex);
+        }
+        else {
+            bufferIndex += readBytesWireFormat(buffer, bufferIndex);
         }
 
         this.length = bufferIndex - start;
-        return this.length;
+        int len = this.length;
+
+        if ( compound || this.nextCommand != 0 ) {
+            // padding becomes part of signature if this is _PART_ of a compound chain
+            len += pad8(bufferIndex);
+        }
+
+        haveResponse(buffer, start, len);
+
+        if ( this.nextCommand != 0 && this.next != null ) {
+            if ( this.nextCommand % 8 != 0 ) {
+                throw new SMBProtocolDecodingException("Chained command is not aligned");
+            }
+        }
+        return len;
     }
 
 
-    int writeHeaderWireFormat ( byte[] dst, int dstIndex ) {
-        System.arraycopy(SMBUtil.SMB_HEADER, 0, dst, dstIndex, SMBUtil.SMB_HEADER.length);
-        // dst[ dstIndex + SmbConstants.CMD_OFFSET ] = this.command;
-        // dst[ dstIndex + SmbConstants.FLAGS_OFFSET ] = this.flags;
-        SMBUtil.writeInt2(this.flags2, dst, dstIndex + SmbConstants.FLAGS_OFFSET + 1);
-        dstIndex += SmbConstants.TID_OFFSET;
-        SMBUtil.writeInt2(this.tid, dst, dstIndex);
-        SMBUtil.writeInt2(this.pid, dst, dstIndex + 2);
-        SMBUtil.writeInt2(this.uid, dst, dstIndex + 4);
-        SMBUtil.writeInt2(this.mid, dst, dstIndex + 6);
-        return SmbConstants.HEADER_LENGTH;
+    protected boolean isErrorResponseStatus () {
+        return getStatus() != 0;
     }
 
 
-    int readHeaderWireFormat ( byte[] buffer, int bufferIndex ) {
-        this.command = buffer[ bufferIndex + SmbConstants.CMD_OFFSET ];
-        this.errorCode = SMBUtil.readInt4(buffer, bufferIndex + SmbConstants.ERROR_CODE_OFFSET);
-        this.flags = buffer[ bufferIndex + SmbConstants.FLAGS_OFFSET ];
-        this.flags2 = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.FLAGS_OFFSET + 1);
-        this.tid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET);
-        this.pid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET + 2);
-        this.uid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET + 4);
-        this.mid = SMBUtil.readInt2(buffer, bufferIndex + SmbConstants.TID_OFFSET + 6);
-        return SmbConstants.HEADER_LENGTH;
+    /**
+     * @param buffer
+     * @param start
+     * @param len
+     * @throws SMBProtocolDecodingException
+     */
+    protected void haveResponse ( byte[] buffer, int start, int len ) throws SMBProtocolDecodingException {}
+
+
+    /**
+     * @param buffer
+     * @param bufferIndex
+     * @return
+     * @throws Smb2ProtocolDecodingException
+     */
+    protected int readErrorResponse ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
+        int start = bufferIndex;
+        int structureSize = SMBUtil.readInt2(buffer, bufferIndex);
+        if ( structureSize != 9 ) {
+            throw new SMBProtocolDecodingException("Error structureSize should be 9");
+        }
+        this.errorContextCount = buffer[ bufferIndex + 2 ];
+        bufferIndex += 4;
+
+        int bc = SMBUtil.readInt4(buffer, bufferIndex);
+        bufferIndex += 4;
+
+        if ( bc > 0 ) {
+            this.errorData = new byte[bc];
+            System.arraycopy(buffer, bufferIndex, this.errorData, 0, bc);
+            bufferIndex += bc;
+        }
+        return bufferIndex - start;
+    }
+
+
+    protected int writeHeaderWireFormat ( byte[] dst, int dstIndex ) {
+        System.arraycopy(SMBUtil.SMB2_HEADER, 0, dst, dstIndex, SMBUtil.SMB2_HEADER.length);
+
+        SMBUtil.writeInt2(this.creditCharge, dst, dstIndex + 6);
+        SMBUtil.writeInt2(this.command, dst, dstIndex + 12);
+        SMBUtil.writeInt2(this.credit, dst, dstIndex + 14);
+        SMBUtil.writeInt4(this.flags, dst, dstIndex + 16);
+        SMBUtil.writeInt4(this.nextCommand, dst, dstIndex + 20);
+        SMBUtil.writeInt8(this.mid, dst, dstIndex + 24);
+
+        if ( this.async ) {
+            SMBUtil.writeInt8(this.asyncId, dst, dstIndex + 32);
+            SMBUtil.writeInt8(this.sessionId, dst, dstIndex + 40);
+        }
+        else {
+            // 4 reserved
+            SMBUtil.writeInt4(this.treeId, dst, dstIndex + 36);
+            SMBUtil.writeInt8(this.sessionId, dst, dstIndex + 40);
+            // + signature
+        }
+
+        return Smb2Constants.SMB2_HEADER_LENGTH;
+    }
+
+
+    protected int readHeaderWireFormat ( byte[] buffer, int bufferIndex ) {
+        // these are common between SYNC/ASYNC
+        SMBUtil.readInt4(buffer, bufferIndex);
+        bufferIndex += 4;
+        SMBUtil.readInt2(buffer, bufferIndex);
+        this.creditCharge = SMBUtil.readInt2(buffer, bufferIndex + 2);
+        bufferIndex += 4;
+        this.status = SMBUtil.readInt4(buffer, bufferIndex);
+        bufferIndex += 4;
+        this.command = SMBUtil.readInt2(buffer, bufferIndex);
+        this.credit = SMBUtil.readInt2(buffer, bufferIndex + 2);
+        bufferIndex += 4;
+
+        this.flags = SMBUtil.readInt4(buffer, bufferIndex);
+        bufferIndex += 4;
+        this.nextCommand = SMBUtil.readInt4(buffer, bufferIndex);
+        bufferIndex += 4;
+        this.mid = SMBUtil.readInt8(buffer, bufferIndex);
+        bufferIndex += 8;
+
+        if ( ( this.flags & SMB2_FLAGS_ASYNC_COMMAND ) == SMB2_FLAGS_ASYNC_COMMAND ) {
+            // async
+            this.async = true;
+            this.asyncId = SMBUtil.readInt8(buffer, bufferIndex);
+            bufferIndex += 8;
+            this.sessionId = SMBUtil.readInt8(buffer, bufferIndex);
+            bufferIndex += 8;
+            System.arraycopy(buffer, bufferIndex, this.signature, 0, 16);
+            bufferIndex += 16;
+        }
+        else {
+            // sync
+            this.async = false;
+            bufferIndex += 4; // reserved
+            this.treeId = SMBUtil.readInt4(buffer, bufferIndex);
+            bufferIndex += 4;
+            this.sessionId = SMBUtil.readInt8(buffer, bufferIndex);
+            bufferIndex += 8;
+            System.arraycopy(buffer, bufferIndex, this.signature, 0, 16);
+            bufferIndex += 16;
+        }
+
+        return Smb2Constants.SMB2_HEADER_LENGTH;
     }
 
 
     boolean isResponse () {
-        return ( this.flags & SmbConstants.FLAGS_RESPONSE ) == SmbConstants.FLAGS_RESPONSE;
+        return ( this.flags & SMB2_FLAGS_SERVER_TO_REDIR ) == SMB2_FLAGS_SERVER_TO_REDIR;
     }
 
 
-    /*
-     * For this packet deconstruction technique to work for
-     * other networking protocols the InputStream may need
-     * to be passed to the readXxxWireFormat methods. This is
-     * actually purer. However, in the case of smb we know the
-     * wordCount and byteCount. And since every subclass of
-     * ServerMessageBlock would have to perform the same read
-     * operation on the input stream, we might as will pull that
-     * common functionality into the superclass and read wordCount
-     * and byteCount worth of data.
-     * 
-     * We will still use the readXxxWireFormat return values to
-     * indicate how many bytes(note: readParameterWordsWireFormat
-     * returns bytes read and not the number of words(but the
-     * wordCount member DOES store the number of words)) we
-     * actually read. Incedentally this is important to the
-     * AndXServerMessageBlock class that needs to potentially
-     * read in another smb's parameter words and bytes based on
-     * information in it's andxCommand, andxOffset, ...etc.
-     */
-
-    abstract int writeParameterWordsWireFormat ( byte[] dst, int dstIndex );
+    protected abstract int writeBytesWireFormat ( byte[] dst, int dstIndex );
 
 
-    abstract int writeBytesWireFormat ( byte[] dst, int dstIndex );
-
-
-    abstract int readParameterWordsWireFormat ( byte[] buffer, int bufferIndex );
-
-
-    abstract int readBytesWireFormat ( byte[] buffer, int bufferIndex );
+    protected abstract int readBytesWireFormat ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException;
 
 
     @Override
     public int hashCode () {
-        return this.mid;
+        return (int) this.mid;
     }
 
 
@@ -408,10 +743,10 @@ abstract class ServerMessageBlock2 extends Response implements Request {
         default:
             c = "UNKNOWN";
         }
-        String str = this.errorCode == 0 ? "0" : SmbException.getMessageByCode(this.errorCode);
+        String str = this.status == 0 ? "0" : SmbException.getMessageByCode(this.status);
         return new String(
-            "command=" + c + ",received=" + this.received + ",errorCode=" + str + ",flags=0x" + Hexdump.toHexString(this.flags & 0xFF, 4)
-                    + ",flags2=0x" + Hexdump.toHexString(this.flags2, 4) + ",signSeq=" + this.signSeq + ",tid=" + this.tid + ",pid=" + this.pid
-                    + ",uid=" + this.uid + ",mid=" + this.mid + ",wordCount=" + this.wordCount + ",byteCount=" + this.byteCount);
+            "command=" + c + ",status=" + str + ",flags=0x" + Hexdump.toHexString(this.flags, 4) + ",mid=" + this.mid + ",wordCount=" + this.wordCount
+                    + ",byteCount=" + this.byteCount);
     }
+
 }

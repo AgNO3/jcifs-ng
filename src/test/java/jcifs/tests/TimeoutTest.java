@@ -29,6 +29,7 @@ import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,7 @@ import javax.net.ServerSocketFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.Address;
 import jcifs.CIFSContext;
@@ -67,6 +69,12 @@ public class TimeoutTest extends BaseCIFSTest {
 
     public TimeoutTest ( String name, Map<String, String> properties ) {
         super(name, properties);
+    }
+
+
+    @Parameters ( name = "{0}" )
+    public static Collection<Object> configs () {
+        return getConfigs("smb2");
     }
 
 

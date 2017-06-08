@@ -71,4 +71,10 @@ public interface FileEntry {
      * @return the file size
      */
     long length ();
+
+
+    /**
+     * @return the file index inside the parent
+     */
+    int getFileIndex ();
 }

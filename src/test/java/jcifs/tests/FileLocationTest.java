@@ -112,9 +112,9 @@ public class FileLocationTest {
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("share", fl.getShare());
-            assertEquals("\\foo", fl.getUNCPath());
-            assertEquals("smb://1.2.3.4/share/foo", fl.getCanonicalURL());
-            assertEquals("/share/foo", fl.getURLPath());
+            assertEquals("\\foo\\", fl.getUNCPath());
+            assertEquals("smb://1.2.3.4/share/foo/", fl.getCanonicalURL());
+            assertEquals("/share/foo/", fl.getURLPath());
         }
     }
 
@@ -127,9 +127,9 @@ public class FileLocationTest {
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("share", fl.getShare());
-            assertEquals("\\foo\\bar", fl.getUNCPath());
-            assertEquals("smb://1.2.3.4/share/foo/bar", fl.getCanonicalURL());
-            assertEquals("/share/foo/bar", fl.getURLPath());
+            assertEquals("\\foo\\bar\\", fl.getUNCPath());
+            assertEquals("smb://1.2.3.4/share/foo/bar/", fl.getCanonicalURL());
+            assertEquals("/share/foo/bar/", fl.getURLPath());
         }
     }
 
@@ -142,9 +142,9 @@ public class FileLocationTest {
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("share", fl.getShare());
-            assertEquals("\\foo", fl.getUNCPath());
-            assertEquals("smb://1.2.3.4/share/foo", fl.getCanonicalURL());
-            assertEquals("/share/foo", fl.getURLPath());
+            assertEquals("\\foo\\", fl.getUNCPath());
+            assertEquals("smb://1.2.3.4/share/foo/", fl.getCanonicalURL());
+            assertEquals("/share/foo/", fl.getURLPath());
         }
     }
 
@@ -213,7 +213,7 @@ public class FileLocationTest {
             assertEquals(SmbConstants.TYPE_FILESYSTEM, fl.getType());
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("share", fl.getShare());
-            assertEquals("\\foo", fl.getUNCPath());
+            assertEquals("\\foo\\", fl.getUNCPath());
             assertEquals("/share/foo/", fl.getURLPath());
         }
     }
@@ -230,7 +230,7 @@ public class FileLocationTest {
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("2.3.4.5", fl.getServerWithDfs());
             assertEquals("share", fl.getShare());
-            assertEquals("\\foo\\bar", fl.getUNCPath());
+            assertEquals("\\foo\\bar\\", fl.getUNCPath());
             assertEquals("/share/foo/bar/", fl.getURLPath());
         }
     }
@@ -247,7 +247,7 @@ public class FileLocationTest {
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("1.2.3.4", fl.getServerWithDfs());
             assertEquals("other", fl.getShare());
-            assertEquals("\\foo\\bar", fl.getUNCPath());
+            assertEquals("\\foo\\bar\\", fl.getUNCPath());
             // this intentionally sticks to the old name
             assertEquals("/share/foo/bar/", fl.getURLPath());
         }
@@ -264,7 +264,7 @@ public class FileLocationTest {
             assertEquals("1.2.3.4", fl.getServer());
             assertEquals("1.2.3.4", fl.getServerWithDfs());
             assertEquals("target", fl.getShare());
-            assertEquals("\\bar", fl.getUNCPath());
+            assertEquals("\\bar\\", fl.getUNCPath());
             // this intentionally sticks to the old name
             assertEquals("/dfs/share/bar/", fl.getURLPath());
         }
@@ -312,6 +312,28 @@ public class FileLocationTest {
         @Override
         public String getServer () {
             return this.server;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getDomain()
+         */
+        @Override
+        public String getDomain () {
+            return null;
+        }
+
+
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.DfsReferralData#getLink()
+         */
+        @Override
+        public String getLink () {
+            return null;
         }
 
 

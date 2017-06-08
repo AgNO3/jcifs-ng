@@ -39,13 +39,14 @@ public interface CredentialsInternal extends Cloneable, Credentials {
 
     /**
      * @param tc
+     * @param targetDomain
      * @param host
      * @param initialToken
      * @param doSigning
      * @return a new context
      * @throws SmbException
      */
-    SSPContext createContext ( CIFSContext tc, String host, byte[] initialToken, boolean doSigning ) throws SmbException;
+    SSPContext createContext ( CIFSContext tc, String targetDomain, String host, byte[] initialToken, boolean doSigning ) throws SmbException;
 
 
     /**

@@ -1,4 +1,5 @@
 /*
+ * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,4 +22,35 @@ package jcifs.util.transport;
  * 
  *
  */
-public interface Request {}
+public interface Request extends Message {
+
+    /**
+     * @return number of credits this request requires
+     */
+    int getCreditCost ();
+
+
+    /**
+     * @param credits
+     */
+    void setRequestCredits ( int credits );
+
+
+    /**
+     * @return whether this is a cancel request
+     */
+    boolean isCancel ();
+
+
+    /**
+     * @return chained request
+     */
+    Request getNext ();
+
+
+    /**
+     * @return the response for this request
+     */
+    Response getResponse ();
+
+}

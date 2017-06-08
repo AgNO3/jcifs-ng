@@ -67,6 +67,17 @@ public class NetServerEnum2Response extends SmbComTransactionResponse {
         }
 
 
+        /**
+         * {@inheritDoc}
+         *
+         * @see jcifs.smb.FileEntry#getFileIndex()
+         */
+        @Override
+        public int getFileIndex () {
+            return 0;
+        }
+
+
         @Override
         public long createTime () {
             return 0L;

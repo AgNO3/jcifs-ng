@@ -20,6 +20,7 @@ package jcifs.internal.smb1.trans2;
 
 
 import jcifs.Configuration;
+import jcifs.internal.fscc.FileInformation;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
@@ -30,7 +31,7 @@ import jcifs.util.Hexdump;
  */
 public class Trans2QueryPathInformation extends SmbComTransaction {
 
-    private int informationLevel;
+    private final int informationLevel;
 
 
     /**
@@ -62,7 +63,7 @@ public class Trans2QueryPathInformation extends SmbComTransaction {
     protected int writeParametersWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
 
-        SMBUtil.writeInt2(this.informationLevel, dst, dstIndex);
+        SMBUtil.writeInt2(mapInformationLevel(this.informationLevel), dst, dstIndex);
         dstIndex += 2;
         dst[ dstIndex++ ] = (byte) 0x00;
         dst[ dstIndex++ ] = (byte) 0x00;
@@ -71,6 +72,23 @@ public class Trans2QueryPathInformation extends SmbComTransaction {
         dstIndex += writeString(this.path, dst, dstIndex);
 
         return dstIndex - start;
+    }
+
+
+    /**
+     * @param informationLevel2
+     * @return
+     */
+    static long mapInformationLevel ( int il ) {
+        switch ( il ) {
+        case FileInformation.FILE_BASIC_INFO:
+            return 0x0101;
+        case FileInformation.FILE_STANDARD_INFO:
+            return 0x0102;
+        case FileInformation.FILE_ENDOFFILE_INFO:
+            return 0x0104;
+        }
+        throw new IllegalArgumentException("Unsupported information level " + il);
     }
 
 

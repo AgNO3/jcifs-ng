@@ -22,18 +22,28 @@ package jcifs.smb;
 import java.io.IOException;
 import java.net.MalformedURLException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbFileHandle;
 import jcifs.SmbRandomAccess;
-import jcifs.internal.smb1.ServerMessageBlock;
+import jcifs.internal.fscc.FileEndOfFileInformation;
 import jcifs.internal.smb1.com.SmbComReadAndX;
 import jcifs.internal.smb1.com.SmbComReadAndXResponse;
 import jcifs.internal.smb1.com.SmbComWrite;
 import jcifs.internal.smb1.com.SmbComWriteAndX;
 import jcifs.internal.smb1.com.SmbComWriteAndXResponse;
 import jcifs.internal.smb1.com.SmbComWriteResponse;
+import jcifs.internal.smb1.trans2.Trans2SetFileInformation;
+import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
+import jcifs.internal.smb2.info.Smb2SetInfoRequest;
+import jcifs.internal.smb2.io.Smb2ReadRequest;
+import jcifs.internal.smb2.io.Smb2ReadResponse;
+import jcifs.internal.smb2.io.Smb2WriteRequest;
+import jcifs.internal.smb2.io.Smb2WriteResponse;
 import jcifs.util.Encdec;
 
 
@@ -44,6 +54,7 @@ import jcifs.util.Encdec;
  */
 public class SmbRandomAccessFile implements SmbRandomAccess {
 
+    private static final Logger log = LoggerFactory.getLogger(SmbRandomAccessFile.class);
     private static final int WRITE_OPTIONS = 0x0842;
 
     private SmbFile file;
@@ -197,6 +208,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
             }
         }
         finally {
+            this.file.clearAttributeCache();
             if ( this.unsharedFile ) {
                 this.file.close();
             }
@@ -229,20 +241,42 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
             SmbComReadAndXResponse response = new SmbComReadAndXResponse(th.getConfig(), b, off);
             do {
                 r = len > this.readSize ? this.readSize : len;
-                ServerMessageBlock andX = null;
-                SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fh.getFid(), this.fp, r, andX);
-                if ( this.largeReadX ) {
-                    request.setMaxCount(r & 0xFFFF);
-                    request.setOpenTimeout( ( r >> 16 ) & 0xFFFF);
-                }
 
-                try {
-                    th.send(request, response, RequestParam.NO_RETRY);
+                if ( th.isSMB2() ) {
+                    Smb2ReadRequest request = new Smb2ReadRequest(th.getConfig(), fh.getFileId(), b, off);
+                    request.setOffset(this.fp);
+                    request.setReadLength(r);
+                    request.setRemainingBytes(len - r - off);
+                    try {
+                        Smb2ReadResponse resp = th.send(request, RequestParam.NO_RETRY);
+                        n = resp.getDataLength();
+                    }
+                    catch ( SmbException e ) {
+                        if ( e.getNtStatus() == 0xC0000011 ) {
+                            log.debug("Reached end of file", e);
+                            n = -1;
+                        }
+                        else {
+                            throw e;
+                        }
+                    }
                 }
-                catch ( CIFSException e ) {
-                    throw SmbException.wrap(e);
+                else {
+                    SmbComReadAndX request = new SmbComReadAndX(th.getConfig(), fh.getFid(), this.fp, r, null);
+                    if ( this.largeReadX ) {
+                        request.setMaxCount(r & 0xFFFF);
+                        request.setOpenTimeout( ( r >> 16 ) & 0xFFFF);
+                    }
+
+                    try {
+                        th.send(request, response, RequestParam.NO_RETRY);
+                        n = response.getDataLength();
+                    }
+                    catch ( CIFSException e ) {
+                        throw SmbException.wrap(e);
+                    }
                 }
-                if ( ( n = response.getDataLength() ) <= 0 ) {
+                if ( n <= 0 ) {
                     return (int) ( ( this.fp - start ) > 0L ? this.fp - start : -1 );
                 }
                 this.fp += n;
@@ -315,14 +349,22 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
             int w;
             do {
                 w = len > this.writeSize ? this.writeSize : len;
-                SmbComWriteAndX request = new SmbComWriteAndX(th.getConfig(), fh.getFid(), this.fp, len - w, b, off, w, null);
-                try {
+                long cnt;
+
+                if ( th.isSMB2() ) {
+                    Smb2WriteRequest request = new Smb2WriteRequest(th.getConfig(), fh.getFileId());
+                    request.setOffset(this.fp);
+                    request.setRemainingBytes(len - w - off);
+                    request.setData(b, off, w);
+                    Smb2WriteResponse resp = th.send(request, RequestParam.NO_RETRY);
+                    cnt = resp.getCount();
+                }
+                else {
+                    SmbComWriteAndX request = new SmbComWriteAndX(th.getConfig(), fh.getFid(), this.fp, len - w - off, b, off, w, null);
                     th.send(request, this.write_andx_resp, RequestParam.NO_RETRY);
+                    cnt = this.write_andx_resp.getCount();
                 }
-                catch ( CIFSException e ) {
-                    throw SmbException.wrap(e);
-                }
-                long cnt = this.write_andx_resp.getCount();
+
                 this.fp += cnt;
                 len -= cnt;
                 off += cnt;
@@ -368,20 +410,34 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
 
 
     /**
-     * Expand file length
+     * Expand/truncate file length
      * 
      * @param newLength
-     *            new file length, 32-bit max
+     *            new file length
      * @throws SmbException
      */
     public void setLength ( long newLength ) throws SmbException {
-        // ensure file is open
-
         try ( SmbFileHandleImpl fh = ensureOpen();
               SmbTreeHandleImpl th = fh.getTree() ) {
-            // TODO: is there a way to make this 64-bit safe
-            SmbComWriteResponse rsp = new SmbComWriteResponse(th.getConfig());
-            th.send(new SmbComWrite(th.getConfig(), fh.getFid(), (int) ( newLength & 0xFFFFFFFFL ), 0, this.tmp, 0, 0), rsp, RequestParam.NO_RETRY);
+            if ( th.isSMB2() ) {
+                Smb2SetInfoRequest req = new Smb2SetInfoRequest(th.getConfig(), fh.getFileId());
+                req.setFileInformation(new FileEndOfFileInformation(newLength));
+                th.send(req, RequestParam.NO_RETRY);
+            }
+            else if ( th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
+                th.send(
+                    new Trans2SetFileInformation(th.getConfig(), fh.getFid(), new FileEndOfFileInformation(newLength)),
+                    new Trans2SetFileInformationResponse(th.getConfig()),
+                    RequestParam.NO_RETRY);
+            }
+            else {
+                // this is the original, COM_WRITE allows truncation but no 64 bit offsets
+                SmbComWriteResponse rsp = new SmbComWriteResponse(th.getConfig());
+                th.send(
+                    new SmbComWrite(th.getConfig(), fh.getFid(), (int) ( newLength & 0xFFFFFFFFL ), 0, this.tmp, 0, 0),
+                    rsp,
+                    RequestParam.NO_RETRY);
+            }
         }
         catch ( CIFSException e ) {
             throw SmbException.wrap(e);

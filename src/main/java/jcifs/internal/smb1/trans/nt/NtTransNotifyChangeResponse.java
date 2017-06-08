@@ -19,19 +19,19 @@
 package jcifs.internal.smb1.trans.nt;
 
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import jcifs.Configuration;
 import jcifs.FileNotifyInformation;
-import jcifs.RuntimeCIFSException;
+import jcifs.internal.NotifyResponse;
+import jcifs.internal.SMBProtocolDecodingException;
 
 
 /**
  * 
  */
-public class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse {
+public class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse implements NotifyResponse {
 
     private List<FileNotifyInformation> notifyInformation = new ArrayList<>();
 
@@ -48,6 +48,7 @@ public class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse {
     /**
      * @return the notifyInformation
      */
+    @Override
     public final List<FileNotifyInformation> getNotifyInformation () {
         return this.notifyInformation;
     }
@@ -78,28 +79,24 @@ public class NtTransNotifyChangeResponse extends SmbComNtTransactionResponse {
 
 
     @Override
-    protected int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len ) {
+    protected int readParametersWireFormat ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException {
         int start = bufferIndex;
-        try {
-            int elemStart = start;
 
-            FileNotifyInformationImpl i = new FileNotifyInformationImpl();
+        int elemStart = start;
+
+        FileNotifyInformationImpl i = new FileNotifyInformationImpl();
+        bufferIndex += i.decode(buffer, bufferIndex, len);
+        this.notifyInformation.add(i);
+
+        while ( i.getNextEntryOffset() > 0 ) {
+            bufferIndex = elemStart + i.getNextEntryOffset();
+            elemStart = bufferIndex;
+
+            i = new FileNotifyInformationImpl();
             bufferIndex += i.decode(buffer, bufferIndex, len);
             this.notifyInformation.add(i);
-
-            while ( i.nextEntryOffset > 0 ) {
-                bufferIndex = elemStart + i.nextEntryOffset;
-                elemStart = bufferIndex;
-
-                i = new FileNotifyInformationImpl();
-                bufferIndex += i.decode(buffer, bufferIndex, len);
-                this.notifyInformation.add(i);
-            }
-
         }
-        catch ( IOException ioe ) {
-            throw new RuntimeCIFSException(ioe.getMessage());
-        }
+
         return bufferIndex - start;
     }
 

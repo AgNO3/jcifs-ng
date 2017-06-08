@@ -28,10 +28,18 @@ import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.internal.fscc.FileBasicInfo;
 import jcifs.internal.smb1.com.SmbComSetInformation;
 import jcifs.internal.smb1.com.SmbComSetInformationResponse;
 import jcifs.internal.smb1.trans2.Trans2SetFileInformation;
 import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
+import jcifs.internal.smb2.info.Smb2SetInfoRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
+import jcifs.internal.smb2.ioctl.SrvCopyChunkCopyResponse;
+import jcifs.internal.smb2.ioctl.SrvCopychunk;
+import jcifs.internal.smb2.ioctl.SrvCopychunkCopy;
+import jcifs.internal.smb2.ioctl.SrvRequestResumeKeyResponse;
 
 
 /**
@@ -55,11 +63,11 @@ final class SmbCopyUtil {
      * @throws SmbException
      * @throws SmbAuthException
      */
-    static SmbFileHandleImpl openCopyTargetFile ( SmbFile dest, int attrs ) throws CIFSException {
+    static SmbFileHandleImpl openCopyTargetFile ( SmbFile dest, int attrs, boolean alsoRead ) throws CIFSException {
         try {
             return dest.openUnshared(
                 SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_TRUNC,
-                SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES,
+                SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES | ( alsoRead ? SmbConstants.FILE_READ_DATA : 0 ),
                 SmbConstants.FILE_NO_SHARE,
                 attrs,
                 0);
@@ -74,7 +82,7 @@ final class SmbCopyUtil {
                 dest.setPathInformation(dattrs & ~SmbConstants.ATTR_READONLY, 0L, 0L, 0L);
                 return dest.openUnshared(
                     SmbConstants.O_CREAT | SmbConstants.O_WRONLY | SmbConstants.O_TRUNC,
-                    SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES,
+                    SmbConstants.FILE_WRITE_DATA | SmbConstants.FILE_WRITE_ATTRIBUTES | ( alsoRead ? SmbConstants.FILE_READ_DATA : 0 ),
                     SmbConstants.FILE_NO_SHARE,
                     attrs,
                     0);
@@ -97,10 +105,23 @@ final class SmbCopyUtil {
      */
     static void copyFile ( SmbFile src, SmbFile dest, byte[][] b, int bsize, WriterThread w, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh )
             throws SmbException {
+
+        if ( sh.isSMB2() && dh.isSMB2() && sh.isSameTree(dh) ) {
+            try {
+                serverSideCopy(src, dest, sh, dh, false);
+                return;
+            }
+            catch ( CIFSException e ) {
+                log.warn("Server side copy failed", e);
+                throw SmbException.wrap(e);
+            }
+        }
+
         try ( SmbFileHandleImpl sfd = src.openUnshared(0, SmbConstants.O_RDONLY, SmbConstants.FILE_SHARE_READ, SmbConstants.ATTR_NORMAL, 0);
               SmbFileInputStream fis = new SmbFileInputStream(src, sh, sfd) ) {
             int attrs = src.getAttributes();
-            try ( SmbFileHandleImpl dfd = openCopyTargetFile(dest, attrs);
+
+            try ( SmbFileHandleImpl dfd = openCopyTargetFile(dest, attrs, false);
                   SmbFileOutputStream fos = new SmbFileOutputStream(
                       dest,
                       dh,
@@ -142,7 +163,12 @@ final class SmbCopyUtil {
                     log.debug(String.format("Copied a total of %d bytes", off));
                 }
 
-                if ( dh.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
+                if ( dh.isSMB2() ) {
+                    Smb2SetInfoRequest req = new Smb2SetInfoRequest(dh.getConfig(), dfd.getFileId());
+                    req.setFileInformation(new FileBasicInfo(ctime, atime, mtime, 0L, attrs));
+                    dh.send(req);
+                }
+                else if ( dh.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                     // use the open file descriptor
                     dh.send(
                         new Trans2SetFileInformation(dh.getConfig(), dfd.getFid(), attrs, ctime, mtime, atime),
@@ -159,7 +185,133 @@ final class SmbCopyUtil {
             if ( !src.getContext().getConfig().isIgnoreCopyToException() ) {
                 throw new SmbException("Failed to copy file from [" + src.toString() + "] to [" + dest.toString() + "]", se);
             }
-            log.debug("Copy failed", se);
+            log.warn("Copy failed", se);
+        }
+    }
+
+
+    /**
+     * @param src
+     * @param dest
+     * @param sh
+     * @param dh
+     * @throws SmbException
+     */
+    @SuppressWarnings ( "resource" )
+    private static void serverSideCopy ( SmbFile src, SmbFile dest, SmbTreeHandleImpl sh, SmbTreeHandleImpl dh, boolean write ) throws CIFSException {
+        log.debug("Trying server side copy");
+        SmbFileHandleImpl dfd = null;
+        try {
+            long size;
+            byte[] resumeKey;
+
+            // despite there being a resume key, we still need an open file descriptor?
+            try ( SmbFileHandleImpl sfd = src.openUnshared(0, SmbConstants.O_RDONLY, SmbConstants.FILE_SHARE_READ, SmbConstants.ATTR_NORMAL, 0) ) {
+                if ( sfd.getInitialSize() == 0 ) {
+                    try ( SmbFileHandleImpl edfd = openCopyTargetFile(dest, src.getAttributes(), !write) ) {
+                        return;
+                    }
+                }
+
+                Smb2IoctlRequest resumeReq = new Smb2IoctlRequest(sh.getConfig(), Smb2IoctlRequest.FSCTL_SRV_REQUEST_RESUME_KEY, sfd.getFileId());
+                resumeReq.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+                Smb2IoctlResponse resumeResp = sh.send(resumeReq);
+                SrvRequestResumeKeyResponse rkresp = resumeResp.getOutputData(SrvRequestResumeKeyResponse.class);
+                size = sfd.getInitialSize();
+                resumeKey = rkresp.getResumeKey();
+
+                // start with some reasonably safe defaults, the server will till us if it does not like it
+                // can we resume this if we loose the file descriptor?
+
+                int maxChunks = 256;
+                int maxChunkSize = 1024 * 1024;
+                int byteLimit = 16 * 1024 * 1024;
+                boolean retry = false;
+                do {
+                    long ooff = 0;
+                    while ( ooff < size ) {
+                        long wsize = size - ooff;
+                        if ( wsize > byteLimit ) {
+                            wsize = byteLimit;
+                        }
+
+                        int chunks = (int) ( wsize / maxChunkSize );
+                        int lastChunkSize;
+                        if ( chunks + 1 > maxChunks ) {
+                            chunks = maxChunks;
+                            lastChunkSize = maxChunkSize;
+                        }
+                        else {
+                            lastChunkSize = (int) ( wsize % maxChunkSize );
+                            if ( lastChunkSize != 0 ) {
+                                chunks++;
+                            }
+                            else {
+                                lastChunkSize = maxChunkSize;
+                            }
+                        }
+
+                        SrvCopychunk[] chunkInfo = new SrvCopychunk[chunks];
+                        long ioff = 0;
+                        for ( int i = 0; i < chunks; i++ ) {
+                            long absoff = ooff + ioff;
+                            int csize = i == chunks - 1 ? lastChunkSize : maxChunkSize;
+                            chunkInfo[ i ] = new SrvCopychunk(absoff, absoff, csize);
+                            ioff += maxChunkSize;
+                        }
+
+                        if ( dfd == null || !dfd.isValid() ) {
+                            // don't reopen the file for every round if it's not necessary, keep the lock
+                            dfd = openCopyTargetFile(dest, src.getAttributes(), !write);
+                        }
+
+                        // FSCTL_SRV_COPYCHUNK_WRITE allows to open the file for writing only, FSCTL_SRV_COPYCHUNK also
+                        // needs read access
+                        Smb2IoctlRequest copy = new Smb2IoctlRequest(
+                            sh.getConfig(),
+                            write ? Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK_WRITE : Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK,
+                            dfd.getFileId());
+                        copy.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+                        copy.setInputData(new SrvCopychunkCopy(resumeKey, chunkInfo));
+
+                        try {
+                            SrvCopyChunkCopyResponse r = dh.send(copy, RequestParam.NO_RETRY).getOutputData(SrvCopyChunkCopyResponse.class);
+                            if ( log.isDebugEnabled() ) {
+                                log.debug(
+                                    String.format(
+                                        "Wrote %d bytes (%d chunks, last partial write %d)",
+                                        r.getTotalBytesWritten(),
+                                        r.getChunksWritten(),
+                                        r.getChunkBytesWritten()));
+                            }
+                            ooff += r.getTotalBytesWritten();
+                        }
+                        catch ( SmbException e ) {
+                            Smb2IoctlResponse response = copy.getResponse();
+                            if ( !retry && response.isReceived() && !response.isError()
+                                    && response.getStatus() == NtStatus.NT_STATUS_INVALID_PARAMETER ) {
+                                retry = true;
+                                SrvCopyChunkCopyResponse outputData = response.getOutputData(SrvCopyChunkCopyResponse.class);
+                                maxChunks = outputData.getChunksWritten();
+                                maxChunkSize = outputData.getChunkBytesWritten();
+                                byteLimit = outputData.getTotalBytesWritten();
+                                continue;
+                            }
+                            throw e;
+                        }
+                    }
+                    break;
+                }
+                while ( retry );
+            }
+        }
+        catch ( IOException se ) {
+            throw new CIFSException("Server side copy failed", se);
+        }
+        finally {
+            if ( dfd != null ) {
+                dfd.close();
+            }
         }
     }
 

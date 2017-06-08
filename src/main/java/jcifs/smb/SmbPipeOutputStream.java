@@ -75,4 +75,5 @@ public class SmbPipeOutputStream extends SmbFileOutputStream {
     public void close () {
         // ignore, the shared file descriptor is closed by the pipe handle
     }
+
 }

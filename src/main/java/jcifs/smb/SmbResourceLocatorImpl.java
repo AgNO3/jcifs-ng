@@ -45,6 +45,9 @@ import jcifs.netbios.UniAddress;
  * - share + uncpath within it: This is the relevant information for most SMB requests. Both are adjusted by DFS
  * referrals. Nested resources will inherit the information already resolved by the parent resource.
  * 
+ * Invariant:
+ * A directory resource must have a trailing slash/backslash for both URL and UNC path at all times.
+ * 
  * @author mbechler
  *
  */
@@ -110,7 +113,9 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             this.dfsReferral = context.getDfsReferral();
         }
         int last = name.length() - 1;
+        boolean trailingSlash = false;
         if ( last >= 0 && name.charAt(last) == '/' ) {
+            trailingSlash = true;
             name = name.substring(0, last);
         }
 
@@ -132,8 +137,8 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             if ( nameParts.length > pos ) {
                 String[] remainParts = new String[nameParts.length - pos];
                 System.arraycopy(nameParts, pos, remainParts, 0, nameParts.length - pos);
-                this.unc = "\\" + String.join("\\", remainParts);
-                this.canon = "/" + this.share + "/" + String.join("/", remainParts);
+                this.unc = "\\" + String.join("\\", remainParts) + ( trailingSlash ? "\\" : "" );
+                this.canon = "/" + this.share + "/" + String.join("/", remainParts) + ( trailingSlash ? "/" : "" );
             }
             else {
                 this.unc = "\\";
@@ -145,16 +150,19 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
                 }
             }
         }
-        else if ( context.getUNCPath().equals("\\") ) {
-            // context share != null, so the remainder is path
-            this.unc = '\\' + name.replace('/', '\\');
-            this.canon = context.getURLPath() + name;
-            this.share = shr;
-        }
         else {
-            this.unc = context.getUNCPath() + '\\' + name.replace('/', '\\');
-            this.canon = context.getURLPath() + '/' + name;
-            this.share = shr;
+            String uncPath = context.getUNCPath();
+            if ( uncPath.equals("\\") ) {
+                // context share != null, so the remainder is path
+                this.unc = '\\' + name.replace('/', '\\') + ( trailingSlash ? "\\" : "" );
+                this.canon = context.getURLPath() + name + ( trailingSlash ? "/" : "" );
+                this.share = shr;
+            }
+            else {
+                this.unc = uncPath + name.replace('/', '\\') + ( trailingSlash ? "\\" : "" );
+                this.canon = context.getURLPath() + name + ( trailingSlash ? "/" : "" );
+                this.share = shr;
+            }
         }
     }
 
@@ -639,7 +647,8 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             }
             else {
                 this.share = this.canon.substring(1, i);
-                this.unc = this.canon.substring(i, out[ o ] == '/' ? o : o + 1).replace('/', '\\');
+                this.unc = this.canon.substring(i, o + 1).replace('/', '\\');
+                // this.unc = this.canon.substring(i, out[ o ] == '/' ? o : o + 1).replace('/', '\\');
             }
         }
         else {
@@ -740,6 +749,9 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
      */
     @Override
     public String handleDFSReferral ( DfsReferralData dr, String reqPath ) {
+        if ( this.dfsReferral != null ) {
+            return this.unc;
+        }
         this.dfsReferral = dr;
 
         String oldUncPath = getUNCPath();
@@ -762,10 +774,13 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             log.debug("Remaining '" + dunc + "'");
         }
 
-        if ( dunc.equals("") )
+        if ( dunc.equals("") ) {
             dunc = "\\";
-        if ( !dr.getPath().isEmpty() )
+            this.type = SmbConstants.TYPE_SHARE;
+        }
+        if ( !dr.getPath().isEmpty() ) {
             dunc = "\\" + dr.getPath() + dunc;
+        }
 
         if ( dunc.charAt(0) != '\\' ) {
             log.warn("No slash at start of remaining DFS path " + dunc);

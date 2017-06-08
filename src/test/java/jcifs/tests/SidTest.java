@@ -21,11 +21,13 @@ package jcifs.tests;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import jcifs.smb.SID;
 
@@ -44,6 +46,12 @@ public class SidTest extends BaseCIFSTest {
      */
     public SidTest ( String name, Map<String, String> properties ) {
         super(name, properties);
+    }
+
+
+    @Parameters ( name = "{0}" )
+    public static Collection<Object> configs () {
+        return getConfigs("smb2");
     }
 
 

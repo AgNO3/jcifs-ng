@@ -23,8 +23,8 @@ import java.io.IOException;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
+import jcifs.internal.dtyp.SecurityDescriptor;
 import jcifs.internal.util.SMBUtil;
-import jcifs.smb.SecurityDescriptor;
 
 
 /**

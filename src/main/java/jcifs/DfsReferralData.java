@@ -43,6 +43,13 @@ public interface DfsReferralData {
 
 
     /**
+     * 
+     * @return the domain this referral is for
+     */
+    String getDomain ();
+
+
+    /**
      * @return the share this referral points to
      */
     String getShare ();
@@ -71,5 +78,11 @@ public interface DfsReferralData {
      * @return pointer to next referral, points to self if there is no further referral
      */
     DfsReferralData next ();
+
+
+    /**
+     * @return the link
+     */
+    String getLink ();
 
 }

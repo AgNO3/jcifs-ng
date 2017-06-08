@@ -49,20 +49,16 @@ public interface SmbTreeHandle extends AutoCloseable {
 
     /**
      * @return server timezone offset
+     * @throws CIFSException
      */
-    long getServerTimeZoneOffset ();
+    long getServerTimeZoneOffset () throws CIFSException;
 
 
     /**
      * @return server reported domain name
+     * @throws CIFSException
      */
-    String getOEMDomainName ();
-
-
-    /**
-     * @return the service we are connected to
-     */
-    String getConnectedService ();
+    String getOEMDomainName () throws CIFSException;
 
 
     /**
@@ -76,5 +72,23 @@ public interface SmbTreeHandle extends AutoCloseable {
      * @return whether the handles refer to the same tree
      */
     boolean isSameTree ( SmbTreeHandle th );
+
+
+    /**
+     * @return whether this tree handle uses SMB2+
+     */
+    boolean isSMB2 ();
+
+
+    /**
+     * @return the remote host name
+     */
+    String getRemoteHostName ();
+
+
+    /**
+     * @return the tree type
+     */
+    int getTreeType ();
 
 }

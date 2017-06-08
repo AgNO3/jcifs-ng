@@ -1,4 +1,5 @@
 /*
+ * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,25 +21,132 @@ package jcifs.util.transport;
 /**
  *
  */
-public abstract class Response {
+public interface Response extends Message {
+
+    /**
+     * 
+     * @return whether the response is received
+     */
+    boolean isReceived ();
+
+
+    /**
+     * Set received status
+     */
+    void received ();
+
+
+    /**
+     * Unset received status
+     */
+    void clearReceived ();
+
+
+    /**
+     * 
+     * @return number of credits granted by the server
+     */
+    int getGrantedCredits ();
+
+
+    /**
+     * @return status code
+     */
+    int getErrorCode ();
+
+
+    /**
+     * 
+     * @param buffer
+     * @param i
+     * @param size
+     * @return whether signature verification is successful
+     */
+    boolean verifySignature ( byte[] buffer, int i, int size );
+
+
+    /**
+     * @return whether signature verification failed
+     */
+    boolean isVerifyFailed ();
+
+
+    /**
+     * 
+     * @return whether the response is an error
+     */
+    boolean isError ();
+
+
+    /**
+     * Set error status
+     */
+    void error ();
+
+
+    /**
+     * 
+     * @return the message timeout
+     */
+    Long getExpiration ();
+
+
+    /**
+     * 
+     * @param exp
+     *            message timeout
+     */
+    void setExpiration ( Long exp );
+
+
+    /**
+     * Indicate that this message should retain it's raw payload
+     */
+    void retainPayload ();
+
+
+    /**
+     * 
+     * @return whether to retain the message payload
+     */
+    boolean isRetainPayload ();
+
+
+    /**
+     * 
+     * @return the raw response message
+     */
+    byte[] getRawPayload ();
+
 
     /**
      * 
      */
-    public Long expiration;
+    public void reset ();
+
 
     /**
      * 
+     * @return an exception linked to an error
      */
-    public boolean isReceived;
+    public Exception getException ();
+
 
     /**
-     * 
+     * @param e
      */
-    public boolean isError;
+    public void exception ( Exception e );
+
 
     /**
-     * 
+     * @param rawPayload
      */
-    public Exception exception;
+    void setRawPayload ( byte[] rawPayload );
+
+
+    /**
+     * @return chained response
+     */
+    Response getNextResponse ();
+
 }

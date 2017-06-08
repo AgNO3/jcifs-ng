@@ -21,6 +21,7 @@ package jcifs.smb;
 import java.io.IOException;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.DfsReferralData;
 import jcifs.SmbSession;
 import jcifs.SmbTransport;
@@ -49,44 +50,46 @@ public interface SmbTransportInternal extends SmbTransport {
     /**
      * @param hard
      * @param inuse
+     * @return whether the connection was in use
      * @throws IOException
      */
-    void disconnect ( boolean hard, boolean inuse ) throws IOException;
+    boolean disconnect ( boolean hard, boolean inuse ) throws IOException;
 
 
     /**
+     * @return whether the transport was connected
      * @throws SmbException
+     * @throws IOException
      * 
      */
-    void ensureConnected () throws SmbException;
+    boolean ensureConnected () throws IOException;
 
 
     /**
      * @param ctx
      * @param name
+     * @param targetHost
+     * @param targetDomain
      * @param rn
      * @return dfs referral
      * @throws SmbException
+     * @throws CIFSException
      */
-    DfsReferralData getDfsReferrals ( CIFSContext ctx, String name, int rn ) throws SmbException;
+    DfsReferralData getDfsReferrals ( CIFSContext ctx, String name, String targetHost, String targetDomain, int rn ) throws CIFSException;
 
 
     /**
      * @return whether signatures are supported but not required
+     * @throws SmbException
      */
-    boolean isSigningOptional ();
+    boolean isSigningOptional () throws SmbException;
 
 
     /**
      * @return whether signatures are enforced from either side
+     * @throws SmbException
      */
-    boolean isSigningEnforced ();
-
-
-    /**
-     * @return the hostname reported by the remote server
-     */
-    String getRemoteHostName ();
+    boolean isSigningEnforced () throws SmbException;
 
 
     /**
@@ -100,4 +103,13 @@ public interface SmbTransportInternal extends SmbTransport {
      * @return session
      */
     SmbSession getSmbSession ( CIFSContext ctx );
+
+
+    /**
+     * @param tf
+     * @param targetHost
+     * @param targetDomain
+     * @return session
+     */
+    SmbSession getSmbSession ( CIFSContext tf, String targetHost, String targetDomain );
 }

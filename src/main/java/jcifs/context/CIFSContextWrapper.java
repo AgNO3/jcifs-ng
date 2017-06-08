@@ -185,7 +185,7 @@ public class CIFSContextWrapper implements CIFSContext {
 
 
     @Override
-    public void close () throws CIFSException {
-        this.delegate.close();
+    public boolean close () throws CIFSException {
+        return this.delegate.close();
     }
 }

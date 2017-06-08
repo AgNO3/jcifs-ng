@@ -66,10 +66,13 @@ public class SmbComOpenAndX extends AndXServerMessageBlock {
      * @param access
      * @param shareAccess
      * @param flags
+     * @param fileAttributes
      * @param andx
      */
-    public SmbComOpenAndX ( Configuration config, String fileName, int access, int shareAccess, int flags, ServerMessageBlock andx ) {
+    public SmbComOpenAndX ( Configuration config, String fileName, int access, int shareAccess, int flags, int fileAttributes,
+            ServerMessageBlock andx ) {
         super(config, SMB_COM_OPEN_ANDX, fileName, andx);
+        this.fileAttributes = fileAttributes;
 
         this.desiredAccess = access & 0x3;
         if ( this.desiredAccess == 0x3 ) {
@@ -98,9 +101,6 @@ public class SmbComOpenAndX extends AndXServerMessageBlock {
 
         // searchAttributes
         this.searchAttributes = SmbConstants.ATTR_DIRECTORY | SmbConstants.ATTR_HIDDEN | SmbConstants.ATTR_SYSTEM;
-
-        // fileAttributes
-        this.fileAttributes = 0;
 
         // openFunction
         if ( ( flags & SmbConstants.O_TRUNC ) == SmbConstants.O_TRUNC ) {

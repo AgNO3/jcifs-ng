@@ -20,10 +20,11 @@ package jcifs.internal.smb1.trans2;
 
 
 import jcifs.Configuration;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.fscc.FileBothDirectoryInfo;
 import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans.SmbComTransactionResponse;
 import jcifs.internal.util.SMBUtil;
-import jcifs.util.Strings;
 
 
 /**
@@ -90,37 +91,6 @@ public class Trans2FindFirst2Response extends SmbComTransactionResponse {
     }
 
 
-    String readString ( byte[] src, int srcIndex, int len ) {
-        String str = null;
-        if ( isUseUnicode() ) {
-            // should Unicode alignment be corrected for here?
-            str = Strings.fromUNIBytes(src, srcIndex, len);
-        }
-        else {
-
-            /*
-             * On NT without Unicode the fileNameLength
-             * includes the '\0' whereas on win98 it doesn't. I
-             * guess most clients only support non-unicode so
-             * they don't run into this.
-             */
-
-            /*
-             * UPDATE: Maybe not! Could this be a Unicode alignment issue. I hope
-             * so. We cannot just comment out this method and use readString of
-             * ServerMessageBlock.java because the arguments are different, however
-             * one might be able to reduce this.
-             */
-
-            if ( len > 0 && src[ srcIndex + len - 1 ] == '\0' ) {
-                len--;
-            }
-            str = Strings.fromOEMBytes(src, srcIndex, len, getConfig());
-        }
-        return str;
-    }
-
-
     @Override
     protected int writeSetupWireFormat ( byte[] dst, int dstIndex ) {
         return 0;
@@ -167,34 +137,16 @@ public class Trans2FindFirst2Response extends SmbComTransactionResponse {
 
 
     @Override
-    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) {
-        SmbFindFileBothDirectoryInfo e;
+    protected int readDataWireFormat ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException {
+        FileBothDirectoryInfo e;
 
         this.lastNameBufferIndex = bufferIndex + this.lastNameOffset;
 
-        SmbFindFileBothDirectoryInfo[] results = new SmbFindFileBothDirectoryInfo[getNumEntries()];
+        FileBothDirectoryInfo[] results = new FileBothDirectoryInfo[getNumEntries()];
         for ( int i = 0; i < getNumEntries(); i++ ) {
-            results[ i ] = e = new SmbFindFileBothDirectoryInfo();
+            results[ i ] = e = new FileBothDirectoryInfo(getConfig(), isUseUnicode());
 
-            e.nextEntryOffset = SMBUtil.readInt4(buffer, bufferIndex);
-            e.fileIndex = SMBUtil.readInt4(buffer, bufferIndex + 4);
-            e.creationTime = SMBUtil.readTime(buffer, bufferIndex + 8);
-            // e.lastAccessTime = readTime( buffer, bufferIndex + 16 );
-            e.lastWriteTime = SMBUtil.readTime(buffer, bufferIndex + 24);
-            // e.changeTime = readTime( buffer, bufferIndex + 32 );
-            e.endOfFile = SMBUtil.readInt8(buffer, bufferIndex + 40);
-            // e.allocationSize = readInt8( buffer, bufferIndex + 48 );
-            e.extFileAttributes = SMBUtil.readInt4(buffer, bufferIndex + 56);
-            e.fileNameLength = SMBUtil.readInt4(buffer, bufferIndex + 60);
-            // e.eaSize = readInt4( buffer, bufferIndex + 64 );
-            // e.shortNameLength = buffer[bufferIndex + 68] & 0xFF;
-
-            /*
-             * With NT, the shortName is in Unicode regardless of what is negotiated.
-             */
-
-            // e.shortName = readString( buffer, bufferIndex + 70, e.shortNameLength );
-            e.filename = readString(buffer, bufferIndex + 94, e.fileNameLength);
+            e.decode(buffer, bufferIndex, len);
 
             /*
              * lastNameOffset ends up pointing to either to
@@ -206,12 +158,12 @@ public class Trans2FindFirst2Response extends SmbComTransactionResponse {
              */
 
             if ( this.lastNameBufferIndex >= bufferIndex
-                    && ( e.nextEntryOffset == 0 || this.lastNameBufferIndex < ( bufferIndex + e.nextEntryOffset ) ) ) {
-                this.lastName = e.filename;
-                this.resumeKey = e.fileIndex;
+                    && ( e.getNextEntryOffset() == 0 || this.lastNameBufferIndex < ( bufferIndex + e.getNextEntryOffset() ) ) ) {
+                this.lastName = e.getFilename();
+                this.resumeKey = e.getFileIndex();
             }
 
-            bufferIndex += e.nextEntryOffset;
+            bufferIndex += e.getNextEntryOffset();
         }
 
         setResults(results);

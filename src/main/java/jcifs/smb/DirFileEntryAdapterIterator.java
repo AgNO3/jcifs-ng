@@ -20,6 +20,7 @@ package jcifs.smb;
 
 import java.net.MalformedURLException;
 
+import jcifs.CloseableIterator;
 import jcifs.ResourceFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
@@ -32,7 +33,7 @@ class DirFileEntryAdapterIterator extends FileEntryAdapterIterator {
      * @param delegate
      * @param filter
      */
-    public DirFileEntryAdapterIterator ( SmbResource parent, DirFileEntryEnumIterator delegate, ResourceFilter filter ) {
+    public DirFileEntryAdapterIterator ( SmbResource parent, CloseableIterator<FileEntry> delegate, ResourceFilter filter ) {
         super(parent, delegate, filter);
     }
 
@@ -45,7 +46,7 @@ class DirFileEntryAdapterIterator extends FileEntryAdapterIterator {
     @Override
     protected SmbResource adapt ( FileEntry e ) throws MalformedURLException {
         return new SmbFile(
-            this.getParent(),
+            getParent(),
             e.getName(),
             true,
             SmbConstants.TYPE_FILESYSTEM,

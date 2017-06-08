@@ -1,5 +1,5 @@
-/* jcifs smb client library in Java
- * Copyright (C) 2002  "Michael B. Allen" <jcifs at samba dot org>
+/*
+ * © 2017 AgNO3 Gmbh & Co. KG
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -15,8 +15,10 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
 package jcifs.internal;
+
+
+import jcifs.internal.fscc.FileSystemInformation;
 
 
 /**
@@ -24,7 +26,7 @@ package jcifs.internal;
  * @author mbechler
  *
  */
-public interface AllocInfo {
+public interface AllocInfo extends FileSystemInformation {
 
     /**
      * 

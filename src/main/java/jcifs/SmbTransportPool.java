@@ -18,7 +18,9 @@
 package jcifs;
 
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 
 /**
@@ -28,6 +30,20 @@ import java.net.InetAddress;
  * @internal
  */
 public interface SmbTransportPool {
+
+    /**
+     * @param tf
+     * @param name
+     * @param port
+     * @param exclusive
+     * @param forceSigning
+     * @return a connected transport
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    SmbTransport getSmbTransport ( CIFSContext tf, String name, int port, boolean exclusive, boolean forceSigning )
+            throws UnknownHostException, IOException;
+
 
     /**
      * Get transport connection
@@ -105,10 +121,12 @@ public interface SmbTransportPool {
     /**
      * Closes the pool and all connections in it
      * 
+     * @return whether any transport was still in use
+     * 
      * @throws CIFSException
      * 
      */
-    void close () throws CIFSException;
+    boolean close () throws CIFSException;
 
 
     /**
