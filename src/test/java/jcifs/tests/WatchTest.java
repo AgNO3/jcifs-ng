@@ -194,6 +194,26 @@ public class WatchTest extends BaseCIFSTest {
     }
 
 
+    @Test
+    public void testWatchRecursive () throws InterruptedException, ExecutionException, IOException {
+        try ( SmbResource subdir = this.base.resolve("test/") ) {
+            subdir.mkdir();
+            try ( SmbWatchHandle w = this.base.watch(FileNotifyInformation.FILE_NOTIFY_CHANGE_FILE_NAME, true) ) {
+                setupWatch(w);
+                try ( SmbResource cr = new SmbFile(subdir, "created") ) {
+                    cr.createNewFile();
+                    assertNotified(w, FileNotifyInformation.FILE_ACTION_ADDED, "test\\created", null);
+                }
+            }
+            catch ( TimeoutException e ) {
+                log.info("Timeout waiting", e);
+                fail("Did not recieve notification");
+            }
+        }
+
+    }
+
+
     private void assertNotified ( SmbWatchHandle w, int action, String name, List<FileNotifyInformation> infos )
             throws InterruptedException, ExecutionException, TimeoutException {
         boolean found = checkInResult(action, name, infos);

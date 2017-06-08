@@ -293,4 +293,18 @@ public class FileAttributesTest extends BaseCIFSTest {
         }
     }
 
+
+    @Test
+    public void testFileIndex () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                long idx = f.fileIndex();
+                Assume.assumeTrue("FileIndex unsupported", idx != 0);
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
 }

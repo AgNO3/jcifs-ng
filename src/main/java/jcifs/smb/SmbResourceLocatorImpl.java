@@ -774,7 +774,7 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             log.debug("Remaining '" + dunc + "'");
         }
 
-        if ( dunc.equals("") ) {
+        if ( dunc.equals("") || dunc.equals("\\") ) {
             dunc = "\\";
             this.type = SmbConstants.TYPE_SHARE;
         }

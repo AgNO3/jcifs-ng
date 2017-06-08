@@ -53,6 +53,7 @@ import jcifs.internal.dtyp.SecurityInfo;
 import jcifs.internal.fscc.BasicFileInformation;
 import jcifs.internal.fscc.FileBasicInfo;
 import jcifs.internal.fscc.FileInformation;
+import jcifs.internal.fscc.FileInternalInfo;
 import jcifs.internal.fscc.FileRenameInformation2;
 import jcifs.internal.fscc.FileSystemInformation;
 import jcifs.internal.smb1.com.SmbComBlankResponse;
@@ -2253,6 +2254,21 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public long fileIndex () throws SmbException {
+
+        try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
+
+            if ( th.isSMB2() ) {
+                Smb2QueryInfoRequest req = new Smb2QueryInfoRequest(th.getConfig());
+                req.setFileInfoClass(FileInformation.FILE_INTERNAL_INFO);
+                Smb2QueryInfoResponse resp = withOpen(th, req);
+                FileInternalInfo info = resp.getInfo(FileInternalInfo.class);
+                return info.getIndexNumber();
+            }
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
+
         return 0;
     }
 

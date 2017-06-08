@@ -25,6 +25,8 @@ import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.dtyp.SecurityDescriptor;
 import jcifs.internal.fscc.FileFsFullSizeInformation;
 import jcifs.internal.fscc.FileFsSizeInformation;
+import jcifs.internal.fscc.FileInformation;
+import jcifs.internal.fscc.FileInternalInfo;
 import jcifs.internal.fscc.FileSystemInformation;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
@@ -179,8 +181,10 @@ public class Smb2QueryInfoResponse extends ServerMessageBlock2Response {
      */
     private static Decodable createFileInformation ( byte infoClass ) throws SMBProtocolDecodingException {
         switch ( infoClass ) {
+        case FileInformation.FILE_INTERNAL_INFO:
+            return new FileInternalInfo();
         default:
-            throw new SMBProtocolDecodingException("Unknwon file info class " + infoClass);
+            throw new SMBProtocolDecodingException("Unknown file info class " + infoClass);
         }
     }
 
