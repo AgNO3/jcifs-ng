@@ -27,15 +27,32 @@ import jcifs.smb.SmbException;
 
 
 @SuppressWarnings ( "javadoc" )
-public class SamrDomainHandle extends rpc.policy_handle {
+public class SamrDomainHandle extends rpc.policy_handle implements AutoCloseable {
+
+    private final DcerpcHandle handle;
+    private boolean opened;
+
 
     public SamrDomainHandle ( DcerpcHandle handle, SamrPolicyHandle policyHandle, int access, rpc.sid_t sid ) throws IOException {
+        this.handle = handle;
         MsrpcSamrOpenDomain rpc = new MsrpcSamrOpenDomain(policyHandle, access, sid, this);
         handle.sendrecv(rpc);
-        if ( rpc.retval != 0 )
+        if ( rpc.retval != 0 ) {
             throw new SmbException(rpc.retval, false);
+        }
+        this.opened = true;
     }
 
 
-    public void close () {}
+    @Override
+    public synchronized void close () throws IOException {
+        if ( this.opened ) {
+            this.opened = false;
+            MsrpcSamrCloseHandle rpc = new MsrpcSamrCloseHandle(this);
+            this.handle.sendrecv(rpc);
+            if ( rpc.retval != 0 ) {
+                throw new SmbException(rpc.retval, false);
+            }
+        }
+    }
 }

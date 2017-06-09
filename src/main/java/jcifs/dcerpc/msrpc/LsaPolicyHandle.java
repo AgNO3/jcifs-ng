@@ -28,17 +28,35 @@ import jcifs.smb.SmbException;
 
 
 @SuppressWarnings ( "javadoc" )
-public class LsaPolicyHandle extends rpc.policy_handle {
+public class LsaPolicyHandle extends rpc.policy_handle implements AutoCloseable {
+
+    private final DcerpcHandle handle;
+    private boolean opened;
+
 
     public LsaPolicyHandle ( DcerpcHandle handle, String server, int access ) throws IOException {
-        if ( server == null )
+        this.handle = handle;
+        if ( server == null ) {
             server = "\\\\";
+        }
         MsrpcLsarOpenPolicy2 rpc = new MsrpcLsarOpenPolicy2(server, access, this);
         handle.sendrecv(rpc);
-        if ( rpc.retval != 0 )
+        if ( rpc.retval != 0 ) {
             throw new SmbException(rpc.retval, false);
+        }
+        this.opened = true;
     }
 
 
-    public void close () {}
+    @Override
+    public synchronized void close () throws IOException {
+        if ( this.opened ) {
+            this.opened = false;
+            MsrpcLsarClose rpc = new MsrpcLsarClose(this);
+            this.handle.sendrecv(rpc);
+            if ( rpc.retval != 0 ) {
+                throw new SmbException(rpc.retval, false);
+            }
+        }
+    }
 }

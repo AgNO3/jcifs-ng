@@ -98,16 +98,15 @@ public class SIDCacheImpl implements SidResolver {
 
 
     void resolveSids0 ( String authorityServerName, CIFSContext tc, jcifs.SID[] sids ) throws CIFSException {
-        LsaPolicyHandle policyHandle = null;
-
         synchronized ( this.sidCache ) {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + authorityServerName + "[\\PIPE\\lsarpc]", tc) ) {
                 String server = authorityServerName;
                 int dot = server.indexOf('.');
                 if ( dot > 0 && Character.isDigit(server.charAt(0)) == false )
                     server = server.substring(0, dot);
-                policyHandle = new LsaPolicyHandle(handle, "\\\\" + server, 0x00000800);
-                resolveSids(handle, policyHandle, sids);
+                try ( LsaPolicyHandle policyHandle = new LsaPolicyHandle(handle, "\\\\" + server, 0x00000800) ) {
+                    resolveSids(handle, policyHandle, sids);
+                }
             }
             catch ( IOException e ) {
                 throw new CIFSException("Failed to resolve SIDs", e);
@@ -198,18 +197,18 @@ public class SIDCacheImpl implements SidResolver {
 
     @Override
     public SID getServerSid ( CIFSContext tc, String server ) throws CIFSException {
-        LsaPolicyHandle policyHandle = null;
         lsarpc.LsarDomainInfo info = new lsarpc.LsarDomainInfo();
         MsrpcQueryInformationPolicy rpc;
 
         synchronized ( this.sidCache ) {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + server + "[\\PIPE\\lsarpc]", tc) ) {
                 // NetApp doesn't like the 'generic' access mask values
-                policyHandle = new LsaPolicyHandle(handle, null, 0x00000001);
-                rpc = new MsrpcQueryInformationPolicy(policyHandle, (short) lsarpc.POLICY_INFO_ACCOUNT_DOMAIN, info);
-                handle.sendrecv(rpc);
-                if ( rpc.retval != 0 )
-                    throw new SmbException(rpc.retval, false);
+                try ( LsaPolicyHandle policyHandle = new LsaPolicyHandle(handle, null, 0x00000001) ) {
+                    rpc = new MsrpcQueryInformationPolicy(policyHandle, (short) lsarpc.POLICY_INFO_ACCOUNT_DOMAIN, info);
+                    handle.sendrecv(rpc);
+                    if ( rpc.retval != 0 )
+                        throw new SmbException(rpc.retval, false);
+                }
 
                 return new SID(info.sid, jcifs.SID.SID_TYPE_DOMAIN, ( new UnicodeString(info.name, false) ).toString(), null, false);
             }
@@ -222,7 +221,6 @@ public class SIDCacheImpl implements SidResolver {
 
     @Override
     public SID[] getGroupMemberSids ( CIFSContext tc, String authorityServerName, jcifs.SID domsid, int rid, int flags ) throws CIFSException {
-        SamrAliasHandle aliasHandle = null;
         lsarpc.LsarSidArray sidarray = new lsarpc.LsarSidArray();
         MsrpcGetMembersInAlias rpc = null;
 
@@ -230,8 +228,7 @@ public class SIDCacheImpl implements SidResolver {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + authorityServerName + "[\\PIPE\\samr]", tc) ) {
                 SamrPolicyHandle policyHandle = new SamrPolicyHandle(handle, authorityServerName, 0x00000030);
                 SamrDomainHandle domainHandle = new SamrDomainHandle(handle, policyHandle, 0x00000200, domsid.unwrap(sid_t.class));
-                try {
-                    aliasHandle = new SamrAliasHandle(handle, domainHandle, 0x0002000c, rid);
+                try ( SamrAliasHandle aliasHandle = new SamrAliasHandle(handle, domainHandle, 0x0002000c, rid) ) {
                     rpc = new MsrpcGetMembersInAlias(aliasHandle, sidarray);
                     handle.sendrecv(rpc);
                     if ( rpc.retval != 0 )
@@ -250,11 +247,6 @@ public class SIDCacheImpl implements SidResolver {
                         resolveSids(origin_ctx, origin_server, sids);
                     }
                     return sids;
-                }
-                finally {
-                    if ( aliasHandle != null ) {
-                        aliasHandle.close();
-                    }
                 }
             }
             catch ( IOException e ) {
@@ -277,36 +269,38 @@ public class SIDCacheImpl implements SidResolver {
         synchronized ( this.sidCache ) {
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + authorityServerName + "[\\PIPE\\samr]", tc) ) {
                 samr.SamrSamArray sam = new samr.SamrSamArray();
-                SamrPolicyHandle policyHandle = new SamrPolicyHandle(handle, authorityServerName, 0x02000000);
-                SamrDomainHandle domainHandle = new SamrDomainHandle(handle, policyHandle, 0x02000000, domSid);
-                MsrpcEnumerateAliasesInDomain rpc = new MsrpcEnumerateAliasesInDomain(domainHandle, 0xFFFF, sam);
-                handle.sendrecv(rpc);
-                if ( rpc.retval != 0 )
-                    throw new SmbException(rpc.retval, false);
-
-                Map<jcifs.SID, List<jcifs.SID>> map = new HashMap<>();
-
-                for ( int ei = 0; ei < rpc.sam.count; ei++ ) {
-                    samr.SamrSamEntry entry = rpc.sam.entries[ ei ];
-
-                    SID[] mems = getGroupMemberSids(tc, authorityServerName, domSid, entry.idx, flags);
-                    SID groupSid = new SID(domSid, entry.idx);
-                    groupSid.type = jcifs.SID.SID_TYPE_ALIAS;
-                    groupSid.domainName = domSid.getDomainName();
-                    groupSid.acctName = ( new UnicodeString(entry.name, false) ).toString();
-
-                    for ( int mi = 0; mi < mems.length; mi++ ) {
-                        List<jcifs.SID> groups = map.get(mems[ mi ]);
-                        if ( groups == null ) {
-                            groups = new ArrayList<>();
-                            map.put(mems[ mi ], groups);
-                        }
-                        if ( !groups.contains(groupSid) )
-                            groups.add(groupSid);
+                try ( SamrPolicyHandle policyHandle = new SamrPolicyHandle(handle, authorityServerName, 0x02000000);
+                      SamrDomainHandle domainHandle = new SamrDomainHandle(handle, policyHandle, 0x02000000, domSid) ) {
+                    MsrpcEnumerateAliasesInDomain rpc = new MsrpcEnumerateAliasesInDomain(domainHandle, 0xFFFF, sam);
+                    handle.sendrecv(rpc);
+                    if ( rpc.retval != 0 ) {
+                        throw new SmbException(rpc.retval, false);
                     }
-                }
 
-                return map;
+                    Map<jcifs.SID, List<jcifs.SID>> map = new HashMap<>();
+
+                    for ( int ei = 0; ei < rpc.sam.count; ei++ ) {
+                        samr.SamrSamEntry entry = rpc.sam.entries[ ei ];
+
+                        SID[] mems = getGroupMemberSids(tc, authorityServerName, domSid, entry.idx, flags);
+                        SID groupSid = new SID(domSid, entry.idx);
+                        groupSid.type = jcifs.SID.SID_TYPE_ALIAS;
+                        groupSid.domainName = domSid.getDomainName();
+                        groupSid.acctName = ( new UnicodeString(entry.name, false) ).toString();
+
+                        for ( int mi = 0; mi < mems.length; mi++ ) {
+                            List<jcifs.SID> groups = map.get(mems[ mi ]);
+                            if ( groups == null ) {
+                                groups = new ArrayList<>();
+                                map.put(mems[ mi ], groups);
+                            }
+                            if ( !groups.contains(groupSid) )
+                                groups.add(groupSid);
+                        }
+                    }
+
+                    return map;
+                }
             }
             catch ( IOException e ) {
                 throw new CIFSException("Failed to resolve groups", e);

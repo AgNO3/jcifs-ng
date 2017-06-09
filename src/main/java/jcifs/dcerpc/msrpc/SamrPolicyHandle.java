@@ -25,27 +25,45 @@ import jcifs.dcerpc.DcerpcError;
 import jcifs.dcerpc.DcerpcException;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.rpc;
+import jcifs.smb.SmbException;
 
 
 @SuppressWarnings ( "javadoc" )
-public class SamrPolicyHandle extends rpc.policy_handle {
+public class SamrPolicyHandle extends rpc.policy_handle implements AutoCloseable {
+
+    private final DcerpcHandle handle;
+    private boolean opened;
+
 
     public SamrPolicyHandle ( DcerpcHandle handle, String server, int access ) throws IOException {
-        if ( server == null )
+        this.handle = handle;
+        if ( server == null ) {
             server = "\\\\";
+        }
         MsrpcSamrConnect4 rpc = new MsrpcSamrConnect4(server, access, this);
         try {
             handle.sendrecv(rpc);
         }
         catch ( DcerpcException de ) {
-            if ( de.getErrorCode() != DcerpcError.DCERPC_FAULT_OP_RNG_ERROR )
+            if ( de.getErrorCode() != DcerpcError.DCERPC_FAULT_OP_RNG_ERROR ) {
                 throw de;
-
+            }
             MsrpcSamrConnect2 rpc2 = new MsrpcSamrConnect2(server, access, this);
             handle.sendrecv(rpc2);
         }
+        this.opened = true;
     }
 
 
-    public void close () {}
+    @Override
+    public synchronized void close () throws IOException {
+        if ( this.opened ) {
+            this.opened = false;
+            samr.SamrCloseHandle rpc = new MsrpcSamrCloseHandle(this);
+            this.handle.sendrecv(rpc);
+            if ( rpc.retval != 0 ) {
+                throw new SmbException(rpc.retval, false);
+            }
+        }
+    }
 }

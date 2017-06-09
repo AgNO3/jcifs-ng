@@ -91,14 +91,14 @@ public class PipeTest extends BaseCIFSTest {
             if ( dot > 0 && Character.isDigit(server.charAt(0)) == false )
                 server = server.substring(0, dot);
 
-            LsaPolicyHandle policyHandle = new LsaPolicyHandle(handle, "\\\\" + server, 0x00000800);
-            MsrpcLookupSids rpc = new MsrpcLookupSids(policyHandle, new SID[] {
-                SID.EVERYONE
-            });
-            handle.sendrecv(rpc);
+            try ( LsaPolicyHandle policyHandle = new LsaPolicyHandle(handle, "\\\\" + server, 0x00000800) ) {
+                MsrpcLookupSids rpc = new MsrpcLookupSids(policyHandle, new SID[] {
+                    SID.EVERYONE
+                });
+                handle.sendrecv(rpc);
 
-            assertEquals(0, rpc.retval);
-
+                assertEquals(0, rpc.retval);
+            }
         }
     }
 
