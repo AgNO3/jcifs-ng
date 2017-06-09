@@ -19,7 +19,10 @@ package jcifs.smb;
 
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.SmbTree;
+import jcifs.internal.CommonServerMessageBlockResponse;
+import jcifs.internal.Request;
 
 
 /**
@@ -33,4 +36,13 @@ public interface SmbTreeInternal extends SmbTree {
      * @throws SmbException
      */
     void connectLogon ( CIFSContext tf ) throws SmbException;
+
+
+    /**
+     * @param request
+     * @param params
+     * @return response message
+     * @throws CIFSException
+     */
+    <T extends CommonServerMessageBlockResponse> T send ( Request<T> request, RequestParam... params ) throws CIFSException;
 }

@@ -22,6 +22,7 @@ package jcifs.smb;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -391,8 +392,9 @@ class SmbTreeImpl implements SmbTreeInternal {
     }
 
 
-    <T extends CommonServerMessageBlockResponse> T send ( jcifs.internal.Request<T> request ) throws CIFSException {
-        return send((CommonServerMessageBlockRequest) request, null, Collections.<RequestParam> emptySet());
+    @Override
+    public <T extends CommonServerMessageBlockResponse> T send ( jcifs.internal.Request<T> request, RequestParam... params ) throws CIFSException {
+        return send((CommonServerMessageBlockRequest) request, null, EnumSet.copyOf(Arrays.asList(params)));
     }
 
 

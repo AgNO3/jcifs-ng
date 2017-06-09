@@ -1353,6 +1353,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         try ( SmbTreeHandleImpl sh = ensureTreeConnected();
               SmbTreeHandleImpl th = dest.ensureTreeConnected() ) {
 
+            // this still might be required for standalone DFS
+            exists();
+            dest.exists();
+
             if ( this.fileLocator.isRoot() || dest.getLocator().isRoot() ) {
                 throw new SmbException("Invalid operation for workgroups, servers, or shares");
             }
