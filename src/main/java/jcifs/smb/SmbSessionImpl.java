@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -92,7 +93,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
     private boolean extendedSecurity;
 
     private final AtomicLong usageCount = new AtomicLong(1);
-    private boolean transportAcquired = true;
+    private final AtomicBoolean transportAcquired = new AtomicBoolean(true);
 
     private long sessionId;
 
@@ -171,12 +172,9 @@ final class SmbSessionImpl implements SmbSessionInternal {
         }
 
         if ( usage == 1 ) {
-            log.debug("Reacquire transport");
-            synchronized ( this ) {
-                if ( !this.transportAcquired ) {
-                    this.transport.acquire();
-                    this.transportAcquired = true;
-                }
+            if ( this.transportAcquired.compareAndSet(false, true) ) {
+                log.debug("Reacquire transport");
+                this.transport.acquire();
             }
         }
 
@@ -222,8 +220,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 log.debug("Usage dropped to zero, release connection " + this.transport);
             }
             synchronized ( this ) {
-                if ( this.transportAcquired ) {
-                    this.transportAcquired = false;
+                if ( this.transportAcquired.compareAndSet(true, false) ) {
                     this.transport.release();
                 }
             }

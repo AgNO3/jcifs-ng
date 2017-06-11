@@ -26,6 +26,7 @@ import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -81,7 +82,7 @@ class SmbTreeImpl implements SmbTreeInternal {
     private volatile long treeNum; // used by SmbFile.isOpen
 
     private final AtomicLong usageCount = new AtomicLong(0);
-    private boolean sessionAcquired = true;
+    private final AtomicBoolean sessionAcquired = new AtomicBoolean(true);
 
     private final boolean traceResource;
     private final List<StackTraceElement[]> acquires;
@@ -163,10 +164,9 @@ class SmbTreeImpl implements SmbTreeInternal {
 
         if ( usage == 1 ) {
             synchronized ( this ) {
-                if ( !this.sessionAcquired ) {
+                if ( this.sessionAcquired.compareAndSet(false, true) ) {
                     log.debug("Reacquire session");
                     this.session.acquire();
-                    this.sessionAcquired = true;
                 }
             }
         }
@@ -208,8 +208,9 @@ class SmbTreeImpl implements SmbTreeInternal {
         if ( usage == 0 ) {
             synchronized ( this ) {
                 log.debug("Usage dropped to zero, release session");
-                this.sessionAcquired = false;
-                this.session.release();
+                if ( this.sessionAcquired.compareAndSet(true, false) ) {
+                    this.session.release();
+                }
             }
         }
         else if ( usage < 0 ) {

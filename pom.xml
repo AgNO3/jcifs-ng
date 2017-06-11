@@ -50,8 +50,6 @@
 		<project.scm.id>github</project.scm.id>
 		<osgi.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</osgi.version>
 		<osgi.pkg.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</osgi.pkg.version>
-		<!-- <osgi.version>2.0.0</osgi.version>
-		<osgi.pkg.version>2.0.0</osgi.pkg.version> -->
 	</properties>
 
 	<dependencies>
@@ -392,7 +390,14 @@
 	<profiles>
 		<profile>
 			<id>release</id>
-
+		</profile>
+		<profile>
+			<id>eclipse</id>
+			<properties>
+				<!-- within eclipse parsedVersion is not properly expanded, so just set this to a unqualified version -->
+				<osgi.version>2.0.0</osgi.version>
+				<osgi.pkg.version>2.0.0</osgi.pkg.version>
+			</properties>
 		</profile>
 		<profile>
 			<id>sign</id>

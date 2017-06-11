@@ -1703,7 +1703,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
 
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
-
+            // should not normally be required, but samba without NTStatus does not properly resolve the path and fails
+            // with
+            // STATUS_UNSUCCESSFUL
+            exists();
             // get the path again, this may have changed through DFS referrals
             path = this.fileLocator.getUNCPath();
 
