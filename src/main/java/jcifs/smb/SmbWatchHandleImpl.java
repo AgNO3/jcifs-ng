@@ -19,7 +19,6 @@ package jcifs.smb;
 
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +45,6 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     private final SmbFileHandleImpl handle;
     private final int filter;
     private final boolean recursive;
-    private AtomicReference<CommonServerMessageBlockRequest> lastRequest = new AtomicReference<>();
 
 
     /**
@@ -97,7 +95,6 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
             if ( log.isTraceEnabled() ) {
                 log.trace("Sending NtTransNotifyChange for " + this.handle);
             }
-            this.lastRequest.set(req);
             try {
                 resp = th.send(req, resp, RequestParam.NO_TIMEOUT, RequestParam.NO_RETRY);
             }
@@ -108,9 +105,6 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
                     return null;
                 }
                 throw e;
-            }
-            finally {
-                this.lastRequest.set(null);
             }
             if ( log.isTraceEnabled() ) {
                 log.trace("Returned from NtTransNotifyChange " + resp.getErrorCode());
@@ -150,23 +144,7 @@ class SmbWatchHandleImpl implements SmbWatchHandle {
     @Override
     public void close () throws CIFSException {
         if ( this.handle.isValid() ) {
-            try {
-                CommonServerMessageBlockRequest lastReq = this.lastRequest.getAndSet(null);
-                if ( lastReq != null && !lastReq.getResponse().isReceived() ) {
-                    CommonServerMessageBlockRequest cancel = lastReq.createCancel();
-                    if ( cancel != null ) {
-                        try ( SmbTreeHandleImpl th = this.handle.getTree() ) {
-                            th.send(cancel, null);
-                        }
-                        catch ( SmbException e ) {
-                            log.debug("Cancel failed", e);
-                        }
-                    }
-                }
-            }
-            finally {
-                this.handle.close(0L);
-            }
+            this.handle.close(0L);
         }
     }
 }
