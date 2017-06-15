@@ -215,7 +215,8 @@ public class AllTests {
 
         if ( System.getProperties().containsKey(TestProperties.TEST_CONFIG_DIR) ) {
             try {
-                Iterator<Path> it = Files.list(Paths.get(System.getProperty(TestProperties.TEST_CONFIG_DIR))).iterator();
+                Path configDir = Paths.get(System.getProperty(TestProperties.TEST_CONFIG_DIR));
+                Iterator<Path> it = Files.newDirectoryStream(configDir).iterator();
 
                 while ( it.hasNext() ) {
                     Path config = it.next();

@@ -129,4 +129,8 @@ class ShareEnumIterator implements CloseableIterator<SmbResource> {
         this.next = null;
     }
 
+    @Override
+    public void remove() {
+        throw new UnsupportedOperationException("remove");
+    }
 }

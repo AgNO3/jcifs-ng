@@ -177,8 +177,14 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
             @Override
             public int compare ( Address o1, Address o2 ) {
-                int fail1 = SmbTransportPoolImpl.this.failCounts.getOrDefault(o1.getHostAddress(), 0);
-                int fail2 = SmbTransportPoolImpl.this.failCounts.getOrDefault(o2.getHostAddress(), 0);
+                Integer fail1 = SmbTransportPoolImpl.this.failCounts.get(o1.getHostAddress());
+                Integer fail2 = SmbTransportPoolImpl.this.failCounts.get(o2.getHostAddress());
+                if(fail1 == null) {
+                    fail1 = 0;
+                }
+                if(fail2 == null) {
+                    fail2 = 0;
+                }
                 return Integer.compare(fail1, fail2);
             }
 
@@ -214,7 +220,12 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             }
             catch ( IOException e ) {
                 String hostAddress = addr.getHostAddress();
-                this.failCounts.put(hostAddress, this.failCounts.getOrDefault(hostAddress, 0) + 1);
+                Integer failCount = this.failCounts.get(hostAddress);
+                if(failCount == null) {
+                    this.failCounts.put(hostAddress, 1);
+                } else {
+                    this.failCounts.put(hostAddress, failCount + 1);
+                }
                 ex = e;
             }
         }

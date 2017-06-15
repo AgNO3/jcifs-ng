@@ -135,4 +135,8 @@ abstract class FileEntryAdapterIterator implements CloseableIterator<SmbResource
         this.delegate.close();
     }
 
+    @Override
+    public void remove() {
+        this.delegate.remove();
+    }
 }

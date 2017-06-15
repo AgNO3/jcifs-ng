@@ -207,4 +207,8 @@ public class NetServerEnumIterator implements CloseableIterator<FileEntry> {
         this.next = null;
     }
 
+    @Override
+    public void remove() {
+        throw new UnsupportedOperationException("remove");
+    }
 }
