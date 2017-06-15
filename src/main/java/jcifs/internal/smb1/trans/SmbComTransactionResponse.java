@@ -230,6 +230,10 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
     @Override
     public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int len = super.decode(buffer, bufferIndex);
+        if ( this.byteCount == 0 ) {
+            // otherwise hasMore may not be correctly set
+            readBytesWireFormat(buffer, len + bufferIndex);
+        }
         nextElement();
         return len;
     }

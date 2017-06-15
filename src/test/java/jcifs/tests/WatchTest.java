@@ -237,7 +237,7 @@ public class WatchTest extends BaseCIFSTest {
     private boolean checkInResult ( int action, String name, List<FileNotifyInformation> infos )
             throws InterruptedException, ExecutionException, TimeoutException {
         assertNotNull(this.future);
-        List<FileNotifyInformation> notifications = this.future.get(5, TimeUnit.SECONDS);
+        List<FileNotifyInformation> notifications = this.future.get(10, TimeUnit.SECONDS);
         if ( infos != null ) {
             infos.addAll(notifications);
         }
