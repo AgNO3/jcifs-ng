@@ -24,7 +24,6 @@ package jcifs;
  * @author mbechler
  *
  */
-@FunctionalInterface
 public interface ResourceNameFilter {
 
     /**

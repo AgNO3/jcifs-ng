@@ -31,6 +31,7 @@ import jcifs.DfsReferralData;
 import jcifs.NetbiosAddress;
 import jcifs.SmbConstants;
 import jcifs.SmbResourceLocator;
+import jcifs.internal.util.StringUtil;
 import jcifs.netbios.NbtAddress;
 import jcifs.netbios.UniAddress;
 
@@ -137,8 +138,8 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             if ( nameParts.length > pos ) {
                 String[] remainParts = new String[nameParts.length - pos];
                 System.arraycopy(nameParts, pos, remainParts, 0, nameParts.length - pos);
-                this.unc = "\\" + String.join("\\", remainParts) + ( trailingSlash ? "\\" : "" );
-                this.canon = "/" + this.share + "/" + String.join("/", remainParts) + ( trailingSlash ? "/" : "" );
+                this.unc = "\\" + StringUtil.join("\\", remainParts) + ( trailingSlash ? "\\" : "" );
+                this.canon = "/" + this.share + "/" + StringUtil.join("/", remainParts) + ( trailingSlash ? "/" : "" );
             }
             else {
                 this.unc = "\\";
