@@ -18,21 +18,33 @@
 
 package jcifs.internal.util;
 
-public class StringUtil {
+
+/**
+ * 
+ */
+public final class StringUtil {
+
+    /**
+     * 
+     */
+    private StringUtil () {}
+
+
     /**
      * Implementation of {@link java.lang.String#join} backported for JDK7.
      * 
      * @param delimiter
      * @param elements
-     * @return 
+     * @return elements separated by delimiter
      */
-    public static String join(CharSequence delimiter, CharSequence... elements) {
+    public static String join ( CharSequence delimiter, CharSequence... elements ) {
         StringBuilder sb = new StringBuilder();
-        for(CharSequence element: elements) {
-            if(sb.length() > 0) {
-                if(delimiter != null) {
+        for ( CharSequence element : elements ) {
+            if ( sb.length() > 0 ) {
+                if ( delimiter != null ) {
                     sb.append(delimiter);
-                } else {
+                }
+                else {
                     sb.append("null");
                 }
             }

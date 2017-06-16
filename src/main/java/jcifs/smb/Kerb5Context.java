@@ -41,7 +41,6 @@ import jcifs.spnego.NegTokenInit;
  * 
  * @author Shun
  */
-@SuppressWarnings ( "restriction" )
 class Kerb5Context implements SSPContext {
 
     private static final Logger log = LoggerFactory.getLogger(Kerb5Context.class);
@@ -186,27 +185,29 @@ class Kerb5Context implements SSPContext {
     @Override
     public byte[] getSigningKey () throws SmbException {
         /*
-        The kerberos session key is not accessible via the JGSS API. IBM and 
-        Oracle both implement a similar API to make an ExtendedGSSContext
-        available. That API is accessed via reflection to make this independend
-        of the runtime JRE
-        */
-        if( extendedGSSContextClass == null 
-                || inquireSecContext == null 
-                || inquireTypeSessionKey == null) {
+         * The kerberos session key is not accessible via the JGSS API. IBM and
+         * Oracle both implement a similar API to make an ExtendedGSSContext
+         * available. That API is accessed via reflection to make this independend
+         * of the runtime JRE
+         */
+        if ( extendedGSSContextClass == null || inquireSecContext == null || inquireTypeSessionKey == null ) {
             throw new SmbException("ExtendedGSSContext support not available from JRE");
-        } else {
-            if(extendedGSSContextClass.isAssignableFrom(gssContext.getClass())) {
-                try {
-                    Key k = (Key) inquireSecContext.invoke(gssContext, new Object[]{inquireTypeSessionKey});
-                    return k.getEncoded();
-                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
-                    throw new SmbException("Failed to query Kerberos session key from ExtendedGSSContext", ex);
-                }
-            } else {
-                throw new SmbException("ExtendedGSSContext is not implemented by GSSContext");
+        }
+        else if ( extendedGSSContextClass.isAssignableFrom(this.gssContext.getClass()) ) {
+            try {
+                Key k = (Key) inquireSecContext.invoke(this.gssContext, new Object[] {
+                    inquireTypeSessionKey
+                });
+                return k.getEncoded();
+            }
+            catch (
+                IllegalAccessException |
+                IllegalArgumentException |
+                InvocationTargetException ex ) {
+                throw new SmbException("Failed to query Kerberos session key from ExtendedGSSContext", ex);
             }
         }
+        throw new SmbException("ExtendedGSSContext is not implemented by GSSContext");
     }
 
 
@@ -268,7 +269,7 @@ class Kerb5Context implements SSPContext {
             }
         }
     }
-    
+
     /*
      * Prepare reflective access to ExtendedGSSContext. The reflective access
      * abstracts the acces so far, that Oracle JDK, Open JDK and IBM JDK are
@@ -280,51 +281,65 @@ class Kerb5Context implements SSPContext {
 
     private static final String OPENJDK_JGSS_INQUIRE_TYPE_CLASS = "com.sun.security.jgss.InquireType";
     private static final String OPENJDK_JGSS_EXT_GSSCTX_CLASS = "com.sun.security.jgss.ExtendedGSSContext";
-    
+
     private static final String IBM_JGSS_INQUIRE_TYPE_CLASS = "com.ibm.security.jgss.InquireType";
     private static final String IBM_JGSS_EXT_GSSCTX_CLASS = "com.ibm.security.jgss.ExtendedGSSContext";
-    
-    private final static Class extendedGSSContextClass;
+
+    private final static Class<?> extendedGSSContextClass;
     private final static Method inquireSecContext;
     private final static Object inquireTypeSessionKey;
-    
+
+
     static {
-        Class extendedGSSContextClassPrep = null;
+        Class<?> extendedGSSContextClassPrep = null;
         Method inquireSecContextPrep = null;
         Object inquireTypeSessionKeyPrep = null;
-        
-        if (extendedGSSContextClassPrep == null || inquireSecContextPrep == null || inquireTypeSessionKeyPrep == null) {
-            try {
-                extendedGSSContextClassPrep = Class.forName(OPENJDK_JGSS_EXT_GSSCTX_CLASS);
-                Class inquireTypeClass = Class.forName(OPENJDK_JGSS_INQUIRE_TYPE_CLASS);
-                inquireSecContextPrep = extendedGSSContextClassPrep.getMethod("inquireSecContext", inquireTypeClass);
-                inquireTypeSessionKeyPrep = Enum.valueOf(inquireTypeClass, "KRB5_GET_SESSION_KEY");
-            } catch (ClassNotFoundException | NoSuchMethodException | SecurityException ex) {
-                if ( log.isDebugEnabled() ) {
-                    log.debug("Failed to initalize ExtendedGSSContext initializdation for OracleJDK / OpenJDK", ex); 
-                }
+
+        try {
+            extendedGSSContextClassPrep = Class.forName(OPENJDK_JGSS_EXT_GSSCTX_CLASS);
+            Class<?> inquireTypeClass = Class.forName(OPENJDK_JGSS_INQUIRE_TYPE_CLASS);
+            inquireTypeSessionKeyPrep = getSessionKeyInquireType(inquireTypeClass);
+            inquireSecContextPrep = extendedGSSContextClassPrep.getMethod("inquireSecContext", inquireTypeClass);
+        }
+        catch (
+            ClassNotFoundException |
+            NoSuchMethodException |
+            RuntimeException ex ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug("Failed to initalize ExtendedGSSContext initializdation for OracleJDK / OpenJDK", ex);
             }
         }
-        if (extendedGSSContextClassPrep == null || inquireSecContextPrep == null || inquireTypeSessionKeyPrep == null) {
+
+        if ( extendedGSSContextClassPrep == null || inquireSecContextPrep == null || inquireTypeSessionKeyPrep == null ) {
             try {
                 extendedGSSContextClassPrep = Class.forName(IBM_JGSS_EXT_GSSCTX_CLASS);
-                Class inquireTypeClass = Class.forName(IBM_JGSS_INQUIRE_TYPE_CLASS);
+                Class<?> inquireTypeClass = Class.forName(IBM_JGSS_INQUIRE_TYPE_CLASS);
+                inquireTypeSessionKeyPrep = getSessionKeyInquireType(inquireTypeClass);
                 inquireSecContextPrep = extendedGSSContextClassPrep.getMethod("inquireSecContext", inquireTypeClass);
-                inquireTypeSessionKeyPrep = Enum.valueOf(inquireTypeClass, "KRB5_GET_SESSION_KEY");
-            } catch (ClassNotFoundException | NoSuchMethodException | SecurityException ex) {
+            }
+            catch (
+                ClassNotFoundException |
+                NoSuchMethodException |
+                RuntimeException ex ) {
                 if ( log.isDebugEnabled() ) {
-                    log.debug("Failed to initalize ExtendedGSSContext initializdation for IBM JDK", ex); 
+                    log.debug("Failed to initalize ExtendedGSSContext initializdation for IBM JDK", ex);
                 }
             }
         }
         extendedGSSContextClass = extendedGSSContextClassPrep;
         inquireSecContext = inquireSecContextPrep;
         inquireTypeSessionKey = inquireTypeSessionKeyPrep;
-        
-        if (extendedGSSContextClass != null && inquireSecContext != null && inquireTypeSessionKey != null) {
+
+        if ( extendedGSSContextClass != null && inquireSecContext != null && inquireTypeSessionKey != null ) {
             if ( log.isDebugEnabled() ) {
-                    log.debug("Found ExtendedGSSContext implementation: " + extendedGSSContextClass.getName()); 
+                log.debug("Found ExtendedGSSContext implementation: " + extendedGSSContextClass.getName());
             }
         }
+    }
+
+
+    @SuppressWarnings ( "unchecked" )
+    private static <T extends Enum<T>> Object getSessionKeyInquireType ( Class<?> inquireTypeClass ) {
+        return Enum.valueOf((Class<T>) inquireTypeClass, "KRB5_GET_SESSION_KEY");
     }
 }
