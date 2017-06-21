@@ -54,6 +54,7 @@ class SpnegoContext implements SSPContext {
 
     private SSPContext mechContext;
     private Oid[] mechs;
+    private boolean firstResponse;
 
 
     /**
@@ -187,11 +188,12 @@ class SpnegoContext implements SSPContext {
         try {
             SpnegoToken spToken = getToken(inputBuf, offset, len);
 
-            if ( spToken instanceof NegTokenTarg ) {
+            if ( this.firstResponse && spToken instanceof NegTokenTarg ) {
                 NegTokenTarg targ = (NegTokenTarg) spToken;
                 if ( !this.mechContext.isSupported(targ.getMechanism()) ) {
                     throw new SmbException("Server chose an unsupported mechanism " + targ.getMechanism());
                 }
+                this.firstResponse = false;
             }
 
             Oid currentMech = null;
