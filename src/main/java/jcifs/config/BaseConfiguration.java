@@ -716,7 +716,7 @@ public class BaseConfiguration implements Configuration {
         if ( this.supportedDialects == null ) {
             if ( this.enableSMB2 ) {
                 this.supportedDialects = new String[] {
-                    "NT LM 0.12", "SMB 2.???"
+                    "NT LM 0.12", "SMB 2.???", "SMB 2.002"
                 };
             }
             else {
