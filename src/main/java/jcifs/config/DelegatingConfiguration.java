@@ -70,6 +70,28 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isDisableSMB1()
+     */
+    @Override
+    public boolean isDisableSMB1 () {
+        return this.delegate.isDisableSMB1();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isUseSMB2OnlyNegotiation()
+     */
+    @Override
+    public boolean isUseSMB2OnlyNegotiation () {
+        return this.delegate.isUseSMB2OnlyNegotiation();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getDfsTtl()
      */

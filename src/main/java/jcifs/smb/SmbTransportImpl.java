@@ -485,7 +485,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 this.in = this.socket.getInputStream();
             }
 
-            if ( this.smb2 ) {
+            if ( this.smb2 || this.getContext().getConfig().isUseSMB2OnlyNegotiation() ) {
                 log.debug("Using SMB2 only negotiation");
                 SmbNegotiationResponse resp = negotiate2(null);
                 return resp;
@@ -498,6 +498,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             SmbNegotiationResponse resp = null;
 
             if ( !this.smb2 ) {
+                if ( this.getContext().getConfig().isDisableSMB1() ) {
+                    throw new CIFSException("Server does not support SMB2");
+                }
                 resp = new SmbComNegotiateResponse(getContext());
                 resp.decode(this.sbuf, 4);
                 resp.received();

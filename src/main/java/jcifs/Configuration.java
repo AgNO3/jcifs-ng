@@ -97,6 +97,28 @@ public interface Configuration {
 
 
     /**
+     * Disables SMB1 support
+     * 
+     * Property <tt>jcifs.smb.client.disableSMB1</tt> (boolean, default false)
+     * 
+     * Rejects connections if the server chooses SMB1.
+     * 
+     * @return whether to disable SMB1 support
+     */
+    boolean isDisableSMB1 ();
+
+
+    /**
+     * Use SMB2 non-backward compatible negotiation style
+     * 
+     * Property <tt>jcifs.smb.client.useSMB2Negotiation</tt> (boolean, default false)
+     * 
+     * @return wether to use non-backward compatible protocol negotiation
+     */
+    boolean isUseSMB2OnlyNegotiation ();
+
+
+    /**
      * 
      * Property <tt>jcifs.smb.client.useUnicode</tt> (boolean, default true)
      * 

@@ -70,6 +70,8 @@ public class BaseConfiguration implements Configuration {
     protected boolean useExtendedSecurity = true;
     protected boolean forceExtendedSecurity = false;
     protected boolean enableSMB2 = false;
+    protected boolean disableSMB1 = false;
+    protected boolean smb2OnlyNegotiation;
     protected boolean useNTSmbs = true;
     protected boolean useLargeReadWrite = true;
     protected int lanmanCompatibility = 3;
@@ -251,6 +253,18 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isEnableSMB2 () {
         return this.enableSMB2;
+    }
+
+
+    @Override
+    public boolean isDisableSMB1 () {
+        return this.disableSMB1;
+    }
+
+
+    @Override
+    public boolean isUseSMB2OnlyNegotiation () {
+        return this.smb2OnlyNegotiation;
     }
 
 
@@ -714,7 +728,12 @@ public class BaseConfiguration implements Configuration {
         }
 
         if ( this.supportedDialects == null ) {
-            if ( this.enableSMB2 ) {
+            if ( this.disableSMB1 ) {
+                this.supportedDialects = new String[] {
+                    "SMB 2.???", "SMB 2.002"
+                };
+            }
+            else if ( this.enableSMB2 ) {
                 this.supportedDialects = new String[] {
                     "NT LM 0.12", "SMB 2.???", "SMB 2.002"
                 };
