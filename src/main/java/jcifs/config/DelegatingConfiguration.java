@@ -92,6 +92,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isPort139FailoverEnabled()
+     */
+    @Override
+    public boolean isPort139FailoverEnabled () {
+        return this.delegate.isPort139FailoverEnabled();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getDfsTtl()
      */

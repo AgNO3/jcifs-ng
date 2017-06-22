@@ -71,7 +71,8 @@ public class BaseConfiguration implements Configuration {
     protected boolean forceExtendedSecurity = false;
     protected boolean enableSMB2 = false;
     protected boolean disableSMB1 = false;
-    protected boolean smb2OnlyNegotiation;
+    protected boolean smb2OnlyNegotiation = false;
+    protected boolean port139FailoverEnabled = false;
     protected boolean useNTSmbs = true;
     protected boolean useLargeReadWrite = true;
     protected int lanmanCompatibility = 3;
@@ -265,6 +266,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isUseSMB2OnlyNegotiation () {
         return this.smb2OnlyNegotiation;
+    }
+
+
+    @Override
+    public boolean isPort139FailoverEnabled () {
+        return this.port139FailoverEnabled;
     }
 
 

@@ -113,9 +113,19 @@ public interface Configuration {
      * 
      * Property <tt>jcifs.smb.client.useSMB2Negotiation</tt> (boolean, default false)
      * 
-     * @return wether to use non-backward compatible protocol negotiation
+     * @return whether to use non-backward compatible protocol negotiation
      */
     boolean isUseSMB2OnlyNegotiation ();
+
+
+    /**
+     * Enable port 139 failover
+     * 
+     * Property <tt>jcifs.smb.client.port139.enabled</tt> (boolean, default false)
+     * 
+     * @return whether to failover to legacy transport on port 139
+     */
+    boolean isPort139FailoverEnabled ();
 
 
     /**

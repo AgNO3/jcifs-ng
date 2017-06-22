@@ -671,10 +671,15 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             resp = negotiate(this.port);
         }
         catch ( IOException ce ) {
-            this.port = ( this.port == 0 || this.port == DEFAULT_PORT ) ? 139 : DEFAULT_PORT;
-            this.smb2 = false;
-            this.mid.set(0);
-            resp = negotiate(this.port);
+            if ( getContext().getConfig().isPort139FailoverEnabled() ) {
+                this.port = ( this.port == 0 || this.port == DEFAULT_PORT ) ? 139 : DEFAULT_PORT;
+                this.smb2 = false;
+                this.mid.set(0);
+                resp = negotiate(this.port);
+            }
+            else {
+                throw ce;
+            }
         }
 
         if ( log.isDebugEnabled() ) {
