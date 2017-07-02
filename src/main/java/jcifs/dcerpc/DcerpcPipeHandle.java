@@ -110,7 +110,7 @@ public class DcerpcPipeHandle extends DcerpcHandle {
             throw new IOException("DCERPC pipe is no longer open");
         }
 
-        return this.handle.sendrecv(buf, off, length, inB);
+        return this.handle.sendrecv(buf, off, length, inB, getMaxRecv());
     }
 
 
@@ -149,7 +149,11 @@ public class DcerpcPipeHandle extends DcerpcHandle {
     @Override
     public void close () throws IOException {
         super.close();
-        this.handle.close();
-        this.pipe.close();
+        try {
+            this.handle.close();
+        }
+        finally {
+            this.pipe.close();
+        }
     }
 }

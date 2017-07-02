@@ -242,11 +242,11 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SmbPipeHandleInternal#sendrecv(byte[], int, int, byte[])
+     * @see jcifs.smb.SmbPipeHandleInternal#sendrecv(byte[], int, int, byte[], int)
      */
     @SuppressWarnings ( "resource" )
     @Override
-    public int sendrecv ( byte[] buf, int off, int length, byte[] inB ) throws IOException {
+    public int sendrecv ( byte[] buf, int off, int length, byte[] inB, int maxRecvSize ) throws IOException {
         try ( SmbFileHandleImpl fh = ensureOpen();
               SmbTreeHandleImpl th = fh.getTree() ) {
 
@@ -254,7 +254,8 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
                 Smb2IoctlRequest req = new Smb2IoctlRequest(th.getConfig(), Smb2IoctlRequest.FSCTL_PIPE_TRANSCEIVE, fh.getFileId(), inB);
                 req.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
                 req.setInputData(new ByteEncodable(buf, off, length));
-                Smb2IoctlResponse resp = th.send(req);
+                req.setMaxOutputResponse(maxRecvSize);
+                Smb2IoctlResponse resp = th.send(req, RequestParam.NO_RETRY);
                 return resp.getOutputLength();
             }
             else if ( this.transact ) {
@@ -329,6 +330,9 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
         try {
             if ( wasOpen ) {
                 this.handle.close();
+            }
+            else if ( this.handle != null ) {
+                this.handle.release();
             }
             this.handle = null;
         }

@@ -105,8 +105,9 @@ public interface SmbPipeHandleInternal extends SmbPipeHandle {
      * @param off
      * @param length
      * @param inB
+     * @param maxRecvCnt
      * @return len
      * @throws IOException
      */
-    int sendrecv ( byte[] buf, int off, int length, byte[] inB ) throws IOException;
+    int sendrecv ( byte[] buf, int off, int length, byte[] inB, int maxRecvCnt ) throws IOException;
 }

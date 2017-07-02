@@ -271,9 +271,6 @@ class SmbTreeConnection {
                 if ( t != null ) {
                     try {
                         t.treeDisconnect(inError, true);
-                        if ( inError ) {
-                            // session.logoff(inError, true);
-                        }
                     }
                     finally {
                         this.tree = null;
