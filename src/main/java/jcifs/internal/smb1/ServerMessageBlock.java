@@ -108,6 +108,11 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
     /**
      * 
      */
+    public static final byte SMB_COM_LOCKING_ANDX = (byte) 0x24;
+
+    /**
+     * 
+     */
     public static final byte SMB_COM_TRANSACTION = (byte) 0x25;
 
     /**
@@ -1328,6 +1333,9 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
             break;
         case SMB_COM_NT_TRANSACT_SECONDARY:
             c = "SMB_COM_NT_TRANSACT_SECONDARY";
+            break;
+        case SMB_COM_LOCKING_ANDX:
+            c = "SMB_COM_LOCKING_ANDX";
             break;
         default:
             c = "UNKNOWN";
