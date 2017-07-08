@@ -176,7 +176,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
     protected abstract void doRecv ( Response response ) throws IOException;
 
 
-    protected abstract void doSkip () throws IOException;
+    protected abstract void doSkip ( Long key ) throws IOException;
 
 
     /**
@@ -225,7 +225,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                         response.received();
                         return response;
                     }
-                    doSkip();
+                    doSkip(peekKey);
                 }
             }
 
@@ -449,7 +449,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                         if ( log.isDebugEnabled() ) {
                             log.debug("Unexpected message id, skipping message " + key);
                         }
-                        doSkip();
+                        doSkip(key);
                     }
                     else {
                         doRecv(response);

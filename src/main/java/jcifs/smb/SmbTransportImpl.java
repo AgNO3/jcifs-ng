@@ -63,6 +63,7 @@ import jcifs.internal.dfs.Referral;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.smb1.com.SmbComBlankResponse;
+import jcifs.internal.smb1.com.SmbComLockingAndX;
 import jcifs.internal.smb1.com.SmbComNegotiate;
 import jcifs.internal.smb1.com.SmbComNegotiateResponse;
 import jcifs.internal.smb1.com.SmbComReadAndXResponse;
@@ -75,6 +76,7 @@ import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.lock.Smb2OplockBreakNotification;
 import jcifs.internal.smb2.nego.Smb2NegotiateRequest;
 import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
 import jcifs.netbios.Name;
@@ -227,6 +229,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
      * @return whether this is SMB2 transport
      * @throws SmbException
      */
+    @Override
     public boolean isSMB2 () throws SmbException {
         return this.smb2 || getNegotiateResponse() instanceof Smb2NegotiateResponse;
     }
@@ -1239,7 +1242,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
 
     @Override
-    protected void doSkip () throws IOException {
+    protected void doSkip ( Long key ) throws IOException {
         synchronized ( this.inLock ) {
             int size = Encdec.dec_uint16be(this.sbuf, 2) & 0xFFFF;
             if ( size < 33 || ( 4 + size ) > this.getContext().getConfig().getRecieveBufferSize() ) {
@@ -1248,10 +1251,57 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 this.in.skip(this.in.available());
             }
             else {
-                log.warn("Skipping message");
+                Response notification = createNotification(key);
+                if ( notification != null ) {
+                    log.debug("Parsing notification");
+                    doRecv(notification);
+                    handleNotification(notification);
+                    return;
+                }
+                log.warn("Skipping message " + key);
                 this.in.skip(size - 32);
             }
         }
+    }
+
+
+    /**
+     * @param notification
+     */
+    protected void handleNotification ( Response notification ) {
+        log.info("Received notification " + notification);
+    }
+
+
+    /**
+     * @param key
+     * @return
+     * @throws SmbException
+     */
+    protected Response createNotification ( Long key ) throws SmbException {
+        if ( key == null ) {
+            // no valid header
+            return null;
+        }
+        if ( this.smb2 ) {
+            if ( key != -1 ) {
+                return null;
+            }
+            int cmd = Encdec.dec_uint16le(this.sbuf, 4 + 12) & 0xFFFF;
+            if ( cmd == 0x12 ) {
+                return new Smb2OplockBreakNotification(getContext().getConfig());
+            }
+        }
+        else {
+            if ( key != 0xFFFF ) {
+                return null;
+            }
+            int cmd = this.sbuf[ 4 + 4 ];
+            if ( cmd == 0x24 ) {
+                return new SmbComLockingAndX(getContext().getConfig());
+            }
+        }
+        return null;
     }
 
 

@@ -112,4 +112,11 @@ public interface SmbTransportInternal extends SmbTransport {
      * @return session
      */
     SmbSession getSmbSession ( CIFSContext tf, String targetHost, String targetDomain );
+
+
+    /**
+     * @return whether this is a SMB2 connection
+     * @throws SmbException
+     */
+    boolean isSMB2 () throws SmbException;
 }
