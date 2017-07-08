@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
+import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.CommonServerMessageBlockRequest;
 import jcifs.internal.CommonServerMessageBlockResponse;
 import jcifs.internal.RequestWithPath;
@@ -712,8 +713,17 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
      * @return the response
      */
     @Override
-    public final ServerMessageBlock getResponse () {
+    public ServerMessageBlock getResponse () {
         return this.response;
+    }
+
+
+    /**
+     * 
+     * @return null
+     */
+    public CommonServerMessageBlock ignoreDisconnect () {
+        return this;
     }
 
 

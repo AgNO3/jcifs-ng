@@ -19,8 +19,10 @@
 package jcifs.internal.smb1.com;
 
 
+import jcifs.CIFSContext;
 import jcifs.Configuration;
 import jcifs.SmbConstants;
+import jcifs.internal.Request;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
@@ -31,7 +33,7 @@ import jcifs.util.Hexdump;
  * 
  * 
  */
-public class SmbComNTCreateAndX extends AndXServerMessageBlock {
+public class SmbComNTCreateAndX extends AndXServerMessageBlock implements Request<SmbComNTCreateAndXResponse> {
 
     // share access specified in SmbFile
 
@@ -159,6 +161,30 @@ public class SmbComNTCreateAndX extends AndXServerMessageBlock {
 
 
     /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb1.ServerMessageBlock#getResponse()
+     */
+    @Override
+    public final SmbComNTCreateAndXResponse getResponse () {
+        return (SmbComNTCreateAndXResponse) super.getResponse();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.Request#initResponse(jcifs.CIFSContext)
+     */
+    @Override
+    public SmbComNTCreateAndXResponse initResponse ( CIFSContext tc ) {
+        SmbComNTCreateAndXResponse resp = new SmbComNTCreateAndXResponse(tc.getConfig());
+        setResponse(resp);
+        return resp;
+    }
+
+
+    /**
      * @param fl
      *            the flags0 to set
      */
@@ -231,4 +257,5 @@ public class SmbComNTCreateAndX extends AndXServerMessageBlock {
                     + Hexdump.toHexString(this.impersonationLevel, 4) + ",securityFlags=0x" + Hexdump.toHexString(this.securityFlags, 2) + ",name="
                     + this.path + "]");
     }
+
 }

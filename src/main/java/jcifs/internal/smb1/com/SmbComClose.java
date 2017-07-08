@@ -22,7 +22,9 @@ package jcifs.internal.smb1.com;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSContext;
 import jcifs.Configuration;
+import jcifs.internal.Request;
 import jcifs.internal.smb1.SMB1SigningDigest;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
@@ -32,7 +34,7 @@ import jcifs.internal.util.SMBUtil;
  * 
  *
  */
-public class SmbComClose extends ServerMessageBlock {
+public class SmbComClose extends ServerMessageBlock implements Request<SmbComBlankResponse> {
 
     private static final Logger log = LoggerFactory.getLogger(SmbComClose.class);
 
@@ -50,6 +52,30 @@ public class SmbComClose extends ServerMessageBlock {
         super(config, SMB_COM_CLOSE);
         this.fid = fid;
         this.lastWriteTime = lastWriteTime;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb1.ServerMessageBlock#getResponse()
+     */
+    @Override
+    public final SmbComBlankResponse getResponse () {
+        return (SmbComBlankResponse) super.getResponse();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.Request#initResponse(jcifs.CIFSContext)
+     */
+    @Override
+    public SmbComBlankResponse initResponse ( CIFSContext tc ) {
+        SmbComBlankResponse resp = new SmbComBlankResponse(tc.getConfig());
+        setResponse(resp);
+        return resp;
     }
 
 
