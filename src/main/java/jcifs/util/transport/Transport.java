@@ -359,7 +359,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                             if ( log.isDebugEnabled() ) {
                                 log.debug("State is " + this.state);
                             }
-                            throw new TransportException(this.name + " timedout waiting for response to " + curReq);
+                            throw new RequestTimeoutException(this.name + " timedout waiting for response to " + curReq);
                         }
                         continue;
                     }
