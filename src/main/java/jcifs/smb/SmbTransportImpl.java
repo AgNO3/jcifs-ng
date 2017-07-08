@@ -1045,7 +1045,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         ServerMessageBlock2Request<?> req = (ServerMessageBlock2Request<?>) request;
         ServerMessageBlock2Response resp = (ServerMessageBlock2Response) response;
         synchronized ( resp ) {
-            if ( resp.isAsync() && resp.getStatus() == NtStatus.NT_STATUS_PENDING && resp.getAsyncId() != 0 ) {
+            if ( resp.isAsync() && !resp.isAsyncHandled() && resp.getStatus() == NtStatus.NT_STATUS_PENDING && resp.getAsyncId() != 0 ) {
+                resp.setAsyncHandled(true);
                 boolean first = !req.isAsync();
                 req.setAsyncId(resp.getAsyncId());
                 Long exp = resp.getExpiration();

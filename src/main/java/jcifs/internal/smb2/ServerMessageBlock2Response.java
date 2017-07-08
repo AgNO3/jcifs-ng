@@ -38,6 +38,7 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
     private byte[] rawPayload;
     private boolean verifyFailed;
     private Exception exception;
+    private boolean asyncHandled;
 
 
     /**
@@ -222,6 +223,23 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
 
 
     /**
+     * @return whether the interim response has been handled
+     */
+    public boolean isAsyncHandled () {
+        return this.asyncHandled;
+    }
+
+
+    /**
+     * @param asyncHandled
+     *            the asyncHandled to set
+     */
+    public void setAsyncHandled ( boolean asyncHandled ) {
+        this.asyncHandled = asyncHandled;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see jcifs.util.transport.Response#getRawPayload()
@@ -303,6 +321,7 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
             throw new SMBProtocolDecodingException("Signature verification failed for " + getClass().getName());
         }
 
+        setAsyncHandled(false);
         received();
     }
 
