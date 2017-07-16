@@ -72,4 +72,11 @@ public interface CommonServerMessageBlockRequest extends CommonServerMessageBloc
      */
     void setTid ( int t );
 
+
+    /**
+     * 
+     * @return custom response timeout for this request
+     */
+    Integer getOverrideTimeout ();
+
 }

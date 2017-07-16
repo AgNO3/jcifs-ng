@@ -145,7 +145,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
      * @see jcifs.util.transport.Transport#getResponseTimeout()
      */
     @Override
-    protected int getResponseTimeout () {
+    protected int getResponseTimeout ( Request req ) {
+        if ( req instanceof CommonServerMessageBlockRequest ) {
+            Integer overrideTimeout = ( (CommonServerMessageBlockRequest) req ).getOverrideTimeout();
+            if ( overrideTimeout != null ) {
+                return overrideTimeout;
+            }
+        }
         return getContext().getConfig().getResponseTimeout();
     }
 
@@ -928,7 +934,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     // for space there is nothing we can do, callers need to make sure that a single message fits
 
                     try {
-                        long timeout = this.transportContext.getConfig().getResponseTimeout();
+                        long timeout = getResponseTimeout(chain);
                         if ( !params.contains(RequestParam.NO_TIMEOUT) ) {
                             this.credits.acquire(cost);
                         }
@@ -1054,7 +1060,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 req.setAsyncId(resp.getAsyncId());
                 Long exp = resp.getExpiration();
                 if ( exp != null ) {
-                    resp.setExpiration(System.currentTimeMillis() + getResponseTimeout());
+                    resp.setExpiration(System.currentTimeMillis() + getResponseTimeout(request));
                 }
                 if ( log.isDebugEnabled() ) {
                     log.debug("Have intermediate reply " + response);
@@ -1555,7 +1561,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
             resp.clearReceived();
             try {
-                long timeout = this.transportContext.getConfig().getResponseTimeout();
+                long timeout = getResponseTimeout(req);
                 if ( !params.contains(RequestParam.NO_TIMEOUT) ) {
                     resp.setExpiration(System.currentTimeMillis() + timeout);
                 }

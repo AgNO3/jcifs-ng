@@ -35,6 +35,7 @@ public abstract class ServerMessageBlock2Request <T extends ServerMessageBlock2R
         implements CommonServerMessageBlockRequest, Request<T> {
 
     private T response;
+    private Integer overrideTimeout;
 
 
     /**
@@ -154,6 +155,26 @@ public abstract class ServerMessageBlock2Request <T extends ServerMessageBlock2R
     @Override
     public void setRequestCredits ( int credits ) {
         setCredit(credits);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#getOverrideTimeout()
+     */
+    @Override
+    public final Integer getOverrideTimeout () {
+        return this.overrideTimeout;
+    }
+
+
+    /**
+     * @param overrideTimeout
+     *            the overrideTimeout to set
+     */
+    public final void setOverrideTimeout ( Integer overrideTimeout ) {
+        this.overrideTimeout = overrideTimeout;
     }
 
 

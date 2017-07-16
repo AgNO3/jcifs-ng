@@ -238,6 +238,8 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
     private String server;
     private String domain;
 
+    private Integer overrideTimeout;
+
 
     protected ServerMessageBlock ( Configuration config ) {
         this(config, (byte) 0);
@@ -289,6 +291,26 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
     @Override
     public boolean isResponseAsync () {
         return false;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#getOverrideTimeout()
+     */
+    @Override
+    public final Integer getOverrideTimeout () {
+        return this.overrideTimeout;
+    }
+
+
+    /**
+     * @param overrideTimeout
+     *            the overrideTimeout to set
+     */
+    public final void setOverrideTimeout ( Integer overrideTimeout ) {
+        this.overrideTimeout = overrideTimeout;
     }
 
 

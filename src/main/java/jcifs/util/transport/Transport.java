@@ -210,7 +210,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
             throw new TransportException("Transport is disconnected " + this.name);
         }
         try {
-            long timeout = !params.contains(RequestParam.NO_TIMEOUT) ? getResponseTimeout() : 0;
+            long timeout = !params.contains(RequestParam.NO_TIMEOUT) ? getResponseTimeout(request) : 0;
 
             long firstKey = doSend(request, response, params, timeout);
 
@@ -402,9 +402,10 @@ public abstract class Transport implements Runnable, AutoCloseable {
 
 
     /**
+     * @param request
      * @return
      */
-    protected abstract int getResponseTimeout ();
+    protected abstract int getResponseTimeout ( Request request );
 
 
     private void loop () {

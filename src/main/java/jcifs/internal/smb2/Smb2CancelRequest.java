@@ -75,6 +75,17 @@ public class Smb2CancelRequest extends ServerMessageBlock2 implements CommonServ
     /**
      * {@inheritDoc}
      *
+     * @see jcifs.internal.CommonServerMessageBlockRequest#getOverrideTimeout()
+     */
+    @Override
+    public Integer getOverrideTimeout () {
+        return null;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
      * @see jcifs.internal.CommonServerMessageBlockRequest#allowChain(jcifs.internal.CommonServerMessageBlockRequest)
      */
     @Override
