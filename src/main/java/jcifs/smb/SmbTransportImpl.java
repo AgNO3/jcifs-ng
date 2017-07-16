@@ -891,7 +891,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             if ( response == null ) {
                 response = (T) ( (jcifs.internal.Request<?>) request ).initResponse(getContext());
             }
-            else {
+            else if ( isSMB2() ) {
                 throw new IOException("Should not provide response argument for SMB2");
             }
         }
