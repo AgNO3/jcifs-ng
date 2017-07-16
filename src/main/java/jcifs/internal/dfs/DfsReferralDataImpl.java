@@ -20,6 +20,7 @@ package jcifs.internal.dfs;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -241,8 +242,6 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
                 if ( log.isDebugEnabled() ) {
                     log.debug("Adjusting server name " + s + " to " + fqdn);
                 }
-
-                this.pathConsumed += fqdn.length() - s.length();
                 this.server = fqdn;
             }
             else {
@@ -274,6 +273,34 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
      */
     public long getTtl () {
         return this.ttl;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode () {
+        return Objects.hash(this.server, this.share, this.path, this.pathConsumed);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals ( Object obj ) {
+        if ( ! ( obj instanceof DfsReferralData ) ) {
+            return false;
+        }
+        DfsReferralData other = (DfsReferralData) obj;
+
+        return Objects.equals(getServer(), other.getServer()) && Objects.equals(getShare(), other.getShare())
+                && Objects.equals(getPath(), other.getPath()) && Objects.equals(getPathConsumed(), other.getPathConsumed());
     }
 
 

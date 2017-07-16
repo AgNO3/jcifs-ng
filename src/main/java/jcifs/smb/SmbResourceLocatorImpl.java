@@ -20,6 +20,7 @@ package jcifs.smb;
 
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -750,7 +751,7 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
      */
     @Override
     public String handleDFSReferral ( DfsReferralData dr, String reqPath ) {
-        if ( this.dfsReferral != null ) {
+        if ( Objects.equals(this.dfsReferral, dr) ) {
             return this.unc;
         }
         this.dfsReferral = dr;
