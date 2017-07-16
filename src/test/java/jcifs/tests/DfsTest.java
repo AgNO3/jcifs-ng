@@ -105,6 +105,7 @@ public class DfsTest extends BaseCIFSTest {
 
     @Test
     public void resolveRoot () throws CIFSException, URISyntaxException {
+        Assume.assumeFalse("Is standalone DFS", isStandalone());
         DfsReferralData ref = doResolve(null, "", true);
 
         assertNotNull(ref);
@@ -115,8 +116,7 @@ public class DfsTest extends BaseCIFSTest {
 
     @Test
     public void testStandalone () throws CIFSException, URISyntaxException {
-        URI uri = new URI(getTestShareURL());
-        Assume.assumeTrue("Is domain DFS", uri.getHost().equals(getTestServer()));
+        Assume.assumeTrue("Is domain DFS", isStandalone());
 
         CIFSContext context = getContext();
         context = withTestNTLMCredentials(context);
@@ -138,6 +138,16 @@ public class DfsTest extends BaseCIFSTest {
         DfsReferralData ref = doResolve(dfsTestSharePath, "", false);
         assertNotNull(ref);
         assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
+    }
+
+
+    /**
+     * @return
+     * @throws URISyntaxException
+     */
+    private boolean isStandalone () throws URISyntaxException {
+        URI uri = new URI(getTestShareURL());
+        return uri.getHost().equals(getTestServer());
     }
 
 
@@ -174,6 +184,7 @@ public class DfsTest extends BaseCIFSTest {
 
     @Test
     public void resolveCacheMatch () throws CIFSException, URISyntaxException {
+        Assume.assumeFalse("Is standalone DFS", isStandalone());
         DfsReferralData ref = doResolve(null, "", true);
         DfsReferralData ref2 = doResolve(null, "", true);
         DfsReferralData ref3 = doResolve(null, "foo", true);
@@ -187,6 +198,7 @@ public class DfsTest extends BaseCIFSTest {
 
     @Test
     public void resolveCacheNonMatch () throws CIFSException, URISyntaxException {
+        Assume.assumeFalse("Is standalone DFS", isStandalone());
         String dfsTestSharePath = getDFSTestSharePath();
         DfsReferralData ref = doResolve("", "", true);
         DfsReferralData ref2 = doResolve(dfsTestSharePath, "", true);
@@ -198,6 +210,7 @@ public class DfsTest extends BaseCIFSTest {
 
     @Test
     public void resolveCacheNonMatch2 () throws CIFSException, URISyntaxException {
+        Assume.assumeFalse("Is standalone DFS", isStandalone());
         String dfsTestSharePath = getDFSTestSharePath();
         DfsReferralData ref = doResolve(dfsTestSharePath, "", true);
         DfsReferralData ref2 = doResolve("", "", true);
@@ -220,7 +233,7 @@ public class DfsTest extends BaseCIFSTest {
         String dfsShare = getDFSShare();
         String dfsSharePath = getDFSTestSharePath();
 
-        String target = domain ? getTestDomain() : getTestServer();
+        String target = ( domain && !isStandalone() ) ? getTestDomain() : getTestServer();
 
         String path = link != null ? link : dfsSharePath + relative;
         log.info("Resolving \\" + target + "\\" + dfsShare + path);
@@ -231,6 +244,9 @@ public class DfsTest extends BaseCIFSTest {
                 log.info("ref " + ref);
             }
             while ( ( ref.next() != ref ) && ( ref = ref.next() ) != null );
+        }
+        else {
+            log.info("No ref");
         }
 
         return ref;

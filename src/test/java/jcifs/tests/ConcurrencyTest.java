@@ -104,7 +104,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
             List<MultiTestCase> runnables = new ArrayList<>();
             runnables.add(f);
             runnables.add(s);
-            runMultiTestCase(runnables, 5);
+            runMultiTestCase(runnables, 10);
         }
     }
 

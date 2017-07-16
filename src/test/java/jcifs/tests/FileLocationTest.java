@@ -270,6 +270,82 @@ public class FileLocationTest {
         }
     }
 
+
+    @Test
+    public void testDfsReferralAfterUncPath () throws MalformedURLException, CIFSException {
+        try ( SmbResource p = new SmbFile("smb://1.2.3.4/share/foo/bar/", getContext()) ) {
+            p.getLocator().getUNCPath();
+
+            DfsReferralData dr = new TestDfsReferral("1.2.3.5", "other", "", 0);
+            String reqPath = "\\foo\\bar\\";
+            SmbResourceLocator fl = p.getLocator();
+            assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl ).handleDFSReferral(dr, reqPath));
+
+            assertEquals("1.2.3.4", fl.getServer());
+            assertEquals("1.2.3.5", fl.getServerWithDfs());
+            assertEquals("other", fl.getShare());
+            assertEquals("\\foo\\bar\\", fl.getUNCPath());
+            // this intentionally sticks to the old name
+            assertEquals("/share/foo/bar/", fl.getURLPath());
+        }
+    }
+
+
+    @Test
+    public void testDfsReferralChildResource () throws MalformedURLException, CIFSException {
+        try ( SmbResource p = new SmbFile("smb://1.2.3.4/share/foo/", getContext()) ) {
+            DfsReferralData dr = new TestDfsReferral("1.2.3.5", "other", "", 0);
+            String reqPath = "\\foo\\";
+            SmbResourceLocator fl = p.getLocator();
+            assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl ).handleDFSReferral(dr, reqPath));
+
+            assertEquals("1.2.3.4", fl.getServer());
+            assertEquals("1.2.3.5", fl.getServerWithDfs());
+            assertEquals("other", fl.getShare());
+            assertEquals("\\foo\\", fl.getUNCPath());
+            // this intentionally sticks to the old name
+            assertEquals("/share/foo/", fl.getURLPath());
+
+            try ( SmbResource c = p.resolve("bar/") ) {
+                SmbResourceLocator fl2 = c.getLocator();
+                reqPath = fl2.getUNCPath();
+                assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl2 ).handleDFSReferral(dr, reqPath));
+            }
+        }
+    }
+
+
+    @Test
+    public void testDfsReferralMultiLink () throws MalformedURLException, CIFSException {
+        try ( SmbResource p = new SmbFile("smb://1.2.3.4/share/foo/", getContext()) ) {
+            DfsReferralData dr = new TestDfsReferral("1.2.3.5", "otherdfs", "", 0);
+            String reqPath = "\\foo\\";
+            SmbResourceLocator fl = p.getLocator();
+            assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl ).handleDFSReferral(dr, reqPath));
+
+            assertEquals("1.2.3.4", fl.getServer());
+            assertEquals("1.2.3.5", fl.getServerWithDfs());
+            assertEquals("otherdfs", fl.getShare());
+            assertEquals("\\foo\\", fl.getUNCPath());
+            // this intentionally sticks to the old name
+            assertEquals("/share/foo/", fl.getURLPath());
+
+            try ( SmbResource c = p.resolve("bar/") ) {
+                DfsReferralData dr2 = new TestDfsReferral("1.2.3.6", "target", "", 0);
+                SmbResourceLocator fl2 = c.getLocator();
+                reqPath = fl2.getUNCPath();
+                assertEquals(reqPath, ( (SmbResourceLocatorInternal) fl2 ).handleDFSReferral(dr2, reqPath));
+
+                assertEquals("1.2.3.4", fl2.getServer());
+                assertEquals("1.2.3.6", fl2.getServerWithDfs());
+                assertEquals("target", fl2.getShare());
+                assertEquals("\\foo\\bar\\", fl2.getUNCPath());
+                // this intentionally sticks to the old name
+                assertEquals("/share/foo/bar/", fl2.getURLPath());
+            }
+        }
+    }
+
     private static class TestDfsReferral implements DfsReferralData {
 
         private String server;
