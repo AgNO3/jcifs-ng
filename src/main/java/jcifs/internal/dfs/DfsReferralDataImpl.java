@@ -54,6 +54,8 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
     private String key;
     private String domain;
 
+    private boolean intermediate;
+
 
     /**
      * 
@@ -201,9 +203,11 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
      * 
      * @param dr
      */
-    public void append ( DfsReferralDataImpl dr ) {
-        dr.next = this.next;
-        this.next = dr;
+    @Override
+    public void append ( DfsReferralDataInternal dr ) {
+        DfsReferralDataImpl dri = (DfsReferralDataImpl) dr;
+        dri.next = this.next;
+        this.next = dri;
     }
 
 
@@ -257,6 +261,23 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
     @Override
     public boolean isResolveHashes () {
         return this.resolveHashes;
+    }
+
+
+    /**
+     * 
+     */
+    public void intermediate () {
+        this.intermediate = true;
+    }
+
+
+    /**
+     * @return the intermediate
+     */
+    @Override
+    public boolean isIntermediate () {
+        return this.intermediate;
     }
 
 
@@ -358,6 +379,27 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
             }
         }
 
+        return dr;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.dfs.DfsReferralDataInternal#combine(jcifs.DfsReferralData)
+     */
+    @Override
+    public DfsReferralDataInternal combine ( DfsReferralData n ) {
+        DfsReferralDataImpl dr = new DfsReferralDataImpl();
+        dr.server = n.getServer();
+        dr.share = n.getShare();
+        dr.expiration = n.getExpiration();
+        dr.path = n.getPath();
+        dr.pathConsumed = this.pathConsumed + n.getPathConsumed();
+        if ( this.path != null ) {
+            dr.pathConsumed -= ( this.path != null ? this.path.length() + 1 : 0 );
+        }
+        dr.domain = n.getDomain();
         return dr;
     }
 

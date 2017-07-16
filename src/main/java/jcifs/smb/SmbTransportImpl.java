@@ -1687,6 +1687,11 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                         .fromReferral(refs[ di ], path, expiration, dfsResp.getPathConsumed(), ntlmCreds.areHashesExternal());
                 dr.setDomain(targetDomain);
 
+                if ( ( dfsResp.getTflags() & 0x2 ) == 0 && ( dr.getFlags() & 0x2 ) == 0 ) {
+                    log.debug("Non-root referral is not final " + dfsResp);
+                    dr.intermediate();
+                }
+
                 if ( cur == null ) {
                     cur = dr;
                 }

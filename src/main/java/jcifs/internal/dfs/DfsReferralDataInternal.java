@@ -95,4 +95,23 @@ public interface DfsReferralDataInternal extends DfsReferralData {
      * @return resolveHashes
      */
     boolean isResolveHashes ();
+
+
+    /**
+     * @return whether this refrral needs to be resolved further
+     */
+    boolean isIntermediate ();
+
+
+    /**
+     * @param next
+     * @return new referral, combining a chain of referrals
+     */
+    DfsReferralDataInternal combine ( DfsReferralData next );
+
+
+    /**
+     * @param dr
+     */
+    void append ( DfsReferralDataInternal dr );
 }
