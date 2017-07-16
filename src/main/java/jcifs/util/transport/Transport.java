@@ -741,7 +741,11 @@ public abstract class Transport implements Runnable, AutoCloseable {
                     }
                     return;
                 }
-                if ( ex0 != null ) {
+
+                if ( ex0 instanceof SocketTimeoutException ) {
+                    this.te = new ConnectionTimeoutException(ex0);
+                }
+                else if ( ex0 != null ) {
                     this.te = new TransportException(ex0);
                 }
                 this.state = 2; // run connected
