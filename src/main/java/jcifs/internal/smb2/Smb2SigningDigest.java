@@ -24,6 +24,8 @@ import java.security.MessageDigest;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.apache.log4j.Logger;
+
 import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.SMBSigningDigest;
 import jcifs.internal.util.SMBUtil;
@@ -34,6 +36,8 @@ import jcifs.internal.util.SMBUtil;
  *
  */
 public class Smb2SigningDigest implements SMBSigningDigest {
+
+    private static final Logger log = Logger.getLogger(Smb2SigningDigest.class);
 
     /**
      * 
@@ -105,6 +109,13 @@ public class Smb2SigningDigest implements SMBSigningDigest {
     @Override
     public synchronized boolean verify ( byte[] data, int offset, int length, CommonServerMessageBlock msg ) {
         this.digest.reset();
+
+        int flags = SMBUtil.readInt4(data, offset + 16);
+        if ( ( flags & ServerMessageBlock2.SMB2_FLAGS_SIGNED ) == 0 ) {
+            log.error("The server did not sign a message we expected to be signed");
+            return true;
+        }
+
         byte[] sig = new byte[SIGNATURE_LENGTH];
         System.arraycopy(data, offset + SIGNATURE_OFFSET, sig, 0, SIGNATURE_LENGTH);
 
