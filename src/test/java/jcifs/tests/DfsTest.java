@@ -236,17 +236,17 @@ public class DfsTest extends BaseCIFSTest {
         String target = ( domain && !isStandalone() ) ? getTestDomain() : getTestServer();
 
         String path = link != null ? link : dfsSharePath + relative;
-        log.info("Resolving \\" + target + "\\" + dfsShare + path);
+        log.debug("Resolving \\" + target + "\\" + dfsShare + path);
         DfsReferralData ref = dfs.resolve(context, target, dfsShare, path);
 
         if ( ref != null ) {
             do {
-                log.info("ref " + ref);
+                log.debug("ref " + ref);
             }
             while ( ( ref.next() != ref ) && ( ref = ref.next() ) != null );
         }
         else {
-            log.info("No ref");
+            log.debug("No ref");
         }
 
         return ref;

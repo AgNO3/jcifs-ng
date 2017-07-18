@@ -577,7 +577,7 @@ class SmbTreeConnection {
             log.debug("Signatures for file enabled but not required " + this);
         }
 
-        if ( referral != null && referral.getShare() != t.getShare() ) {
+        if ( referral != null ) {
             t.markDomainDfs();
         }
 

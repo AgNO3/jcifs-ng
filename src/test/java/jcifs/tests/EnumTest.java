@@ -26,7 +26,9 @@ import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -93,11 +95,27 @@ public class EnumTest extends BaseCIFSTest {
 
     @Test
     public void testDFSShareEnum () throws CIFSException, MalformedURLException {
-        try ( SmbFile smbFile = new SmbFile(getDFSRootURL(), withTestNTLMCredentials(getContext())) ) {
+        String dfsRoot = getDFSRootURL();
+        try ( SmbFile smbFile = new SmbFile(dfsRoot, withTestNTLMCredentials(getContext())) ) {
             String[] list = smbFile.list();
             assertNotNull(list);
             assertTrue("No share found", list.length > 0);
             log.debug(Arrays.toString(list));
+
+            String shareUrl = getTestShareURL();
+            String link = shareUrl.substring(dfsRoot.length());
+
+            Set<String> listLinks = new HashSet<>(Arrays.asList(list));
+            int firstSep = link.indexOf('/');
+            if ( firstSep == link.length() - 1 ) {
+                // single level
+                assertTrue("Link not found " + link, listLinks.contains(link));
+            }
+            else {
+                link = link.substring(0, firstSep + 1);
+                // single level
+                assertTrue("First component of link not found" + link, listLinks.contains(link));
+            }
         }
     }
 
