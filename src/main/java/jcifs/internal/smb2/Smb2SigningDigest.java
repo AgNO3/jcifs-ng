@@ -24,7 +24,8 @@ import java.security.MessageDigest;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.SMBSigningDigest;
@@ -37,7 +38,7 @@ import jcifs.internal.util.SMBUtil;
  */
 public class Smb2SigningDigest implements SMBSigningDigest {
 
-    private static final Logger log = Logger.getLogger(Smb2SigningDigest.class);
+    private static final Logger log = LoggerFactory.getLogger(Smb2SigningDigest.class);
 
     /**
      * 
