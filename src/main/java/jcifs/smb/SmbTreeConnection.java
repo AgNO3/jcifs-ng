@@ -601,7 +601,7 @@ class SmbTreeConnection {
                 log.debug("Trying to renew credentials after auth error");
                 try ( SmbSessionInternal s = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(share, null).unwrap(SmbTreeImpl.class) ) {
-                    if ( referral != null && referral.getShare() != t.getShare() ) {
+                    if ( referral != null ) {
                         tr.markDomainDfs();
                     }
                     tr.treeConnect(null, null);
