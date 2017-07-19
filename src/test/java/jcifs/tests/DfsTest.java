@@ -45,6 +45,8 @@ import jcifs.DfsReferralData;
 import jcifs.DfsResolver;
 import jcifs.SmbResource;
 import jcifs.SmbTransport;
+import jcifs.internal.dfs.DfsReferralDataImpl;
+import jcifs.smb.DfsImpl;
 
 
 /**
@@ -96,9 +98,11 @@ public class DfsTest extends BaseCIFSTest {
 
         String testDomain = getTestDomain();
         assertTrue(dfs.isTrustedDomain(context, testDomain));
+        assertTrue(dfs.isTrustedDomain(context, testDomain.toLowerCase(Locale.ROOT)));
         String shortDom = getProperties().get(TestProperties.TEST_DOMAIN_SHORT);
         if ( shortDom != null ) {
-            assertTrue(dfs.isTrustedDomain(context, shortDom));
+            assertTrue(dfs.isTrustedDomain(context, shortDom.toUpperCase(Locale.ROOT)));
+            assertTrue(dfs.isTrustedDomain(context, shortDom.toLowerCase(Locale.ROOT)));
         }
     }
 
@@ -141,6 +145,94 @@ public class DfsTest extends BaseCIFSTest {
     }
 
 
+    @Test
+    public void testStandaloneSubresource () throws CIFSException, URISyntaxException {
+        Assume.assumeTrue("Is domain DFS", isStandalone());
+
+        CIFSContext context = getContext();
+        context = withTestNTLMCredentials(context);
+
+        try ( SmbResource root = context.get(getTestShareURL()) ) {
+            root.exists();
+            String dfsTestSharePath = getDFSTestSharePath();
+            DfsReferralData ref = doResolve(dfsTestSharePath.toUpperCase(Locale.ROOT), "foo", false);
+            assertNotNull(ref);
+            assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
+        }
+
+    }
+
+
+    @Test
+    public void testStandaloneDFSCache () throws CIFSException {
+        CIFSContext context = getContext();
+        context = withTestNTLMCredentials(context);
+
+        final String hostname = "foo";
+        final String root = "dfs";
+        final String path = "\\bla\\";
+
+        DfsImpl dfs = new DfsImpl(context);
+
+        DfsReferralDataImpl dr = new DfsReferralDataImpl() {
+
+            @Override
+            public int getPathConsumed () {
+                return 2 + hostname.length() + root.length() + path.length();
+            }
+
+
+            @Override
+            public String getServer () {
+                return getTestServer();
+            }
+
+
+            @Override
+            public void stripPathConsumed ( int i ) {}
+        };
+        dfs.cache(context, "\\" + hostname + "\\" + root + path, dr);
+        DfsReferralData ref = dfs.resolve(context, hostname, root, path);
+        assertNotNull(ref);
+    }
+
+
+    @Test
+    public void testStandaloneDFSCacheSubresource () throws CIFSException {
+        CIFSContext context = getContext();
+        context = withTestNTLMCredentials(context);
+
+        final String hostname = "foo";
+        final String root = "dfs";
+        final String path = "\\bla\\";
+
+        DfsImpl dfs = new DfsImpl(context);
+
+        DfsReferralDataImpl dr = new DfsReferralDataImpl() {
+
+            @Override
+            public int getPathConsumed () {
+                return 2 + hostname.length() + root.length() + path.length();
+            }
+
+
+            @Override
+            public String getServer () {
+                return getTestServer();
+            }
+
+
+            @Override
+            public void stripPathConsumed ( int i ) {}
+        };
+        dfs.cache(context, "\\" + hostname + "\\" + root + path, dr);
+        DfsReferralData ref = dfs.resolve(context, hostname, root, path + "lalala\\foo\\");
+        assertNotNull(ref);
+        DfsReferralData ref2 = dfs.resolve(context, hostname, root, path + "lalala\\foo");
+        assertNotNull(ref2);
+    }
+
+
     /**
      * @return
      * @throws URISyntaxException
@@ -159,6 +251,12 @@ public class DfsTest extends BaseCIFSTest {
         assertNotNull(ref);
         assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
         assertEquals(dfsTestSharePath.length() - 1, ref.getPathConsumed());
+
+        DfsReferralData ref2 = doResolve(dfsTestSharePath, "", true, true);
+
+        assertNotNull(ref2);
+        assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref2.getServer().toLowerCase(Locale.ROOT));
+        assertEquals(dfsTestSharePath.length() - 1, ref2.getPathConsumed());
     }
 
 
@@ -197,6 +295,20 @@ public class DfsTest extends BaseCIFSTest {
 
 
     @Test
+    public void resolveCacheMatchUpper () throws CIFSException, URISyntaxException {
+        Assume.assumeFalse("Is standalone DFS", isStandalone());
+        DfsReferralData ref = doResolve(null, "", true);
+        DfsReferralData ref2 = doResolve(null, "", true, true);
+        DfsReferralData ref3 = doResolve(null, "foo", true, true);
+        assertNotNull(ref);
+        assertNotNull(ref2);
+        assertNotNull(ref3);
+        assertEquals(ref, ref2);
+        assertEquals(ref, ref3);
+    }
+
+
+    @Test
     public void resolveCacheNonMatch () throws CIFSException, URISyntaxException {
         Assume.assumeFalse("Is standalone DFS", isStandalone());
         String dfsTestSharePath = getDFSTestSharePath();
@@ -220,12 +332,17 @@ public class DfsTest extends BaseCIFSTest {
     }
 
 
+    private DfsReferralData doResolve ( String link, String relative, boolean domain ) throws URISyntaxException, CIFSException {
+        return doResolve(link, relative, domain, false);
+    }
+
+
     /**
      * @return
      * @throws URISyntaxException
      * @throws CIFSException
      */
-    private DfsReferralData doResolve ( String link, String relative, boolean domain ) throws URISyntaxException, CIFSException {
+    private DfsReferralData doResolve ( String link, String relative, boolean domain, boolean upper ) throws URISyntaxException, CIFSException {
         CIFSContext context = getContext();
         context = withTestNTLMCredentials(context);
         DfsResolver dfs = context.getDfs();
@@ -236,6 +353,13 @@ public class DfsTest extends BaseCIFSTest {
         String target = ( domain && !isStandalone() ) ? getTestDomain() : getTestServer();
 
         String path = link != null ? link : dfsSharePath + relative;
+
+        if ( upper ) {
+            dfsShare = dfsShare.toUpperCase(Locale.ROOT);
+            path = path.toUpperCase(Locale.ROOT);
+            target = target.toUpperCase(Locale.ROOT);
+        }
+
         log.debug("Resolving \\" + target + "\\" + dfsShare + path);
         DfsReferralData ref = dfs.resolve(context, target, dfsShare, path);
 

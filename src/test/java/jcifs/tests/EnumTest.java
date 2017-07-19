@@ -22,11 +22,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,6 +41,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
+import jcifs.CloseableIterator;
+import jcifs.SmbResource;
 import jcifs.smb.DosFileFilter;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -152,6 +156,67 @@ public class EnumTest extends BaseCIFSTest {
                 f.delete();
             }
         }
+    }
+
+
+    @Test
+    public void testEnumDeepUnresolved () throws IOException {
+        try ( SmbFile r = getDefaultShareRoot();
+              SmbFile f = new SmbFile(r, "enum-test/a/b/") ) {
+
+            f.resolve("c/").exists();
+
+            Set<String> names = new HashSet<>();
+            try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                while ( chld.hasNext() ) {
+
+                    try ( SmbResource next = chld.next() ) {
+                        try ( CloseableIterator<SmbResource> children = next.children() ) {}
+                        names.add(next.getName());
+                    }
+                }
+            }
+
+            assertTrue("Test directory  enum-test/a/b/c/ not found", names.contains("c/"));
+        }
+
+        try ( SmbFile r = getDefaultShareRoot();
+              SmbFile f = new SmbFile(r, "enum-test/a/b/c/") ) {
+            f.exists();
+        }
+
+    }
+
+
+    @Test
+    public void testEnumDeepUnresolvedCasing () throws IOException {
+
+        String testShareURL = getTestShareURL().toUpperCase(Locale.ROOT);
+
+        try ( SmbFile r = new SmbFile(testShareURL, withTestNTLMCredentials(getContext()));
+              SmbFile f = new SmbFile(r, "enum-test/a/b/") ) {
+
+            f.resolve("c/").exists();
+
+            Set<String> names = new HashSet<>();
+            try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                while ( chld.hasNext() ) {
+
+                    try ( SmbResource next = chld.next() ) {
+                        try ( CloseableIterator<SmbResource> children = next.children() ) {}
+                        names.add(next.getName());
+                    }
+                }
+            }
+
+            assertTrue("Test directory  enum-test/a/b/c/ not found", names.contains("c/"));
+        }
+
+        try ( SmbFile r = getDefaultShareRoot();
+              SmbFile f = new SmbFile(r, "enum-test/a/b/c/") ) {
+            f.exists();
+        }
+
     }
 
 

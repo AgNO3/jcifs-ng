@@ -162,7 +162,7 @@ public class DfsImpl implements DfsResolver {
             Map<String, Map<String, CacheEntry<DfsReferralDataInternal>>> domains = getTrustedDomains(tf);
             if ( domains == null )
                 return false;
-            domain = domain.toLowerCase();
+            domain = domain.toLowerCase(Locale.ROOT);
             return domains.get(domain) != null;
         }
     }
@@ -754,28 +754,34 @@ public class DfsImpl implements DfsResolver {
             key += path;
         }
 
-        if ( key.charAt(key.length() - 1) == '\\' ) {
-            key = key.substring(0, key.length() - 1);
-        }
-
-        key = key.toLowerCase();
+        key = key.toLowerCase(Locale.ROOT);
 
         Iterator<String> iter = refs.map.keySet().iterator();
+        int searchLen = key.length();
         while ( iter.hasNext() ) {
-            String _key = iter.next();
-            int _klen = _key.length();
-            boolean match = false;
+            String cachedKey = iter.next();
+            int cachedKeyLen = cachedKey.length();
 
-            if ( _klen == key.length() ) {
-                match = _key.equals(key);
+            boolean match = false;
+            if ( cachedKeyLen == searchLen ) {
+                match = cachedKey.equals(key);
             }
-            else if ( _klen < key.length() ) {
-                match = _key.regionMatches(0, key, 0, _klen) && key.charAt(_klen) == '\\';
+            else if ( cachedKeyLen < searchLen ) {
+                match = key.startsWith(cachedKey);
+            }
+            else if ( log.isTraceEnabled() ) {
+                log.trace(key + " vs. " + cachedKey);
             }
 
             if ( match ) {
-                return refs.map.get(_key);
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Matched " + cachedKey);
+                }
+                return refs.map.get(cachedKey);
             }
+        }
+        if ( log.isTraceEnabled() ) {
+            log.trace("No match for " + key);
         }
         return null;
     }
@@ -793,6 +799,12 @@ public class DfsImpl implements DfsResolver {
 
         int s1 = path.indexOf('\\', 1);
         int s2 = path.indexOf('\\', s1 + 1);
+
+        if ( s1 < 0 || s2 < 0 ) {
+            log.error("Invalid UNC path " + path);
+            return;
+        }
+
         String server = path.substring(1, s1).toLowerCase(Locale.ROOT);
         String share = path.substring(s1 + 1, s2);
         String key = path.substring(0, dr.getPathConsumed()).toLowerCase(Locale.ROOT);
@@ -813,6 +825,14 @@ public class DfsImpl implements DfsResolver {
          * the entire path.
          */
         dri.stripPathConsumed(1 + server.length() + 1 + share.length());
+
+        if ( key.charAt(key.length() - 1) != '\\' ) {
+            key += '\\';
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug("Key is " + key);
+        }
 
         CacheEntry<DfsReferralDataInternal> refs = this.referrals;
         synchronized ( this.referralsLock ) {

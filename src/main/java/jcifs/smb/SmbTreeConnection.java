@@ -470,10 +470,23 @@ class SmbTreeConnection {
      * 
      * @param loc
      * @param host
-     * @return tree handle
+     * @return
      * @throws IOException
      */
     public synchronized SmbTreeHandleImpl connectHost ( SmbResourceLocatorImpl loc, String host ) throws IOException {
+        return connectHost(loc, host, null);
+    }
+
+
+    /**
+     * 
+     * @param loc
+     * @param host
+     * @param referral
+     * @return tree handle
+     * @throws IOException
+     */
+    public synchronized SmbTreeHandleImpl connectHost ( SmbResourceLocatorImpl loc, String host, DfsReferralData referral ) throws IOException {
         String targetDomain = null;
         try ( SmbTreeImpl t = getTree() ) {
             if ( t != null ) {
@@ -501,7 +514,8 @@ class SmbTreeConnection {
         String path = ( loc.getType() == SmbConstants.TYPE_SHARE || loc.getUNCPath() == null || "\\".equals(loc.getUNCPath()) ) ? null
                 : loc.getUNCPath();
         String share = loc.getShare();
-        DfsReferralData start = this.ctx.getDfs().resolve(this.ctx, hostName, loc.getShare(), path);
+
+        DfsReferralData start = referral != null ? referral : this.ctx.getDfs().resolve(this.ctx, hostName, loc.getShare(), path);
         DfsReferralData dr = start;
         IOException last = null;
         do {
@@ -704,15 +718,16 @@ class SmbTreeConnection {
                 if ( request != null ) {
                     request.setPath(dunc);
                 }
-                if ( !t.getShare().equals(loc.getShare()) ) {
-                    // this should only happen for standalone roots
+
+                if ( !t.getShare().equals(dr.getShare()) ) {
+                    // this should only happen for standalone roots or if the DC/domain root lookup failed
                     IOException last;
                     DfsReferralData start = dr;
                     do {
                         if ( log.isDebugEnabled() ) {
                             log.debug("Need to switch tree for " + dr);
                         }
-                        try ( SmbTreeHandleImpl nt = connectHost(loc, session.getTargetHost()) ) {
+                        try ( SmbTreeHandleImpl nt = connectHost(loc, session.getTargetHost(), dr) ) {
                             log.debug("Switched tree");
                             return loc;
                         }
