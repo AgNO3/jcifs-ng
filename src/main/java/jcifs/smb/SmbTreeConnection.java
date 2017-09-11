@@ -470,7 +470,7 @@ class SmbTreeConnection {
      * 
      * @param loc
      * @param host
-     * @return
+     * @return tree handle
      * @throws IOException
      */
     public synchronized SmbTreeHandleImpl connectHost ( SmbResourceLocatorImpl loc, String host ) throws IOException {
