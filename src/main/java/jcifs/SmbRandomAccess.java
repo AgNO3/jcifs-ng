@@ -21,6 +21,8 @@ package jcifs;
 import java.io.DataInput;
 import java.io.DataOutput;
 
+import jcifs.smb.SmbException;
+
 
 /**
  * File access that exposes random access semantics
@@ -29,5 +31,83 @@ import java.io.DataOutput;
  *
  */
 public interface SmbRandomAccess extends DataOutput, DataInput, AutoCloseable {
+
+    /**
+     * Close the file
+     * 
+     * @throws SmbException
+     */
+    @Override
+    void close () throws SmbException;
+
+
+    /**
+     * Read a single byte from the current position
+     * 
+     * @return read byte, -1 if EOF
+     * @throws SmbException
+     */
+    int read () throws SmbException;
+
+
+    /**
+     * Read into buffer from current position
+     * 
+     * @param b
+     *            buffer
+     * @return number of bytes read
+     * @throws SmbException
+     */
+    int read ( byte[] b ) throws SmbException;
+
+
+    /**
+     * Read into buffer from current position
+     * 
+     * @param b
+     *            buffer
+     * @param off
+     *            offset into buffer
+     * @param len
+     *            read up to <tt>len</tt> bytes
+     * @return number of bytes read
+     * @throws SmbException
+     */
+    int read ( byte[] b, int off, int len ) throws SmbException;
+
+
+    /**
+     * Current position in file
+     * 
+     * @return current position
+     */
+    long getFilePointer ();
+
+
+    /**
+     * Seek to new position
+     * 
+     * @param pos
+     */
+    void seek ( long pos );
+
+
+    /**
+     * Get the current file length
+     * 
+     * @return file length
+     * @throws SmbException
+     */
+    long length () throws SmbException;
+
+
+    /**
+     * Expand/truncate file length
+     * 
+     * @param newLength
+     *            new file length
+     * @throws SmbException
+     */
+    void setLength ( long newLength ) throws SmbException;
 
 }
