@@ -69,15 +69,25 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
             this.response.getLastName(),
             th.getConfig().getListCount(),
             th.getConfig().getListSize());
-        th.send(
-            new Trans2FindFirst2(
-                th.getConfig(),
-                unc,
-                this.getWildcard(),
-                this.getSearchAttributes(),
-                th.getConfig().getListCount(),
-                th.getConfig().getListSize()),
-            this.response);
+
+        try {
+            th.send(
+                new Trans2FindFirst2(
+                    th.getConfig(),
+                    unc,
+                    this.getWildcard(),
+                    this.getSearchAttributes(),
+                    th.getConfig().getListCount(),
+                    th.getConfig().getListSize()),
+                this.response);
+        }
+        catch ( SmbException e ) {
+            if ( this.response != null && this.response.isReceived() && e.getNtStatus() == NtStatus.NT_STATUS_NO_SUCH_FILE ) {
+                doClose();
+                return null;
+            }
+            throw e;
+        }
 
         this.response.setSubCommand(SmbComTransaction.TRANS2_FIND_NEXT2);
         FileEntry n = advance(false);

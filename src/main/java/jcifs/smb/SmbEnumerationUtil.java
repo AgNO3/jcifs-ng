@@ -174,8 +174,8 @@ final class SmbEnumerationUtil {
     @SuppressWarnings ( "resource" )
     static CloseableIterator<SmbResource> doEnum ( SmbFile parent, String wildcard, int searchAttributes, ResourceNameFilter fnf, ResourceFilter ff )
             throws CIFSException {
-        if ( ff != null && ff instanceof DosFileFilter ) {
-            DosFileFilter dff = (DosFileFilter) ff;
+        DosFileFilter dff = unwrapDOSFilter(ff);
+        if ( dff != null ) {
             if ( dff.wildcard != null )
                 wildcard = dff.wildcard;
             searchAttributes = dff.attributes;
@@ -196,6 +196,17 @@ final class SmbEnumerationUtil {
             }
             return new DirFileEntryAdapterIterator(parent, new DirFileEntryEnumIterator1(th, parent, wildcard, fnf, searchAttributes), ff);
         }
+    }
+
+
+    private static DosFileFilter unwrapDOSFilter ( ResourceFilter ff ) {
+        if ( ff instanceof ResourceFilterWrapper ) {
+            SmbFileFilter sff = ( (ResourceFilterWrapper) ff ).getFileFilter();
+            if ( sff instanceof DosFileFilter ) {
+                return (DosFileFilter) sff;
+            }
+        }
+        return null;
     }
 
 
@@ -237,25 +248,12 @@ final class SmbEnumerationUtil {
 
     static SmbFile[] listFiles ( SmbFile root, String wildcard, int searchAttributes, final SmbFilenameFilter fnf, final SmbFileFilter ff )
             throws SmbException {
-        try ( CloseableIterator<SmbResource> it = doEnum(root, wildcard, searchAttributes, fnf == null ? null : new ResourceNameFilter() {
-
-            @Override
-            public boolean accept ( SmbResource parent, String name ) throws CIFSException {
-                if ( ! ( parent instanceof SmbFile ) ) {
-                    return false;
-                }
-                return fnf.accept((SmbFile) parent, name);
-            }
-        }, ff == null ? null : new ResourceFilter() {
-
-            @Override
-            public boolean accept ( SmbResource resource ) throws CIFSException {
-                if ( ! ( resource instanceof SmbFile ) ) {
-                    return false;
-                }
-                return ff.accept((SmbFile) resource);
-            }
-        }) ) {
+        try ( CloseableIterator<SmbResource> it = doEnum(
+            root,
+            wildcard,
+            searchAttributes,
+            fnf == null ? null : new ResourceNameFilterWrapper(fnf),
+            ff == null ? null : new ResourceFilterWrapper(ff)) ) {
 
             List<SmbFile> list = new ArrayList<>();
             while ( it.hasNext() ) {
@@ -269,6 +267,69 @@ final class SmbEnumerationUtil {
         }
         catch ( CIFSException e ) {
             throw SmbException.wrap(e);
+        }
+    }
+
+    /**
+     * @author mbechler
+     *
+     */
+    private static final class ResourceFilterWrapper implements ResourceFilter {
+
+        /**
+         * 
+         */
+        private final SmbFileFilter ff;
+
+
+        /**
+         * @param ff
+         */
+        ResourceFilterWrapper ( SmbFileFilter ff ) {
+            this.ff = ff;
+        }
+
+
+        SmbFileFilter getFileFilter () {
+            return this.ff;
+        }
+
+
+        @Override
+        public boolean accept ( SmbResource resource ) throws CIFSException {
+            if ( ! ( resource instanceof SmbFile ) ) {
+                return false;
+            }
+            return this.ff.accept((SmbFile) resource);
+        }
+    }
+
+    /**
+     * @author mbechler
+     *
+     */
+    private static final class ResourceNameFilterWrapper implements ResourceNameFilter {
+
+        /**
+         * 
+         */
+        private final SmbFilenameFilter fnf;
+
+
+        /**
+         * @param fnf
+         */
+        ResourceNameFilterWrapper ( SmbFilenameFilter fnf ) {
+            this.fnf = fnf;
+        }
+
+
+        @Override
+        public boolean accept ( SmbResource parent, String name ) throws CIFSException {
+            if ( ! ( parent instanceof SmbFile ) ) {
+                return false;
+            }
+            return this.fnf.accept((SmbFile) parent, name);
         }
     }
 

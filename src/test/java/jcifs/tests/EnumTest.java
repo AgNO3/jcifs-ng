@@ -267,6 +267,7 @@ public class EnumTest extends BaseCIFSTest {
     }
 
 
+    @Test
     public void testDirDosFilterEnum () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestDirectory() ) {
             try ( SmbFile a = new SmbFile(f, "a.txt");
@@ -277,7 +278,7 @@ public class EnumTest extends BaseCIFSTest {
                 b.createNewFile();
                 c.createNewFile();
 
-                SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", 0));
+                SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", -1));
                 assertNotNull(files);
                 assertEquals(2, files.length);
                 for ( SmbFile cf : files ) {
@@ -288,6 +289,57 @@ public class EnumTest extends BaseCIFSTest {
             finally {
                 f.delete();
             }
+        }
+    }
+
+
+    @Test
+    public void testPatternEnum () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbFile f = createTestDirectory() ) {
+            try ( SmbFile a = new SmbFile(f, "a.txt");
+                  SmbFile b = new SmbFile(f, "b.txt");
+                  SmbFile c = new SmbFile(f, "c.bar") ) {
+
+                a.createNewFile();
+                b.createNewFile();
+                c.createNewFile();
+
+                SmbFile[] files = f.listFiles("*.txt");
+                assertNotNull(files);
+                assertEquals(2, files.length);
+                for ( SmbFile cf : files ) {
+                    assertTrue(cf.exists());
+                    cf.close();
+                }
+
+                int n = 0;
+                try ( CloseableIterator<SmbResource> children = f.children("*.txt") ) {
+                    while ( children.hasNext() ) {
+                        try ( SmbResource r = children.next() ) {
+                            assertTrue(r.exists());
+                            n++;
+                        }
+                    }
+                }
+                assertEquals(2, n);
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testEmptyEnum () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbFile f = createTestDirectory() ) {
+            SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", 0));
+            assertNotNull(files);
+            assertEquals(0, files.length);
+
+            files = f.listFiles();
+            assertNotNull(files);
+            assertEquals(0, files.length);
         }
     }
 

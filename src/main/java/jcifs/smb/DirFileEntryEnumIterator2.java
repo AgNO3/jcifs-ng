@@ -103,6 +103,15 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
                     e.addSuppressed(e2);
                 }
             }
+
+            Smb2QueryDirectoryResponse qr = query.getResponse();
+
+            if ( qr != null && qr.isReceived() && qr.getStatus() == NtStatus.NT_STATUS_NO_SUCH_FILE ) {
+                // this simply indicates an empty listing
+                doClose();
+                return null;
+            }
+
             throw e;
         }
         this.fileId = createResp.getFileId();
