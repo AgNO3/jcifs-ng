@@ -414,6 +414,26 @@ public interface SmbResource extends AutoCloseable {
 
 
     /**
+     * Changes the name of the file this <code>SmbResource</code> represents to the name
+     * designated by the <code>SmbResource</code> argument.
+     * <br>
+     * <i>Remember: <code>SmbResource</code>s are immutible and therefore
+     * the path associated with this <code>SmbResource</code> object will not
+     * change). To access the renamed file it is necessary to construct a
+     * new <tt>SmbResource</tt></i>.
+     *
+     * @param dest
+     *            An <code>SmbResource</code> that represents the new pathname
+     * @param replace
+     *            Whether an existing destination file should be replaced (only supported with SMB2)
+     * @throws CIFSException
+     * @throws NullPointerException
+     *             If the <code>dest</code> argument is <code>null</code>
+     */
+    void renameTo ( SmbResource dest, boolean replace ) throws CIFSException;
+
+
+    /**
      * Creates a directory watch
      * 
      * The server will notify the client when there are changes to the directories contents

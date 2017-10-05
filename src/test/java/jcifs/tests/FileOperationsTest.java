@@ -40,6 +40,7 @@ import jcifs.SmbResource;
 import jcifs.SmbTreeHandle;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbRandomAccessFile;
+import jcifs.smb.SmbUnsupportedOperationException;
 
 
 /**
@@ -77,6 +78,39 @@ public class FileOperationsTest extends BaseCIFSTest {
                 finally {
                     f2.delete();
                 }
+            }
+            finally {
+                if ( !renamed && f.exists() ) {
+                    f.delete();
+                }
+            }
+        }
+    }
+
+
+    @Test
+    public void testRenameOverwrite () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbResource f = new SmbFile(defaultShareRoot, makeRandomName());
+              SmbResource tgt = new SmbFile(defaultShareRoot, makeRandomName()) ) {
+            f.createNewFile();
+            tgt.createNewFile();
+            boolean renamed = false;
+            try {
+                f.renameTo(tgt, true);
+                try {
+                    assertTrue(tgt.exists());
+                    renamed = true;
+                }
+                finally {
+                    tgt.delete();
+                }
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                try ( SmbTreeHandle th = defaultShareRoot.getTreeHandle() ) {
+                    Assume.assumeTrue("Not SMB2", th.isSMB2());
+                }
+                throw e;
             }
             finally {
                 if ( !renamed && f.exists() ) {

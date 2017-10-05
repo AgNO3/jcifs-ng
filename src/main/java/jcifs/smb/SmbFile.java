@@ -1346,6 +1346,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public void renameTo ( SmbResource d ) throws SmbException {
+        renameTo(d, false);
+    }
+
+
+    @Override
+    public void renameTo ( SmbResource d, boolean replace ) throws SmbException {
         if ( ! ( d instanceof SmbFile ) ) {
             throw new SmbException("Invalid target resource");
         }
@@ -1382,10 +1388,14 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
              */
             if ( sh.isSMB2() ) {
                 Smb2SetInfoRequest req = new Smb2SetInfoRequest(sh.getConfig());
-                req.setFileInformation(new FileRenameInformation2(dest.getUncPath().substring(1), false));
+                req.setFileInformation(new FileRenameInformation2(dest.getUncPath().substring(1), replace));
                 withOpen(sh, Smb2CreateRequest.FILE_OPEN, FILE_WRITE_ATTRIBUTES | DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE, req);
             }
             else {
+                if ( replace ) {
+                    // TRANS2_SET_FILE_INFORMATION does not seem to support the SMB1 RENAME_INFO
+                    throw new SmbUnsupportedOperationException("Replacing rename only supported with SMB2");
+                }
                 sh.send(new SmbComRename(sh.getConfig(), getUncPath(), dest.getUncPath()), new SmbComBlankResponse(sh.getConfig()));
             }
         }
