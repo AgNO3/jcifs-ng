@@ -165,16 +165,13 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>clirr-maven-plugin</artifactId>
-				<executions>
-					<!-- Disabled for 1.6, turn back on for patch release, clirr is buggy as hell -->
-					<!-- 
+				<executions> 
 					<execution>
 						<id>check-compatibility</id>
 						<goals>
 							<goal>check</goal>
 						</goals>
 					</execution>
-					 -->
 				</executions>
 				<configuration>
 					<ignored>
@@ -188,8 +185,8 @@
 							<to>*</to>
 						</difference>
 						<difference>
-							<!-- these either have a base class or are internal -->
-							<className>jcifs/*</className>
+							<!-- these were missing in 2.0.0 -->
+							<className>jcifs/SmbRandomAccess</className>
 							<differenceType>7012</differenceType>
 							<method>*</method>
 							<from>*</from>
