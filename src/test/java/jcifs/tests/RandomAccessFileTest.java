@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
+import jcifs.SmbRandomAccess;
 import jcifs.smb.SmbEndOfFileException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFileOutputStream;
@@ -252,6 +253,27 @@ public class RandomAccessFileTest extends BaseCIFSTest {
     }
 
 
+    @Test
+    public void testLargeReadWrite () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                int bufSize = 64 * 1024 + 512;
+                int l = bufSize;
+                try ( SmbRandomAccess raf = f.openRandomAccess("rw") ) {
+                    writeRandom(bufSize, l, raf);
+                }
+
+                try ( SmbRandomAccess raf = f.openRandomAccess("rw") ) {
+                    verifyRandom(bufSize, l, raf);
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
     private static void verifyZero ( int cnt, InputStream is ) throws IOException {
         byte[] offBuf = new byte[cnt];
         int pos = 0;
@@ -277,7 +299,7 @@ public class RandomAccessFileTest extends BaseCIFSTest {
      * @param is
      * @throws IOException
      */
-    static void verifyRandom ( int bufSize, long length, SmbRandomAccessFile is ) throws IOException {
+    static void verifyRandom ( int bufSize, long length, SmbRandomAccess is ) throws IOException {
         long start = System.currentTimeMillis();
         byte buffer[] = new byte[bufSize];
         long p = 0;

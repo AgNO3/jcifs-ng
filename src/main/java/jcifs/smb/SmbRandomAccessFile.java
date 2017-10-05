@@ -219,7 +219,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
                     Smb2ReadRequest request = new Smb2ReadRequest(th.getConfig(), fh.getFileId(), b, off);
                     request.setOffset(this.fp);
                     request.setReadLength(r);
-                    request.setRemainingBytes(len - r - off);
+                    request.setRemainingBytes(len - off);
                     try {
                         Smb2ReadResponse resp = th.send(request, RequestParam.NO_RETRY);
                         n = resp.getDataLength();
@@ -254,6 +254,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
                 }
                 this.fp += n;
                 len -= n;
+                off += n;
                 response.adjustOffset(n);
             }
             while ( len > 0 && n == r );
