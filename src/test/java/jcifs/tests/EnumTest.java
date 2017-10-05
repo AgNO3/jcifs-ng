@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
+import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.smb.DosFileFilter;
 import jcifs.smb.SmbException;
@@ -325,6 +326,37 @@ public class EnumTest extends BaseCIFSTest {
             }
             finally {
                 f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testAttributeEnum () throws CIFSException, MalformedURLException, UnknownHostException {
+
+        try ( SmbFile f = createTestDirectory() ) {
+            try ( SmbFile a = new SmbFile(f, "a/");
+                  SmbFile b = new SmbFile(f, "b.txt");
+                  SmbFile c = new SmbFile(f, "c.bar") ) {
+
+                a.mkdir();
+                b.createNewFile();
+                b.setAttributes(SmbConstants.ATTR_HIDDEN);
+
+                c.createNewFile();
+                c.setAttributes(SmbConstants.ATTR_ARCHIVE);
+
+                SmbFile[] dirs = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_DIRECTORY));
+                assertNotNull(dirs);
+                assertEquals(1, dirs.length);
+
+                SmbFile[] hidden = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_HIDDEN));
+                assertNotNull(hidden);
+                assertEquals(1, hidden.length);
+
+                SmbFile[] archive = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_ARCHIVE));
+                assertNotNull(archive);
+                assertEquals(1, archive.length);
             }
         }
     }
