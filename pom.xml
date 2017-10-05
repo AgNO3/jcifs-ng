@@ -180,7 +180,7 @@
 								return types -->
 							<className>**</className>
 							<differenceType>7006</differenceType>
-							<method>* clone()</method>
+							<method>*</method>
 							<from>*</from>
 							<to>*</to>
 						</difference>
@@ -189,6 +189,14 @@
 							<className>jcifs/SmbRandomAccess</className>
 							<differenceType>7012</differenceType>
 							<method>*</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+						<difference>
+							<!-- added 2.0.1 -->
+							<className>jcifs/SmbResource</className>
+							<differenceType>7012</differenceType>
+							<method>void renameTo(jcifs.SmbResource, boolean)</method>
 							<from>*</from>
 							<to>*</to>
 						</difference>
