@@ -22,6 +22,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -31,6 +32,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Random;
 
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -39,7 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
+import jcifs.smb.SmbEndOfFileException;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbFileOutputStream;
 import jcifs.smb.SmbRandomAccessFile;
 
 
@@ -66,6 +70,74 @@ public class RandomAccessFileTest extends BaseCIFSTest {
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
         return getConfigs("noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs", "smb2");
+    }
+
+
+    @Test
+    public void testReadOnly () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                try ( SmbFileOutputStream os = f.openOutputStream() ) {
+                    os.write(new byte[] {
+                        0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7
+                    });
+                }
+
+                byte[] buf = new byte[4];
+                try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "r") ) {
+                    raf.seek(4);
+                    raf.readFully(buf);
+                }
+
+                Assert.assertArrayEquals(new byte[] {
+                    0x4, 0x5, 0x6, 0x7
+                }, buf);
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testReadOnlySeekOOB () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+            try {
+                try ( SmbFileOutputStream os = f.openOutputStream() ) {
+                    os.write(new byte[] {
+                        0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7
+                    });
+                }
+
+                try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "r") ) {
+                    raf.seek(10);
+                    Assert.assertEquals(-1, raf.read());
+                }
+
+                byte[] buf = new byte[4];
+                try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "r") ) {
+                    raf.seek(6);
+                    Assert.assertEquals(2, raf.read(buf));
+                    Assert.assertArrayEquals(new byte[] {
+                        0x6, 0x7, 0x0, 0x0
+                    }, buf);
+                }
+
+                try ( SmbRandomAccessFile raf = new SmbRandomAccessFile(f, "r") ) {
+                    raf.seek(6);
+                    try {
+                        raf.readFully(buf);
+                        Assert.fail("Should have thrown exception");
+                    }
+                    catch ( SmbEndOfFileException e ) {}
+                }
+
+            }
+            finally {
+                f.delete();
+            }
+        }
     }
 
 
@@ -237,7 +309,7 @@ public class RandomAccessFileTest extends BaseCIFSTest {
      * @param os
      * @throws IOException
      */
-    static void writeRandom ( int bufSize, long length, SmbRandomAccessFile os ) throws IOException {
+    static void writeRandom ( int bufSize, long length, DataOutput os ) throws IOException {
         long start = System.currentTimeMillis();
         byte buffer[] = new byte[bufSize];
         long p = 0;

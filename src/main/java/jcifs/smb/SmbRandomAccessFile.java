@@ -114,6 +114,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
         try ( SmbTreeHandleInternal th = this.file.ensureTreeConnected() ) {
             if ( mode.equals("r") ) {
                 this.openFlags = SmbConstants.O_CREAT | SmbConstants.O_RDONLY;
+                this.access = SmbConstants.FILE_READ_DATA;
             }
             else if ( mode.equals("rw") ) {
                 this.openFlags = SmbConstants.O_CREAT | SmbConstants.O_RDWR | SmbConstants.O_APPEND;
@@ -148,33 +149,6 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
 
 
     /**
-     * Read a single byte from the current position
-     * 
-     * @return read byte, -1 if EOF
-     * @throws SmbException
-     */
-    public int read () throws SmbException {
-        if ( read(this.tmp, 0, 1) == -1 ) {
-            return -1;
-        }
-        return this.tmp[ 0 ] & 0xFF;
-    }
-
-
-    /**
-     * Read into buffer from current position
-     * 
-     * @param b
-     *            buffer
-     * @return number of bytes read
-     * @throws SmbException
-     */
-    public int read ( byte b[] ) throws SmbException {
-        return read(b, 0, b.length);
-    }
-
-
-    /**
      * @return
      * @throws SmbException
      */
@@ -189,11 +163,6 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     }
 
 
-    /**
-     * Close the file
-     * 
-     * @throws SmbException
-     */
     @Override
     public synchronized void close () throws SmbException {
         try {
@@ -216,18 +185,22 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     }
 
 
-    /**
-     * Read into buffer from current position
-     * 
-     * @param b
-     *            buffer
-     * @param off
-     *            offset into buffer
-     * @param len
-     *            read up to <tt>len</tt> bytes
-     * @return number of bytes read
-     * @throws SmbException
-     */
+    @Override
+    public int read () throws SmbException {
+        if ( read(this.tmp, 0, 1) == -1 ) {
+            return -1;
+        }
+        return this.tmp[ 0 ] & 0xFF;
+    }
+
+
+    @Override
+    public int read ( byte b[] ) throws SmbException {
+        return read(b, 0, b.length);
+    }
+
+
+    @Override
     public int read ( byte b[], int off, int len ) throws SmbException {
         if ( len <= 0 ) {
             return 0;
@@ -306,7 +279,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
         do {
             count = this.read(b, off + n, len - n);
             if ( count < 0 )
-                throw new SmbException("EOF");
+                throw new SmbEndOfFileException();
             n += count;
             this.fp += count;
         }
@@ -377,45 +350,25 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     }
 
 
-    /**
-     * Current position in file
-     * 
-     * @return current position
-     */
+    @Override
     public long getFilePointer () {
         return this.fp;
     }
 
 
-    /**
-     * Seek to new position
-     * 
-     * 
-     * @param pos
-     */
+    @Override
     public void seek ( long pos ) {
         this.fp = pos;
     }
 
 
-    /**
-     * Get the current file length
-     * 
-     * @return file length
-     * @throws SmbException
-     */
+    @Override
     public long length () throws SmbException {
         return this.file.length();
     }
 
 
-    /**
-     * Expand/truncate file length
-     * 
-     * @param newLength
-     *            new file length
-     * @throws SmbException
-     */
+    @Override
     public void setLength ( long newLength ) throws SmbException {
         try ( SmbFileHandleImpl fh = ensureOpen();
               SmbTreeHandleImpl th = fh.getTree() ) {
@@ -448,7 +401,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final boolean readBoolean () throws SmbException {
         if ( ( read(this.tmp, 0, 1) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return this.tmp[ 0 ] != (byte) 0x00;
     }
@@ -457,7 +410,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final byte readByte () throws SmbException {
         if ( ( read(this.tmp, 0, 1) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return this.tmp[ 0 ];
     }
@@ -466,7 +419,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final int readUnsignedByte () throws SmbException {
         if ( ( read(this.tmp, 0, 1) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return this.tmp[ 0 ] & 0xFF;
     }
@@ -475,7 +428,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final short readShort () throws SmbException {
         if ( ( read(this.tmp, 0, 2) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return Encdec.dec_uint16be(this.tmp, 0);
     }
@@ -484,7 +437,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final int readUnsignedShort () throws SmbException {
         if ( ( read(this.tmp, 0, 2) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return Encdec.dec_uint16be(this.tmp, 0) & 0xFFFF;
     }
@@ -493,7 +446,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final char readChar () throws SmbException {
         if ( ( read(this.tmp, 0, 2) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return (char) Encdec.dec_uint16be(this.tmp, 0);
     }
@@ -502,7 +455,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final int readInt () throws SmbException {
         if ( ( read(this.tmp, 0, 4) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return Encdec.dec_uint32be(this.tmp, 0);
     }
@@ -511,7 +464,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final long readLong () throws SmbException {
         if ( ( read(this.tmp, 0, 8) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return Encdec.dec_uint64be(this.tmp, 0);
     }
@@ -520,7 +473,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final float readFloat () throws SmbException {
         if ( ( read(this.tmp, 0, 4) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return Encdec.dec_floatbe(this.tmp, 0);
     }
@@ -529,7 +482,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
     @Override
     public final double readDouble () throws SmbException {
         if ( ( read(this.tmp, 0, 8) ) < 0 ) {
-            throw new SmbException("EOF");
+            throw new SmbEndOfFileException();
         }
         return Encdec.dec_doublebe(this.tmp, 0);
     }
