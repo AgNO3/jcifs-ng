@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.SmbNegotiationResponse;
@@ -197,6 +198,31 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
 
         if ( getDialectRevision() == Smb2Constants.SMB2_DIALECT_ANY ) {
             log.error("Server returned ANY dialect");
+            return false;
+        }
+
+        DialectVersion selected = null;
+        for ( DialectVersion dv : DialectVersion.values() ) {
+            if ( !dv.isSMB2() ) {
+                continue;
+            }
+            if ( dv.getDialect() == getDialectRevision() ) {
+                selected = dv;
+            }
+        }
+
+        if ( selected == null ) {
+            log.error("Server returned an unknown dialect");
+            return false;
+        }
+
+        if ( !selected.atLeast(getConfig().getMinimumVersion()) || !selected.atMost(getConfig().getMaximumVersion()) ) {
+            log.error(
+                String.format(
+                    "Server selected an disallowed dialect version %s (min: %s max: %s)",
+                    selected,
+                    getConfig().getMinimumVersion(),
+                    getConfig().getMaximumVersion()));
             return false;
         }
 
