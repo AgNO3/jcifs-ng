@@ -1400,7 +1400,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             throw new SmbException(resp.getErrorCode(), null);
         }
         if ( resp.isVerifyFailed() ) {
-            throw new SmbException("Signature verification failed.");
+            throw new SMBSignatureValidationException("Signature verification failed.");
         }
         return cont;
     }

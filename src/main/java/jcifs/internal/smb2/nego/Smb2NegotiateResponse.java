@@ -57,6 +57,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     private long serverStartTime;
     private NegotiateContextResponse[] negotiateContexts;
     private byte[] securityBuffer;
+    private DialectVersion selectedDialect;
 
 
     /**
@@ -84,6 +85,22 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
      */
     public int getDialectRevision () {
         return this.dialectRevision;
+    }
+
+
+    /**
+     * @return the serverGuid
+     */
+    public byte[] getServerGuid () {
+        return this.serverGuid;
+    }
+
+
+    /**
+     * @return the selectedDialect
+     */
+    public DialectVersion getSelectedDialect () {
+        return this.selectedDialect;
     }
 
 
@@ -225,6 +242,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
                     getConfig().getMaximumVersion()));
             return false;
         }
+        this.selectedDialect = selected;
 
         int maxBufferSize = tc.getConfig().getTransactionBufferSize();
         this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getRecieveBufferSize(), this.maxReadSize));

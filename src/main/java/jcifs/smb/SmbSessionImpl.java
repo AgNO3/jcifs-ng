@@ -560,11 +560,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                     });
                 }
-                catch (
-
-                PrivilegedActionException e )
-
-                {
+                catch ( PrivilegedActionException e ) {
                     if ( e.getException() instanceof SmbException ) {
                         throw (SmbException) e.getException();
                     }

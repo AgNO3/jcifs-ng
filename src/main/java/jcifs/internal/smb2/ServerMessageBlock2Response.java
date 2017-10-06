@@ -335,11 +335,12 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
     @Override
     public boolean verifySignature ( byte[] buffer, int i, int size ) {
         // observed too that signatures on error responses are sometimes wrong??
-        /*
-         * Looks like the failure case also is just reflecting back the signature we sent
-         */
+        // Looks like the failure case also is just reflecting back the signature we sent
+
+        // with SMB3's negotiation validation it's no longer possible to ignore this (on the validation response)
+        // make sure that validation is performed in any case
         Smb2SigningDigest dgst = getDigest();
-        if ( dgst != null && !isAsync() && getErrorCode() == NtStatus.NT_STATUS_OK ) {
+        if ( dgst != null && !isAsync() && ( getConfig().isRequireSecureNegotiate() || getErrorCode() == NtStatus.NT_STATUS_OK ) ) {
             // TODO: SMB2 - do we need to check the MIDs?
             // We only read what we were waiting for, so first guess would be no.
             boolean verify = dgst.verify(buffer, i, size, this);

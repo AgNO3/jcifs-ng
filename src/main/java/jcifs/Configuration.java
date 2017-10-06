@@ -116,6 +116,20 @@ public interface Configuration {
 
 
     /**
+     * Enforce secure negotiation
+     * 
+     * Property <tt>jcifs.smb.client.requireSecureNegotiate</tt> (boolean, default true)
+     * 
+     * This does not provide any actual downgrade protection if SMB1 is allowed.
+     * 
+     * It will also break connections with SMB2 servers that do not properly sign error responses.
+     * 
+     * @return whether to enforce the use of secure negotiation.
+     */
+    boolean isRequireSecureNegotiate ();
+
+
+    /**
      * Enable port 139 failover
      * 
      * Property <tt>jcifs.smb.client.port139.enabled</tt> (boolean, default false)

@@ -65,6 +65,38 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
 
 
     /**
+     * @return the securityMode
+     */
+    public int getSecurityMode () {
+        return this.securityMode;
+    }
+
+
+    /**
+     * @return the capabilities
+     */
+    public int getCapabilities () {
+        return this.capabilities;
+    }
+
+
+    /**
+     * @return the dialects
+     */
+    public int[] getDialects () {
+        return this.dialects;
+    }
+
+
+    /**
+     * @return the clientGuid
+     */
+    public byte[] getClientGuid () {
+        return this.clientGuid;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see jcifs.internal.smb2.ServerMessageBlock2Request#createResponse(jcifs.Configuration,

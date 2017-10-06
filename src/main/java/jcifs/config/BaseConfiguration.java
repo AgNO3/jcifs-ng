@@ -130,6 +130,7 @@ public class BaseConfiguration implements Configuration {
     protected Set<String> disallowCompound;
     protected DialectVersion minVersion;
     protected DialectVersion maxVersion;
+    private boolean requireSecureNegotiate = true;
 
 
     /**
@@ -265,6 +266,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isUseSMB2OnlyNegotiation () {
         return this.smb2OnlyNegotiation;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isRequireSecureNegotiate()
+     */
+    @Override
+    public boolean isRequireSecureNegotiate () {
+        return this.requireSecureNegotiate;
     }
 
 

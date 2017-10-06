@@ -5,7 +5,7 @@
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
-	<version>2.0.1-SNAPSHOT</version>
+	<version>2.1.0-SNAPSHOT</version>
 
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>
@@ -166,12 +166,13 @@
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>clirr-maven-plugin</artifactId>
 				<executions> 
-					<execution>
+					<!-- Temporary disabled for 2.1 -->
+					<!--<execution>
 						<id>check-compatibility</id>
 						<goals>
 							<goal>check</goal>
 						</goals>
-					</execution>
+					</execution>-->
 				</executions>
 				<configuration>
 					<ignored>
@@ -181,22 +182,6 @@
 							<className>**</className>
 							<differenceType>7006</differenceType>
 							<method>*</method>
-							<from>*</from>
-							<to>*</to>
-						</difference>
-						<difference>
-							<!-- these were missing in 2.0.0 -->
-							<className>jcifs/SmbRandomAccess</className>
-							<differenceType>7012</differenceType>
-							<method>*</method>
-							<from>*</from>
-							<to>*</to>
-						</difference>
-						<difference>
-							<!-- added 2.0.1 -->
-							<className>jcifs/SmbResource</className>
-							<differenceType>7012</differenceType>
-							<method>void renameTo(jcifs.SmbResource, boolean)</method>
 							<from>*</from>
 							<to>*</to>
 						</difference>

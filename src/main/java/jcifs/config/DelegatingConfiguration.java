@@ -94,6 +94,17 @@ public class DelegatingConfiguration implements Configuration {
     /**
      * {@inheritDoc}
      *
+     * @see jcifs.Configuration#isRequireSecureNegotiate()
+     */
+    @Override
+    public boolean isRequireSecureNegotiate () {
+        return this.delegate.isRequireSecureNegotiate();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
      * @see jcifs.Configuration#isPort139FailoverEnabled()
      */
     @Override
