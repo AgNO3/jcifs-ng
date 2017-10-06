@@ -67,7 +67,6 @@ public class AllTests {
 
     private static Map<String, CIFSContext> CONTEXT_CACHE = new HashMap<>();
 
-
     static {
         MUTATIONS.put("noSigning", new TestMutation() {
 
@@ -171,7 +170,18 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
-                cfg.put("jcifs.smb.client.enableSMB2", "true");
+                cfg.put("jcifs.smb.client.minVersion", "SMB202");
+                cfg.put("jcifs.smb.client.maxVersion", "SMB210");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("smb30", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.minVersion", "SMB300");
+                cfg.put("jcifs.smb.client.maxVersion", "SMB302");
                 return cfg;
             }
         });
