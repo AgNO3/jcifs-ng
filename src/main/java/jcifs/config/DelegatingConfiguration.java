@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.TimeZone;
 
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.ResolverType;
 
 
@@ -60,22 +61,22 @@ public class DelegatingConfiguration implements Configuration {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.Configuration#isEnableSMB2()
+     * @see jcifs.Configuration#getMinimumVersion()
      */
     @Override
-    public boolean isEnableSMB2 () {
-        return this.delegate.isEnableSMB2();
+    public DialectVersion getMinimumVersion () {
+        return this.delegate.getMinimumVersion();
     }
 
 
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.Configuration#isDisableSMB1()
+     * @see jcifs.Configuration#getMaximumVersion()
      */
     @Override
-    public boolean isDisableSMB1 () {
-        return this.delegate.isDisableSMB1();
+    public DialectVersion getMaximumVersion () {
+        return this.delegate.getMaximumVersion();
     }
 
 
@@ -779,17 +780,6 @@ public class DelegatingConfiguration implements Configuration {
     @Override
     public boolean isStrictResourceLifecycle () {
         return this.delegate.isStrictResourceLifecycle();
-    }
-
-
-    /**
-     * {@inheritDoc}
-     * 
-     * @see jcifs.Configuration#getSupportedDialects()
-     */
-    @Override
-    public String[] getSupportedDialects () {
-        return this.delegate.getSupportedDialects();
     }
 
 

@@ -18,8 +18,11 @@
 package jcifs.internal.smb2.nego;
 
 
+import java.util.Set;
+
 import jcifs.CIFSContext;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.util.SMBUtil;
@@ -48,9 +51,16 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
         if ( !config.isDfsDisabled() ) {
             this.capabilities = Smb2Constants.SMB2_GLOBAL_CAP_DFS;
         }
-        this.dialects = new int[] {
-            Smb2Constants.SMB2_DIALECT_0202 // , Smb2Constants.SMB2_DIALECT_0210
-        };
+
+        Set<DialectVersion> dvs = DialectVersion
+                .range(DialectVersion.max(DialectVersion.SMB202, config.getMinimumVersion()), config.getMaximumVersion());
+
+        this.dialects = new int[dvs.size()];
+        int i = 0;
+        for ( DialectVersion ver : dvs ) {
+            this.dialects[ i ] = ver.getDialect();
+            i++;
+        }
     }
 
 

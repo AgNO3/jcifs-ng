@@ -84,28 +84,25 @@ public interface Configuration {
 
 
     /**
-     * Enable experimental SMB2 support
+     * Minimum protocol version
      * 
-     * Property <tt>jcifs.smb.client.enableSMB2</tt> (boolean, default false)
+     * Property <tt>jcifs.smb.client.minVersion</tt> (string, default SMB1)
      * 
-     * This enables announcement of SMB2 support.
-     * SMB2 might still be chosen if the server rejects SMB1 and answers with a SMB2 negotiation response.
-     * 
-     * @return whether to enable experimental SMB2+ support
+     * @see DialectVersion
+     * @return minimum protocol version to use/allow
      */
-    boolean isEnableSMB2 ();
+    DialectVersion getMinimumVersion ();
 
 
     /**
-     * Disables SMB1 support
+     * Maximum protocol version
      * 
-     * Property <tt>jcifs.smb.client.disableSMB1</tt> (boolean, default false)
+     * Property <tt>jcifs.smb.client.maxVersion</tt> (string, default SMB210)
      * 
-     * Rejects connections if the server chooses SMB1.
-     * 
-     * @return whether to disable SMB1 support
+     * @see DialectVersion
+     * @return maximum protocol version to use/allow
      */
-    boolean isDisableSMB1 ();
+    DialectVersion getMaximumVersion ();
 
 
     /**
@@ -630,12 +627,6 @@ public interface Configuration {
      * @return the batch limit for the given command
      */
     int getBatchLimit ( String cmd );
-
-
-    /**
-     * @return the supported dialects
-     */
-    String[] getSupportedDialects ();
 
 
     /**

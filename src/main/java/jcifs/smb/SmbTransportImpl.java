@@ -407,7 +407,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             hostName = addr.getHostName();
         return ( this.tconHostName == null || hostName.equalsIgnoreCase(this.tconHostName) ) && addr.equals(this.address)
                 && ( prt == 0 || prt == this.port ||
-                        /* port 139 is ok if 445 was requested */
+                /* port 139 is ok if 445 was requested */
                         ( prt == 445 && this.port == 139 ) )
                 && ( laddr == this.localAddr || ( laddr != null && laddr.equals(this.localAddr) ) ) && lprt == this.localPort;
     }
@@ -507,7 +507,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             SmbNegotiationResponse resp = null;
 
             if ( !this.smb2 ) {
-                if ( this.getContext().getConfig().isDisableSMB1() ) {
+                if ( this.getContext().getConfig().getMinimumVersion().isSMB2() ) {
                     throw new CIFSException("Server does not support SMB2");
                 }
                 resp = new SmbComNegotiateResponse(getContext());
