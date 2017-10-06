@@ -20,10 +20,12 @@ package jcifs.internal.smb2;
 
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.Provider;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,29 +49,36 @@ public class Smb2SigningDigest implements SMBSigningDigest {
     private static final int SIGNATURE_LENGTH = 16;
     private final Mac digest;
 
+    private static final Provider BC = new BouncyCastleProvider();
+
 
     /**
-     * @param macSigningKey
+     * @param sessionKey
      * @param dialect
      * @throws GeneralSecurityException
      * 
      */
-    public Smb2SigningDigest ( byte[] macSigningKey, int dialect ) throws GeneralSecurityException {
+    public Smb2SigningDigest ( byte[] sessionKey, int dialect ) throws GeneralSecurityException {
         Mac m;
+        byte[] signingKey;
         switch ( dialect ) {
         case Smb2Constants.SMB2_DIALECT_0202:
         case Smb2Constants.SMB2_DIALECT_0210:
             m = Mac.getInstance("HmacSHA256");
+            signingKey = sessionKey;
             break;
         case Smb2Constants.SMB2_DIALECT_0300:
         case Smb2Constants.SMB2_DIALECT_0302:
+            signingKey = Smb3KeyDerivation.deriveSigningKey(dialect, sessionKey, new byte[0] /* unimplemented */);
+            m = Mac.getInstance("AESCMAC", BC);
+            break;
         case Smb2Constants.SMB2_DIALECT_0311:
-            throw new UnsupportedOperationException("SMB3 not yet supported");
-
+            throw new IllegalArgumentException("SMB 3.11 not yet supported");
         default:
             throw new IllegalArgumentException("Unknown dialect");
         }
-        m.init(new SecretKeySpec(macSigningKey, "HMAC"));
+
+        m.init(new SecretKeySpec(signingKey, "HMAC"));
         this.digest = m;
     }
 
