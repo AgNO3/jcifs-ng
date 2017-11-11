@@ -200,6 +200,42 @@
 							<from>*</from>
 							<to>*</to>
 						</difference>
+						
+						<difference>
+							<!-- added 2.0.2 - needed for #14 fix -->
+							<className>jcifs/internal/CommonServerMessageBlock</className>
+							<differenceType>7012</differenceType>
+							<method>long getMid()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+						
+						<difference>
+							<!-- added 2.0.2 - needed for #14 test -->
+							<className>jcifs/smb/SmbTransportInternal</className>
+							<differenceType>7012</differenceType>
+							<method>int getInflightRequests()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+						
+						<difference>
+							<!-- added 2.0.2 - needed for #14 fix  -->
+							<className>jcifs/util/transport/Response</className>
+							<differenceType>7012</differenceType>
+							<method>long getMid()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+						
+						<difference>
+							<!-- added 2.0.2 - needed for #14 fix  -->
+							<className>jcifs/util/transport/Response</className>
+							<differenceType>7012</differenceType>
+							<method>void setMid(long)</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>

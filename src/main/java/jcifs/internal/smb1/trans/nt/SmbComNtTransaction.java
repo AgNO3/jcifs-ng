@@ -61,7 +61,7 @@ public abstract class SmbComNtTransaction extends SmbComTransaction {
      */
     @Override
     public CommonServerMessageBlockRequest createCancel () {
-        return new SmbComNtCancel(getConfig(), getMid());
+        return new SmbComNtCancel(getConfig(), (int) getMid());
     }
 
 

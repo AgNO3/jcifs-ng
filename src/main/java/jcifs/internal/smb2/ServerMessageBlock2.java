@@ -347,6 +347,7 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
     /**
      * @return the mid
      */
+    @Override
     public final long getMid () {
         return this.mid;
     }

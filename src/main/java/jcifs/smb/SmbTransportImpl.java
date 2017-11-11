@@ -156,9 +156,6 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     }
 
 
-    /**
-     * @return the address
-     */
     @Override
     public Address getRemoteAddress () {
         return this.address;
@@ -180,34 +177,24 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.util.transport.Transport#isDisconnected()
-     */
+    @Override
+    public int getInflightRequests () {
+        return this.response_map.size();
+    }
+
+
     @Override
     public boolean isDisconnected () {
         return super.isDisconnected() || this.socket.isClosed();
     }
 
 
-    /**
-     * 
-     * {@inheritDoc}
-     *
-     * @see jcifs.util.transport.Transport#isFailed()
-     */
     @Override
     public boolean isFailed () {
         return super.isFailed() || this.socket.isClosed();
     }
 
 
-    /**
-     * @param cap
-     * @return whether the given capability was negotiated
-     * @throws SmbException
-     */
     @Override
     public boolean hasCapability ( int cap ) throws SmbException {
         return getNegotiateResponse().haveCapabilitiy(cap);
@@ -407,7 +394,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             hostName = addr.getHostName();
         return ( this.tconHostName == null || hostName.equalsIgnoreCase(this.tconHostName) ) && addr.equals(this.address)
                 && ( prt == 0 || prt == this.port ||
-                        /* port 139 is ok if 445 was requested */
+                /* port 139 is ok if 445 was requested */
                         ( prt == 445 && this.port == 139 ) )
                 && ( laddr == this.localAddr || ( laddr != null && laddr.equals(this.localAddr) ) ) && lprt == this.localPort;
     }
@@ -1615,7 +1602,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 throw new TransportException(ie);
             }
             finally {
-                this.response_map.remove(req);
+                this.response_map.remove(k);
             }
         }
         finally {

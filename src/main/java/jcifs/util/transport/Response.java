@@ -56,6 +56,18 @@ public interface Response extends Message {
 
 
     /**
+     * @param k
+     */
+    void setMid ( long k );
+
+
+    /**
+     * @return mid
+     */
+    long getMid ();
+
+
+    /**
      * 
      * @param buffer
      * @param i

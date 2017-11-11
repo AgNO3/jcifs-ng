@@ -781,7 +781,8 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
     /**
      * @return the mid
      */
-    public final int getMid () {
+    @Override
+    public final long getMid () {
         return this.mid;
     }
 
