@@ -249,7 +249,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
             Response curResp = response;
             Request curReq = request;
             while ( curResp != null ) {
-                this.response_map.remove(curResp);
+                this.response_map.remove(curResp.getMid());
                 Request next = curReq.getNext();
                 if ( next != null ) {
                     curReq = next;
@@ -310,6 +310,8 @@ public abstract class Transport implements Runnable, AutoCloseable {
             else {
                 curResp.setExpiration(null);
             }
+
+            curResp.setMid(k);
             this.response_map.put(k, curResp);
 
             Request next = curReq.getNext();
@@ -349,10 +351,11 @@ public abstract class Transport implements Runnable, AutoCloseable {
                             throw new TransportException(this.name + " error reading response to " + curReq, curResp.getException());
                         }
                         if ( isDisconnected() && this.state != 5 ) {
-                            throw new TransportException(String.format(
-                                "Transport was disconnected while waiting for a response (transport: %s state: %d),",
-                                this.name,
-                                this.state));
+                            throw new TransportException(
+                                String.format(
+                                    "Transport was disconnected while waiting for a response (transport: %s state: %d),",
+                                    this.name,
+                                    this.state));
                         }
                         timeout = curResp.getExpiration() - System.currentTimeMillis();
                         if ( timeout <= 0 ) {

@@ -18,9 +18,12 @@
 package jcifs.tests;
 
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.util.Collection;
 import java.util.Map;
 
@@ -36,6 +39,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.SmbResource;
 import jcifs.SmbTransport;
+import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSessionInternal;
 import jcifs.smb.SmbTransportInternal;
@@ -144,6 +148,43 @@ public class SessionTest extends BaseCIFSTest {
             try ( SmbResource f2 = ctx2.get(loc) ) {
                 f2.exists();
                 connectionMatches(f1, f2);
+            }
+        }
+    }
+
+
+    @Test
+    // BUG #14
+    public void testNoLeakRequest () throws CIFSException, MalformedURLException {
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            try ( SmbTreeHandleInternal th = (SmbTreeHandleInternal) f.getTreeHandle();
+                  SmbSessionInternal sess = th.getSession().unwrap(SmbSessionInternal.class);
+                  SmbTransportInternal t = (SmbTransportInternal) sess.getTransport() ) {
+
+                assertEquals(0, t.getInflightRequests());
+                f.exists();
+                assertEquals(0, t.getInflightRequests());
+            }
+        }
+    }
+
+
+    @Test
+    // BUG #14
+    public void testNoLeakRequestError () throws IOException {
+        try ( SmbResource f = getDefaultShareRoot().resolve("doesnotexist") ) {
+            try ( SmbTreeHandleInternal th = (SmbTreeHandleInternal) ( (SmbFile) f ).getTreeHandle();
+                  SmbSessionInternal sess = th.getSession().unwrap(SmbSessionInternal.class);
+                  SmbTransportInternal t = (SmbTransportInternal) sess.getTransport() ) {
+
+                assertEquals(0, t.getInflightRequests());
+                try ( InputStream is = f.openInputStream() ) {
+
+                }
+                catch ( SmbException e ) {
+                    // expected
+                }
+                assertEquals(0, t.getInflightRequests());
             }
         }
     }

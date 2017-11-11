@@ -72,6 +72,13 @@ public interface CommonServerMessageBlock extends Message {
 
 
     /**
+     * 
+     * @return the message id
+     */
+    long getMid ();
+
+
+    /**
      * @param mid
      */
     void setMid ( long mid );

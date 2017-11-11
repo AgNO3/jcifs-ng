@@ -119,4 +119,10 @@ public interface SmbTransportInternal extends SmbTransport {
      * @throws SmbException
      */
     boolean isSMB2 () throws SmbException;
+
+
+    /**
+     * @return number of inflight requests
+     */
+    int getInflightRequests ();
 }
