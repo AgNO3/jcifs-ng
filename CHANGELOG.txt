@@ -1,3 +1,14 @@
+jcifs-ng 2.0.2
+- Fix grave memory leak, messages not being removed from response_map (#14)
+
+jcifs-ng 2.0.1
+- Fix possible SmbRandomAccessFile read corruption when output buffer size
+  greater than read size.
+- Fix SmbRandomAccessFile access flags, causing AccessDenied
+- Add designated SmbEndOfFileException exception
+- Don't throw exception when enumerations don't return any result
+- Add a replacing renameTo operation (SMB2 only)
+
 jcifs-ng 2.0.0
 - Add SMB2 support (2.02 protocol level), optional for now (jcifs.smb.client.enableSMB2)
 - Some work on the DFS code, improving efficiency and fixing some bugs. 
