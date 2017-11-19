@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -45,6 +46,7 @@ import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.SmbTreeHandle;
 import jcifs.config.DelegatingConfiguration;
 import jcifs.smb.DosFileFilter;
 import jcifs.smb.SmbException;
@@ -409,6 +411,11 @@ public class EnumTest extends BaseCIFSTest {
         ctx = withTestNTLMCredentials(ctx);
         try ( SmbResource root = ctx.get(getTestShareURL());
               SmbResource f = root.resolve(makeRandomDirectoryName()) ) {
+
+            try ( SmbTreeHandle treeHandle = ( (SmbFile) root ).getTreeHandle() ) {
+                Assume.assumeTrue("Not SMB2", treeHandle.isSMB2());
+            }
+
             f.mkdir();
             try {
 
