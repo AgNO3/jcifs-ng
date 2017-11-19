@@ -40,10 +40,12 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.config.DelegatingConfiguration;
 import jcifs.smb.DosFileFilter;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -358,6 +360,9 @@ public class EnumTest extends BaseCIFSTest {
                 assertNotNull(archive);
                 assertEquals(1, archive.length);
             }
+            finally {
+                f.delete();
+            }
         }
     }
 
@@ -365,14 +370,95 @@ public class EnumTest extends BaseCIFSTest {
     @Test
     public void testEmptyEnum () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestDirectory() ) {
-            SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", 0));
-            assertNotNull(files);
-            assertEquals(0, files.length);
+            try {
+                SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", 0));
+                assertNotNull(files);
+                assertEquals(0, files.length);
 
-            files = f.listFiles();
-            assertNotNull(files);
-            assertEquals(0, files.length);
+                files = f.listFiles();
+                assertNotNull(files);
+                assertEquals(0, files.length);
+            }
+            finally {
+                f.delete();
+            }
         }
+    }
+
+
+    @Test
+    // BUG #15
+    // this cannot be reproduced against samba, samba always subtracts
+    // 8 bytes from the output buffer length, probably to mitigate
+    // against this issue
+    public void testEnumBufferSize () throws IOException {
+        CIFSContext ctx = getContext();
+        int origBufferSize = ctx.getConfig().getMaximumBufferSize();
+        // odd buffer size that does match the alignment
+        int tryBufferSize = 1023;
+        final int bufSize[] = new int[] {
+            origBufferSize
+        };
+        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public int getMaximumBufferSize () {
+                return bufSize[ 0 ];
+            }
+        });
+        ctx = withTestNTLMCredentials(ctx);
+        try ( SmbResource root = ctx.get(getTestShareURL());
+              SmbResource f = root.resolve(makeRandomDirectoryName()) ) {
+            f.mkdir();
+            try {
+
+                for ( int i = 0; i < 5; i++ ) {
+                    // each entry 94 byte + 2 * name length
+                    // = 128 byte per entry
+                    try ( SmbResource r = f.resolve(String.format("%04x%s", i, repeat('X', 13))) ) {
+                        r.createNewFile();
+                    }
+                }
+                // == 5*128 = 640
+
+                // . and .. entries = 200 byte (includes alignment)
+
+                // + 64 byte header
+                // + 8 byte query response overhead
+                // + 110 bytes entry
+                // -> 1022 predicted message size <= 1023 maximum buffer size
+                // 112 bytes to alignment
+                // -> aligned to 1024 > 1023 maximum buffer size
+
+                // 110 byte entry = 16 byte name = 8 char length
+                try ( SmbResource r = f.resolve(repeat('Y', 8)) ) {
+                    r.createNewFile();
+                }
+
+                bufSize[ 0 ] = tryBufferSize;
+
+                try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                    while ( chld.hasNext() ) {
+                        chld.next();
+                    }
+                }
+                finally {
+                    bufSize[ 0 ] = origBufferSize;
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    private static String repeat ( char c, int n ) {
+        char chs[] = new char[n];
+        for ( int i = 0; i < n; i++ ) {
+            chs[ i ] = c;
+        }
+        return new String(chs);
     }
 
 }

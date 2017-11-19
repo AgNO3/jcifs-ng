@@ -1,3 +1,7 @@
+jcifs-ng 2.0.3
+- Fix possible "Message size exceeds maximum buffer size" exceptions
+  by properly accounting for buffer padding (#15)
+
 jcifs-ng 2.0.2
 - Fix grave memory leak, messages not being removed from response_map (#14)
 
