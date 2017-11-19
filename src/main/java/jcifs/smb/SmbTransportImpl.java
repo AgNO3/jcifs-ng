@@ -1203,7 +1203,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         try {
             System.arraycopy(this.sbuf, 0, buffer, 0, 4 + SMB1_HEADER_LENGTH);
             int size = ( Encdec.dec_uint16be(buffer, 2) & 0xFFFF );
-            if ( size < ( SMB1_HEADER_LENGTH + 1 ) || ( 4 + size ) > getContext().getConfig().getMaximumBufferSize() ) {
+            if ( size < ( SMB1_HEADER_LENGTH + 1 ) || ( 4 + size ) > Math.min(0xFFFF, getContext().getConfig().getMaximumBufferSize()) ) {
                 throw new IOException("Invalid payload size: " + size);
             }
             int errorCode = Encdec.dec_uint32le(buffer, 9) & 0xFFFFFFFF;

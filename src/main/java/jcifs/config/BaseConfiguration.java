@@ -50,7 +50,6 @@ public class BaseConfiguration implements Configuration {
     private static final Logger log = LoggerFactory.getLogger(PropertyConfiguration.class);
     private static final Map<String, Integer> DEFAULT_BATCH_LIMITS = new HashMap<>();
 
-
     static {
         DEFAULT_BATCH_LIMITS.put("TreeConnectAndX.QueryInformation", 0);
     }
@@ -119,7 +118,7 @@ public class BaseConfiguration implements Configuration {
     protected InetAddress[] winsServer = new InetAddress[0];
     protected InetAddress broadcastAddress;
     protected List<ResolverType> resolverOrder;
-    protected int maximumBufferSize = 0xFFFF;
+    protected int maximumBufferSize = 0x10000;
     protected int transactionBufferSize = 0xFFFF - 512;
     protected int bufferCacheSize = 16;
     protected int smbListSize = 65535;
