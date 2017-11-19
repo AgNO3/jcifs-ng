@@ -1165,7 +1165,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 nextCommand = Encdec.dec_uint32le(buffer, 20);
 
                 if ( ( nextCommand != 0 && nextCommand > maximumBufferSize ) || ( nextCommand == 0 && size > maximumBufferSize ) ) {
-                    throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", nextCommand, maximumBufferSize));
+                    throw new IOException(
+                        String.format("Message size %d exceeds maxiumum buffer size %d", nextCommand != 0 ? nextCommand : size, maximumBufferSize));
                 }
 
                 rl = nextCommand != 0 ? nextCommand : size;
