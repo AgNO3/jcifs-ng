@@ -62,13 +62,6 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
 
         SmbTreeHandleImpl th = getTreeHandle();
         this.response = new Trans2FindFirst2Response(th.getConfig());
-        this.nextRequest = new Trans2FindNext2(
-            th.getConfig(),
-            this.response.getSid(),
-            this.response.getResumeKey(),
-            this.response.getLastName(),
-            th.getConfig().getListCount(),
-            th.getConfig().getListSize());
 
         try {
             th.send(
@@ -80,6 +73,14 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
                     th.getConfig().getListCount(),
                     th.getConfig().getListSize()),
                 this.response);
+
+            this.nextRequest = new Trans2FindNext2(
+                th.getConfig(),
+                this.response.getSid(),
+                this.response.getResumeKey(),
+                this.response.getLastName(),
+                th.getConfig().getListCount(),
+                th.getConfig().getListSize());
         }
         catch ( SmbException e ) {
             if ( this.response != null && this.response.isReceived() && e.getNtStatus() == NtStatus.NT_STATUS_NO_SUCH_FILE ) {
@@ -120,8 +121,17 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
     protected boolean fetchMore () throws CIFSException {
         this.nextRequest.reset(this.response.getResumeKey(), this.response.getLastName());
         this.response.reset();
-        getTreeHandle().send(this.nextRequest, this.response);
-        return true;
+        try {
+            getTreeHandle().send(this.nextRequest, this.response);
+            return true;
+        }
+        catch ( SmbException e ) {
+            if ( e.getNtStatus() == 0x80000006 ) {
+                log.debug("No more entries", e);
+                return false;
+            }
+            throw e;
+        }
     }
 
 
