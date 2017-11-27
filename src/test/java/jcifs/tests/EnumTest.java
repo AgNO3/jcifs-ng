@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,14 +41,18 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.SmbTreeHandle;
+import jcifs.config.DelegatingConfiguration;
 import jcifs.smb.DosFileFilter;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFilenameFilter;
+import jcifs.smb.SmbUnsupportedOperationException;
 
 
 /**
@@ -165,7 +170,11 @@ public class EnumTest extends BaseCIFSTest {
         try ( SmbFile r = getDefaultShareRoot();
               SmbFile f = new SmbFile(r, "enum-test/a/b/") ) {
 
-            f.resolve("c/").exists();
+            try ( SmbResource c = f.resolve("c/") ) {
+                if ( !c.exists() ) {
+                    c.mkdirs();
+                }
+            }
 
             Set<String> names = new HashSet<>();
             try ( CloseableIterator<SmbResource> chld = f.children() ) {
@@ -197,7 +206,11 @@ public class EnumTest extends BaseCIFSTest {
         try ( SmbFile r = new SmbFile(testShareURL, withTestNTLMCredentials(getContext()));
               SmbFile f = new SmbFile(r, "enum-test/a/b/") ) {
 
-            f.resolve("c/").exists();
+            try ( SmbResource c = f.resolve("c/") ) {
+                if ( !c.exists() ) {
+                    c.mkdirs();
+                }
+            }
 
             Set<String> names = new HashSet<>();
             try ( CloseableIterator<SmbResource> chld = f.children() ) {
@@ -340,23 +353,41 @@ public class EnumTest extends BaseCIFSTest {
                   SmbFile c = new SmbFile(f, "c.bar") ) {
 
                 a.mkdir();
+
                 b.createNewFile();
-                b.setAttributes(SmbConstants.ATTR_HIDDEN);
+                boolean haveHidden = false;
+                try {
+                    b.setAttributes(SmbConstants.ATTR_HIDDEN);
+                    haveHidden = true;
+                }
+                catch ( SmbUnsupportedOperationException e ) {}
 
                 c.createNewFile();
-                c.setAttributes(SmbConstants.ATTR_ARCHIVE);
+                boolean haveArchive = false;
+                try {
+                    c.setAttributes(SmbConstants.ATTR_ARCHIVE);
+                    haveArchive = true;
+                }
+                catch ( SmbUnsupportedOperationException e ) {}
 
                 SmbFile[] dirs = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_DIRECTORY));
                 assertNotNull(dirs);
                 assertEquals(1, dirs.length);
 
-                SmbFile[] hidden = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_HIDDEN));
-                assertNotNull(hidden);
-                assertEquals(1, hidden.length);
+                if ( haveHidden ) {
+                    SmbFile[] hidden = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_HIDDEN));
+                    assertNotNull(hidden);
+                    assertEquals(1, hidden.length);
+                }
 
-                SmbFile[] archive = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_ARCHIVE));
-                assertNotNull(archive);
-                assertEquals(1, archive.length);
+                if ( haveArchive ) {
+                    SmbFile[] archive = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_ARCHIVE));
+                    assertNotNull(archive);
+                    assertEquals(1, archive.length);
+                }
+            }
+            finally {
+                f.delete();
             }
         }
     }
@@ -365,14 +396,159 @@ public class EnumTest extends BaseCIFSTest {
     @Test
     public void testEmptyEnum () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestDirectory() ) {
-            SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", 0));
-            assertNotNull(files);
-            assertEquals(0, files.length);
+            try {
+                SmbFile[] files = f.listFiles(new DosFileFilter("*.txt", 0));
+                assertNotNull(files);
+                assertEquals(0, files.length);
 
-            files = f.listFiles();
-            assertNotNull(files);
-            assertEquals(0, files.length);
+                files = f.listFiles();
+                assertNotNull(files);
+                assertEquals(0, files.length);
+            }
+            finally {
+                f.delete();
+            }
         }
+    }
+
+
+    @Test
+    // BUG #15
+    // this cannot be reproduced against samba, samba always subtracts
+    // 8 bytes from the output buffer length, probably to mitigate
+    // against this issue
+    public void testEnumBufferSize () throws IOException {
+        CIFSContext ctx = getContext();
+        int origBufferSize = ctx.getConfig().getMaximumBufferSize();
+        // odd buffer size that does match the alignment
+        int tryBufferSize = 1023;
+        final int bufSize[] = new int[] {
+            origBufferSize
+        };
+        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public int getMaximumBufferSize () {
+                return bufSize[ 0 ];
+            }
+        });
+        ctx = withTestNTLMCredentials(ctx);
+        try ( SmbResource root = ctx.get(getTestShareURL());
+              SmbResource f = root.resolve(makeRandomDirectoryName()) ) {
+
+            try ( SmbTreeHandle treeHandle = ( (SmbFile) root ).getTreeHandle() ) {
+                Assume.assumeTrue("Not SMB2", treeHandle.isSMB2());
+            }
+
+            f.mkdir();
+            try {
+
+                for ( int i = 0; i < 5; i++ ) {
+                    // each entry 94 byte + 2 * name length
+                    // = 128 byte per entry
+                    try ( SmbResource r = f.resolve(String.format("%04x%s", i, repeat('X', 13))) ) {
+                        r.createNewFile();
+                    }
+                }
+                // == 5*128 = 640
+
+                // . and .. entries = 200 byte (includes alignment)
+
+                // + 64 byte header
+                // + 8 byte query response overhead
+                // + 110 bytes entry
+                // -> 1022 predicted message size <= 1023 maximum buffer size
+                // 112 bytes to alignment
+                // -> aligned to 1024 > 1023 maximum buffer size
+
+                // 110 byte entry = 16 byte name = 8 char length
+                try ( SmbResource r = f.resolve(repeat('Y', 8)) ) {
+                    r.createNewFile();
+                }
+
+                bufSize[ 0 ] = tryBufferSize;
+
+                try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                    while ( chld.hasNext() ) {
+                        chld.next();
+                    }
+                }
+                finally {
+                    bufSize[ 0 ] = origBufferSize;
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
+    // BUG #16
+    public void testListCountRollover () throws IOException {
+        testListCount(5, 4); // 4 + 2 (.,..) files
+    }
+
+
+    @Test
+    // BUG #16
+    public void testListCountExact () throws IOException {
+        testListCount(5, 3); // 3 + 2 (.,..) files
+    }
+
+
+    @Test
+    // BUG #16
+    public void testListCountMoreThanTwo () throws IOException {
+        testListCount(5, 10); // 10 + 2 (.,..) files
+    }
+
+
+    private void testListCount ( final int pageSize, int numFiles ) throws CIFSException {
+        CIFSContext ctx = getContext();
+        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public int getListCount () {
+                return pageSize;
+            }
+        });
+        ctx = withTestNTLMCredentials(ctx);
+        try ( SmbResource root = ctx.get(getTestShareURL());
+              SmbResource f = root.resolve(makeRandomDirectoryName()) ) {
+            f.mkdir();
+            try {
+                for ( int i = 0; i < numFiles; i++ ) {
+                    try ( SmbResource r = f.resolve(String.format("%04x", i)) ) {
+                        r.createNewFile();
+                    }
+                }
+
+                int cnt = 0;
+                try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                    while ( chld.hasNext() ) {
+                        try ( SmbResource next = chld.next() ) {
+                            cnt++;
+                        }
+                    }
+                }
+
+                assertEquals(numFiles, cnt);
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    private static String repeat ( char c, int n ) {
+        char chs[] = new char[n];
+        for ( int i = 0; i < n; i++ ) {
+            chs[ i ] = c;
+        }
+        return new String(chs);
     }
 
 }

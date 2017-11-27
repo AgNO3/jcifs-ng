@@ -128,7 +128,7 @@ public class Smb2IoctlRequest extends ServerMessageBlock2Request<Smb2IoctlRespon
         super(config, SMB2_IOCTL);
         this.controlCode = controlCode;
         this.fileId = fileId;
-        this.maxOutputResponse = config.getTransactionBufferSize();
+        this.maxOutputResponse = config.getTransactionBufferSize() & ~0x7;
         this.outputBuffer = null;
     }
 

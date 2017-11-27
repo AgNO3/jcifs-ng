@@ -34,7 +34,7 @@ public class Smb2ReadResponse extends ServerMessageBlock2Response {
     /**
      * 
      */
-    public static final int OVERHEAD = Smb2Constants.SMB2_HEADER_LENGTH + 4 + 16;
+    public static final int OVERHEAD = Smb2Constants.SMB2_HEADER_LENGTH + 16;
 
     private int dataRemaining;
     private int dataLength;

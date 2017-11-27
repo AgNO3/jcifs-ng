@@ -222,6 +222,12 @@ public abstract class DirFileEntryEnumIteratorBase implements CloseableIterator<
         catch ( CIFSException e ) {
             log.warn("Enumeration failed", e);
             this.next = null;
+            try {
+                doClose();
+            }
+            catch ( CIFSException e1 ) {
+                log.debug("Failed to close enum", e);
+            }
         }
         return n;
     }
@@ -239,8 +245,9 @@ public abstract class DirFileEntryEnumIteratorBase implements CloseableIterator<
         }
     }
 
+
     @Override
-    public void remove() {
+    public void remove () {
         throw new UnsupportedOperationException("remove");
     }
 }

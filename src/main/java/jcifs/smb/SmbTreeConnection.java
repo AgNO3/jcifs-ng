@@ -264,21 +264,25 @@ class SmbTreeConnection {
 
 
     synchronized void disconnect ( boolean inError ) {
-        try ( SmbSessionImpl session = getSession();
-              SmbTransportImpl transport = session.getTransport() ) {
-            synchronized ( transport ) {
-                SmbTreeImpl t = getTreeInternal();
-                if ( t != null ) {
-                    try {
-                        t.treeDisconnect(inError, true);
+        try ( SmbSessionImpl session = getSession() ) {
+            if ( session == null ) {
+                return;
+            }
+            try ( SmbTransportImpl transport = session.getTransport() ) {
+                synchronized ( transport ) {
+                    SmbTreeImpl t = getTreeInternal();
+                    if ( t != null ) {
+                        try {
+                            t.treeDisconnect(inError, true);
+                        }
+                        finally {
+                            this.tree = null;
+                            this.treeAcquired = false;
+                        }
                     }
-                    finally {
-                        this.tree = null;
-                        this.treeAcquired = false;
+                    else {
+                        this.delegate.disconnect(inError);
                     }
-                }
-                else {
-                    this.delegate.disconnect(inError);
                 }
             }
         }
@@ -388,7 +392,7 @@ class SmbTreeConnection {
             try ( SmbTreeImpl t = getTree() ) {
                 if ( t == null ) {
                     throw new CIFSException("Failed to get tree connection");
-                };
+                } ;
                 return t.send(request, response, params);
             }
             catch ( DfsReferral dre ) {

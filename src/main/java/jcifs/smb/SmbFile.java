@@ -1992,6 +1992,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         try {
             setPathInformation(attrs & ATTR_SET_MASK, 0L, 0L, 0L);
         }
+        catch ( SmbException e ) {
+            if ( e.getNtStatus() != 0xC00000BB ) {
+                throw e;
+            }
+            throw new SmbUnsupportedOperationException("Attribute not supported by server");
+        }
         catch ( CIFSException e ) {
             throw SmbException.wrap(e);
         }

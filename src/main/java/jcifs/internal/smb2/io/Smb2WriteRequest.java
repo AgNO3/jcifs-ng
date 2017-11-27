@@ -35,7 +35,7 @@ public class Smb2WriteRequest extends ServerMessageBlock2Request<Smb2WriteRespon
     /**
      * 
      */
-    public static final int OVERHEAD = Smb2Constants.SMB2_HEADER_LENGTH + 4 + 48;
+    public static final int OVERHEAD = Smb2Constants.SMB2_HEADER_LENGTH + 48;
 
     private byte[] data;
     private int dataOffset;
