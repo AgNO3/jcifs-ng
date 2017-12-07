@@ -29,10 +29,10 @@ import java.util.Set;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,9 +127,9 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
                 log.debug("Have initial token " + tok);
             }
             if ( tok.getMechanisms() != null ) {
-                Set<Oid> mechs = new HashSet<>(Arrays.asList(tok.getMechanisms()));
+                Set<ASN1ObjectIdentifier> mechs = new HashSet<>(Arrays.asList(tok.getMechanisms()));
                 boolean foundKerberos = false;
-                for ( Oid mech : Kerb5Context.SUPPORTED_MECHS ) {
+                for ( ASN1ObjectIdentifier mech : Kerb5Context.SUPPORTED_MECHS ) {
                     foundKerberos |= mechs.contains(mech);
                 }
                 if ( !foundKerberos && this.canFallback && tc.getConfig().isAllowNTLMFallback() ) {

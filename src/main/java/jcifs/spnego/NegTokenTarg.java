@@ -35,8 +35,6 @@ import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DEROutputStream;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
 
 
 @SuppressWarnings ( "javadoc" )
@@ -50,7 +48,7 @@ public class NegTokenTarg extends SpnegoToken {
 
     public static final int REJECTED = 2;
 
-    private Oid mechanism;
+    private ASN1ObjectIdentifier mechanism;
 
     private int result = UNSPECIFIED_RESULT;
 
@@ -58,7 +56,7 @@ public class NegTokenTarg extends SpnegoToken {
     public NegTokenTarg () {}
 
 
-    public NegTokenTarg ( int result, Oid mechanism, byte[] mechanismToken, byte[] mechanismListMIC ) {
+    public NegTokenTarg ( int result, ASN1ObjectIdentifier mechanism, byte[] mechanismToken, byte[] mechanismListMIC ) {
         setResult(result);
         setMechanism(mechanism);
         setMechanismToken(mechanismToken);
@@ -81,12 +79,12 @@ public class NegTokenTarg extends SpnegoToken {
     }
 
 
-    public Oid getMechanism () {
+    public ASN1ObjectIdentifier getMechanism () {
         return this.mechanism;
     }
 
 
-    public void setMechanism ( Oid mechanism ) {
+    public void setMechanism ( ASN1ObjectIdentifier mechanism ) {
         this.mechanism = mechanism;
     }
 
@@ -101,9 +99,9 @@ public class NegTokenTarg extends SpnegoToken {
             if ( res != UNSPECIFIED_RESULT ) {
                 fields.add(new DERTaggedObject(true, 0, new ASN1Enumerated(res)));
             }
-            Oid mech = getMechanism();
+            ASN1ObjectIdentifier mech = getMechanism();
             if ( mech != null ) {
-                fields.add(new DERTaggedObject(true, 1, ASN1ObjectIdentifier.getInstance(mech.getDER())));
+                fields.add(new DERTaggedObject(true, 1, mech));
             }
             byte[] mechanismToken = getMechanismToken();
             if ( mechanismToken != null ) {
@@ -116,9 +114,7 @@ public class NegTokenTarg extends SpnegoToken {
             der.writeObject(new DERTaggedObject(true, 1, new DERSequence(fields)));
             return collector.toByteArray();
         }
-        catch (
-            IOException |
-            GSSException ex ) {
+        catch ( IOException ex ) {
             throw new IllegalStateException(ex.getMessage());
         }
     }
@@ -138,8 +134,7 @@ public class NegTokenTarg extends SpnegoToken {
                     setResult(enumerated.getValue().intValue());
                     break;
                 case 1:
-                    ASN1ObjectIdentifier mech = ASN1ObjectIdentifier.getInstance(tagged, true);
-                    setMechanism(new Oid(mech.getId()));
+                    setMechanism(ASN1ObjectIdentifier.getInstance(tagged, true));
                     break;
                 case 2:
                     ASN1OctetString mechanismToken = ASN1OctetString.getInstance(tagged, true);
@@ -153,9 +148,6 @@ public class NegTokenTarg extends SpnegoToken {
                     throw new IOException("Malformed token field.");
                 }
             }
-        }
-        catch ( GSSException e ) {
-            throw new IOException("Failed to parse Oid", e);
         }
     }
 

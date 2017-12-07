@@ -491,7 +491,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
      */
     @SuppressWarnings ( "unchecked" )
     private <T extends CommonServerMessageBlock> T sessionSetupSMB2 ( SmbTransportImpl trans, final String tdomain,
-            ServerMessageBlock2Request<?> chain, T andxResponse ) throws SmbException, GeneralSecurityException {
+            ServerMessageBlock2Request<?> chain, T andxResponse ) throws CIFSException, GeneralSecurityException {
         final Smb2NegotiateResponse negoResp = (Smb2NegotiateResponse) trans.getNegotiateResponse();
         Smb2SessionSetupRequest request = null;
         Smb2SessionSetupResponse response = null;
