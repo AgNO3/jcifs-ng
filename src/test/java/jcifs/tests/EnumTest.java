@@ -82,6 +82,38 @@ public class EnumTest extends BaseCIFSTest {
 
 
     @Test
+    public void testBrowse () throws MalformedURLException, CIFSException {
+        CIFSContext ctx = withAnonymousCredentials();
+        try ( SmbFile smbFile = new SmbFile("smb://", ctx) ) {
+            try ( CloseableIterator<SmbResource> it = smbFile.children() ) {
+                while ( it.hasNext() ) {
+                    try ( SmbResource serv = it.next() ) {
+                        System.err.println(serv.getName());
+                    }
+                }
+            }
+        }
+    }
+
+
+    @Test
+    public void testBrowseDomain () throws MalformedURLException, CIFSException {
+        CIFSContext ctx = withAnonymousCredentials();
+        try ( SmbFile smbFile = new SmbFile("smb://" + getRequiredProperty(TestProperties.TEST_DOMAIN_SHORT), ctx) ) {
+            // if domain is resolved through DNS this will be treated as a server and will enumerate shares instead
+            Assume.assumeTrue("Is workgroup", SmbConstants.TYPE_WORKGROUP == smbFile.getType());
+            try ( CloseableIterator<SmbResource> it = smbFile.children() ) {
+                while ( it.hasNext() ) {
+                    try ( SmbResource serv = it.next() ) {
+                        System.err.println(serv.getName());
+                    }
+                }
+            }
+        }
+    }
+
+
+    @Test
     public void testShareEnum () throws MalformedURLException, CIFSException {
         try ( SmbFile smbFile = new SmbFile("smb://" + getTestServer(), withTestNTLMCredentials(getContext())) ) {
             String[] list = smbFile.list();

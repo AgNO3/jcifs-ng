@@ -426,13 +426,21 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
                 this.type = SmbConstants.TYPE_WORKGROUP;
             }
             else {
-                NetbiosAddress nbaddr = getAddress().unwrap(NetbiosAddress.class);
-                if ( nbaddr != null ) {
-                    int code = nbaddr.getNameType();
-                    if ( code == 0x1d || code == 0x1b ) {
-                        this.type = SmbConstants.TYPE_WORKGROUP;
-                        return this.type;
+                try {
+                    NetbiosAddress nbaddr = getAddress().unwrap(NetbiosAddress.class);
+                    if ( nbaddr != null ) {
+                        int code = nbaddr.getNameType();
+                        if ( code == 0x1d || code == 0x1b ) {
+                            this.type = SmbConstants.TYPE_WORKGROUP;
+                            return this.type;
+                        }
                     }
+                }
+                catch ( CIFSException e ) {
+                    if ( ! ( e.getCause() instanceof UnknownHostException ) ) {
+                        throw e;
+                    }
+                    log.debug("Unknown host", e);
                 }
                 this.type = SmbConstants.TYPE_SERVER;
             }

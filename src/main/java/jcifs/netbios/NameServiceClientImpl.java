@@ -20,6 +20,7 @@ package jcifs.netbios;
 
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -377,9 +378,6 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
     @Override
     public void run () {
-        int nameTrnId;
-        NameServicePacket response;
-
         try {
             while ( this.thread == Thread.currentThread() ) {
                 this.in.setLength(this.transportContext.getConfig().getNetbiosRcvBufSize());
@@ -389,8 +387,8 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
                 log.trace("NetBIOS: new data read from socket");
 
-                nameTrnId = NameServicePacket.readNameTrnId(this.rcv_buf, 0);
-                response = this.responseTable.get(new Integer(nameTrnId));
+                int nameTrnId = NameServicePacket.readNameTrnId(this.rcv_buf, 0);
+                NameServicePacket response = this.responseTable.get(new Integer(nameTrnId));
                 if ( response == null || response.received ) {
                     continue;
                 }
@@ -423,8 +421,9 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         Integer nid = null;
         int max = this.transportContext.getConfig().getWinsServers().length;
 
-        if ( max == 0 )
+        if ( max == 0 ) {
             max = 1; /* No WINs, try only bcast addr */
+        }
 
         synchronized ( response ) {
             while ( max-- > 0 ) {
@@ -466,7 +465,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
                 }
                 catch ( InterruptedException ie ) {
-                    throw new IOException(ie.getMessage());
+                    throw new InterruptedIOException();
                 }
                 finally {
                     this.responseTable.remove(nid);
@@ -527,7 +526,6 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
 
     NbtAddress getByName ( Name name, InetAddress addr ) throws UnknownHostException {
-        int n;
         NameQueryRequest request = new NameQueryRequest(this.transportContext.getConfig(), name);
         NameQueryResponse response = new NameQueryResponse(this.transportContext.getConfig());
 
@@ -538,10 +536,16 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             request.addr = addr; /* if addr ends with 255 flag it bcast */
             request.isBroadcast = ( addr.getAddress()[ 3 ] == (byte) 0xFF );
 
-            n = this.transportContext.getConfig().getNetbiosRetryCount();
+            int n = this.transportContext.getConfig().getNetbiosRetryCount();
             do {
                 try {
                     send(request, response, this.transportContext.getConfig().getNetbiosRetryTimeout());
+                }
+                catch ( InterruptedIOException ioe ) {
+                    if ( log.isTraceEnabled() ) {
+                        log.trace("Timeout waiting for response " + name.name, ioe);
+                    }
+                    throw new UnknownHostException(name.name);
                 }
                 catch ( IOException ioe ) {
                     log.info("Failed to send nameservice request for " + name.name, ioe);
@@ -586,7 +590,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                         request.isBroadcast = true;
                     }
 
-                    n = this.transportContext.getConfig().getNetbiosRetryCount();
+                    int n = this.transportContext.getConfig().getNetbiosRetryCount();
                     while ( n-- > 0 ) {
                         try {
                             send(request, response, this.transportContext.getConfig().getNetbiosRetryTimeout());
@@ -628,15 +632,13 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
     @Override
     public NbtAddress[] getNodeStatus ( NetbiosAddress addr ) throws UnknownHostException {
-        int n, srcHashCode;
-
         NodeStatusResponse response = new NodeStatusResponse(this.transportContext.getConfig(), addr.unwrap(NbtAddress.class));
         NodeStatusRequest request = new NodeStatusRequest(
             this.transportContext.getConfig(),
             new Name(this.transportContext.getConfig(), NbtAddress.ANY_HOSTS_NAME, 0x00, null));
         request.addr = addr.toInetAddress();
 
-        n = this.transportContext.getConfig().getNetbiosRetryCount();
+        int n = this.transportContext.getConfig().getNetbiosRetryCount();
         while ( n-- > 0 ) {
             try {
                 send(request, response, this.transportContext.getConfig().getNetbiosRetryTimeout());
@@ -661,7 +663,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                  * make them specific to who resolved the name.
                  */
 
-                srcHashCode = request.addr.hashCode();
+                int srcHashCode = request.addr.hashCode();
                 for ( int i = 0; i < response.addressArray.length; i++ ) {
                     response.addressArray[ i ].hostName.srcHashCode = srcHashCode;
                 }
@@ -688,11 +690,12 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     public NbtAddress getNbtByName ( String host, int type, String scope, InetAddress svr ) throws UnknownHostException {
 
         if ( host == null || host.length() == 0 ) {
-            return this.getLocalHost();
+            return getLocalHost();
         }
+
         Name name = new Name(this.transportContext.getConfig(), host, type, scope);
         if ( !Character.isDigit(host.charAt(0)) ) {
-            return this.doNameQuery(name, svr);
+            return doNameQuery(name, svr);
         }
 
         int IP = 0x00;
@@ -702,12 +705,12 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         for ( int i = 0; i < data.length; i++ ) {
             char c = data[ i ];
             if ( c < 48 || c > 57 ) {
-                return this.doNameQuery(name, svr);
+                return doNameQuery(name, svr);
             }
             int b = 0x00;
             while ( c != '.' ) {
                 if ( c < 48 || c > 57 ) {
-                    return this.doNameQuery(name, svr);
+                    return doNameQuery(name, svr);
                 }
                 b = b * 10 + c - '0';
 
@@ -717,13 +720,13 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                 c = data[ i ];
             }
             if ( b > 0xFF ) {
-                return this.doNameQuery(name, svr);
+                return doNameQuery(name, svr);
             }
             IP = ( IP << 8 ) + b;
             hitDots++;
         }
         if ( hitDots != 4 || host.endsWith(".") ) {
-            return this.doNameQuery(name, svr);
+            return doNameQuery(name, svr);
         }
         return new NbtAddress(getUnknownName(), IP, false, NbtAddress.B_NODE);
     }
@@ -755,10 +758,11 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             return addrs;
         }
         catch ( UnknownHostException uhe ) {
-            throw new UnknownHostException("no name with type 0x" + Hexdump.toHexString(addr.getNameType(), 2)
-                    + ( ( ( addr.getName().getScope() == null ) || ( addr.getName().getScope().isEmpty() ) ) ? " with no scope"
-                            : " with scope " + addr.getName().getScope() )
-                    + " for host " + addr.getHostAddress());
+            throw new UnknownHostException(
+                "no name with type 0x" + Hexdump.toHexString(addr.getNameType(), 2)
+                        + ( ( ( addr.getName().getScope() == null ) || ( addr.getName().getScope().isEmpty() ) ) ? " with no scope"
+                                : " with scope " + addr.getName().getScope() )
+                        + " for host " + addr.getHostAddress());
         }
     }
 
@@ -944,8 +948,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
     @Override
     public UniAddress getByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException {
-        UniAddress[] addrs = getAllByName(hostname, possibleNTDomainOrWorkgroup);
-        return addrs[ 0 ];
+        return getAllByName(hostname, possibleNTDomainOrWorkgroup)[ 0 ];
     }
 
 
@@ -975,7 +978,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                     }
                     break;
                 case RESOLVER_WINS:
-                    if ( hostname == NbtAddress.MASTER_BROWSER_NAME || hostname.length() > 15 ) {
+                    if ( hostname.equals(NbtAddress.MASTER_BROWSER_NAME) || hostname.length() > 15 ) {
                         // invalid netbios name
                         continue;
                     }

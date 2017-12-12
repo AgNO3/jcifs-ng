@@ -20,6 +20,7 @@ package jcifs.smb;
 
 import java.io.IOException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +33,7 @@ import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
+import jcifs.EmptyIterator;
 import jcifs.ResourceFilter;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
@@ -181,8 +183,33 @@ final class SmbEnumerationUtil {
             searchAttributes = dff.attributes;
         }
         SmbResourceLocator locator = parent.getLocator();
-        if ( locator.getURL().getHost().isEmpty() || locator.getType() == SmbConstants.TYPE_WORKGROUP ) {
+        if ( locator.getURL().getHost().isEmpty() ) {
+            // smb:// -> enumerate servers through browsing
+            Address addr;
+            try {
+                addr = locator.getAddress();
+            }
+            catch ( CIFSException e ) {
+                if ( e.getCause() instanceof UnknownHostException ) {
+                    log.debug("Failed to find master browser", e);
+                    return new EmptyIterator();
+                }
+                throw e;
+            }
+            try ( SmbFile browser = (SmbFile) parent.resolve(addr.getHostAddress()) ) {
+                try ( SmbTreeHandleImpl th = browser.ensureTreeConnected() ) {
+                    if ( th.isSMB2() ) {
+                        return new EmptyIterator();
+                    }
+                    return new NetServerFileEntryAdapterIterator(parent, new NetServerEnumIterator(parent, th, wildcard, searchAttributes, fnf), ff);
+                }
+            }
+        }
+        else if ( locator.getType() == SmbConstants.TYPE_WORKGROUP ) {
             try ( SmbTreeHandleImpl th = parent.ensureTreeConnected() ) {
+                if ( th.isSMB2() ) {
+                    return new EmptyIterator();
+                }
                 return new NetServerFileEntryAdapterIterator(parent, new NetServerEnumIterator(parent, th, wildcard, searchAttributes, fnf), ff);
             }
         }

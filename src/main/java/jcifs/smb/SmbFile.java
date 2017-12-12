@@ -193,28 +193,6 @@ import jcifs.internal.smb2.info.Smb2SetInfoRequest;
  * </tr>
  * 
  * <tr>
- * <td width="20%"><code>smb://myworkgroup/</code></td>
- * <td>
- * This syntactically is identical to the above example. However if
- * <code>myworkgroup</code> happends to be a workgroup(which is indeed
- * suggested by the name) the <code>list</code> method will return
- * a list of servers that have registered themselves as members of
- * <code>myworkgroup</code>.
- * </td>
- * </tr>
- * 
- * <tr>
- * <td width="20%"><code>smb://</code></td>
- * <td>
- * Just as <code>smb://server/</code> lists shares and
- * <code>smb://workgroup/</code> lists servers, the <code>smb://</code>
- * URL lists all available workgroups on a netbios LAN. Again,
- * in this context many methods are not valid and return default
- * values(e.g. <code>isHidden</code> will always return false).
- * </td>
- * </tr>
- * 
- * <tr>
  * <td width="20%"><code>smb://angus.foo.net/d/jcifs/pipes.doc</code></td>
  * <td>
  * The server name may also be a DNS name as it is in this example. See
@@ -239,32 +217,12 @@ import jcifs.internal.smb2.info.Smb2SetInfoRequest;
  * A prototypical example that uses all the fields.
  * </td>
  * </tr>
- * 
- * <tr>
- * <td width="20%"><code>smb://myworkgroup/angus/ &lt;-- ILLEGAL </code></td>
- * <td>
- * Despite the hierarchial relationship between workgroups, servers, and
- * filesystems this example is not valid.
- * </td>
- * </tr>
  *
  * <tr>
  * <td width="20%">
  * <code>smb://server/share/path/to/dir &lt;-- ILLEGAL </code></td>
  * <td>
- * URLs that represent workgroups, servers, shares, or directories require a trailing slash '/'.
- * </td>
- * </tr>
- *
- * <tr>
- * <td width="20%">
- * <code>smb://MYGROUP/?SERVER=192.168.10.15</code></td>
- * <td>
- * SMB URLs support some query string parameters. In this example
- * the <code>SERVER</code> parameter is used to override the
- * server name service lookup to contact the server 192.168.10.15
- * (presumably known to be a master
- * browser) for the server list in workgroup <code>MYGROUP</code>.
+ * URLs that represent servers, shares, or directories require a trailing slash '/'.
  * </td>
  * </tr>
  *
@@ -372,32 +330,6 @@ import jcifs.internal.smb2.info.Smb2SetInfoRequest;
  * </code></td>
  * <td><code>
  *  smb://server/
- * </code></td>
- * </tr>
- * 
- * <tr>
- * <td width="20%"><code>
- *  smb://
- * </code></td>
- * <td width="20%"><code>
- *  myworkgroup/
- * </code></td>
- * <td><code>
- *  smb://myworkgroup/
- * </code></td>
- * </tr>
- * 
- * <tr>
- * <td width="20%"><code>
- *  smb://myworkgroup/
- * </code></td>
- * <td width="20%"><code>
- *  angus/
- * </code></td>
- * <td><code>
- *  smb://myworkgroup/angus/ &lt;-- ILLEGAL<br>(But if you first create an <tt>SmbFile</tt> with 'smb://workgroup/' and
- * use and use it as the first parameter to a constructor that accepts it with a second <tt>String</tt> parameter jCIFS
- * will factor out the 'workgroup'.)
  * </code></td>
  * </tr>
  * 
