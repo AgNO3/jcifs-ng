@@ -611,7 +611,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     response = sessResponse;
                 }
 
-                if ( response.isLoggedInAsGuest() && !this.credentials.isGuest() ) {
+                if ( response.isLoggedInAsGuest() && !anonymous ) {
                     throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                 }
 
@@ -744,10 +744,11 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                 }
 
-                if ( ex != null )
+                if ( ex != null ) {
                     throw ex;
+                }
 
-                this.setUid(response.getUid());
+                setUid(response.getUid());
 
                 if ( request.getDigest() != null ) {
                     /* success - install the signing digest */
@@ -765,7 +766,6 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 final boolean doSigning = !anonymous && ( negoResp.getNegotiatedFlags2() & SmbConstants.FLAGS2_SECURITY_SIGNATURES ) != 0;
                 final byte[] curToken = token;
                 if ( ctx == null ) {
-
                     String host = this.getTargetHost();
                     if ( host == null ) {
                         host = trans.getRemoteAddress().getHostAddress();
@@ -824,9 +824,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                             });
                         }
-                        catch (
-
-                        PrivilegedActionException e ) {
+                        catch ( PrivilegedActionException e ) {
                             if ( e.getException() instanceof SmbException )
 
                             {
@@ -852,7 +850,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     catch ( IOException ioe ) {
                         log.debug("Disconnect failed");
                     }
-                    this.setUid(0);
+                    setUid(0);
                     throw se;
                 }
 
@@ -874,7 +872,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     response = new SmbComSessionSetupAndXResponse(getContext().getConfig(), null);
                     response.setExtendedSecurity(true);
                     request.setUid(getUid());
-                    this.setUid(0);
+                    setUid(0);
 
                     try {
                         trans.send(request, response);
@@ -899,12 +897,13 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         }
                     }
 
-                    if ( response.isLoggedInAsGuest() && !this.credentials.isGuest() ) {
+                    if ( response.isLoggedInAsGuest() && !anonymous ) {
                         throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
                     }
 
-                    if ( ex != null )
+                    if ( ex != null ) {
                         throw ex;
+                    }
 
                     setUid(response.getUid());
 
