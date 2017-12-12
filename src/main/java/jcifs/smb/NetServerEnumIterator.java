@@ -73,7 +73,7 @@ public class NetServerEnumIterator implements CloseableIterator<FileEntry> {
             this.response = new NetServerEnum2Response(th.getConfig());
         }
         else {
-            throw new SmbException("The requested list operations is invalid: " + locator.getURL().toString());
+            throw new SmbException("The requested list operations is invalid: " + locator.getURL());
         }
 
         this.treeHandle = th.acquire();
@@ -207,8 +207,9 @@ public class NetServerEnumIterator implements CloseableIterator<FileEntry> {
         this.next = null;
     }
 
+
     @Override
-    public void remove() {
+    public void remove () {
         throw new UnsupportedOperationException("remove");
     }
 }
