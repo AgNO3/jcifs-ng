@@ -43,7 +43,22 @@ public class SmbComNegotiate extends ServerMessageBlock {
     public SmbComNegotiate ( Configuration config ) {
         super(config, SMB_COM_NEGOTIATE);
         setFlags2(config.getFlags2());
-        this.dialects = config.getSupportedDialects();
+
+        if ( config.getMinimumVersion().isSMB2() ) {
+            this.dialects = new String[] {
+                "SMB 2.???", "SMB 2.002"
+            };
+        }
+        else if ( config.getMaximumVersion().isSMB2() ) {
+            this.dialects = new String[] {
+                "NT LM 0.12", "SMB 2.???", "SMB 2.002"
+            };
+        }
+        else {
+            this.dialects = new String[] {
+                "NT LM 0.12"
+            };
+        }
     }
 
 

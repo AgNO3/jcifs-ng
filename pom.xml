@@ -6,7 +6,6 @@
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
 	<version>2.1.0-SNAPSHOT</version>
-
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>
 
@@ -404,8 +403,8 @@
 			<id>eclipse</id>
 			<properties>
 				<!-- within eclipse parsedVersion is not properly expanded, so just set this to a unqualified version -->
-				<osgi.version>2.0.0</osgi.version>
-				<osgi.pkg.version>2.0.0</osgi.pkg.version>
+				<osgi.version>2.1.0</osgi.version>
+				<osgi.pkg.version>2.1.0</osgi.pkg.version>
 			</properties>
 		</profile>
 		<profile>

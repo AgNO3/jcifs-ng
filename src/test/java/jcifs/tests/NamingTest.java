@@ -64,7 +64,7 @@ public class NamingTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noUnicode", "forceUnicode", "noUnicode-cp850", "noUnicode-windows-1252", "smb2");
+        return getConfigs("noUnicode", "forceUnicode", "noUnicode-cp850", "noUnicode-windows-1252", "smb2", "smb30");
     }
 
 
@@ -77,7 +77,7 @@ public class NamingTest extends BaseCIFSTest {
     @Test
     public void testCodepage () throws MalformedURLException, UnknownHostException, CIFSException {
         Assume.assumeFalse("Unicode support", getContext().getConfig().isUseUnicode());
-        Assume.assumeFalse("SMB2", getContext().getConfig().isEnableSMB2());
+        Assume.assumeFalse("SMB2", getContext().getConfig().getMaximumVersion().isSMB2());
         String oemEncoding = getContext().getConfig().getOemEncoding();
         String str = null;
         try {

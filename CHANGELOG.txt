@@ -1,4 +1,7 @@
 jcifs-ng 2.1.0
+- Basic SMB 3.0 support (signing)
+- Enable SMB2 support by default. Protocol versions to enable/disable
+  are now controlled by jcifs.smb.client.minVersion/maxVersion.
 - Fix file enumeration when entry count exceeds listCount (SMB1, #16) 
 - Fix legacy server enumeration (#22)
 - Deprecate legacy server enumeration, throw SmbUnsupportedOperation

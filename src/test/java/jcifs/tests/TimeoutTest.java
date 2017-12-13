@@ -74,7 +74,7 @@ public class TimeoutTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("smb2");
+        return getConfigs("smb2", "smb30");
     }
 
 

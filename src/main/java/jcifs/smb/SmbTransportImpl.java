@@ -494,7 +494,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             SmbNegotiationResponse resp = null;
 
             if ( !this.smb2 ) {
-                if ( this.getContext().getConfig().isDisableSMB1() ) {
+                if ( this.getContext().getConfig().getMinimumVersion().isSMB2() ) {
                     throw new CIFSException("Server does not support SMB2");
                 }
                 resp = new SmbComNegotiateResponse(getContext());
@@ -1388,7 +1388,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             throw new SmbException(resp.getErrorCode(), null);
         }
         if ( resp.isVerifyFailed() ) {
-            throw new SmbException("Signature verification failed.");
+            throw new SMBSignatureValidationException("Signature verification failed.");
         }
         return cont;
     }

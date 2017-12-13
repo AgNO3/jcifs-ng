@@ -24,6 +24,7 @@ import java.util.Properties;
 import jcifs.CIFSException;
 import jcifs.Config;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.SmbConstants;
 
 
@@ -61,8 +62,6 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.useExtendedSecurity = Config.getBoolean(p, "jcifs.smb.client.useExtendedSecurity", true);
         this.forceExtendedSecurity = Config.getBoolean(p, "jcifs.smb.client.forceExtendedSecurity", false);
 
-        this.enableSMB2 = Config.getBoolean(p, "jcifs.smb.client.enableSMB2", false);
-        this.disableSMB1 = Config.getBoolean(p, "jcifs.smb.client.disableSMB1", false);
         this.smb2OnlyNegotiation = Config.getBoolean(p, "jcifs.smb.client.useSMB2Negotiation", false);
         this.port139FailoverEnabled = Config.getBoolean(p, "jcifs.smb.client.port139.enabled", false);
 
@@ -135,8 +134,21 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.traceResourceUsage = Config.getBoolean(p, "jcifs.traceResources", false);
         this.strictResourceLifecycle = Config.getBoolean(p, "jcifs.smb.client.strictResourceLifecycle", false);
 
+        String minVer = p.getProperty("jcifs.smb.client.minVersion");
+        String maxVer = p.getProperty("jcifs.smb.client.maxVersion");
+
+        if ( minVer != null || maxVer != null ) {
+            initProtocolVersions(minVer, maxVer);
+        }
+        else {
+            boolean smb2 = Config.getBoolean(p, "jcifs.smb.client.enableSMB2", false);
+            boolean nosmb1 = Config.getBoolean(p, "jcifs.smb.client.disableSMB1", false);
+            initProtocolVersions(nosmb1 ? DialectVersion.SMB202 : null, !smb2 ? DialectVersion.SMB1 : null);
+        }
+
         initResolverOrder(p.getProperty("jcifs.resolveOrder"));
         initDisallowCompound(p.getProperty("jcifs.smb.client.disallowCompound"));
         initDefaults();
     }
+
 }

@@ -72,7 +72,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noNTStatus", "noNTSmbs", "smb2");
+        return getConfigs("noNTStatus", "noNTSmbs", "smb2", "smb30");
     }
 
 

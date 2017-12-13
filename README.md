@@ -4,7 +4,7 @@ A cleaned-up and improved version of the jCIFS library
 
 ### Changes
 
- * SMB2 (2.02 protocol level) support
+ * SMB2 (2.02 protocol level) support, some SMB3 support
  * Remove global state
  * Allow per context configuration
  * Logging through SLF4J
@@ -18,6 +18,20 @@ A cleaned-up and improved version of the jCIFS library
  * Various fixes
  
 ### Migration
+
+#### jcifs-ng 2.1
+
+This release enables SMB2 support by default and contains some experimental 
+SMB3.0 support. 
+
+Protocol levels negotitated can now be controlled with 
+```jcifs.smb.client.minVersion``` and ```jcifs.smb.client.maxVersion```
+(this deprecates the ```jcifs.smb.client.enableSMB2``` / 
+```jcifs.smb.client.disableSMB1``` properties). Default min/max 
+versions are SMB1 to SMB210.
+
+This release deprecates server browsing (i.e. server/workgroup enumeration)
+and contains some breaking API changes regarding authentication. 
 
 #### jcifs-ng 2.0
 

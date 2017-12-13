@@ -82,7 +82,7 @@ public class ReadWriteTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noLargeReadWrite", "noNTSmbs", "forceSigning", "smb2");
+        return getConfigs("noLargeReadWrite", "noNTSmbs", "forceSigning", "smb2", "smb30");
     }
 
 

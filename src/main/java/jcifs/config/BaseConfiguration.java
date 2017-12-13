@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.ResolverType;
 import jcifs.SmbConstants;
 
@@ -68,8 +69,6 @@ public class BaseConfiguration implements Configuration {
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
     protected boolean forceExtendedSecurity = false;
-    protected boolean enableSMB2 = false;
-    protected boolean disableSMB1 = false;
     protected boolean smb2OnlyNegotiation = false;
     protected boolean port139FailoverEnabled = false;
     protected boolean useNTSmbs = true;
@@ -126,10 +125,12 @@ public class BaseConfiguration implements Configuration {
     protected long smbAttributeExpiration = 5000L;
     protected boolean ignoreCopyToException = true;
     protected int maxRequestRetries = 2;
-    protected String[] supportedDialects;
     protected boolean traceResourceUsage;
     protected boolean strictResourceLifecycle;
     protected Set<String> disallowCompound;
+    protected DialectVersion minVersion;
+    protected DialectVersion maxVersion;
+    private boolean requireSecureNegotiate = true;
 
 
     /**
@@ -251,20 +252,31 @@ public class BaseConfiguration implements Configuration {
 
 
     @Override
-    public boolean isEnableSMB2 () {
-        return this.enableSMB2;
+    public DialectVersion getMinimumVersion () {
+        return this.minVersion;
     }
 
 
     @Override
-    public boolean isDisableSMB1 () {
-        return this.disableSMB1;
+    public DialectVersion getMaximumVersion () {
+        return this.maxVersion;
     }
 
 
     @Override
     public boolean isUseSMB2OnlyNegotiation () {
         return this.smb2OnlyNegotiation;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isRequireSecureNegotiate()
+     */
+    @Override
+    public boolean isRequireSecureNegotiate () {
+        return this.requireSecureNegotiate;
     }
 
 
@@ -535,17 +547,6 @@ public class BaseConfiguration implements Configuration {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.Configuration#getSupportedDialects()
-     */
-    @Override
-    public String[] getSupportedDialects () {
-        return this.supportedDialects;
-    }
-
-
-    /**
-     * {@inheritDoc}
-     *
      * @see jcifs.Configuration#getMaxRequestRetries()
      */
     @Override
@@ -674,6 +675,19 @@ public class BaseConfiguration implements Configuration {
     }
 
 
+    protected void initProtocolVersions ( String minStr, String maxStr ) {
+        DialectVersion min = ( minStr != null && !minStr.isEmpty() ) ? DialectVersion.valueOf(minStr) : null;
+        DialectVersion max = ( maxStr != null && !maxStr.isEmpty() ) ? DialectVersion.valueOf(maxStr) : null;
+        initProtocolVersions(min, max);
+    }
+
+
+    protected void initProtocolVersions ( DialectVersion min, DialectVersion max ) {
+        this.minVersion = min != null ? min : DialectVersion.SMB1;
+        this.maxVersion = max != null ? max : DialectVersion.SMB210;
+    }
+
+
     protected void initDisallowCompound ( String prop ) {
         if ( prop == null ) {
             return;
@@ -733,22 +747,8 @@ public class BaseConfiguration implements Configuration {
             initResolverOrder(null);
         }
 
-        if ( this.supportedDialects == null ) {
-            if ( this.disableSMB1 ) {
-                this.supportedDialects = new String[] {
-                    "SMB 2.???", "SMB 2.002"
-                };
-            }
-            else if ( this.enableSMB2 ) {
-                this.supportedDialects = new String[] {
-                    "NT LM 0.12", "SMB 2.???", "SMB 2.002"
-                };
-            }
-            else {
-                this.supportedDialects = new String[] {
-                    "NT LM 0.12"
-                };
-            }
+        if ( this.minVersion == null || this.maxVersion == null ) {
+            initProtocolVersions((DialectVersion) null, null);
         }
 
         if ( this.disallowCompound == null ) {

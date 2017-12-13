@@ -206,6 +206,8 @@ public class Smb2IoctlResponse extends ServerMessageBlock2Response {
         case Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK:
         case Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK_WRITE:
             return new SrvCopyChunkCopyResponse();
+        case Smb2IoctlRequest.FSCTL_VALIDATE_NEGOTIATE_INFO:
+            return new ValidateNegotiateInfoResponse();
         }
         return null;
     }

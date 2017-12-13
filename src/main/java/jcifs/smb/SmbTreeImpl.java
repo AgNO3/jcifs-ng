@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.DfsReferralData;
+import jcifs.DialectVersion;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbTree;
@@ -54,6 +55,12 @@ import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans2.Trans2FindFirst2;
 import jcifs.internal.smb1.trans2.Trans2FindFirst2Response;
 import jcifs.internal.smb2.ServerMessageBlock2;
+import jcifs.internal.smb2.ioctl.ValidateNegotiateInfoRequest;
+import jcifs.internal.smb2.ioctl.ValidateNegotiateInfoResponse;
+import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
+import jcifs.internal.smb2.nego.Smb2NegotiateRequest;
+import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
 import jcifs.internal.smb2.tree.Smb2TreeConnectRequest;
 import jcifs.internal.smb2.tree.Smb2TreeDisconnectRequest;
 
@@ -598,7 +605,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                     }
 
                     response = sess.send(request, response);
-                    treeConnected(transport, response);
+                    treeConnected(transport, sess, response);
 
                     if ( andxResponse != null && andxResponse.isReceived() ) {
                         return andxResponse;
@@ -614,7 +621,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                         response = (TreeConnectResponse) request.getResponse();
                         if ( response.isReceived() && !response.isError() && response.getErrorCode() == NtStatus.NT_STATUS_OK ) {
                             if ( !transport.isDisconnected() ) {
-                                treeConnected(transport, response);
+                                treeConnected(transport, sess, response);
                             }
                             throw se;
                         }
@@ -638,10 +645,11 @@ class SmbTreeImpl implements SmbTreeInternal {
 
     /**
      * @param transport
+     * @param sess
      * @param response
-     * @throws SmbException
+     * @throws IOException
      */
-    private void treeConnected ( SmbTransportImpl transport, TreeConnectResponse response ) throws SmbException {
+    private void treeConnected ( SmbTransportImpl transport, SmbSessionImpl sess, TreeConnectResponse response ) throws CIFSException {
         int treeId = response.getTid();
         if ( treeId == 0 ) {
             throw new SmbException("TreeID is NULL");
@@ -656,6 +664,80 @@ class SmbTreeImpl implements SmbTreeInternal {
         this.treeNum = TREE_CONN_COUNTER.incrementAndGet();
 
         this.connectionState.set(2); // connected
+
+        try {
+            validateNegotiation(transport, sess);
+        }
+        catch ( CIFSException se ) {
+            try {
+                transport.disconnect(true);
+            }
+            catch ( IOException e ) {
+                log.warn("Failed to disconnect transport", e);
+                se.addSuppressed(e);
+            }
+            throw se;
+        }
+    }
+
+
+    /**
+     * @param trans
+     * @param sess
+     * @throws CIFSException
+     * 
+     */
+    private void validateNegotiation ( SmbTransportImpl trans, SmbSessionImpl sess ) throws CIFSException {
+        if ( !trans.isSMB2() || sess.getCredentials().isAnonymous() || sess.getCredentials().isGuest()
+                || !sess.getConfig().isRequireSecureNegotiate() ) {
+            log.debug("Secure negotiation does not apply");
+            return;
+        }
+
+        Smb2NegotiateResponse nego = (Smb2NegotiateResponse) trans.getNegotiateResponse();
+        if ( nego.getSelectedDialect().atLeast(DialectVersion.SMB311) ) {
+            // have preauth integrity instead
+            log.debug("Secure negotiation does not apply, is SMB3.1");
+            return;
+        }
+        Smb2NegotiateRequest negoReq = new Smb2NegotiateRequest(sess.getConfig(), 1);
+
+        log.debug("Sending VALIDATE_NEGOTIATE_INFO");
+        Smb2IoctlRequest req = new Smb2IoctlRequest(sess.getConfig(), Smb2IoctlRequest.FSCTL_VALIDATE_NEGOTIATE_INFO);
+        req.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+        req.setInputData(
+            new ValidateNegotiateInfoRequest(
+                negoReq.getCapabilities(),
+                negoReq.getClientGuid(),
+                (short) negoReq.getSecurityMode(),
+                negoReq.getDialects()));
+
+        Smb2IoctlResponse resp;
+        try {
+            resp = send(req, RequestParam.NO_RETRY);
+        }
+        catch ( SMBSignatureValidationException e ) {
+            throw new SMBProtocolDowngradeException("Signature error during negotiate validation", e);
+        }
+        catch ( SmbException e ) {
+            log.debug("VALIDATE_NEGOTIATE_INFO returned error", e);
+            if ( ( req.getResponse().isReceived() && req.getResponse().isVerifyFailed() ) || e.getNtStatus() == NtStatus.NT_STATUS_ACCESS_DENIED ) {
+                // this is the signature error
+                throw new SMBProtocolDowngradeException("Signature error during negotiate validation", e);
+            }
+
+            // other errors are treated as success
+            return;
+        }
+        ValidateNegotiateInfoResponse out = resp.getOutputData(ValidateNegotiateInfoResponse.class);
+
+        if ( nego.getSecurityMode() != out.getSecurityMode() || nego.getCapabilities() != out.getCapabilities()
+                || nego.getDialectRevision() != out.getDialect() || !Arrays.equals(nego.getServerGuid(), out.getServerGuid()) ) {
+            log.debug("Secure negotiation failure");
+            throw new CIFSException("Mismatched attributes validating negotiate info");
+        }
+
+        log.debug("Secure negotiation OK");
     }
 
 

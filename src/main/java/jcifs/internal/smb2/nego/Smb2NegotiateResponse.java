@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.SmbNegotiationResponse;
@@ -56,6 +57,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     private long serverStartTime;
     private NegotiateContextResponse[] negotiateContexts;
     private byte[] securityBuffer;
+    private DialectVersion selectedDialect;
 
 
     /**
@@ -83,6 +85,22 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
      */
     public int getDialectRevision () {
         return this.dialectRevision;
+    }
+
+
+    /**
+     * @return the serverGuid
+     */
+    public byte[] getServerGuid () {
+        return this.serverGuid;
+    }
+
+
+    /**
+     * @return the selectedDialect
+     */
+    public DialectVersion getSelectedDialect () {
+        return this.selectedDialect;
     }
 
 
@@ -199,6 +217,32 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
             log.error("Server returned ANY dialect");
             return false;
         }
+
+        DialectVersion selected = null;
+        for ( DialectVersion dv : DialectVersion.values() ) {
+            if ( !dv.isSMB2() ) {
+                continue;
+            }
+            if ( dv.getDialect() == getDialectRevision() ) {
+                selected = dv;
+            }
+        }
+
+        if ( selected == null ) {
+            log.error("Server returned an unknown dialect");
+            return false;
+        }
+
+        if ( !selected.atLeast(getConfig().getMinimumVersion()) || !selected.atMost(getConfig().getMaximumVersion()) ) {
+            log.error(
+                String.format(
+                    "Server selected an disallowed dialect version %s (min: %s max: %s)",
+                    selected,
+                    getConfig().getMinimumVersion(),
+                    getConfig().getMaximumVersion()));
+            return false;
+        }
+        this.selectedDialect = selected;
 
         int maxBufferSize = tc.getConfig().getTransactionBufferSize();
         this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getRecieveBufferSize(), this.maxReadSize))
