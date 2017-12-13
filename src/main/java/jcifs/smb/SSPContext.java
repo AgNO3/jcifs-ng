@@ -18,7 +18,9 @@
 package jcifs.smb;
 
 
-import org.ietf.jgss.Oid;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+
+import jcifs.CIFSException;
 
 
 /**
@@ -30,9 +32,9 @@ public interface SSPContext {
     /**
      * @return the signing key for the session
      * 
-     * @throws SmbException
+     * @throws CIFSException
      */
-    byte[] getSigningKey () throws SmbException;
+    byte[] getSigningKey () throws CIFSException;
 
 
     /**
@@ -47,8 +49,9 @@ public interface SSPContext {
      * @param len
      * @return result token
      * @throws SmbException
+     * @throws CIFSException
      */
-    byte[] initSecContext ( byte[] token, int off, int len ) throws SmbException;
+    byte[] initSecContext ( byte[] token, int off, int len ) throws CIFSException;
 
 
     /**
@@ -58,16 +61,16 @@ public interface SSPContext {
 
 
     /**
-     * @throws SmbException
+     * @throws CIFSException
      */
-    void dispose () throws SmbException;
+    void dispose () throws CIFSException;
 
 
     /**
      * @param mechanism
      * @return whether the specified mechanism is supported
      */
-    boolean isSupported ( Oid mechanism );
+    boolean isSupported ( ASN1ObjectIdentifier mechanism );
 
 
     /**
@@ -79,6 +82,6 @@ public interface SSPContext {
     /**
      * @return array of supported mechanism OIDs
      */
-    Oid[] getSupportedMechs ();
+    ASN1ObjectIdentifier[] getSupportedMechs ();
 
 }

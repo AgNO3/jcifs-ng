@@ -19,8 +19,7 @@ package jcifs.smb;
 
 import java.util.Objects;
 
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 
 /**
@@ -39,7 +38,7 @@ class MIEName {
     private static int MECH_OID_LEN_SIZE = 2;
     private static int NAME_LEN_SIZE = 4;
 
-    private Oid oid;
+    private ASN1ObjectIdentifier oid;
     private String name;
 
 
@@ -72,12 +71,7 @@ class MIEName {
         byte[] bo = new byte[len];
         System.arraycopy(buf, i, bo, 0, len);
         i += len;
-        try {
-            this.oid = new Oid(bo);
-        }
-        catch ( GSSException e ) {
-            throw new IllegalArgumentException(e.getMessage());
-        }
+        this.oid = ASN1ObjectIdentifier.getInstance(bo);
 
         // NAME_LEN
         if ( buf.length < i + NAME_LEN_SIZE ) {
@@ -97,7 +91,7 @@ class MIEName {
     }
 
 
-    MIEName ( Oid oid, String name ) {
+    MIEName ( ASN1ObjectIdentifier oid, String name ) {
         this.oid = oid;
         this.name = name;
     }

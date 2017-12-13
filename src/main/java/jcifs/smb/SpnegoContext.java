@@ -19,19 +19,19 @@ package jcifs.smb;
 
 import java.io.IOException;
 
-import org.ietf.jgss.GSSContext;
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.spnego.NegTokenInit;
 import jcifs.spnego.NegTokenTarg;
+import jcifs.spnego.SpnegoException;
 import jcifs.spnego.SpnegoToken;
 
 
 /**
- * This class used to wrap a {@link GSSContext} to provide SPNEGO feature.
+ * This class used to wrap a {@link SSPContext} to provide SPNEGO feature.
  * 
  * @author Shun
  *
@@ -40,30 +40,28 @@ class SpnegoContext implements SSPContext {
 
     private static final Logger log = LoggerFactory.getLogger(SpnegoContext.class);
 
-    private static Oid SPNEGO_MECH_OID;
-
+    private static ASN1ObjectIdentifier SPNEGO_MECH_OID;
 
     static {
         try {
-            SPNEGO_MECH_OID = new Oid("1.3.6.1.5.5.2");
+            SPNEGO_MECH_OID = new ASN1ObjectIdentifier("1.3.6.1.5.5.2");
         }
-        catch ( GSSException e ) {
+        catch ( IllegalArgumentException e ) {
             log.error("Failed to initialize OID", e);
         }
     }
 
     private SSPContext mechContext;
-    private Oid[] mechs;
+    private ASN1ObjectIdentifier[] mechs;
     private boolean firstResponse;
 
 
     /**
-     * Instance a <code>SpnegoContext</code> object by wrapping a {@link GSSContext}
-     * with the same mechanism this {@link GSSContext} used.
+     * Instance a <code>SpnegoContext</code> object by wrapping a {@link SSPContext}
+     * with the same mechanism this {@link SSPContext} used.
      * 
      * @param source
-     *            the {@link GSSContext} to be wrapped
-     * @throws GSSException
+     *            the {@link SSPContext} to be wrapped
      */
     SpnegoContext ( SSPContext source ) {
         this(source, source.getSupportedMechs());
@@ -71,7 +69,7 @@ class SpnegoContext implements SSPContext {
 
 
     /**
-     * Instance a <code>SpnegoContext</code> object by wrapping a {@link GSSContext}
+     * Instance a <code>SpnegoContext</code> object by wrapping a {@link SSPContext}
      * with specified mechanism.
      * 
      * @param source
@@ -79,7 +77,7 @@ class SpnegoContext implements SSPContext {
      * @param mech
      *            the mechanism is being used for this context.
      */
-    SpnegoContext ( SSPContext source, Oid[] mech ) {
+    SpnegoContext ( SSPContext source, ASN1ObjectIdentifier[] mech ) {
         this.mechContext = source;
         this.mechs = mech;
     }
@@ -91,8 +89,8 @@ class SpnegoContext implements SSPContext {
      * @see jcifs.smb.SSPContext#getSupportedMechs()
      */
     @Override
-    public Oid[] getSupportedMechs () {
-        return new Oid[] {
+    public ASN1ObjectIdentifier[] getSupportedMechs () {
+        return new ASN1ObjectIdentifier[] {
             SPNEGO_MECH_OID
         };
     }
@@ -110,7 +108,7 @@ class SpnegoContext implements SSPContext {
 
 
     @Override
-    public boolean isSupported ( Oid mechanism ) {
+    public boolean isSupported ( ASN1ObjectIdentifier mechanism ) {
         // prevent nesting
         return false;
     }
@@ -121,7 +119,7 @@ class SpnegoContext implements SSPContext {
      * 
      * @return the Oid of the mechanism being used
      */
-    Oid[] getMechs () {
+    ASN1ObjectIdentifier[] getMechs () {
         return this.mechs;
     }
 
@@ -131,7 +129,7 @@ class SpnegoContext implements SSPContext {
      * 
      * @param mechs
      */
-    void setMechs ( Oid[] mechs ) {
+    void setMechs ( ASN1ObjectIdentifier[] mechs ) {
         this.mechs = mechs;
     }
 
@@ -153,7 +151,7 @@ class SpnegoContext implements SSPContext {
      * @see jcifs.smb.SSPContext#getSigningKey()
      */
     @Override
-    public byte[] getSigningKey () throws SmbException {
+    public byte[] getSigningKey () throws CIFSException {
         return this.mechContext.getSigningKey();
     }
 
@@ -167,7 +165,7 @@ class SpnegoContext implements SSPContext {
      * @return response token
      */
     @Override
-    public byte[] initSecContext ( byte[] inputBuf, int offset, int len ) throws SmbException {
+    public byte[] initSecContext ( byte[] inputBuf, int offset, int len ) throws CIFSException {
         if ( len == 0 ) {
             return initialToken();
         }
@@ -176,65 +174,47 @@ class SpnegoContext implements SSPContext {
     }
 
 
-    /**
-     * @param inputBuf
-     * @param offset
-     * @param len
-     * @return
-     * @throws GSSException
-     * @throws SmbException
-     */
-    private byte[] negotitate ( byte[] inputBuf, int offset, int len ) throws SmbException {
-        try {
-            SpnegoToken spToken = getToken(inputBuf, offset, len);
+    private byte[] negotitate ( byte[] inputBuf, int offset, int len ) throws CIFSException {
+        SpnegoToken spToken = getToken(inputBuf, offset, len);
 
-            if ( this.firstResponse && spToken instanceof NegTokenTarg ) {
+        if ( this.firstResponse && spToken instanceof NegTokenTarg ) {
+            NegTokenTarg targ = (NegTokenTarg) spToken;
+            if ( !this.mechContext.isSupported(targ.getMechanism()) ) {
+                throw new SmbException("Server chose an unsupported mechanism " + targ.getMechanism());
+            }
+            this.firstResponse = false;
+        }
+
+        ASN1ObjectIdentifier currentMech = null;
+        byte[] mechToken = spToken.getMechanismToken();
+        if ( mechToken == null ) {
+            return initialToken();
+        }
+
+        mechToken = this.mechContext.initSecContext(mechToken, 0, mechToken.length);
+        if ( mechToken != null ) {
+            int result = NegTokenTarg.ACCEPT_INCOMPLETE;
+            byte[] mechMIC = null;
+            if ( spToken instanceof NegTokenTarg ) {
                 NegTokenTarg targ = (NegTokenTarg) spToken;
-                if ( !this.mechContext.isSupported(targ.getMechanism()) ) {
-                    throw new SmbException("Server chose an unsupported mechanism " + targ.getMechanism());
-                }
-                this.firstResponse = false;
-            }
-
-            Oid currentMech = null;
-            byte[] mechToken = spToken.getMechanismToken();
-            if ( mechToken == null ) {
-                return initialToken();
-            }
-
-            mechToken = this.mechContext.initSecContext(mechToken, 0, mechToken.length);
-            if ( mechToken != null ) {
-                int result = NegTokenTarg.ACCEPT_INCOMPLETE;
-                byte[] mechMIC = null;
-                if ( spToken instanceof NegTokenTarg ) {
-                    NegTokenTarg targ = (NegTokenTarg) spToken;
-                    if ( targ.getResult() == NegTokenTarg.ACCEPT_COMPLETED && this.mechContext.isEstablished() ) {
-                        result = NegTokenTarg.ACCEPT_COMPLETED;
-                        if ( targ.getMechanism() != null ) {
-                            currentMech = targ.getMechanism();
-                        }
-                        mechMIC = targ.getMechanismListMIC();
+                if ( targ.getResult() == NegTokenTarg.ACCEPT_COMPLETED && this.mechContext.isEstablished() ) {
+                    result = NegTokenTarg.ACCEPT_COMPLETED;
+                    if ( targ.getMechanism() != null ) {
+                        currentMech = targ.getMechanism();
                     }
-                    else if ( targ.getResult() == NegTokenTarg.REJECTED ) {
-                        throw new SmbException("SPNEGO mechanism was rejected");
-                    }
+                    mechMIC = targ.getMechanismListMIC();
                 }
-                return new NegTokenTarg(result, currentMech, mechToken, mechMIC).toByteArray();
+                else if ( targ.getResult() == NegTokenTarg.REJECTED ) {
+                    throw new SmbException("SPNEGO mechanism was rejected");
+                }
             }
-
-            return null;
+            return new NegTokenTarg(result, currentMech, mechToken, mechMIC).toByteArray();
         }
-        catch ( GSSException e ) {
-            throw new SmbException("SPNEGO mechanism failed", e);
-        }
+        return null;
     }
 
 
-    /**
-     * @return
-     * @throws GSSException
-     */
-    private byte[] initialToken () throws SmbException {
+    private byte[] initialToken () throws CIFSException {
         byte[] mechToken = this.mechContext.initSecContext(new byte[0], 0, 0);
         return new NegTokenInit(this.mechs, this.mechContext.getFlags(), mechToken, null).toByteArray();
     }
@@ -246,7 +226,7 @@ class SpnegoContext implements SSPContext {
     }
 
 
-    private static SpnegoToken getToken ( byte[] token, int off, int len ) throws GSSException {
+    private static SpnegoToken getToken ( byte[] token, int off, int len ) throws SpnegoException {
         byte[] b = new byte[len];
         if ( off == 0 && token.length == len ) {
             b = token;
@@ -258,7 +238,7 @@ class SpnegoContext implements SSPContext {
     }
 
 
-    private static SpnegoToken getToken ( byte[] token ) throws GSSException {
+    private static SpnegoToken getToken ( byte[] token ) throws SpnegoException {
         SpnegoToken spnegoToken = null;
         try {
             switch ( token[ 0 ] ) {
@@ -269,12 +249,12 @@ class SpnegoContext implements SSPContext {
                 spnegoToken = new NegTokenTarg(token);
                 break;
             default:
-                throw new GSSException(GSSException.DEFECTIVE_TOKEN);
+                throw new SpnegoException("Invalid token type");
             }
             return spnegoToken;
         }
         catch ( IOException e ) {
-            throw new GSSException(GSSException.FAILURE);
+            throw new SpnegoException("Invalid token");
         }
     }
 
@@ -294,7 +274,7 @@ class SpnegoContext implements SSPContext {
      * 
      */
     @Override
-    public void dispose () throws SmbException {
+    public void dispose () throws CIFSException {
         this.mechContext.dispose();
     }
 }

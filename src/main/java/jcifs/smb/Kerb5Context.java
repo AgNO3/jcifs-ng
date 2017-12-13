@@ -24,6 +24,7 @@ import java.security.Key;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosTicket;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
@@ -45,24 +46,29 @@ class Kerb5Context implements SSPContext {
 
     private static final Logger log = LoggerFactory.getLogger(Kerb5Context.class);
 
-    private static Oid KRB5_MECH_OID;
-    private static Oid KRB5_MS_MECH_OID;
-    private static Oid KRB5_NAME_OID;
+    private static ASN1ObjectIdentifier KRB5_MECH_OID;
 
-    static Oid[] SUPPORTED_MECHS;
+    private static ASN1ObjectIdentifier KRB5_MS_MECH_OID;
 
+    static ASN1ObjectIdentifier[] SUPPORTED_MECHS;
+
+    private static Oid JGSS_KRB5_NAME_OID;
+    private static Oid JGSS_KRB5_MECH_OID;
 
     static {
         try {
-            KRB5_MECH_OID = new Oid("1.2.840.113554.1.2.2");
-            KRB5_MS_MECH_OID = new Oid("1.2.840.48018.1.2.2");
-            KRB5_NAME_OID = new Oid("1.2.840.113554.1.2.2.1");
-            SUPPORTED_MECHS = new Oid[] {
+            KRB5_MECH_OID = new ASN1ObjectIdentifier("1.2.840.113554.1.2.2");
+            KRB5_MS_MECH_OID = new ASN1ObjectIdentifier("1.2.840.48018.1.2.2");
+
+            JGSS_KRB5_NAME_OID = new Oid("1.2.840.113554.1.2.2.1");
+            JGSS_KRB5_MECH_OID = new Oid("1.2.840.113554.1.2.2");
+
+            SUPPORTED_MECHS = new ASN1ObjectIdentifier[] {
                 KRB5_MECH_OID, KRB5_MS_MECH_OID
             };
         }
-        catch ( GSSException e ) {
-            log.error("Failed to initialize kerberos OIDs");
+        catch ( Exception e ) {
+            log.error("Failed to initialize kerberos OIDs", e);
         }
     }
 
@@ -76,11 +82,12 @@ class Kerb5Context implements SSPContext {
     Kerb5Context ( String host, String service, String name, int userLifetime, int contextLifetime, String realm ) throws GSSException {
         GSSManager manager = GSSManager.getInstance();
         GSSCredential clientCreds = null;
+        Oid mechOid = JGSS_KRB5_MECH_OID;
         if ( realm != null ) {
-            this.serviceName = manager.createName(service + "/" + host + "@" + realm, KRB5_NAME_OID, KRB5_MECH_OID);
+            this.serviceName = manager.createName(service + "/" + host + "@" + realm, JGSS_KRB5_NAME_OID, mechOid);
         }
         else {
-            this.serviceName = manager.createName(service + "@" + host, GSSName.NT_HOSTBASED_SERVICE, KRB5_MECH_OID);
+            this.serviceName = manager.createName(service + "@" + host, GSSName.NT_HOSTBASED_SERVICE, mechOid);
         }
 
         if ( log.isDebugEnabled() ) {
@@ -88,10 +95,10 @@ class Kerb5Context implements SSPContext {
         }
 
         if ( name != null ) {
-            this.clientName = manager.createName(name, GSSName.NT_USER_NAME, KRB5_MECH_OID);
-            clientCreds = manager.createCredential(this.clientName, userLifetime, KRB5_MECH_OID, GSSCredential.INITIATE_ONLY);
+            this.clientName = manager.createName(name, GSSName.NT_USER_NAME, mechOid);
+            clientCreds = manager.createCredential(this.clientName, userLifetime, mechOid, GSSCredential.INITIATE_ONLY);
         }
-        this.gssContext = manager.createContext(this.serviceName, KRB5_MECH_OID, clientCreds, contextLifetime);
+        this.gssContext = manager.createContext(this.serviceName, mechOid, clientCreds, contextLifetime);
 
         this.gssContext.requestAnonymity(false);
         this.gssContext.requestSequenceDet(false);
@@ -106,12 +113,13 @@ class Kerb5Context implements SSPContext {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SSPContext#isSupported(org.ietf.jgss.Oid)
+     * @see jcifs.smb.SSPContext#isSupported(org.bouncycastle.asn1.ASN1ObjectIdentifier)
      */
     @Override
-    public boolean isSupported ( Oid mechanism ) {
+    public boolean isSupported ( ASN1ObjectIdentifier mechanism ) {
         return KRB5_MECH_OID.equals(mechanism) || KRB5_MS_MECH_OID.equals(mechanism);
     }
 
@@ -122,7 +130,7 @@ class Kerb5Context implements SSPContext {
      * @see jcifs.smb.SSPContext#getSupportedMechs()
      */
     @Override
-    public Oid[] getSupportedMechs () {
+    public ASN1ObjectIdentifier[] getSupportedMechs () {
         return SUPPORTED_MECHS;
     }
 
@@ -226,9 +234,10 @@ class Kerb5Context implements SSPContext {
         MIEName src = new MIEName(this.gssContext.getSrcName().export());
         MIEName targ = new MIEName(this.gssContext.getTargName().export());
 
+        ASN1ObjectIdentifier mech = ASN1ObjectIdentifier.getInstance(this.gssContext.getMech().getDER());
         for ( KerberosTicket ticket : subject.getPrivateCredentials(KerberosTicket.class) ) {
-            MIEName client = new MIEName(this.gssContext.getMech(), ticket.getClient().getName());
-            MIEName server = new MIEName(this.gssContext.getMech(), ticket.getServer().getName());
+            MIEName client = new MIEName(mech, ticket.getClient().getName());
+            MIEName server = new MIEName(mech, ticket.getServer().getName());
             if ( src.equals(client) && targ.equals(server) ) {
                 return ticket.getSessionKey();
             }
@@ -288,7 +297,6 @@ class Kerb5Context implements SSPContext {
     private final static Class<?> extendedGSSContextClass;
     private final static Method inquireSecContext;
     private final static Object inquireTypeSessionKey;
-
 
     static {
         Class<?> extendedGSSContextClassPrep = null;

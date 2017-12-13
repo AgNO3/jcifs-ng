@@ -38,8 +38,6 @@ import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DEROutputStream;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
 
 import jcifs.util.Hexdump;
 
@@ -60,7 +58,7 @@ public class NegTokenInit extends SpnegoToken {
 
     private static final ASN1ObjectIdentifier SPNEGO_OID = new ASN1ObjectIdentifier(SpnegoConstants.SPNEGO_MECHANISM);
 
-    private Oid[] mechanisms;
+    private ASN1ObjectIdentifier[] mechanisms;
 
     private int contextFlags;
 
@@ -68,7 +66,7 @@ public class NegTokenInit extends SpnegoToken {
     public NegTokenInit () {}
 
 
-    public NegTokenInit ( Oid[] mechanisms, int contextFlags, byte[] mechanismToken, byte[] mechanismListMIC ) {
+    public NegTokenInit ( ASN1ObjectIdentifier[] mechanisms, int contextFlags, byte[] mechanismToken, byte[] mechanismListMIC ) {
         setMechanisms(mechanisms);
         setContextFlags(contextFlags);
         setMechanismToken(mechanismToken);
@@ -101,12 +99,12 @@ public class NegTokenInit extends SpnegoToken {
     }
 
 
-    public Oid[] getMechanisms () {
+    public ASN1ObjectIdentifier[] getMechanisms () {
         return this.mechanisms;
     }
 
 
-    public void setMechanisms ( Oid[] mechanisms ) {
+    public void setMechanisms ( ASN1ObjectIdentifier[] mechanisms ) {
         this.mechanisms = mechanisms;
     }
 
@@ -130,11 +128,11 @@ public class NegTokenInit extends SpnegoToken {
     public byte[] toByteArray () {
         try {
             ASN1EncodableVector fields = new ASN1EncodableVector();
-            Oid[] mechs = getMechanisms();
+            ASN1ObjectIdentifier[] mechs = getMechanisms();
             if ( mechs != null ) {
                 ASN1EncodableVector vector = new ASN1EncodableVector();
                 for ( int i = 0; i < mechs.length; i++ ) {
-                    vector.add(ASN1ObjectIdentifier.getInstance(mechs[ i ].getDER()));
+                    vector.add(mechs[ i ]);
                 }
                 fields.add(new DERTaggedObject(true, 0, new DERSequence(vector)));
             }
@@ -160,9 +158,7 @@ public class NegTokenInit extends SpnegoToken {
             der.writeObject(derApplicationSpecific);
             return collector.toByteArray();
         }
-        catch (
-            IOException |
-            GSSException ex ) {
+        catch ( IOException ex ) {
             throw new IllegalStateException(ex.getMessage());
         }
     }
@@ -194,10 +190,9 @@ public class NegTokenInit extends SpnegoToken {
                     switch ( tagged.getTagNo() ) {
                     case 0:
                         sequence = ASN1Sequence.getInstance(tagged, true);
-                        Oid[] mechs = new Oid[sequence.size()];
+                        ASN1ObjectIdentifier[] mechs = new ASN1ObjectIdentifier[sequence.size()];
                         for ( int i = mechs.length - 1; i >= 0; i-- ) {
-                            ASN1ObjectIdentifier mechanism = (ASN1ObjectIdentifier) sequence.getObjectAt(i);
-                            mechs[ i ] = new Oid(mechanism.getId());
+                            mechs[ i ] = (ASN1ObjectIdentifier) sequence.getObjectAt(i);
                         }
                         setMechanisms(mechs);
                         break;
@@ -222,9 +217,6 @@ public class NegTokenInit extends SpnegoToken {
                         throw new IOException("Malformed token field.");
                     }
                 }
-            }
-            catch ( GSSException e ) {
-                throw new IOException("Failed to read OID", e);
             }
         }
     }

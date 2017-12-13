@@ -19,8 +19,7 @@
 package jcifs.smb;
 
 
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,14 +41,13 @@ public class NtlmContext implements SSPContext {
 
     private static final Logger log = LoggerFactory.getLogger(NtlmContext.class);
 
-    private static Oid NTLMSSP_OID;
-
+    private static ASN1ObjectIdentifier NTLMSSP_OID;
 
     static {
         try {
-            NTLMSSP_OID = new Oid("1.3.6.1.4.1.311.2.2.10");
+            NTLMSSP_OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.311.2.2.10");
         }
-        catch ( GSSException e ) {
+        catch ( IllegalArgumentException e ) {
             log.error("Failed to parse OID", e);
         }
     }
@@ -92,9 +90,9 @@ public class NtlmContext implements SSPContext {
      * @see jcifs.smb.SSPContext#getSupportedMechs()
      */
     @Override
-    public Oid[] getSupportedMechs () {
+    public ASN1ObjectIdentifier[] getSupportedMechs () {
 
-        return new Oid[] {
+        return new ASN1ObjectIdentifier[] {
             NTLMSSP_OID
         };
     }
@@ -134,12 +132,13 @@ public class NtlmContext implements SSPContext {
 
 
     /**
+     * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.SSPContext#isSupported(org.ietf.jgss.Oid)
+     * @see jcifs.smb.SSPContext#isSupported(org.bouncycastle.asn1.ASN1ObjectIdentifier)
      */
     @Override
-    public boolean isSupported ( Oid mechanism ) {
+    public boolean isSupported ( ASN1ObjectIdentifier mechanism ) {
         return NTLMSSP_OID.equals(mechanism);
     }
 
