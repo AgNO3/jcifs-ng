@@ -135,7 +135,7 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
             }
         }
 
-        return errcode + "";
+        return "W" + Hexdump.toHexString(errcode, 8);
     }
 
     private int status;
