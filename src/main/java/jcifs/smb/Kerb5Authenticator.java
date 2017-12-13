@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.spnego.NegTokenInit;
 
 
@@ -151,6 +152,22 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
         catch ( GSSException e ) {
             throw new SmbException("Context setup failed", e);
         }
+    }
+
+
+    /**
+     * @param subject
+     *            the subject to set
+     */
+    protected void setSubject ( Subject subject ) {
+        this.subject = subject;
+    }
+
+
+    @Override
+    public void refresh () throws CIFSException {
+        // custom Kerb5Authenticators need to override this method for support
+        throw new SmbUnsupportedOperationException("Refreshing credentials is not supported by this authenticator");
     }
 
 

@@ -236,6 +236,24 @@
 							<from>*</from>
 							<to>*</to>
 						</difference>
+
+						<difference>
+							<!-- added 2.0.4 - needed for #21 impl -->
+							<className>jcifs/smb/CredentialsInternal</className>
+							<differenceType>7012</differenceType>
+							<method>void refresh()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
+
+						<difference>
+							<!-- added 2.0.4 - needed for #21 impl -->
+							<className>jcifs/smb/SmbSessionInternal</className>
+							<differenceType>7012</differenceType>
+							<method>void reauthenticate()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>

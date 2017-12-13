@@ -21,6 +21,7 @@ package jcifs.smb;
 import javax.security.auth.Subject;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.Credentials;
 
 
@@ -53,4 +54,11 @@ public interface CredentialsInternal extends Cloneable, Credentials {
      * @return subject associated with the credentials
      */
     Subject getSubject ();
+
+
+    /**
+     * @throws CIFSException
+     * 
+     */
+    void refresh () throws CIFSException;
 }

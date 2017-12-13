@@ -33,6 +33,7 @@ public class Smb2SessionSetupRequest extends ServerMessageBlock2Request<Smb2Sess
 
     private byte[] token;
     private int capabilities;
+    private boolean sessionBinding;
     private long previousSessionId;
     private int securityMode;
 
@@ -56,6 +57,24 @@ public class Smb2SessionSetupRequest extends ServerMessageBlock2Request<Smb2Sess
     @Override
     protected Smb2SessionSetupResponse createResponse ( CIFSContext tc, ServerMessageBlock2Request<Smb2SessionSetupResponse> req ) {
         return new Smb2SessionSetupResponse(tc.getConfig());
+    }
+
+
+    /**
+     * @param previousSessionId
+     *            the previousSessionId to set
+     */
+    public void setPreviousSessionId ( long previousSessionId ) {
+        this.previousSessionId = previousSessionId;
+    }
+
+
+    /**
+     * @param sessionBinding
+     *            the sessionBinding to set
+     */
+    public void setSessionBinding ( boolean sessionBinding ) {
+        this.sessionBinding = sessionBinding;
     }
 
 
@@ -93,7 +112,7 @@ public class Smb2SessionSetupRequest extends ServerMessageBlock2Request<Smb2Sess
 
         SMBUtil.writeInt2(25, dst, dstIndex);
 
-        dst[ dstIndex + 2 ] = (byte) ( this.previousSessionId != 0 ? 0x1 : 0 );
+        dst[ dstIndex + 2 ] = (byte) ( this.sessionBinding ? 0x1 : 0 );
         dst[ dstIndex + 3 ] = (byte) ( this.securityMode );
         dstIndex += 4;
 

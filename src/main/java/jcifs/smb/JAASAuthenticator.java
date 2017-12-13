@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 
 
 /**
@@ -189,6 +190,18 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
         to.serviceName = from.serviceName;
         to.configuration = from.configuration;
         to.cachedSubject = from.cachedSubject;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.Kerb5Authenticator#refresh()
+     */
+    @Override
+    public void refresh () throws CIFSException {
+        log.debug("Refreshing JAAS credentials");
+        this.cachedSubject = null;
     }
 
 

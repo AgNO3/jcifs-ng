@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.CIFSException;
 import jcifs.Credentials;
 import jcifs.RuntimeCIFSException;
 import jcifs.util.Crypto;
@@ -202,23 +203,19 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
     }
 
 
-    /**
-     * @return the context
-     */
     protected CIFSContext getContext () {
         return this.context;
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.smb.CredentialsInternal#getSubject()
-     */
     @Override
     public Subject getSubject () {
         return null;
     }
+
+
+    @Override
+    public void refresh () throws CIFSException {}
 
 
     /**

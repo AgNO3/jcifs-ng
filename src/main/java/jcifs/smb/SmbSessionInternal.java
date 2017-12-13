@@ -64,4 +64,12 @@ public interface SmbSessionInternal extends SmbSession {
      * @return tree instance
      */
     SmbTree getSmbTree ( String share, String service );
+
+
+    /**
+     * Initiate reauthentication
+     * 
+     * @throws CIFSException
+     */
+    void reauthenticate () throws CIFSException;
 }

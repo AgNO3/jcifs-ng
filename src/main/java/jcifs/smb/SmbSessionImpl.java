@@ -57,6 +57,7 @@ import jcifs.internal.smb1.com.SmbComNegotiateResponse;
 import jcifs.internal.smb1.com.SmbComSessionSetupAndX;
 import jcifs.internal.smb1.com.SmbComSessionSetupAndXResponse;
 import jcifs.internal.smb1.com.SmbComTreeConnectAndX;
+import jcifs.internal.smb2.ServerMessageBlock2;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.Smb2SigningDigest;
 import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
@@ -394,7 +395,16 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     if ( log.isTraceEnabled() ) {
                         log.trace("Request " + request);
                     }
-                    response = this.transport.send(request, response, params);
+                    try {
+                        response = this.transport.send(request, response, params);
+                    }
+                    catch ( SmbException e ) {
+                        if ( e.getNtStatus() != 0xC000035C || !trans.isSMB2() ) {
+                            throw e;
+                        }
+                        log.debug("Session expired, trying reauth", e);
+                        return reauthenticate(trans, this.targetDomain, request, response, params);
+                    }
                     if ( log.isTraceEnabled() ) {
                         log.trace("Response " + response);
                     }
@@ -496,84 +506,19 @@ final class SmbSessionImpl implements SmbSessionInternal {
         Smb2SessionSetupRequest request = null;
         Smb2SessionSetupResponse response = null;
         SmbException ex = null;
-        boolean anonymous = this.credentials.isAnonymous();
         SSPContext ctx = null;
         byte[] token = negoResp.getSecurityBlob();
         final int securityMode = negoResp.getSecurityMode();
+        boolean anonymous = this.credentials.isAnonymous();
         final boolean doSigning = securityMode != 0 && !anonymous;
         long sessId = 0;
 
         while ( true ) {
             Subject s = this.credentials.getSubject();
-            final byte[] curToken = token;
             if ( ctx == null ) {
-                String host = trans.getRemoteAddress().getHostAddress();
-                try {
-                    host = trans.getRemoteAddress().getHostName();
-                }
-                catch ( Exception e ) {
-                    log.debug("Failed to resolve host name", e);
-                }
-
-                if ( log.isDebugEnabled() ) {
-                    log.debug("Remote host is " + host);
-                }
-
-                if ( s == null ) {
-                    ctx = this.credentials.createContext(getContext(), tdomain, host, negoResp.getSecurityBlob(), doSigning);
-                }
-                else {
-                    try {
-                        final String hostName = host;
-                        ctx = Subject.doAs(s, new PrivilegedExceptionAction<SSPContext>() {
-
-                            @Override
-                            public SSPContext run () throws Exception {
-                                return getCredentials().createContext(getContext(), tdomain, hostName, negoResp.getSecurityBlob(), doSigning);
-                            }
-
-                        });
-                    }
-                    catch ( PrivilegedActionException e ) {
-                        if ( e.getException() instanceof SmbException ) {
-                            throw (SmbException) e.getException();
-                        }
-                        throw new SmbException("Unexpected exception during context initialization", e);
-                    }
-                }
+                ctx = createContext(trans, tdomain, negoResp, doSigning, s);
             }
-
-            final SSPContext curCtx = ctx;
-
-            if ( log.isTraceEnabled() ) {
-                log.trace(ctx.toString());
-            }
-
-            if ( s != null ) {
-                try {
-                    token = Subject.doAs(s, new PrivilegedExceptionAction<byte[]>() {
-
-                        @Override
-                        public byte[] run () throws Exception {
-                            return curCtx.initSecContext(curToken, 0, curToken == null ? 0 : curToken.length);
-                        }
-
-                    });
-                }
-                catch (
-
-                PrivilegedActionException e )
-
-                {
-                    if ( e.getException() instanceof SmbException ) {
-                        throw (SmbException) e.getException();
-                    }
-                    throw new SmbException("Unexpected exception during context initialization", e);
-                }
-            }
-            else {
-                token = ctx.initSecContext(token, 0, token == null ? 0 : token.length);
-            }
+            token = createToken(ctx, token, s);
 
             if ( token != null ) {
                 request = new Smb2SessionSetupRequest(this.getContext(), securityMode, 0, 0, token);
@@ -660,6 +605,180 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 }
                 return (T) ( response != null ? response.getNextResponse() : null );
             }
+        }
+    }
+
+
+    private static byte[] createToken ( final SSPContext ctx, final byte[] token, Subject s ) throws SmbException {
+        if ( s != null ) {
+            try {
+                return Subject.doAs(s, new PrivilegedExceptionAction<byte[]>() {
+
+                    @Override
+                    public byte[] run () throws Exception {
+                        return ctx.initSecContext(token, 0, token == null ? 0 : token.length);
+                    }
+
+                });
+            }
+            catch ( PrivilegedActionException e ) {
+                if ( e.getException() instanceof SmbException ) {
+                    throw (SmbException) e.getException();
+                }
+                throw new SmbException("Unexpected exception during context initialization", e);
+            }
+        }
+        return ctx.initSecContext(token, 0, token == null ? 0 : token.length);
+    }
+
+
+    /**
+     * @param trans
+     * @param tdomain
+     * @param negoResp
+     * @param ctx
+     * @param doSigning
+     * @param s
+     * @return
+     * @throws SmbException
+     */
+    protected SSPContext createContext ( SmbTransportImpl trans, final String tdomain, final Smb2NegotiateResponse negoResp, final boolean doSigning,
+            Subject s ) throws SmbException {
+        String host = trans.getRemoteAddress().getHostAddress();
+        try {
+            host = trans.getRemoteAddress().getHostName();
+        }
+        catch ( Exception e ) {
+            log.debug("Failed to resolve host name", e);
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug("Remote host is " + host);
+        }
+
+        if ( s == null ) {
+            return this.credentials.createContext(getContext(), tdomain, host, negoResp.getSecurityBlob(), doSigning);
+        }
+
+        try {
+            final String hostName = host;
+            return Subject.doAs(s, new PrivilegedExceptionAction<SSPContext>() {
+
+                @Override
+                public SSPContext run () throws Exception {
+                    return getCredentials().createContext(getContext(), tdomain, hostName, negoResp.getSecurityBlob(), doSigning);
+                }
+
+            });
+        }
+        catch ( PrivilegedActionException e ) {
+            if ( e.getException() instanceof SmbException ) {
+                throw (SmbException) e.getException();
+            }
+            throw new SmbException("Unexpected exception during context initialization", e);
+        }
+    }
+
+
+    /**
+     * @param request
+     * @param response
+     * @param params
+     * @return
+     * @throws CIFSException
+     */
+    @SuppressWarnings ( "unchecked" )
+    private <T extends CommonServerMessageBlock> T reauthenticate ( SmbTransportImpl trans, final String tdomain,
+            CommonServerMessageBlockRequest chain, T andxResponse, Set<RequestParam> params ) throws CIFSException {
+        SmbException ex = null;
+        Smb2SessionSetupResponse response = null;
+        Smb2NegotiateResponse negoResp = (Smb2NegotiateResponse) trans.getNegotiateResponse();
+        byte[] token = negoResp.getSecurityBlob();
+        final int securityMode = negoResp.getSecurityMode();
+        boolean anonymous = this.credentials.isAnonymous();
+        final boolean doSigning = securityMode != 0 && !anonymous;
+        long newSessId = 0;
+        long curSessId = this.sessionId;
+
+        synchronized ( trans ) {
+            this.credentials.refresh();
+            Subject s = this.credentials.getSubject();
+            SSPContext ctx = createContext(trans, tdomain, negoResp, doSigning, s);
+            while ( true ) {
+                token = createToken(ctx, token, s);
+
+                if ( token != null ) {
+                    Smb2SessionSetupRequest request = new Smb2SessionSetupRequest(getContext(), negoResp.getSecurityMode(), 0, 0, token);
+
+                    if ( chain != null ) {
+                        request.chain((ServerMessageBlock2) chain);
+                    }
+
+                    request.setDigest(this.digest);
+                    request.setSessionId(curSessId);
+                    request.setPreviousSessionId(curSessId);
+
+                    try {
+                        response = trans.send(request, null, EnumSet.of(RequestParam.RETAIN_PAYLOAD));
+                        newSessId = response.getSessionId();
+
+                        if ( newSessId != curSessId ) {
+                            throw new SmbAuthException("Server did not reauthenticate after expiration");
+                        }
+                    }
+                    catch ( SmbAuthException sae ) {
+                        throw sae;
+                    }
+                    catch ( SmbException e ) {
+                        Smb2SessionSetupResponse sessResponse = request.getResponse();
+                        if ( !sessResponse.isReceived() || sessResponse.isError() || ( sessResponse.getStatus() != NtStatus.NT_STATUS_OK
+                                && sessResponse.getStatus() != NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED ) ) {
+                            throw e;
+                        }
+                        ex = e;
+                        response = sessResponse;
+                    }
+
+                    if ( response.isLoggedInAsGuest() && !anonymous ) {
+                        throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
+                    }
+
+                    if ( request.getDigest() != null ) {
+                        /* success - install the signing digest */
+                        log.debug("Setting digest");
+                        setDigest(request.getDigest());
+                    }
+
+                    token = response.getBlob();
+                }
+
+                if ( ex != null ) {
+                    throw ex;
+                }
+
+                if ( ctx.isEstablished() ) {
+                    setSessionSetup(response);
+                    @SuppressWarnings ( "cast" )
+                    CommonServerMessageBlockResponse cresp = (CommonServerMessageBlockResponse) ( response != null ? response.getNextResponse()
+                            : null );
+                    if ( cresp != null && cresp.isReceived() ) {
+                        return (T) cresp;
+                    }
+                    if ( chain != null ) {
+                        return this.transport.send(chain, null, params);
+                    }
+                    return null;
+                }
+            }
+        }
+    }
+
+
+    @Override
+    @SuppressWarnings ( "unchecked" )
+    public void reauthenticate () throws CIFSException {
+        try ( SmbTransportImpl trans = getTransport() ) {
+            reauthenticate(trans, this.targetDomain, null, null, Collections.EMPTY_SET);
         }
     }
 
