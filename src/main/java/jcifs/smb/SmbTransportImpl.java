@@ -107,7 +107,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     private final AtomicLong mid = new AtomicLong();
     private OutputStream out;
     private InputStream in;
-    private final byte[] sbuf = new byte[512]; /* small local buffer */
+    private final byte[] sbuf = new byte[1024]; /* small local buffer */
     private long sessionExpiration;
     private final List<SmbSessionImpl> sessions = new LinkedList<>();
 
