@@ -141,7 +141,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
             initProtocolVersions(minVer, maxVer);
         }
         else {
-            boolean smb2 = Config.getBoolean(p, "jcifs.smb.client.enableSMB2", false);
+            boolean smb2 = Config.getBoolean(p, "jcifs.smb.client.enableSMB2", true);
             boolean nosmb1 = Config.getBoolean(p, "jcifs.smb.client.disableSMB1", false);
             initProtocolVersions(nosmb1 ? DialectVersion.SMB202 : null, !smb2 ? DialectVersion.SMB1 : null);
         }

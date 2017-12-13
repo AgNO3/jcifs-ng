@@ -72,6 +72,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.signingPreferred", "false");
                 cfg.put("jcifs.smb.client.signingEnforced", "false");
                 return cfg;
@@ -82,6 +83,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.signingPreferred", "true");
                 cfg.put("jcifs.smb.client.signingEnforced", "true");
                 return cfg;
@@ -92,6 +94,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.lmCompatibility", "2");
                 cfg.put("jcifs.smb.client.useExtendedSecurity", "false");
                 cfg.put("jcifs.smb.client.forceExtendedSecurity", "false");
@@ -103,6 +106,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useUnicode", "false");
                 cfg.put("jcifs.smb.client.forceUnicode", "false");
                 return cfg;
@@ -113,6 +117,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useUnicode", "true");
                 cfg.put("jcifs.smb.client.forceUnicode", "true");
                 return cfg;
@@ -123,6 +128,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useNtStatus", "false");
                 return cfg;
             }
@@ -132,6 +138,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useNTSmbs", "false");
                 return cfg;
             }
@@ -141,6 +148,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useUnicode", "false");
                 cfg.put("jcifs.encoding", "cp850");
                 return cfg;
@@ -151,6 +159,7 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useUnicode", "false");
                 cfg.put("jcifs.encoding", "windows-1252");
                 return cfg;
@@ -161,7 +170,17 @@ public class AllTests {
 
             @Override
             public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 cfg.put("jcifs.smb.client.useLargeReadWrite", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("smb1", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.maxVersion", "SMB1");
                 return cfg;
             }
         });
