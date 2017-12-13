@@ -609,7 +609,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
     }
 
 
-    private static byte[] createToken ( final SSPContext ctx, final byte[] token, Subject s ) throws SmbException {
+    private static byte[] createToken ( final SSPContext ctx, final byte[] token, Subject s ) throws CIFSException {
         if ( s != null ) {
             try {
                 return Subject.doAs(s, new PrivilegedExceptionAction<byte[]>() {

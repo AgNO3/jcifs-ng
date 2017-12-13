@@ -1,8 +1,10 @@
-jcifs-ng 2.0.4
+jcifs-ng 2.1.0
 - Fix file enumeration when entry count exceeds listCount (SMB1, #16) 
 - Fix legacy server enumeration (#22)
 - Deprecate legacy server enumeration, throw SmbUnsupportedOperation
   when unavailable.
+- Support for session reauthentication (#21)
+- Android compat by removing JGSS dependency when unneeded (#20)
 
 jcifs-ng 2.0.3
 - Fix possible "Message size exceeds maximum buffer size" exceptions
