@@ -44,6 +44,40 @@ public class SingletonContext extends BaseContext implements CIFSContext {
 
 
     /**
+     * Initialize singleton context using custom properties
+     * 
+     * This method can only be called once.
+     * 
+     * @param props
+     * @throws CIFSException
+     */
+    public static synchronized final void init ( Properties props ) throws CIFSException {
+        if ( INSTANCE != null ) {
+            throw new CIFSException("Singleton context is already initialized");
+        }
+        Properties p = new Properties();
+        try {
+            String filename = System.getProperty("jcifs.properties");
+            if ( filename != null && filename.length() > 1 ) {
+
+                try ( FileInputStream in = new FileInputStream(filename) ) {
+                    p.load(in);
+                }
+            }
+
+        }
+        catch ( IOException ioe ) {
+            log.error("Failed to load config", ioe); //$NON-NLS-1$
+        }
+        p.putAll(System.getProperties());
+        if ( props != null ) {
+            p.putAll(props);
+        }
+        INSTANCE = new SingletonContext(p);
+    }
+
+
+    /**
      * Get singleton context
      * 
      * The singleton context will use system properties for configuration as well as values specified in a file
@@ -55,29 +89,12 @@ public class SingletonContext extends BaseContext implements CIFSContext {
         if ( INSTANCE == null ) {
             try {
                 log.debug("Initializing singleton context");
-                Properties p = new Properties();
-                try {
-                    String filename = System.getProperty("jcifs.properties");
-                    if ( filename != null && filename.length() > 1 ) {
-
-                        try ( FileInputStream in = new FileInputStream(filename) ) {
-                            p.load(in);
-                        }
-                    }
-
-                }
-                catch ( IOException ioe ) {
-                    log.error("Failed to load config", ioe); //$NON-NLS-1$
-                }
-
-                p.putAll(System.getProperties());
-                INSTANCE = new SingletonContext(p);
+                init(null);
             }
             catch ( CIFSException e ) {
                 log.error("Failed to create singleton JCIFS context", e);
             }
         }
-
         return INSTANCE;
     }
 
