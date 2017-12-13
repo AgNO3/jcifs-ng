@@ -93,6 +93,9 @@ public class EnumTest extends BaseCIFSTest {
                 }
             }
         }
+        catch ( SmbUnsupportedOperationException e ) {
+            Assume.assumeTrue("Browsing unsupported", false);
+        }
     }
 
 
@@ -109,6 +112,9 @@ public class EnumTest extends BaseCIFSTest {
                     }
                 }
             }
+        }
+        catch ( SmbUnsupportedOperationException e ) {
+            Assume.assumeTrue("Browsing unsupported", false);
         }
     }
 
