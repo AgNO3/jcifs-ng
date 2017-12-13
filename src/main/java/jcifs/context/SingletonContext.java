@@ -98,6 +98,27 @@ public class SingletonContext extends BaseContext implements CIFSContext {
         return INSTANCE;
     }
 
+    /**
+     * Get singleton context built from my Properties only
+     * 
+     * @return a global context, initialized on first call
+     */
+    public static synchronized final SingletonContext getInstance (Properties pMyProps) {
+        if ( INSTANCE == null ) {
+            try {
+                log.debug("Initializing singleton context");
+                Properties p = new Properties();
+                p.putAll(System.getProperties());
+                p.putAll(pMyProps);
+                INSTANCE = new SingletonContext(p);
+            }
+            catch ( CIFSException e ) {
+                log.error("Failed to create singleton JCIFS context", e);
+            }
+        }
+
+        return INSTANCE;
+    }
 
     /**
      * This static method registers the SMB URL protocol handler which is
