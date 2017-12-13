@@ -104,6 +104,9 @@ public class NetServerEnumIterator implements CloseableIterator<FileEntry> {
      */
     private void checkStatus () throws SmbException {
         int status = this.response.getStatus();
+        if ( status == WinError.ERROR_SERVICE_NOT_INSTALLED ) {
+            throw new SmbUnsupportedOperationException();
+        }
         if ( status != WinError.ERROR_SUCCESS && status != WinError.ERROR_MORE_DATA ) {
             throw new SmbException(status, true);
         }

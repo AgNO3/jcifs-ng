@@ -33,7 +33,6 @@ import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
-import jcifs.EmptyIterator;
 import jcifs.ResourceFilter;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
@@ -192,14 +191,14 @@ final class SmbEnumerationUtil {
             catch ( CIFSException e ) {
                 if ( e.getCause() instanceof UnknownHostException ) {
                     log.debug("Failed to find master browser", e);
-                    return new EmptyIterator();
+                    throw new SmbUnsupportedOperationException();
                 }
                 throw e;
             }
             try ( SmbFile browser = (SmbFile) parent.resolve(addr.getHostAddress()) ) {
                 try ( SmbTreeHandleImpl th = browser.ensureTreeConnected() ) {
                     if ( th.isSMB2() ) {
-                        return new EmptyIterator();
+                        throw new SmbUnsupportedOperationException();
                     }
                     return new NetServerFileEntryAdapterIterator(parent, new NetServerEnumIterator(parent, th, wildcard, searchAttributes, fnf), ff);
                 }
@@ -208,7 +207,7 @@ final class SmbEnumerationUtil {
         else if ( locator.getType() == SmbConstants.TYPE_WORKGROUP ) {
             try ( SmbTreeHandleImpl th = parent.ensureTreeConnected() ) {
                 if ( th.isSMB2() ) {
-                    return new EmptyIterator();
+                    throw new SmbUnsupportedOperationException();
                 }
                 return new NetServerFileEntryAdapterIterator(parent, new NetServerEnumIterator(parent, th, wildcard, searchAttributes, fnf), ff);
             }

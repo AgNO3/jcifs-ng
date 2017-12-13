@@ -1,7 +1,8 @@
 jcifs-ng 2.0.4
 - Fix file enumeration when entry count exceeds listCount (SMB1, #16) 
 - Fix legacy server enumeration (#22)
-- Deprecate legacy server enumeration
+- Deprecate legacy server enumeration, throw SmbUnsupportedOperation
+  when unavailable.
 
 jcifs-ng 2.0.3
 - Fix possible "Message size exceeds maximum buffer size" exceptions
