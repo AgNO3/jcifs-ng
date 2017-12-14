@@ -34,6 +34,7 @@ import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -81,6 +82,7 @@ public class EnumTest extends BaseCIFSTest {
     }
 
 
+    @Ignore ( "This causes a connection to whatever local master browser is available, config may be incompatible with it" )
     @Test
     public void testBrowse () throws MalformedURLException, CIFSException {
         CIFSContext ctx = withAnonymousCredentials();
