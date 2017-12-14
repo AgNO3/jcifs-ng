@@ -55,6 +55,7 @@ import jcifs.internal.CommonServerMessageBlockResponse;
 import jcifs.internal.RequestWithPath;
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.SMBSigningDigest;
+import jcifs.internal.SmbNegotiation;
 import jcifs.internal.SmbNegotiationResponse;
 import jcifs.internal.dfs.DfsReferralDataImpl;
 import jcifs.internal.dfs.DfsReferralRequestBuffer;
@@ -456,7 +457,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     }
 
 
-    private SmbNegotiationResponse negotiate ( int prt ) throws IOException {
+    private SmbNegotiation negotiate ( int prt ) throws IOException {
         /*
          * We cannot use Transport.sendrecv() yet because
          * the Transport thread is not setup until doConnect()
@@ -483,11 +484,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
             if ( this.smb2 || this.getContext().getConfig().isUseSMB2OnlyNegotiation() ) {
                 log.debug("Using SMB2 only negotiation");
-                SmbNegotiationResponse resp = negotiate2(null);
-                return resp;
+                return negotiate2(null);
             }
 
-            SmbComNegotiate comNeg = new SmbComNegotiate(getContext().getConfig());
+            SmbComNegotiate comNeg = new SmbComNegotiate(getContext().getConfig(), this.signingEnforced);
             int n = negotiateWrite(comNeg, true);
             negotiatePeek();
 
@@ -523,8 +523,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
 
             Arrays.fill(this.sbuf, (byte) 0);
-            return resp;
-
+            return new SmbNegotiation(comNeg, resp);
         }
     }
 
@@ -591,7 +590,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
      * @throws SocketException
      * @throws InterruptedException
      */
-    private SmbNegotiationResponse negotiate2 ( Smb2NegotiateResponse first ) throws IOException, SocketException {
+    private SmbNegotiation negotiate2 ( Smb2NegotiateResponse first ) throws IOException, SocketException {
         int size = 0;
 
         int securityMode = 0;
@@ -623,7 +622,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 log.trace(r.toString());
                 log.trace(Hexdump.toHexString(this.sbuf, 4, size));
             }
-            return r;
+            return new SmbNegotiation(smb2neg, r);
         }
         finally {
             int grantedCredits = r != null ? r.getGrantedCredits() : 0;
@@ -662,7 +661,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             log.debug("Connecting in state " + this.state + " addr " + this.address.getHostAddress());
         }
 
-        SmbNegotiationResponse resp;
+        SmbNegotiation resp;
         try {
             resp = negotiate(this.port);
         }
@@ -682,12 +681,12 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             log.debug("Negotiation response on " + this.name + " :" + resp);
         }
 
-        if ( !resp.isValid(getContext(), this.signingEnforced) ) {
+        if ( !resp.getResponse().isValid(getContext(), resp.getRequest()) ) {
             throw new SmbException("This client is not compatible with the server.");
         }
 
-        boolean serverRequireSig = resp.isSigningRequired();
-        boolean serverEnableSig = resp.isSigningEnabled();
+        boolean serverRequireSig = resp.getResponse().isSigningRequired();
+        boolean serverEnableSig = resp.getResponse().isSigningEnabled();
         if ( log.isDebugEnabled() ) {
             log.debug(
                 "Signature negotiation enforced " + this.signingEnforced + " (server " + serverRequireSig + ") enabled "
@@ -696,7 +695,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
         /* Adjust negotiated values */
         this.tconHostName = this.address.getHostName();
-        this.negotiated = resp;
+        this.negotiated = resp.getResponse();
     }
 
 

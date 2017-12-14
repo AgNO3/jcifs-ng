@@ -500,6 +500,17 @@ public interface Configuration {
 
 
     /**
+     * Property <tt>jcifs.smb.client.encryptionEnabled</tt> (boolean, default false)
+     * 
+     * This is an experimental option allowing to indicate support during protocol
+     * negotiation, SMB encryption is not implemented yet.
+     * 
+     * @return whether SMB encryption is enabled
+     */
+    boolean isEncryptionEnabled ();
+
+
+    /**
      * 
      * Property <tt>jcifs.smb.client.forceExtendedSecurity</tt> (boolean, default false)
      * 

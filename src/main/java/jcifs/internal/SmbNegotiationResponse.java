@@ -31,10 +31,11 @@ public interface SmbNegotiationResponse extends CommonServerMessageBlock, Respon
     /**
      * 
      * @param cifsContext
-     * @param enforceSignatures
+     * @param singingEnforced
+     * @param request
      * @return whether the protocol negotiation was successful
      */
-    boolean isValid ( CIFSContext cifsContext, boolean enforceSignatures );
+    boolean isValid ( CIFSContext cifsContext, SmbNegotiationRequest request );
 
 
     /**

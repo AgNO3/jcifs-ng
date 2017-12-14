@@ -24,6 +24,7 @@ import java.io.IOException;
 
 import jcifs.Configuration;
 import jcifs.RuntimeCIFSException;
+import jcifs.internal.SmbNegotiationRequest;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.util.Strings;
 
@@ -31,17 +32,20 @@ import jcifs.util.Strings;
 /**
  * 
  */
-public class SmbComNegotiate extends ServerMessageBlock {
+public class SmbComNegotiate extends ServerMessageBlock implements SmbNegotiationRequest {
 
+    private final boolean signingEnforced;
     private String[] dialects;
 
 
     /**
      * 
      * @param config
+     * @param signingEnforced
      */
-    public SmbComNegotiate ( Configuration config ) {
+    public SmbComNegotiate ( Configuration config, boolean signingEnforced ) {
         super(config, SMB_COM_NEGOTIATE);
+        this.signingEnforced = signingEnforced;
         setFlags2(config.getFlags2());
 
         if ( config.getMinimumVersion().isSMB2() ) {
@@ -59,6 +63,17 @@ public class SmbComNegotiate extends ServerMessageBlock {
                 "NT LM 0.12"
             };
         }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbNegotiationRequest#isSigningEnforced()
+     */
+    @Override
+    public boolean isSigningEnforced () {
+        return this.signingEnforced;
     }
 
 

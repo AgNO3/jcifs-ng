@@ -66,6 +66,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean signingPreferred = false;
     protected boolean signingEnforced = false;
     protected boolean ipcSigningEnforced = true;
+    protected boolean encryptionEnabled = false;
     protected boolean useNtStatus = true;
     protected boolean useExtendedSecurity = true;
     protected boolean forceExtendedSecurity = false;
@@ -269,11 +270,6 @@ public class BaseConfiguration implements Configuration {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#isRequireSecureNegotiate()
-     */
     @Override
     public boolean isRequireSecureNegotiate () {
         return this.requireSecureNegotiate;
@@ -493,6 +489,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isIpcSigningEnforced () {
         return this.ipcSigningEnforced;
+    }
+
+
+    @Override
+    public boolean isEncryptionEnabled () {
+        return this.encryptionEnabled;
     }
 
 

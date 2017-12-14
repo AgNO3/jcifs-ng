@@ -598,6 +598,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isEncryptionEnabled()
+     */
+    @Override
+    public boolean isEncryptionEnabled () {
+        return this.delegate.isEncryptionEnabled();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getLmHostsFileName()
      */

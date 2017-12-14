@@ -28,6 +28,7 @@ import jcifs.Configuration;
 import jcifs.DialectVersion;
 import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.SmbNegotiationRequest;
 import jcifs.internal.SmbNegotiationResponse;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
@@ -196,19 +197,13 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     }
 
 
-    /**
-     * 
-     * {@inheritDoc}
-     *
-     * @see jcifs.internal.SmbNegotiationResponse#isValid(jcifs.CIFSContext, boolean)
-     */
     @Override
-    public boolean isValid ( CIFSContext tc, boolean signingEnforced ) {
-        if ( !isReceived() || this.getStatus() != 0 ) {
+    public boolean isValid ( CIFSContext tc, SmbNegotiationRequest req ) {
+        if ( !isReceived() || getStatus() != 0 ) {
             return false;
         }
 
-        if ( signingEnforced && !isSigningEnabled() ) {
+        if ( req.isSigningEnforced() && !isSigningEnabled() ) {
             log.error("Signing is enforced but server does not allow it");
             return false;
         }
@@ -217,6 +212,8 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
             log.error("Server returned ANY dialect");
             return false;
         }
+
+        Smb2NegotiateRequest r = (Smb2NegotiateRequest) req;
 
         DialectVersion selected = null;
         for ( DialectVersion dv : DialectVersion.values() ) {
@@ -244,6 +241,15 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         }
         this.selectedDialect = selected;
 
+        // Filter out unsupported capabilities
+        this.capabilities &= r.getCapabilities();
+
+        if ( this.selectedDialect.atLeast(DialectVersion.SMB311) ) {
+            if ( !checkNegotiateContexts(r, this.capabilities) ) {
+                return false;
+            }
+        }
+
         int maxBufferSize = tc.getConfig().getTransactionBufferSize();
         this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getRecieveBufferSize(), this.maxReadSize))
                 & ~0x7;
@@ -251,6 +257,114 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
                 & ~0x7;
         this.maxTransactSize = Math.min(maxBufferSize - 512, this.maxTransactSize) & ~0x7;
 
+        return true;
+    }
+
+
+    private boolean checkNegotiateContexts ( Smb2NegotiateRequest req, int caps ) {
+        if ( this.negotiateContexts == null || this.negotiateContexts.length == 0 ) {
+            log.error("Response lacks negotiate contexts");
+            return false;
+        }
+
+        boolean foundPreauth = false, foundEnc = false;
+        for ( NegotiateContextResponse ncr : this.negotiateContexts ) {
+            if ( ncr == null ) {
+                continue;
+            }
+            else if ( !foundEnc && ncr.getContextType() == EncryptionNegotiateContext.NEGO_CTX_ENC_TYPE ) {
+                foundEnc = true;
+                if ( !checkEncryptionContext(req, (EncryptionNegotiateContext) ncr) ) {
+                    return false;
+                }
+            }
+            else if ( ncr.getContextType() == EncryptionNegotiateContext.NEGO_CTX_ENC_TYPE ) {
+                log.error("Multiple encryption negotiate contexts");
+                return false;
+            }
+            else if ( !foundPreauth && ncr.getContextType() == PreauthIntegrityNegotiateContext.NEGO_CTX_PREAUTH_TYPE ) {
+                foundPreauth = true;
+                if ( !checkPreauthContext(req, (PreauthIntegrityNegotiateContext) ncr) ) {
+                    return false;
+                }
+            }
+            else if ( ncr.getContextType() == PreauthIntegrityNegotiateContext.NEGO_CTX_PREAUTH_TYPE ) {
+                log.error("Multiple preauth negotiate contexts");
+                return false;
+            }
+        }
+
+        if ( !foundPreauth ) {
+            log.error("Missing preauth negotiate context");
+            return false;
+        }
+        if ( !foundEnc && ( caps & Smb2Constants.SMB2_GLOBAL_CAP_ENCRYPTION ) != 0 ) {
+            log.error("Missing encryption negotiate context");
+            return false;
+        }
+        else if ( !foundEnc ) {
+            log.debug("No encryption support");
+        }
+        return true;
+    }
+
+
+    private static boolean checkPreauthContext ( Smb2NegotiateRequest req, PreauthIntegrityNegotiateContext pc ) {
+        if ( pc.getHashAlgos() == null || pc.getHashAlgos().length != 1 ) {
+            log.error("Server returned no hash selection");
+            return false;
+        }
+
+        PreauthIntegrityNegotiateContext rpc = null;
+        for ( NegotiateContextRequest rnc : req.getNegotiateContexts() ) {
+            if ( rnc instanceof PreauthIntegrityNegotiateContext ) {
+                rpc = (PreauthIntegrityNegotiateContext) rnc;
+            }
+        }
+        if ( rpc == null ) {
+            return false;
+        }
+
+        boolean valid = false;
+        for ( int hash : rpc.getHashAlgos() ) {
+            if ( hash == pc.getHashAlgos()[ 0 ] ) {
+                valid = true;
+            }
+        }
+        if ( !valid ) {
+            log.error("Server returned invalid hash selection");
+            return false;
+        }
+        return true;
+    }
+
+
+    private static boolean checkEncryptionContext ( Smb2NegotiateRequest req, EncryptionNegotiateContext ec ) {
+        if ( ec.getCiphers() == null || ec.getCiphers().length != 1 ) {
+            log.error("Server returned no cipher selection");
+            return false;
+        }
+
+        EncryptionNegotiateContext rec = null;
+        for ( NegotiateContextRequest rnc : req.getNegotiateContexts() ) {
+            if ( rnc instanceof EncryptionNegotiateContext ) {
+                rec = (EncryptionNegotiateContext) rnc;
+            }
+        }
+        if ( rec == null ) {
+            return false;
+        }
+
+        boolean valid = false;
+        for ( int cipher : rec.getCiphers() ) {
+            if ( cipher == ec.getCiphers()[ 0 ] ) {
+                valid = true;
+            }
+        }
+        if ( !valid ) {
+            log.error("Server returned invalid cipher selection");
+            return false;
+        }
         return true;
     }
 
@@ -397,7 +511,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
                     bufferIndex += pad8(bufferIndex);
                 }
             }
-
+            this.negotiateContexts = contexts;
         }
 
         return bufferIndex - start;
@@ -409,6 +523,12 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
      * @return
      */
     protected static NegotiateContextResponse createContext ( int type ) {
+        switch ( type ) {
+        case EncryptionNegotiateContext.NEGO_CTX_ENC_TYPE:
+            return new EncryptionNegotiateContext();
+        case PreauthIntegrityNegotiateContext.NEGO_CTX_PREAUTH_TYPE:
+            return new PreauthIntegrityNegotiateContext();
+        }
         return null;
     }
 

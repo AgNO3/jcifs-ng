@@ -50,6 +50,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.signingPreferred = Config.getBoolean(p, "jcifs.smb.client.signingPreferred", false);
         this.signingEnforced = Config.getBoolean(p, "jcifs.smb.client.signingEnforced", false);
         this.ipcSigningEnforced = Config.getBoolean(p, "jcifs.smb.client.ipcSigningEnforced", true);
+        this.encryptionEnabled = Config.getBoolean(p, "jcifs.smb.client.encryptionEnabled", false);
 
         this.lanmanCompatibility = Config.getInt(p, "jcifs.smb.lmCompatibility", 3);
         this.allowNTLMFallback = Config.getBoolean(p, "jcifs.smb.allowNTLMFallback", true);

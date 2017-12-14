@@ -18,11 +18,14 @@
 package jcifs.internal.smb2.nego;
 
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 import jcifs.CIFSContext;
 import jcifs.Configuration;
 import jcifs.DialectVersion;
+import jcifs.internal.SmbNegotiationRequest;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.util.SMBUtil;
@@ -32,13 +35,14 @@ import jcifs.internal.util.SMBUtil;
  * @author mbechler
  *
  */
-public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2NegotiateResponse> {
+public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2NegotiateResponse> implements SmbNegotiationRequest {
 
     private int[] dialects;
     private int capabilities;
     private byte[] clientGuid = new byte[16];
     private int securityMode;
     private NegotiateContextRequest[] negotiateContexts;
+    private byte[] preauthSalt;
 
 
     /**
@@ -48,8 +52,13 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
     public Smb2NegotiateRequest ( Configuration config, int securityMode ) {
         super(config, SMB2_NEGOTIATE);
         this.securityMode = securityMode;
+
         if ( !config.isDfsDisabled() ) {
-            this.capabilities = Smb2Constants.SMB2_GLOBAL_CAP_DFS;
+            this.capabilities |= Smb2Constants.SMB2_GLOBAL_CAP_DFS;
+        }
+
+        if ( config.isEncryptionEnabled() && config.getMaximumVersion() != null && config.getMaximumVersion().atLeast(DialectVersion.SMB300) ) {
+            this.capabilities |= Smb2Constants.SMB2_GLOBAL_CAP_ENCRYPTION;
         }
 
         Set<DialectVersion> dvs = DialectVersion
@@ -61,6 +70,24 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
             this.dialects[ i ] = ver.getDialect();
             i++;
         }
+
+        List<NegotiateContextRequest> negoContexts = new LinkedList<>();
+        if ( config.getMaximumVersion() != null && config.getMaximumVersion().atLeast(DialectVersion.SMB311) ) {
+            byte[] salt = new byte[32];
+            config.getRandom().nextBytes(salt);
+            negoContexts.add(new PreauthIntegrityNegotiateContext(config, new int[] {
+                PreauthIntegrityNegotiateContext.HASH_ALGO_SHA512
+            }, salt));
+            this.preauthSalt = salt;
+
+            if ( config.isEncryptionEnabled() ) {
+                negoContexts.add(new EncryptionNegotiateContext(config, new int[] {
+                    EncryptionNegotiateContext.CIPHER_AES128_GCM, EncryptionNegotiateContext.CIPHER_AES128_CCM
+                }));
+            }
+        }
+
+        this.negotiateContexts = negoContexts.toArray(new NegotiateContextRequest[negoContexts.size()]);
     }
 
 
@@ -69,6 +96,12 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
      */
     public int getSecurityMode () {
         return this.securityMode;
+    }
+
+
+    @Override
+    public boolean isSigningEnforced () {
+        return ( getSecurityMode() & Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED ) != 0;
     }
 
 
@@ -97,6 +130,22 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
 
 
     /**
+     * @return the negotiateContexts
+     */
+    public NegotiateContextRequest[] getNegotiateContexts () {
+        return this.negotiateContexts;
+    }
+
+
+    /**
+     * @return the preauthSalt
+     */
+    public byte[] getPreauthSalt () {
+        return this.preauthSalt;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see jcifs.internal.smb2.ServerMessageBlock2Request#createResponse(jcifs.Configuration,
@@ -118,7 +167,7 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
         int size = Smb2Constants.SMB2_HEADER_LENGTH + 36 + size8(2 * this.dialects.length, 4);
         if ( this.negotiateContexts != null ) {
             for ( NegotiateContextRequest ncr : this.negotiateContexts ) {
-                size += size8(ncr.size());
+                size += 8 + size8(ncr.size());
             }
         }
         return size8(size);
@@ -154,7 +203,8 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
         }
         else {
             negotitateContextOffsetOffset = dstIndex;
-            SMBUtil.writeInt2(this.negotiateContexts.length, dst, dstIndex);
+            SMBUtil.writeInt2(this.negotiateContexts.length, dst, dstIndex + 4);
+            SMBUtil.writeInt2(0, dst, dstIndex + 6);
         }
         dstIndex += 8;
 
@@ -171,11 +221,11 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
                 SMBUtil.writeInt2(nc.getContextType(), dst, dstIndex);
                 int lenOffset = dstIndex + 2;
                 dstIndex += 4;
+                SMBUtil.writeInt4(0, dst, dstIndex);
                 dstIndex += 4; // Reserved
-                int dataLen = nc.encode(dst, dstIndex);
+                int dataLen = size8(nc.encode(dst, dstIndex));
                 SMBUtil.writeInt2(dataLen, dst, lenOffset);
                 dstIndex += dataLen;
-                dstIndex += pad8(dstIndex);
             }
         }
         return dstIndex - start;

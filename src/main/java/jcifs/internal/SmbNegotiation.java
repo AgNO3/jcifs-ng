@@ -15,21 +15,42 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.internal.smb2.nego;
-
-
-import jcifs.Decodable;
+package jcifs.internal;
 
 
 /**
  * @author mbechler
  *
  */
-public interface NegotiateContextResponse extends Decodable {
+public class SmbNegotiation {
+
+    private final SmbNegotiationRequest request;
+    private final SmbNegotiationResponse response;
+
 
     /**
+     * @param request
+     * @param response
      * 
-     * @return context type
      */
-    int getContextType ();
+    public SmbNegotiation ( SmbNegotiationRequest request, SmbNegotiationResponse response ) {
+        this.request = request;
+        this.response = response;
+    }
+
+
+    /**
+     * @return the request
+     */
+    public SmbNegotiationRequest getRequest () {
+        return this.request;
+    }
+
+
+    /**
+     * @return the response
+     */
+    public SmbNegotiationResponse getResponse () {
+        return this.response;
+    }
 }

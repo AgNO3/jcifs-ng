@@ -15,21 +15,18 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package jcifs.internal.smb2.nego;
-
-
-import jcifs.Decodable;
+package jcifs.internal;
 
 
 /**
  * @author mbechler
  *
  */
-public interface NegotiateContextResponse extends Decodable {
+public interface SmbNegotiationRequest {
 
     /**
-     * 
-     * @return context type
+     * @return whether SMB singing is enforced
      */
-    int getContextType ();
+    boolean isSigningEnforced ();
+
 }
