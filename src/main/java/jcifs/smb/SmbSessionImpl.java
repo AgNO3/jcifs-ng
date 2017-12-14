@@ -521,7 +521,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
             token = createToken(ctx, token, s);
 
             if ( token != null ) {
-                request = new Smb2SessionSetupRequest(this.getContext(), securityMode, 0, 0, token);
+                request = new Smb2SessionSetupRequest(this.getContext(), securityMode, negoResp.getCapabilities(), 0, token);
                 // here, messages are rejected with NOT_SUPPORTED if we start signing as soon as we can, wait until
                 // session setup complete
 
@@ -558,6 +558,10 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 if ( response.isLoggedInAsGuest() && !anonymous ) {
                     throw new SmbAuthException(NtStatus.NT_STATUS_LOGON_FAILURE);
+                }
+
+                if ( ( response.getSessionFlags() & Smb2SessionSetupResponse.SMB2_SESSION_FLAG_ENCRYPT_DATA ) != 0 ) {
+                    throw new SmbUnsupportedOperationException("Server requires encryption, not yet supported.");
                 }
 
                 if ( request.getDigest() != null ) {
@@ -708,7 +712,12 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 token = createToken(ctx, token, s);
 
                 if ( token != null ) {
-                    Smb2SessionSetupRequest request = new Smb2SessionSetupRequest(getContext(), negoResp.getSecurityMode(), 0, 0, token);
+                    Smb2SessionSetupRequest request = new Smb2SessionSetupRequest(
+                        getContext(),
+                        negoResp.getSecurityMode(),
+                        negoResp.getCapabilities(),
+                        curSessId,
+                        token);
 
                     if ( chain != null ) {
                         request.chain((ServerMessageBlock2) chain);
@@ -716,7 +725,6 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                     request.setDigest(this.digest);
                     request.setSessionId(curSessId);
-                    request.setPreviousSessionId(curSessId);
 
                     try {
                         response = trans.send(request, null, EnumSet.of(RequestParam.RETAIN_PAYLOAD));

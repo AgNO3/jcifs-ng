@@ -61,15 +61,6 @@ public class Smb2SessionSetupRequest extends ServerMessageBlock2Request<Smb2Sess
 
 
     /**
-     * @param previousSessionId
-     *            the previousSessionId to set
-     */
-    public void setPreviousSessionId ( long previousSessionId ) {
-        this.previousSessionId = previousSessionId;
-    }
-
-
-    /**
      * @param sessionBinding
      *            the sessionBinding to set
      */

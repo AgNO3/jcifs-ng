@@ -137,6 +137,14 @@ public class Smb2SessionSetupResponse extends ServerMessageBlock2Response {
 
 
     /**
+     * @return the sessionFlags
+     */
+    public int getSessionFlags () {
+        return this.sessionFlags;
+    }
+
+
+    /**
      * @return security blob
      */
     public byte[] getBlob () {
