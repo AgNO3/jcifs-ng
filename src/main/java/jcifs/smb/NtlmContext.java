@@ -41,7 +41,10 @@ public class NtlmContext implements SSPContext {
 
     private static final Logger log = LoggerFactory.getLogger(NtlmContext.class);
 
-    private static ASN1ObjectIdentifier NTLMSSP_OID;
+    /**
+     * 
+     */
+    public static ASN1ObjectIdentifier NTLMSSP_OID;
 
     static {
         try {

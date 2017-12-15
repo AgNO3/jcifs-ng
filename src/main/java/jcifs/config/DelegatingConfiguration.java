@@ -422,6 +422,17 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isUseRawNTLM()
+     */
+    @Override
+    public boolean isUseRawNTLM () {
+        return this.delegate.isUseRawNTLM();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getResolveOrder()
      */

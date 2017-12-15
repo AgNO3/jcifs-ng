@@ -142,6 +142,9 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
                 }
             }
         }
+        catch ( SmbException e ) {
+            throw e;
+        }
         catch ( IOException e1 ) {
             log.debug("Ignoring invalid initial token", e1);
         }

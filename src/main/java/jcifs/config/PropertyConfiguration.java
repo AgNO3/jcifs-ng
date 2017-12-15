@@ -54,6 +54,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
 
         this.lanmanCompatibility = Config.getInt(p, "jcifs.smb.lmCompatibility", 3);
         this.allowNTLMFallback = Config.getBoolean(p, "jcifs.smb.allowNTLMFallback", true);
+        this.useRawNTLM = Config.getBoolean(p, "jcifs.smb.useRawNTLM", false);
 
         this.disablePlainTextPasswords = Config.getBoolean(p, "jcifs.smb.client.disablePlainTextPasswords", true);
 

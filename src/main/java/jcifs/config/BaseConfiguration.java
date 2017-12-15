@@ -76,6 +76,7 @@ public class BaseConfiguration implements Configuration {
     protected boolean useLargeReadWrite = true;
     protected int lanmanCompatibility = 3;
     protected boolean allowNTLMFallback = true;
+    protected boolean useRawNTLM = false;
     protected boolean disablePlainTextPasswords = true;
     protected String oemEncoding = SmbConstants.DEFAULT_OEM_ENCODING;
     protected int flags2 = 0;
@@ -363,6 +364,12 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isAllowNTLMFallback () {
         return this.allowNTLMFallback;
+    }
+
+
+    @Override
+    public boolean isUseRawNTLM () {
+        return this.useRawNTLM;
     }
 
 

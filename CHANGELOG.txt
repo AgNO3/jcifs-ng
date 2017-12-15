@@ -9,6 +9,8 @@ jcifs-ng 2.1.0
 - Support for session reauthentication (#21)
 - Android compat by removing JGSS dependency when unneeded (#20)
 - Allow singleton initialization with custom properties (#19)
+- Send SPNEGO wrapped NTLMSSP tokens, old behavor can be restored
+  by setting jcifs.smb.useRawNTLM=true
 
 jcifs-ng 2.0.3
 - Fix possible "Message size exceeds maximum buffer size" exceptions

@@ -20,16 +20,20 @@
 package jcifs.smb;
 
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.Principal;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import javax.security.auth.Subject;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +41,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Credentials;
 import jcifs.RuntimeCIFSException;
+import jcifs.spnego.NegTokenInit;
 import jcifs.util.Crypto;
 import jcifs.util.Strings;
 
@@ -226,9 +231,32 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
      *      boolean)
      */
     @Override
-    public SSPContext createContext ( CIFSContext transportContext, String targetDomain, String host, byte[] initialToken, boolean doSigning )
-            throws SmbException {
-        return new NtlmContext(transportContext, this, doSigning);
+    public SSPContext createContext ( CIFSContext tc, String targetDomain, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
+
+        if ( tc.getConfig().isUseRawNTLM() ) {
+            return new NtlmContext(tc, this, doSigning);
+        }
+
+        try {
+            NegTokenInit tok = new NegTokenInit(initialToken);
+            if ( log.isDebugEnabled() ) {
+                log.debug("Have initial token " + tok);
+            }
+            if ( tok.getMechanisms() != null ) {
+                Set<ASN1ObjectIdentifier> mechs = new HashSet<>(Arrays.asList(tok.getMechanisms()));
+                if ( !mechs.contains(NtlmContext.NTLMSSP_OID) ) {
+                    throw new SmbUnsupportedOperationException("Server does not support NTLM authentication");
+                }
+            }
+        }
+        catch ( SmbException e ) {
+            throw e;
+        }
+        catch ( IOException e1 ) {
+            log.debug("Ignoring invalid initial token", e1);
+        }
+
+        return new SpnegoContext(new NtlmContext(tc, this, doSigning));
     }
 
 

@@ -90,6 +90,7 @@ public interface Configuration {
      * 
      * @see DialectVersion
      * @return minimum protocol version to use/allow
+     * @since 2.1
      */
     DialectVersion getMinimumVersion ();
 
@@ -101,6 +102,7 @@ public interface Configuration {
      * 
      * @see DialectVersion
      * @return maximum protocol version to use/allow
+     * @since 2.1
      */
     DialectVersion getMaximumVersion ();
 
@@ -341,6 +343,15 @@ public interface Configuration {
 
 
     /**
+     * Property <tt>jcifs.smb.useRawNTLM</tt> (boolean, default false)
+     * 
+     * @return whether to use raw NTLMSSP tokens instead of SPNEGO wrapped ones
+     * @since 2.1
+     */
+    boolean isUseRawNTLM ();
+
+
+    /**
      * 
      * Property <tt>jcifs.smb.client.disablePlainTextPasswords</tt> (boolean, default true)
      * 
@@ -506,6 +517,7 @@ public interface Configuration {
      * negotiation, SMB encryption is not implemented yet.
      * 
      * @return whether SMB encryption is enabled
+     * @since 2.1
      */
     boolean isEncryptionEnabled ();
 
