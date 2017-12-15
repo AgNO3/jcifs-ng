@@ -51,6 +51,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     private int dialectRevision;
     private byte[] serverGuid = new byte[16];
     private int capabilities;
+    private int commonCapabilities;
     private int maxTransactSize;
     private int maxReadSize;
     private int maxWriteSize;
@@ -106,10 +107,18 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
 
 
     /**
-     * @return the capabilities
+     * @return the server returned capabilities
      */
     public final int getCapabilities () {
         return this.capabilities;
+    }
+
+
+    /**
+     * @return the common/negotiated capabilieis
+     */
+    public final int getCommonCapabilities () {
+        return this.commonCapabilities;
     }
 
 
@@ -171,7 +180,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
      */
     @Override
     public boolean haveCapabilitiy ( int cap ) {
-        return ( this.capabilities & cap ) == cap;
+        return ( this.commonCapabilities & cap ) == cap;
     }
 
 
@@ -242,10 +251,10 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         this.selectedDialect = selected;
 
         // Filter out unsupported capabilities
-        this.capabilities &= r.getCapabilities();
+        this.commonCapabilities = r.getCapabilities() & this.capabilities;
 
         if ( this.selectedDialect.atLeast(DialectVersion.SMB311) ) {
-            if ( !checkNegotiateContexts(r, this.capabilities) ) {
+            if ( !checkNegotiateContexts(r, this.commonCapabilities) ) {
                 return false;
             }
         }

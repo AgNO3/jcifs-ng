@@ -521,7 +521,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
             token = createToken(ctx, token, s);
 
             if ( token != null ) {
-                request = new Smb2SessionSetupRequest(this.getContext(), securityMode, negoResp.getCapabilities(), 0, token);
+                request = new Smb2SessionSetupRequest(this.getContext(), securityMode, negoResp.getCommonCapabilities(), 0, token);
                 // here, messages are rejected with NOT_SUPPORTED if we start signing as soon as we can, wait until
                 // session setup complete
 
@@ -715,7 +715,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     Smb2SessionSetupRequest request = new Smb2SessionSetupRequest(
                         getContext(),
                         negoResp.getSecurityMode(),
-                        negoResp.getCapabilities(),
+                        negoResp.getCommonCapabilities(),
                         curSessId,
                         token);
 
