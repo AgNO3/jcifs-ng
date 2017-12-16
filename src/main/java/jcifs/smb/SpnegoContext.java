@@ -186,19 +186,29 @@ class SpnegoContext implements SSPContext {
         }
 
         ASN1ObjectIdentifier currentMech = null;
-        byte[] mechToken = spToken.getMechanismToken();
+        byte[] mechToken = null;
+        if ( spToken instanceof NegTokenInit ) {
+            // only use token if the optimistic mechanism is supported
+            NegTokenInit tinit = (NegTokenInit) spToken;
+            ASN1ObjectIdentifier prefMech = tinit.getMechanisms()[ 0 ];
+            if ( this.mechContext.isSupported(prefMech) ) {
+                mechToken = spToken.getMechanismToken();
+            }
+        }
+        else {
+            mechToken = spToken.getMechanismToken();
+        }
+
         if ( mechToken == null ) {
             return initialToken();
         }
 
         mechToken = this.mechContext.initSecContext(mechToken, 0, mechToken.length);
         if ( mechToken != null ) {
-            int result = NegTokenTarg.ACCEPT_INCOMPLETE;
             byte[] mechMIC = null;
             if ( spToken instanceof NegTokenTarg ) {
                 NegTokenTarg targ = (NegTokenTarg) spToken;
                 if ( targ.getResult() == NegTokenTarg.ACCEPT_COMPLETED && this.mechContext.isEstablished() ) {
-                    result = NegTokenTarg.ACCEPT_COMPLETED;
                     if ( targ.getMechanism() != null ) {
                         currentMech = targ.getMechanism();
                     }
@@ -208,7 +218,7 @@ class SpnegoContext implements SSPContext {
                     throw new SmbException("SPNEGO mechanism was rejected");
                 }
             }
-            return new NegTokenTarg(result, currentMech, mechToken, mechMIC).toByteArray();
+            return new NegTokenTarg(NegTokenTarg.UNSPECIFIED_RESULT, currentMech, mechToken, mechMIC).toByteArray();
         }
         return null;
     }
