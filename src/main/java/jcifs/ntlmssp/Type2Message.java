@@ -192,6 +192,46 @@ public class Type2Message extends NtlmMessage {
 
 
     /**
+     * Returns the default flags for a generic Type-2 message in the
+     * current environment.
+     * 
+     * @param tc
+     *            context to use
+     * @return An <code>int</code> containing the default flags.
+     */
+    public static int getDefaultFlags ( CIFSContext tc ) {
+        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
+    }
+
+
+    /**
+     * Returns the default flags for a Type-2 message created in response
+     * to the given Type-1 message in the current environment.
+     * 
+     * @param tc
+     *            context to use
+     * @param type1
+     *            request message
+     *
+     * @return An <code>int</code> containing the default flags.
+     */
+    public static int getDefaultFlags ( CIFSContext tc, Type1Message type1 ) {
+        if ( type1 == null )
+            return getDefaultFlags(tc);
+        int flags = NTLMSSP_NEGOTIATE_NTLM;
+        int type1Flags = type1.getFlags();
+        flags |= ( ( type1Flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM;
+        if ( ( type1Flags & NTLMSSP_REQUEST_TARGET ) != 0 ) {
+            String domain = tc.getConfig().getDefaultDomain();
+            if ( domain != null ) {
+                flags |= NTLMSSP_REQUEST_TARGET | NTLMSSP_TARGET_TYPE_DOMAIN;
+            }
+        }
+        return flags;
+    }
+
+
+    /**
      * Returns the challenge for this message.
      *
      * @return A <code>byte[]</code> containing the challenge.
@@ -285,43 +325,70 @@ public class Type2Message extends NtlmMessage {
     @Override
     public byte[] toByteArray () {
         try {
-            String targetName = getTarget();
-            byte[] challengeBytes = getChallenge();
-            byte[] contextBytes = getContext();
-            byte[] targetInformationBytes = getTargetInformation();
+            int size = 48;
             int flags = getFlags();
+            String targetName = getTarget();
+            byte[] targetInformationBytes = getTargetInformation();
             byte[] targetBytes = new byte[0];
+
             if ( ( flags & NTLMSSP_REQUEST_TARGET ) != 0 ) {
                 if ( targetName != null && targetName.length() != 0 ) {
                     targetBytes = ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ? targetName.getBytes(UNI_ENCODING)
                             : targetName.toUpperCase().getBytes(getOEMEncoding());
+                    size += targetBytes.length;
                 }
                 else {
                     flags &= ( 0xffffffff ^ NTLMSSP_REQUEST_TARGET );
                 }
             }
+
             if ( targetInformationBytes != null ) {
+                size += targetInformationBytes.length;
                 flags |= NTLMSSP_NEGOTIATE_TARGET_INFO;
-                // empty context is needed for padding when t.i. is supplied.
-                if ( contextBytes == null )
-                    contextBytes = new byte[8];
             }
-            int data = 32;
-            if ( contextBytes != null )
-                data += 8;
-            if ( targetInformationBytes != null )
-                data += 8;
-            byte[] type2 = new byte[data + targetBytes.length + ( targetInformationBytes != null ? targetInformationBytes.length : 0 )];
-            System.arraycopy(NTLMSSP_SIGNATURE, 0, type2, 0, 8);
-            writeULong(type2, 8, 2);
-            writeSecurityBuffer(type2, 12, data, targetBytes);
-            writeULong(type2, 20, flags);
-            System.arraycopy(challengeBytes != null ? challengeBytes : new byte[8], 0, type2, 24, 8);
-            if ( contextBytes != null )
-                System.arraycopy(contextBytes, 0, type2, 32, 8);
-            if ( targetInformationBytes != null ) {
-                writeSecurityBuffer(type2, 40, data + targetBytes.length, targetInformationBytes);
+
+            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
+                size += 8;
             }
+
+            byte[] type2 = new byte[size];
+            int pos = 0;
+
+            System.arraycopy(NTLMSSP_SIGNATURE, 0, type2, pos, NTLMSSP_SIGNATURE.length);
+            pos += NTLMSSP_SIGNATURE.length;
+
+            writeULong(type2, pos, NTLMSSP_TYPE2);
+            pos += 4;
+
+            // TargetNameFields
+            int targetNameOff = writeSecurityBuffer(type2, pos, targetBytes);
+            pos += 8;
+
+            writeULong(type2, pos, flags);
+            pos += 4;
+
+            // ServerChallenge
+            byte[] challengeBytes = getChallenge();
+            System.arraycopy(challengeBytes != null ? challengeBytes : new byte[8], 0, type2, pos, 8);
+            pos += 8;
+
+            // Reserved
+            byte[] contextBytes = getContext();
+            System.arraycopy(contextBytes != null ? contextBytes : new byte[8], 0, type2, pos, 8);
+            pos += 8;
+
+            // TargetInfoFields
+            int targetInfoOff = writeSecurityBuffer(type2, pos, targetInformationBytes);
+            pos += 8;
+
+            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
+                System.arraycopy(NTLMSSP_VERSION, 0, type2, pos, NTLMSSP_VERSION.length);
+                pos += NTLMSSP_VERSION.length;
+            }
+
+            pos += writeSecurityBufferContent(type2, pos, targetNameOff, targetBytes);
+            pos += writeSecurityBufferContent(type2, pos, targetInfoOff, targetInformationBytes);
+
             return type2;
         }
         catch ( IOException ex ) {
@@ -344,87 +411,68 @@ public class Type2Message extends NtlmMessage {
     }
 
 
-    /**
-     * Returns the default flags for a generic Type-2 message in the
-     * current environment.
-     * 
-     * @param tc
-     *            context to use
-     * @return An <code>int</code> containing the default flags.
-     */
-    public static int getDefaultFlags ( CIFSContext tc ) {
-        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
-    }
-
-
-    /**
-     * Returns the default flags for a Type-2 message created in response
-     * to the given Type-1 message in the current environment.
-     * 
-     * @param tc
-     *            context to use
-     * @param type1
-     *            request message
-     *
-     * @return An <code>int</code> containing the default flags.
-     */
-    public static int getDefaultFlags ( CIFSContext tc, Type1Message type1 ) {
-        if ( type1 == null )
-            return getDefaultFlags(tc);
-        int flags = NTLMSSP_NEGOTIATE_NTLM;
-        int type1Flags = type1.getFlags();
-        flags |= ( ( type1Flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM;
-        if ( ( type1Flags & NTLMSSP_REQUEST_TARGET ) != 0 ) {
-            String domain = tc.getConfig().getDefaultDomain();
-            if ( domain != null ) {
-                flags |= NTLMSSP_REQUEST_TARGET | NTLMSSP_TARGET_TYPE_DOMAIN;
-            }
-        }
-        return flags;
-    }
-
-
-    private void parse ( byte[] material ) throws IOException {
+    private void parse ( byte[] input ) throws IOException {
+        int pos = 0;
         for ( int i = 0; i < 8; i++ ) {
-            if ( material[ i ] != NTLMSSP_SIGNATURE[ i ] ) {
+            if ( input[ i ] != NTLMSSP_SIGNATURE[ i ] ) {
                 throw new IOException("Not an NTLMSSP message.");
             }
         }
-        if ( readULong(material, 8) != 2 ) {
+        pos += 8;
+
+        if ( readULong(input, pos) != NTLMSSP_TYPE2 ) {
             throw new IOException("Not a Type 2 message.");
         }
-        int flags = readULong(material, 20);
+        pos += 4;
+
+        int flags = readULong(input, pos + 8);
         setFlags(flags);
-        String targetString = null;
-        byte[] bytes = readSecurityBuffer(material, 12);
-        if ( bytes.length != 0 ) {
-            targetString = new String(bytes, ( ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? UNI_ENCODING : getOEMEncoding());
+
+        byte[] targetName = readSecurityBuffer(input, pos);
+        int targetNameOff = readULong(input, pos + 4);
+        if ( targetName.length != 0 ) {
+            setTarget(new String(targetName, ( ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? UNI_ENCODING : getOEMEncoding()));
         }
-        setTarget(targetString);
-        for ( int i = 24; i < 32; i++ ) {
-            if ( material[ i ] != 0 ) {
-                byte[] challengeBytes = new byte[8];
-                System.arraycopy(material, 24, challengeBytes, 0, 8);
-                setChallenge(challengeBytes);
-                break;
+        pos += 12; // 8 for target, 4 for flags
+
+        if ( !allZeros8(input, pos) ) {
+            byte[] challengeBytes = new byte[8];
+            System.arraycopy(input, pos, challengeBytes, 0, challengeBytes.length);
+            setChallenge(challengeBytes);
+        }
+        pos += 8;
+
+        if ( targetNameOff < pos + 8 || input.length < pos + 8 ) {
+            // no room for Context/Reserved
+            return;
+        }
+
+        if ( !allZeros8(input, pos) ) {
+            byte[] contextBytes = new byte[8];
+            System.arraycopy(input, pos, contextBytes, 0, contextBytes.length);
+            setContext(contextBytes);
+        }
+        pos += 8;
+
+        if ( targetNameOff < pos + 8 || input.length < pos + 8 ) {
+            // no room for target info
+            return;
+        }
+
+        byte[] targetInfo = readSecurityBuffer(input, pos);
+        if ( targetInfo.length != 0 ) {
+            setTargetInformation(targetInfo);
+        }
+    }
+
+
+    private static boolean allZeros8 ( byte[] input, int pos ) {
+        for ( int i = pos; i < pos + 8; i++ ) {
+            if ( input[ i ] != 0 ) {
+                return false;
             }
         }
-        int offset = readULong(material, 16); // offset of targetname start
-        if ( offset == 32 || material.length == 32 )
-            return;
-        for ( int i = 32; i < 40; i++ ) {
-            if ( material[ i ] != 0 ) {
-                byte[] contextBytes = new byte[8];
-                System.arraycopy(material, 32, contextBytes, 0, 8);
-                setContext(contextBytes);
-                break;
-            }
-        }
-        if ( offset == 40 || material.length == 40 )
-            return;
-        bytes = readSecurityBuffer(material, 40);
-        if ( bytes.length != 0 )
-            setTargetInformation(bytes);
+        return true;
     }
 
 }

@@ -199,6 +199,7 @@ public class NtlmContext implements SSPContext {
                 // don't drop NTLMSSP_NEGOTIATE_SIGN,NTLMSSP_NEGOTIATE_SEAL if we requested it
                 this.ntlmsspFlags &= ( msg2.getFlags() | NtlmFlags.NTLMSSP_NEGOTIATE_SIGN | NtlmFlags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN
                         | NtlmFlags.NTLMSSP_NEGOTIATE_SEAL );
+
                 Type3Message msg3 = new Type3Message(
                     this.transportContext,
                     msg2,
@@ -207,14 +208,16 @@ public class NtlmContext implements SSPContext {
                     this.auth.getUsername(),
                     this.workstation,
                     this.ntlmsspFlags);
+
                 token = msg3.toByteArray();
 
                 if ( log.isTraceEnabled() ) {
                     log.trace(msg3.toString());
                     log.trace(Hexdump.toHexString(token, 0, token.length));
                 }
-                if ( ( this.ntlmsspFlags & NtlmFlags.NTLMSSP_NEGOTIATE_SIGN ) != 0 )
+                if ( ( this.ntlmsspFlags & NtlmFlags.NTLMSSP_NEGOTIATE_SIGN ) != 0 ) {
                     this.signingKey = msg3.getMasterKey();
+                }
 
                 this.isEstablished = true;
                 this.state++;

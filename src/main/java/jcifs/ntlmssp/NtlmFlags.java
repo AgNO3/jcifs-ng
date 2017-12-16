@@ -154,6 +154,11 @@ public interface NtlmFlags {
     public static final int NTLMSSP_NEGOTIATE_TARGET_INFO = 0x00800000;
 
     /**
+     * 
+     */
+    public static final int NTLMSSP_NEGOTIATE_VERSION = 0x2000000;
+
+    /**
      * Indicates that 128-bit encryption is supported.
      */
     public static final int NTLMSSP_NEGOTIATE_128 = 0x20000000;

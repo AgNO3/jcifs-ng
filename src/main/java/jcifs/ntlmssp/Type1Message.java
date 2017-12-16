@@ -61,8 +61,9 @@ public class Type1Message extends NtlmMessage {
     public Type1Message ( CIFSContext tc, int flags, String suppliedDomain, String suppliedWorkstation ) {
         setFlags(getDefaultFlags(tc) | flags);
         setSuppliedDomain(suppliedDomain);
-        if ( suppliedWorkstation == null )
+        if ( suppliedWorkstation == null ) {
             suppliedWorkstation = tc.getNameServiceClient().getLocalHost().getHostName();
+        }
         setSuppliedWorkstation(suppliedWorkstation);
     }
 
@@ -77,6 +78,19 @@ public class Type1Message extends NtlmMessage {
      */
     public Type1Message ( byte[] material ) throws IOException {
         parse(material);
+    }
+
+
+    /**
+     * Returns the default flags for a generic Type-1 message in the
+     * current environment.
+     * 
+     * @param tc
+     *            context to use
+     * @return An <code>int</code> containing the default flags.
+     */
+    public static int getDefaultFlags ( CIFSContext tc ) {
+        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
     }
 
 
@@ -125,36 +139,56 @@ public class Type1Message extends NtlmMessage {
     @Override
     public byte[] toByteArray () {
         try {
-            String suppliedDomainString = getSuppliedDomain();
-            String suppliedWorkstationString = getSuppliedWorkstation();
             int flags = getFlags();
-            boolean hostInfo = false;
+            int size = 8 * 4 + ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ? 8 : 0 );
+
             byte[] domain = new byte[0];
-            if ( suppliedDomainString != null && suppliedDomainString.length() != 0 ) {
-                hostInfo = true;
+            String suppliedDomainString = getSuppliedDomain();
+            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) == 0 && suppliedDomainString != null && suppliedDomainString.length() != 0 ) {
                 flags |= NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED;
                 domain = suppliedDomainString.toUpperCase().getBytes(getOEMEncoding());
+                size += domain.length;
             }
             else {
                 flags &= ( NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED ^ 0xffffffff );
             }
+
             byte[] workstation = new byte[0];
-            if ( suppliedWorkstationString != null && suppliedWorkstationString.length() != 0 ) {
-                hostInfo = true;
+            String suppliedWorkstationString = getSuppliedWorkstation();
+            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) == 0 && suppliedWorkstationString != null && suppliedWorkstationString.length() != 0 ) {
                 flags |= NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED;
                 workstation = suppliedWorkstationString.toUpperCase().getBytes(getOEMEncoding());
+                size += workstation.length;
             }
             else {
                 flags &= ( NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED ^ 0xffffffff );
             }
-            byte[] type1 = new byte[hostInfo ? ( 32 + domain.length + workstation.length ) : 16];
-            System.arraycopy(NTLMSSP_SIGNATURE, 0, type1, 0, 8);
-            writeULong(type1, 8, 1);
-            writeULong(type1, 12, flags);
-            if ( hostInfo ) {
-                writeSecurityBuffer(type1, 16, 32, domain);
-                writeSecurityBuffer(type1, 24, 32 + domain.length, workstation);
+
+            byte[] type1 = new byte[size];
+            int pos = 0;
+
+            System.arraycopy(NTLMSSP_SIGNATURE, 0, type1, 0, NTLMSSP_SIGNATURE.length);
+            pos += NTLMSSP_SIGNATURE.length;
+
+            writeULong(type1, pos, NTLMSSP_TYPE1);
+            pos += 4;
+
+            writeULong(type1, pos, flags);
+            pos += 4;
+
+            int domOffOff = writeSecurityBuffer(type1, pos, domain);
+            pos += 8;
+
+            int wsOffOff = writeSecurityBuffer(type1, pos, workstation);
+            pos += 8;
+
+            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
+                System.arraycopy(NTLMSSP_VERSION, 0, type1, pos, NTLMSSP_VERSION.length);
+                pos += NTLMSSP_VERSION.length;
             }
+
+            pos += writeSecurityBufferContent(type1, pos, domOffOff, domain);
+            pos += writeSecurityBufferContent(type1, pos, wsOffOff, workstation);
             return type1;
         }
         catch ( IOException ex ) {
@@ -173,42 +207,35 @@ public class Type1Message extends NtlmMessage {
     }
 
 
-    /**
-     * Returns the default flags for a generic Type-1 message in the
-     * current environment.
-     * 
-     * @param tc
-     *            context to use
-     * @return An <code>int</code> containing the default flags.
-     */
-    public static int getDefaultFlags ( CIFSContext tc ) {
-        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
-    }
-
-
     private void parse ( byte[] material ) throws IOException {
+        int pos = 0;
         for ( int i = 0; i < 8; i++ ) {
             if ( material[ i ] != NTLMSSP_SIGNATURE[ i ] ) {
                 throw new IOException("Not an NTLMSSP message.");
             }
         }
-        if ( readULong(material, 8) != 1 ) {
+        pos += 8;
+
+        if ( readULong(material, pos) != NTLMSSP_TYPE1 ) {
             throw new IOException("Not a Type 1 message.");
         }
-        int flags = readULong(material, 12);
-        String suppliedDomainString = null;
-        if ( ( flags & NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED ) != 0 ) {
-            byte[] domain = readSecurityBuffer(material, 16);
-            suppliedDomainString = new String(domain, getOEMEncoding());
-        }
-        String suppliedWorkstationString = null;
-        if ( ( flags & NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED ) != 0 ) {
-            byte[] workstation = readSecurityBuffer(material, 24);
-            suppliedWorkstationString = new String(workstation, getOEMEncoding());
-        }
+        pos += 4;
+
+        int flags = readULong(material, pos);
         setFlags(flags);
-        setSuppliedDomain(suppliedDomainString);
-        setSuppliedWorkstation(suppliedWorkstationString);
+        pos += 4;
+
+        if ( ( flags & NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED ) != 0 ) {
+            byte[] domain = readSecurityBuffer(material, pos);
+            setSuppliedDomain(new String(domain, getOEMEncoding()));
+        }
+        pos += 8;
+
+        if ( ( flags & NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED ) != 0 ) {
+            byte[] workstation = readSecurityBuffer(material, pos);
+            setSuppliedWorkstation(new String(workstation, getOEMEncoding()));
+        }
+        pos += 8;
     }
 
 }

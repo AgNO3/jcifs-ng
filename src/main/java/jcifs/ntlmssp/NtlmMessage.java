@@ -35,6 +35,17 @@ public abstract class NtlmMessage implements NtlmFlags {
         (byte) 'N', (byte) 'T', (byte) 'L', (byte) 'M', (byte) 'S', (byte) 'S', (byte) 'P', (byte) 0
     };
 
+    /**
+     * NTLM version
+     */
+    protected static final byte[] NTLMSSP_VERSION = new byte[] {
+        6, 1, 0, 0, 0, 0, 0, 15
+    };
+
+    protected static final int NTLMSSP_TYPE1 = 0x1;
+    protected static final int NTLMSSP_TYPE2 = 0x2;
+    protected static final int NTLMSSP_TYPE3 = 0x3;
+
     private static final String OEM_ENCODING = SmbConstants.DEFAULT_OEM_ENCODING;
     protected static final String UNI_ENCODING = "UTF-16LE";
 
@@ -124,14 +135,24 @@ public abstract class NtlmMessage implements NtlmFlags {
     }
 
 
-    static void writeSecurityBuffer ( byte[] dest, int offset, int bodyOffset, byte[] src ) {
+    static int writeSecurityBuffer ( byte[] dest, int offset, byte[] src ) {
         int length = ( src != null ) ? src.length : 0;
-        if ( length == 0 )
-            return;
+        if ( length == 0 ) {
+            return offset + 4;
+        }
         writeUShort(dest, offset, length);
         writeUShort(dest, offset + 2, length);
-        writeULong(dest, offset + 4, bodyOffset);
-        System.arraycopy(src, 0, dest, bodyOffset, length);
+        return offset + 4;
+    }
+
+
+    static int writeSecurityBufferContent ( byte[] dest, int pos, int off, byte[] src ) {
+        writeULong(dest, off, pos);
+        if ( src != null && src.length > 0 ) {
+            System.arraycopy(src, 0, dest, pos, src.length);
+            return src.length;
+        }
+        return 0;
     }
 
 

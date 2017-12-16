@@ -44,6 +44,7 @@ public class Type3Message extends NtlmMessage {
     private String workstation;
     private byte[] masterKey = null;
     private byte[] sessionKey = null;
+    private byte[] mic = null;
 
 
     /**
@@ -283,6 +284,38 @@ public class Type3Message extends NtlmMessage {
 
 
     /**
+     * Returns the default flags for a generic Type-3 message in the
+     * current environment.
+     * 
+     * @param tc
+     *            context to use
+     * @return An <code>int</code> containing the default flags.
+     */
+    public static int getDefaultFlags ( CIFSContext tc ) {
+        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
+    }
+
+
+    /**
+     * Returns the default flags for a Type-3 message created in response
+     * to the given Type-2 message in the current environment.
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message.
+     * @return An <code>int</code> containing the default flags.
+     */
+    public static int getDefaultFlags ( CIFSContext tc, Type2Message type2 ) {
+        if ( type2 == null )
+            return getDefaultFlags(tc);
+        int flags = NTLMSSP_NEGOTIATE_NTLM;
+        flags |= ( ( type2.getFlags() & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM;
+        return flags;
+    }
+
+
+    /**
      * Returns the LanManager/LMv2 response.
      *
      * @return A <code>byte[]</code> containing the LanManager response.
@@ -419,52 +452,111 @@ public class Type3Message extends NtlmMessage {
     }
 
 
+    /**
+     * @return A <code>byte[]</code> containing the message integrity code.
+     */
+    public byte[] getMic () {
+        return this.mic;
+    }
+
+
+    /**
+     * @param mic
+     *            NTLM mic to set (16 bytes)
+     */
+    public void setMic ( byte[] mic ) {
+        this.mic = mic;
+    }
+
+
     @Override
     public byte[] toByteArray () {
         try {
             int flags = getFlags();
+            int size = 64;
             boolean unicode = ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0;
-            String oem = unicode ? null : getOEMEncoding();
+            String oemCp = unicode ? null : getOEMEncoding();
+
             String domainName = getDomain();
             byte[] domainBytes = null;
             if ( domainName != null && domainName.length() != 0 ) {
-                domainBytes = unicode ? domainName.getBytes(UNI_ENCODING) : domainName.getBytes(oem);
+                domainBytes = unicode ? domainName.getBytes(UNI_ENCODING) : domainName.getBytes(oemCp);
+                size += domainBytes.length;
             }
-            int domainLength = ( domainBytes != null ) ? domainBytes.length : 0;
+
             String userName = getUser();
             byte[] userBytes = null;
             if ( userName != null && userName.length() != 0 ) {
-                userBytes = unicode ? userName.getBytes(UNI_ENCODING) : userName.toUpperCase().getBytes(oem);
+                userBytes = unicode ? userName.getBytes(UNI_ENCODING) : userName.toUpperCase().getBytes(oemCp);
+                size += userBytes.length;
             }
-            int userLength = ( userBytes != null ) ? userBytes.length : 0;
+
             String workstationName = getWorkstation();
             byte[] workstationBytes = null;
             if ( workstationName != null && workstationName.length() != 0 ) {
-                workstationBytes = unicode ? workstationName.getBytes(UNI_ENCODING) : workstationName.toUpperCase().getBytes(oem);
+                workstationBytes = unicode ? workstationName.getBytes(UNI_ENCODING) : workstationName.toUpperCase().getBytes(oemCp);
+                size += workstationBytes.length;
             }
-            int workstationLength = ( workstationBytes != null ) ? workstationBytes.length : 0;
+
+            byte[] micBytes = getMic();
+            if ( micBytes != null ) {
+                size += 8 + 16;
+            }
+            else if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
+                size += 8;
+            }
+
             byte[] lmResponseBytes = getLMResponse();
-            int lmLength = ( lmResponseBytes != null ) ? lmResponseBytes.length : 0;
+            size += ( lmResponseBytes != null ) ? lmResponseBytes.length : 0;
+
             byte[] ntResponseBytes = getNTResponse();
-            int ntLength = ( ntResponseBytes != null ) ? ntResponseBytes.length : 0;
+            size += ( ntResponseBytes != null ) ? ntResponseBytes.length : 0;
+
             byte[] sessionKeyBytes = getSessionKey();
-            int keyLength = ( sessionKeyBytes != null ) ? sessionKeyBytes.length : 0;
-            byte[] type3 = new byte[64 + domainLength + userLength + workstationLength + lmLength + ntLength + keyLength];
+            size += ( sessionKeyBytes != null ) ? sessionKeyBytes.length : 0;
+
+            byte[] type3 = new byte[size];
+            int pos = 0;
+
             System.arraycopy(NTLMSSP_SIGNATURE, 0, type3, 0, 8);
-            writeULong(type3, 8, 3);
-            int offset = 64;
-            writeSecurityBuffer(type3, 12, offset, lmResponseBytes);
-            offset += lmLength;
-            writeSecurityBuffer(type3, 20, offset, ntResponseBytes);
-            offset += ntLength;
-            writeSecurityBuffer(type3, 28, offset, domainBytes);
-            offset += domainLength;
-            writeSecurityBuffer(type3, 36, offset, userBytes);
-            offset += userLength;
-            writeSecurityBuffer(type3, 44, offset, workstationBytes);
-            offset += workstationLength;
-            writeSecurityBuffer(type3, 52, offset, sessionKeyBytes);
-            writeULong(type3, 60, flags);
+            pos += 8;
+
+            writeULong(type3, pos, NTLMSSP_TYPE3);
+            pos += 4;
+
+            int lmOff = writeSecurityBuffer(type3, 12, lmResponseBytes);
+            pos += 8;
+            int ntOff = writeSecurityBuffer(type3, 20, ntResponseBytes);
+            pos += 8;
+            int domOff = writeSecurityBuffer(type3, 28, domainBytes);
+            pos += 8;
+            int userOff = writeSecurityBuffer(type3, 36, userBytes);
+            pos += 8;
+            int wsOff = writeSecurityBuffer(type3, 44, workstationBytes);
+            pos += 8;
+            int skOff = writeSecurityBuffer(type3, 52, sessionKeyBytes);
+            pos += 8;
+
+            writeULong(type3, pos, flags);
+            pos += 4;
+
+            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
+                System.arraycopy(NTLMSSP_VERSION, 0, type3, pos, NTLMSSP_VERSION.length);
+                pos += NTLMSSP_VERSION.length;
+            }
+
+            if ( micBytes != null ) {
+                System.arraycopy(micBytes, 0, type3, pos, 16);
+                pos += 16;
+            }
+
+            pos += writeSecurityBufferContent(type3, pos, lmOff, lmResponseBytes);
+            pos += writeSecurityBufferContent(type3, pos, ntOff, ntResponseBytes);
+            pos += writeSecurityBufferContent(type3, pos, domOff, domainBytes);
+            pos += writeSecurityBufferContent(type3, pos, userOff, userBytes);
+            pos += writeSecurityBufferContent(type3, pos, wsOff, workstationBytes);
+            pos += writeSecurityBufferContent(type3, pos, skOff, sessionKeyBytes);
+
             return type3;
         }
         catch ( IOException ex ) {
@@ -487,38 +579,6 @@ public class Type3Message extends NtlmMessage {
                 + ( ntResponseBytes == null ? "null" : "<" + ntResponseBytes.length + " bytes>" ) + ",sessionKey="
                 + ( sessionKeyBytes == null ? "null" : "<" + sessionKeyBytes.length + " bytes>" ) + ",flags=0x"
                 + jcifs.util.Hexdump.toHexString(getFlags(), 8) + "]";
-    }
-
-
-    /**
-     * Returns the default flags for a generic Type-3 message in the
-     * current environment.
-     * 
-     * @param tc
-     *            context to use
-     * @return An <code>int</code> containing the default flags.
-     */
-    public static int getDefaultFlags ( CIFSContext tc ) {
-        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
-    }
-
-
-    /**
-     * Returns the default flags for a Type-3 message created in response
-     * to the given Type-2 message in the current environment.
-     * 
-     * @param tc
-     *            context to use
-     * @param type2
-     *            The Type-2 message.
-     * @return An <code>int</code> containing the default flags.
-     */
-    public static int getDefaultFlags ( CIFSContext tc, Type2Message type2 ) {
-        if ( type2 == null )
-            return getDefaultFlags(tc);
-        int flags = NTLMSSP_NEGOTIATE_NTLM;
-        flags |= ( ( type2.getFlags() & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM;
-        return flags;
     }
 
 
@@ -602,42 +662,76 @@ public class Type3Message extends NtlmMessage {
 
 
     private void parse ( byte[] material ) throws IOException {
+        int pos = 0;
         for ( int i = 0; i < 8; i++ ) {
             if ( material[ i ] != NTLMSSP_SIGNATURE[ i ] ) {
                 throw new IOException("Not an NTLMSSP message.");
             }
         }
-        if ( readULong(material, 8) != 3 ) {
+
+        pos += 8;
+        if ( readULong(material, pos) != NTLMSSP_TYPE3 ) {
             throw new IOException("Not a Type 3 message.");
         }
-        byte[] lmResponseBytes = readSecurityBuffer(material, 12);
-        int lmResponseOffset = readULong(material, 16);
-        byte[] ntResponseBytes = readSecurityBuffer(material, 20);
-        int ntResponseOffset = readULong(material, 24);
-        byte[] domainBytes = readSecurityBuffer(material, 28);
-        int domainOffset = readULong(material, 32);
-        byte[] userBytes = readSecurityBuffer(material, 36);
-        int userOffset = readULong(material, 40);
-        byte[] workstationBytes = readSecurityBuffer(material, 44);
-        int workstationOffset = readULong(material, 48);
+
+        byte[] lmResponseBytes = readSecurityBuffer(material, pos);
+        setLMResponse(lmResponseBytes);
+        int lmResponseOffset = readULong(material, pos + 4);
+        pos += 8;
+
+        byte[] ntResponseBytes = readSecurityBuffer(material, pos);
+        setNTResponse(ntResponseBytes);
+        int ntResponseOffset = readULong(material, pos + 4);
+        pos += 8;
+
+        byte[] domainBytes = readSecurityBuffer(material, pos);
+        int domainOffset = readULong(material, pos + 4);
+        pos += 8;
+
+        byte[] userBytes = readSecurityBuffer(material, pos);
+        int userOffset = readULong(material, pos + 4);
+        pos += 8;
+
+        byte[] workstationBytes = readSecurityBuffer(material, pos);
+        int workstationOffset = readULong(material, pos + 4);
+        pos += 8;
+
+        boolean end = false;
         int flags;
         String charset;
-        byte[] _sessionKey = null;
-        if ( lmResponseOffset == 52 || ntResponseOffset == 52 || domainOffset == 52 || userOffset == 52 || workstationOffset == 52 ) {
+        if ( lmResponseOffset < pos + 12 || ntResponseOffset < pos + 12 || domainOffset < pos + 12 || userOffset < pos + 12
+                || workstationOffset < pos + 12 ) {
+            // no room for SK/Flags
             flags = NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_OEM;
+            setFlags(flags);
             charset = getOEMEncoding();
+            end = true;
         }
         else {
-            _sessionKey = readSecurityBuffer(material, 52);
-            flags = readULong(material, 60);
+            setSessionKey(readSecurityBuffer(material, pos));
+            pos += 8;
+
+            flags = readULong(material, pos);
+            setFlags(flags);
+            pos += 4;
+
             charset = ( ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? UNI_ENCODING : getOEMEncoding();
         }
-        setSessionKey(_sessionKey);
-        setFlags(flags);
-        setLMResponse(lmResponseBytes);
-        setNTResponse(ntResponseBytes);
+
         setDomain(new String(domainBytes, charset));
         setUser(new String(userBytes, charset));
         setWorkstation(new String(workstationBytes, charset));
+
+        int micLen = pos + 24; // Version + MIC
+        if ( end || lmResponseOffset < micLen || ntResponseOffset < micLen || domainOffset < micLen || userOffset < micLen
+                || workstationOffset < micLen ) {
+            return;
+        }
+
+        pos += 8; // Version
+
+        byte[] m = new byte[16];
+        System.arraycopy(material, pos, m, 0, m.length);
+        setMic(m);
     }
 }
