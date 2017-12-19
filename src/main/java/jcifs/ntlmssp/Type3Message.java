@@ -191,7 +191,6 @@ public class Type3Message extends NtlmMessage {
                     }
                     else {
                         this.masterKey = ntlm2SessionKey;
-                        setSessionKey(this.masterKey);
                     }
                 }
             }
@@ -229,7 +228,6 @@ public class Type3Message extends NtlmMessage {
                 }
                 else {
                     this.masterKey = userSessionKey;
-                    setSessionKey(this.masterKey);
                 }
             }
 
@@ -399,9 +397,9 @@ public class Type3Message extends NtlmMessage {
 
 
     /**
-     * Returns the session key.
+     * Returns the encrypted session key.
      *
-     * @return A <code>byte[]</code> containing the session key.
+     * @return A <code>byte[]</code> containing the encrypted session key.
      */
     public byte[] getSessionKey () {
         return this.sessionKey;
@@ -409,10 +407,10 @@ public class Type3Message extends NtlmMessage {
 
 
     /**
-     * Sets the session key.
+     * Sets the encrypted session key.
      *
      * @param sessionKey
-     *            The session key.
+     *            The encrypted session key.
      */
     public void setSessionKey ( byte[] sessionKey ) {
         this.sessionKey = sessionKey;

@@ -1,4 +1,5 @@
 jcifs-ng 2.0.4
+- [SECURITY] Do not leak NTLM session keys
 - Fix file enumeration when entry count exceeds listCount (SMB1, #16) 
 - Fix legacy server enumeration (#22)
 - Deprecate legacy server enumeration, throw SmbUnsupportedOperation
