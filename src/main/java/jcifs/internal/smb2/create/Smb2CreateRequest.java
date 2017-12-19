@@ -233,12 +233,7 @@ public class Smb2CreateRequest extends ServerMessageBlock2Request<Smb2CreateResp
      */
     public Smb2CreateRequest ( Configuration config, String name ) {
         super(config, SMB2_CREATE);
-
-        if ( name.length() > 0 && name.charAt(0) == '\\' ) {
-            name = name.substring(1);
-        }
-
-        this.name = name;
+        setPath(name);
     }
 
 
@@ -315,6 +310,10 @@ public class Smb2CreateRequest extends ServerMessageBlock2Request<Smb2CreateResp
     public void setPath ( String path ) {
         if ( path.length() > 0 && path.charAt(0) == '\\' ) {
             path = path.substring(1);
+        }
+        // win8.1 returns ACCESS_DENIED if the trailing backslash is included
+        if ( path.length() > 1 && path.charAt(path.length() - 1) == '\\' ) {
+            path = path.substring(0, path.length() - 1);
         }
         this.name = path;
     }
