@@ -5,6 +5,7 @@ jcifs-ng 2.0.4
 - Deprecate legacy server enumeration, throw SmbUnsupportedOperation
   when unavailable.
 - Allow singleton initialization with custom properties (#19)
+- Don't include trailing slash in Create requests.
 
 jcifs-ng 2.0.3
 - Fix possible "Message size exceeds maximum buffer size" exceptions
