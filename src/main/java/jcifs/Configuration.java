@@ -652,9 +652,9 @@ public interface Configuration {
     /**
      * 
      * 
-     * Property <tt>jcifs.smb.client.ignoreCopyToException</tt> (boolean, true)
+     * Property <tt>jcifs.smb.client.ignoreCopyToException</tt> (boolean, false)
      * 
-     * @return whether to ignore exceptions
+     * @return whether to ignore exceptions that occur during file copy
      */
     boolean isIgnoreCopyToException ();
 

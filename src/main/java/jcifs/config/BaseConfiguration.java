@@ -127,7 +127,7 @@ public class BaseConfiguration implements Configuration {
     protected int smbListSize = 65535;
     protected int smbListCount = 200;
     protected long smbAttributeExpiration = 5000L;
-    protected boolean ignoreCopyToException = true;
+    protected boolean ignoreCopyToException = false;
     protected int maxRequestRetries = 2;
     protected boolean traceResourceUsage;
     protected boolean strictResourceLifecycle;
