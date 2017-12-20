@@ -56,6 +56,9 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.allowNTLMFallback = Config.getBoolean(p, "jcifs.smb.allowNTLMFallback", true);
         this.useRawNTLM = Config.getBoolean(p, "jcifs.smb.useRawNTLM", false);
 
+        this.disableSpnegoIntegrity = Config.getBoolean(p, "jcifs.smb.client.disableSpnegoIntegrity", false);
+        this.enforceSpnegoIntegrity = Config.getBoolean(p, "jcifs.smb.client.enforceSpnegoIntegrity", false);
+
         this.disablePlainTextPasswords = Config.getBoolean(p, "jcifs.smb.client.disablePlainTextPasswords", true);
 
         this.oemEncoding = p.getProperty("jcifs.encoding", SmbConstants.DEFAULT_OEM_ENCODING);

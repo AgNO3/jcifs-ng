@@ -20,6 +20,8 @@
 package jcifs.ntlmssp;
 
 
+import java.io.IOException;
+
 import jcifs.SmbConstants;
 
 
@@ -165,7 +167,8 @@ public abstract class NtlmMessage implements NtlmFlags {
      * Returns the raw byte representation of this message.
      *
      * @return A <code>byte[]</code> containing the raw message material.
+     * @throws IOException
      */
-    public abstract byte[] toByteArray ();
+    public abstract byte[] toByteArray () throws IOException;
 
 }

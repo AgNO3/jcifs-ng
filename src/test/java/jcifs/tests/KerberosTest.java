@@ -36,6 +36,7 @@ import javax.security.auth.kerberos.KeyTab;
 
 import org.ietf.jgss.GSSException;
 import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -87,7 +88,13 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("smb2", "smb30");
+        return getConfigs("smb2", "smb30", "forceSpnegoIntegrity");
+    }
+
+
+    @Before
+    public void setup () {
+        Assume.assumeTrue("Skip kerberos auth", getProperties().get("test.skip.kerberos") == null);
     }
 
 
@@ -109,6 +116,21 @@ public class KerberosTest extends BaseCIFSTest {
     public void testJAAS () throws CIFSException, MalformedURLException {
         CIFSContext ctx = getContext()
                 .withCredentials(new JAASAuthenticator(getContext(), getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
+        try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
+            f.exists();
+        }
+        catch ( SmbUnsupportedOperationException e ) {
+            Assume.assumeTrue("Using short names", false);
+        }
+    }
+
+
+    @Test
+    public void testFallback () throws Exception {
+        Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), null);
+        Kerb5Authenticator auth = new Kerb5Authenticator(getContext(), s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword());
+        auth.setForceFallback(true);
+        CIFSContext ctx = getContext().withCredentials(auth);
         try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
             f.exists();
         }

@@ -40,6 +40,11 @@ public class AvPair {
     public static final int MsvAvTimestamp = 0x7;
 
     /**
+     * Single host type
+     */
+    public static final int MsvAvSingleHost = 0x08;
+
+    /**
      * Target name type
      */
     public static final int MsvAvTargetName = 0x09;

@@ -75,6 +75,11 @@ public interface NtlmFlags {
     public static final int NTLMSSP_NEGOTIATE_NTLM = 0x00000200;
 
     /**
+     * Indicates that this is an anonymous connection
+     */
+    public static final int NTLMSSP_NEGOTIATE_ANONYMOUS = 0x00000800;
+
+    /**
      * Indicates whether the OEM-formatted domain name in which the
      * client workstation has membership is supplied in the Type-1 message.
      * This is used in the negotation of local authentication.
@@ -127,7 +132,7 @@ public interface NtlmFlags {
      * particular session security scheme, and is not related to the use
      * of NTLMv2 authentication.
      */
-    public static final int NTLMSSP_NEGOTIATE_NTLM2 = 0x00080000;
+    public static final int NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY = 0x00080000;
 
     /**
      * ?? According to spec this is a reserved bit and must be set to zero

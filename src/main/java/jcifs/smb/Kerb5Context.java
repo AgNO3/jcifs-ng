@@ -30,10 +30,12 @@ import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.GSSName;
+import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSException;
 import jcifs.spnego.NegTokenInit;
 
 
@@ -46,37 +48,36 @@ class Kerb5Context implements SSPContext {
 
     private static final Logger log = LoggerFactory.getLogger(Kerb5Context.class);
 
-    private static ASN1ObjectIdentifier KRB5_MECH_OID;
-
-    private static ASN1ObjectIdentifier KRB5_MS_MECH_OID;
-
-    static ASN1ObjectIdentifier[] SUPPORTED_MECHS;
-
-    private static Oid JGSS_KRB5_NAME_OID;
-    private static Oid JGSS_KRB5_MECH_OID;
+    private static final ASN1ObjectIdentifier KRB5_MECH_OID;
+    private static final ASN1ObjectIdentifier KRB5_MS_MECH_OID;
+    static final ASN1ObjectIdentifier[] SUPPORTED_MECHS;
+    private static final Oid JGSS_KRB5_NAME_OID;
+    private static final Oid JGSS_KRB5_MECH_OID;
 
     static {
+        KRB5_MECH_OID = new ASN1ObjectIdentifier("1.2.840.113554.1.2.2");
+        KRB5_MS_MECH_OID = new ASN1ObjectIdentifier("1.2.840.48018.1.2.2");
+        SUPPORTED_MECHS = new ASN1ObjectIdentifier[] {
+            KRB5_MECH_OID, KRB5_MS_MECH_OID
+        };
+
+        Oid krbNameOid = null;
+        Oid krbMechOid = null;
         try {
-            KRB5_MECH_OID = new ASN1ObjectIdentifier("1.2.840.113554.1.2.2");
-            KRB5_MS_MECH_OID = new ASN1ObjectIdentifier("1.2.840.48018.1.2.2");
-
-            JGSS_KRB5_NAME_OID = new Oid("1.2.840.113554.1.2.2.1");
-            JGSS_KRB5_MECH_OID = new Oid("1.2.840.113554.1.2.2");
-
-            SUPPORTED_MECHS = new ASN1ObjectIdentifier[] {
-                KRB5_MECH_OID, KRB5_MS_MECH_OID
-            };
+            krbNameOid = new Oid("1.2.840.113554.1.2.2.1");
+            krbMechOid = new Oid("1.2.840.113554.1.2.2");
         }
         catch ( Exception e ) {
             log.error("Failed to initialize kerberos OIDs", e);
         }
+
+        JGSS_KRB5_NAME_OID = krbNameOid;
+        JGSS_KRB5_MECH_OID = krbMechOid;
     }
 
-    private GSSContext gssContext;
-
-    private GSSName clientName;
-
-    private GSSName serviceName;
+    private final GSSContext gssContext;
+    private final GSSName clientName;
+    private final GSSName serviceName;
 
 
     Kerb5Context ( String host, String service, String name, int userLifetime, int contextLifetime, String realm ) throws GSSException {
@@ -98,6 +99,10 @@ class Kerb5Context implements SSPContext {
             this.clientName = manager.createName(name, GSSName.NT_USER_NAME, mechOid);
             clientCreds = manager.createCredential(this.clientName, userLifetime, mechOid, GSSCredential.INITIATE_ONLY);
         }
+        else {
+            this.clientName = null;
+        }
+
         this.gssContext = manager.createContext(this.serviceName, mechOid, clientCreds, contextLifetime);
 
         this.gssContext.requestAnonymity(false);
@@ -121,6 +126,17 @@ class Kerb5Context implements SSPContext {
     @Override
     public boolean isSupported ( ASN1ObjectIdentifier mechanism ) {
         return KRB5_MECH_OID.equals(mechanism) || KRB5_MS_MECH_OID.equals(mechanism);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#isPreferredMech(org.bouncycastle.asn1.ASN1ObjectIdentifier)
+     */
+    @Override
+    public boolean isPreferredMech ( ASN1ObjectIdentifier mechanism ) {
+        return isSupported(mechanism);
     }
 
 
@@ -177,6 +193,62 @@ class Kerb5Context implements SSPContext {
     /**
      * {@inheritDoc}
      *
+     * @see jcifs.smb.SSPContext#supportsIntegrity()
+     */
+    @Override
+    public boolean supportsIntegrity () {
+        return true;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws CIFSException
+     *
+     * @see jcifs.smb.SSPContext#calculateMIC(byte[])
+     */
+    @Override
+    public byte[] calculateMIC ( byte[] data ) throws CIFSException {
+        try {
+            return this.gssContext.getMIC(data, 0, data.length, new MessageProp(false));
+        }
+        catch ( GSSException e ) {
+            throw new CIFSException("Failed to calculate MIC", e);
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#verifyMIC(byte[], byte[])
+     */
+    @Override
+    public void verifyMIC ( byte[] data, byte[] mic ) throws CIFSException {
+        try {
+            this.gssContext.verifyMIC(mic, 0, mic.length, data, 0, data.length, new MessageProp(false));
+        }
+        catch ( GSSException e ) {
+            throw new CIFSException("Failed to verify MIC", e);
+        }
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.smb.SSPContext#isMICAvailable()
+     */
+    @Override
+    public boolean isMICAvailable () {
+        return this.gssContext.getIntegState();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
      * @see jcifs.smb.SSPContext#getNetbiosName()
      */
     @Override
@@ -198,13 +270,13 @@ class Kerb5Context implements SSPContext {
          * available. That API is accessed via reflection to make this independend
          * of the runtime JRE
          */
-        if ( extendedGSSContextClass == null || inquireSecContext == null || inquireTypeSessionKey == null ) {
+        if ( EXT_GSS_CONTEXT_CLASS == null || INQUIRE_SEC_CONTEXT == null || INQUIRE_TYPE_SESSION_KEY == null ) {
             throw new SmbException("ExtendedGSSContext support not available from JRE");
         }
-        else if ( extendedGSSContextClass.isAssignableFrom(this.gssContext.getClass()) ) {
+        else if ( EXT_GSS_CONTEXT_CLASS.isAssignableFrom(this.gssContext.getClass()) ) {
             try {
-                Key k = (Key) inquireSecContext.invoke(this.gssContext, new Object[] {
-                    inquireTypeSessionKey
+                Key k = (Key) INQUIRE_SEC_CONTEXT.invoke(this.gssContext, new Object[] {
+                    INQUIRE_TYPE_SESSION_KEY
                 });
                 return k.getEncoded();
             }
@@ -294,9 +366,9 @@ class Kerb5Context implements SSPContext {
     private static final String IBM_JGSS_INQUIRE_TYPE_CLASS = "com.ibm.security.jgss.InquireType";
     private static final String IBM_JGSS_EXT_GSSCTX_CLASS = "com.ibm.security.jgss.ExtendedGSSContext";
 
-    private final static Class<?> extendedGSSContextClass;
-    private final static Method inquireSecContext;
-    private final static Object inquireTypeSessionKey;
+    private static final Class<?> EXT_GSS_CONTEXT_CLASS;
+    private static final Method INQUIRE_SEC_CONTEXT;
+    private static final Object INQUIRE_TYPE_SESSION_KEY;
 
     static {
         Class<?> extendedGSSContextClassPrep = null;
@@ -334,13 +406,13 @@ class Kerb5Context implements SSPContext {
                 }
             }
         }
-        extendedGSSContextClass = extendedGSSContextClassPrep;
-        inquireSecContext = inquireSecContextPrep;
-        inquireTypeSessionKey = inquireTypeSessionKeyPrep;
+        EXT_GSS_CONTEXT_CLASS = extendedGSSContextClassPrep;
+        INQUIRE_SEC_CONTEXT = inquireSecContextPrep;
+        INQUIRE_TYPE_SESSION_KEY = inquireTypeSessionKeyPrep;
 
-        if ( extendedGSSContextClass != null && inquireSecContext != null && inquireTypeSessionKey != null ) {
+        if ( EXT_GSS_CONTEXT_CLASS != null && INQUIRE_SEC_CONTEXT != null && INQUIRE_TYPE_SESSION_KEY != null ) {
             if ( log.isDebugEnabled() ) {
-                log.debug("Found ExtendedGSSContext implementation: " + extendedGSSContextClass.getName());
+                log.debug("Found ExtendedGSSContext implementation: " + EXT_GSS_CONTEXT_CLASS.getName());
             }
         }
     }

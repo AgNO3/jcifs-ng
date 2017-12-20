@@ -38,11 +38,8 @@ public class Type2Message extends NtlmMessage {
     private static final Logger log = LoggerFactory.getLogger(Type2Message.class);
 
     private byte[] challenge;
-
     private String target;
-
     private byte[] context;
-
     private byte[] targetInformation;
 
     private static final Map<String, byte[]> TARGET_INFO_CACHE = new HashMap<>();
@@ -173,8 +170,9 @@ public class Type2Message extends NtlmMessage {
         setFlags(flags);
         setChallenge(challenge);
         setTarget(target);
-        if ( target != null )
+        if ( target != null ) {
             setTargetInformation(getDefaultTargetInfo(tc));
+        }
     }
 
 
@@ -200,7 +198,8 @@ public class Type2Message extends NtlmMessage {
      * @return An <code>int</code> containing the default flags.
      */
     public static int getDefaultFlags ( CIFSContext tc ) {
-        return NTLMSSP_NEGOTIATE_NTLM | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
+        return NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_VERSION
+                | ( tc.getConfig().isUseUnicode() ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM );
     }
 
 
@@ -218,7 +217,7 @@ public class Type2Message extends NtlmMessage {
     public static int getDefaultFlags ( CIFSContext tc, Type1Message type1 ) {
         if ( type1 == null )
             return getDefaultFlags(tc);
-        int flags = NTLMSSP_NEGOTIATE_NTLM;
+        int flags = NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_VERSION;
         int type1Flags = type1.getFlags();
         flags |= ( ( type1Flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ) ? NTLMSSP_NEGOTIATE_UNICODE : NTLMSSP_NEGOTIATE_OEM;
         if ( ( type1Flags & NTLMSSP_REQUEST_TARGET ) != 0 ) {
@@ -323,77 +322,72 @@ public class Type2Message extends NtlmMessage {
 
 
     @Override
-    public byte[] toByteArray () {
-        try {
-            int size = 48;
-            int flags = getFlags();
-            String targetName = getTarget();
-            byte[] targetInformationBytes = getTargetInformation();
-            byte[] targetBytes = new byte[0];
+    public byte[] toByteArray () throws IOException {
+        int size = 48;
+        int flags = getFlags();
+        String targetName = getTarget();
+        byte[] targetInformationBytes = getTargetInformation();
+        byte[] targetBytes = new byte[0];
 
-            if ( ( flags & NTLMSSP_REQUEST_TARGET ) != 0 ) {
-                if ( targetName != null && targetName.length() != 0 ) {
-                    targetBytes = ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ? targetName.getBytes(UNI_ENCODING)
-                            : targetName.toUpperCase().getBytes(getOEMEncoding());
-                    size += targetBytes.length;
-                }
-                else {
-                    flags &= ( 0xffffffff ^ NTLMSSP_REQUEST_TARGET );
-                }
+        if ( getFlag(NTLMSSP_REQUEST_TARGET) ) {
+            if ( targetName != null && targetName.length() != 0 ) {
+                targetBytes = ( flags & NTLMSSP_NEGOTIATE_UNICODE ) != 0 ? targetName.getBytes(UNI_ENCODING)
+                        : targetName.toUpperCase().getBytes(getOEMEncoding());
+                size += targetBytes.length;
             }
-
-            if ( targetInformationBytes != null ) {
-                size += targetInformationBytes.length;
-                flags |= NTLMSSP_NEGOTIATE_TARGET_INFO;
+            else {
+                flags &= ( 0xffffffff ^ NTLMSSP_REQUEST_TARGET );
             }
-
-            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
-                size += 8;
-            }
-
-            byte[] type2 = new byte[size];
-            int pos = 0;
-
-            System.arraycopy(NTLMSSP_SIGNATURE, 0, type2, pos, NTLMSSP_SIGNATURE.length);
-            pos += NTLMSSP_SIGNATURE.length;
-
-            writeULong(type2, pos, NTLMSSP_TYPE2);
-            pos += 4;
-
-            // TargetNameFields
-            int targetNameOff = writeSecurityBuffer(type2, pos, targetBytes);
-            pos += 8;
-
-            writeULong(type2, pos, flags);
-            pos += 4;
-
-            // ServerChallenge
-            byte[] challengeBytes = getChallenge();
-            System.arraycopy(challengeBytes != null ? challengeBytes : new byte[8], 0, type2, pos, 8);
-            pos += 8;
-
-            // Reserved
-            byte[] contextBytes = getContext();
-            System.arraycopy(contextBytes != null ? contextBytes : new byte[8], 0, type2, pos, 8);
-            pos += 8;
-
-            // TargetInfoFields
-            int targetInfoOff = writeSecurityBuffer(type2, pos, targetInformationBytes);
-            pos += 8;
-
-            if ( ( flags & NTLMSSP_NEGOTIATE_VERSION ) != 0 ) {
-                System.arraycopy(NTLMSSP_VERSION, 0, type2, pos, NTLMSSP_VERSION.length);
-                pos += NTLMSSP_VERSION.length;
-            }
-
-            pos += writeSecurityBufferContent(type2, pos, targetNameOff, targetBytes);
-            pos += writeSecurityBufferContent(type2, pos, targetInfoOff, targetInformationBytes);
-
-            return type2;
         }
-        catch ( IOException ex ) {
-            throw new IllegalStateException(ex.getMessage());
+
+        if ( targetInformationBytes != null ) {
+            size += targetInformationBytes.length;
+            flags |= NTLMSSP_NEGOTIATE_TARGET_INFO;
         }
+
+        if ( getFlag(NTLMSSP_NEGOTIATE_VERSION) ) {
+            size += 8;
+        }
+
+        byte[] type2 = new byte[size];
+        int pos = 0;
+
+        System.arraycopy(NTLMSSP_SIGNATURE, 0, type2, pos, NTLMSSP_SIGNATURE.length);
+        pos += NTLMSSP_SIGNATURE.length;
+
+        writeULong(type2, pos, NTLMSSP_TYPE2);
+        pos += 4;
+
+        // TargetNameFields
+        int targetNameOff = writeSecurityBuffer(type2, pos, targetBytes);
+        pos += 8;
+
+        writeULong(type2, pos, flags);
+        pos += 4;
+
+        // ServerChallenge
+        byte[] challengeBytes = getChallenge();
+        System.arraycopy(challengeBytes != null ? challengeBytes : new byte[8], 0, type2, pos, 8);
+        pos += 8;
+
+        // Reserved
+        byte[] contextBytes = getContext();
+        System.arraycopy(contextBytes != null ? contextBytes : new byte[8], 0, type2, pos, 8);
+        pos += 8;
+
+        // TargetInfoFields
+        int targetInfoOff = writeSecurityBuffer(type2, pos, targetInformationBytes);
+        pos += 8;
+
+        if ( getFlag(NTLMSSP_NEGOTIATE_VERSION) ) {
+            System.arraycopy(NTLMSSP_VERSION, 0, type2, pos, NTLMSSP_VERSION.length);
+            pos += NTLMSSP_VERSION.length;
+        }
+
+        pos += writeSecurityBufferContent(type2, pos, targetNameOff, targetBytes);
+        pos += writeSecurityBufferContent(type2, pos, targetInfoOff, targetInformationBytes);
+
+        return type2;
     }
 
 

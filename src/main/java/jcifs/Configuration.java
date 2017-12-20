@@ -726,4 +726,23 @@ public interface Configuration {
      */
     byte[] getMachineId ();
 
+
+    /**
+     * 
+     * 
+     * Property <tt>jcifs.smb.client.disableSpnegoIntegrity</tt> (boolean, false)
+     * 
+     * @return whether to disable sending/verifying SPNEGO mechanismListMIC
+     */
+    boolean isDisableSpnegoIntegrity ();
+
+
+    /**
+     * 
+     * Property <tt>jcifs.smb.client.enforceSpnegoIntegrity</tt> (boolean, false)
+     * 
+     * @return whether to enforce verifying SPNEGO mechanismListMIC
+     */
+    boolean isEnforceSpnegoIntegrity ();
+
 }

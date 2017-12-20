@@ -176,6 +176,10 @@ public final class AvPairs {
             return new AvTimestamp(raw);
         case AvPair.MsvAvTargetName:
             return new AvTargetName(raw);
+        case AvPair.MsvAvSingleHost:
+            return new AvSingleHost(raw);
+        case AvPair.MsvAvChannelBindings:
+            return new AvChannelBindings(raw);
         default:
             return new AvPair(avId, raw);
         }

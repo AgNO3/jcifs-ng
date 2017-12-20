@@ -18,48 +18,17 @@
 package jcifs.ntlmssp.av;
 
 
-import jcifs.internal.util.SMBUtil;
-
-
 /**
  * @author mbechler
  *
  */
-public class AvTimestamp extends AvPair {
+public class AvChannelBindings extends AvPair {
 
     /**
-     * @param raw
+     * @param channelBindingHash
      */
-    public AvTimestamp ( byte[] raw ) {
-        super(AvPair.MsvAvTimestamp, raw);
-    }
-
-
-    /**
-     * 
-     * @param ts
-     */
-    public AvTimestamp ( long ts ) {
-        this(encode(ts));
-    }
-
-
-    /**
-     * @param ts
-     * @return
-     */
-    private static byte[] encode ( long ts ) {
-        byte[] data = new byte[8];
-        SMBUtil.writeInt8(ts, data, 0);
-        return data;
-    }
-
-
-    /**
-     * @return the timestamp
-     */
-    public long getTimestamp () {
-        return SMBUtil.readInt8(getRaw(), 0);
+    public AvChannelBindings ( byte[] channelBindingHash ) {
+        super(AvPair.MsvAvChannelBindings, channelBindingHash);
     }
 
 }

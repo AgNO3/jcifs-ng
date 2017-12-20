@@ -41,12 +41,10 @@ import org.bouncycastle.asn1.DERTaggedObject;
 public class NegTokenTarg extends SpnegoToken {
 
     public static final int UNSPECIFIED_RESULT = -1;
-
     public static final int ACCEPT_COMPLETED = 0;
-
     public static final int ACCEPT_INCOMPLETE = 1;
-
     public static final int REJECTED = 2;
+    public static final int REQUEST_MIC = 3;
 
     private ASN1ObjectIdentifier mechanism;
 

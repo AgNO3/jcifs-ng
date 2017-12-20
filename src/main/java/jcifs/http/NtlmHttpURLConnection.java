@@ -717,6 +717,7 @@ public class NtlmHttpURLConnection extends HttpURLConnection {
                 message = new Type3Message(
                     this.transportContext,
                     type2,
+                    null,
                     password,
                     domain,
                     user,

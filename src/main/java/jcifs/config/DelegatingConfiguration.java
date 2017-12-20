@@ -433,6 +433,28 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isDisableSpnegoIntegrity()
+     */
+    @Override
+    public boolean isDisableSpnegoIntegrity () {
+        return this.delegate.isDisableSpnegoIntegrity();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isEnforceSpnegoIntegrity()
+     */
+    @Override
+    public boolean isEnforceSpnegoIntegrity () {
+        return this.delegate.isEnforceSpnegoIntegrity();
+    }
+
+
+    /**
+     * {@inheritDoc}
      * 
      * @see jcifs.Configuration#getResolveOrder()
      */

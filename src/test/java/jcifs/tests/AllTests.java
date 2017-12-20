@@ -102,6 +102,15 @@ public class AllTests {
             }
         });
 
+        MUTATIONS.put("forceSpnegoIntegrity", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.enforceSpnegoIntegrity", "true");
+                return cfg;
+            }
+        });
+
         MUTATIONS.put("noUnicode", new TestMutation() {
 
             @Override
@@ -201,6 +210,16 @@ public class AllTests {
             public Map<String, String> mutate ( Map<String, String> cfg ) {
                 cfg.put("jcifs.smb.client.minVersion", "SMB300");
                 cfg.put("jcifs.smb.client.maxVersion", "SMB302");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("smb31", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.minVersion", "SMB311");
+                cfg.put("jcifs.smb.client.maxVersion", "SMB311");
                 return cfg;
             }
         });

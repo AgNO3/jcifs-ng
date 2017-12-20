@@ -50,22 +50,21 @@ public final class NtlmUtil {
      * @param serverChallenge
      * @param clientChallenge
      * @param nanos1601
-     * @param targetInfo
+     * @param avPairs
      * @return the calculated response
      */
-    public static byte[] getNTLMv2Response ( byte[] responseKeyNT, byte[] serverChallenge, byte[] clientChallenge, long nanos1601,
-            byte[] targetInfo ) {
-        int targetInfoLength = targetInfo != null ? targetInfo.length : 0;
-        byte[] temp = new byte[28 + targetInfoLength + 4];
+    public static byte[] getNTLMv2Response ( byte[] responseKeyNT, byte[] serverChallenge, byte[] clientChallenge, long nanos1601, byte[] avPairs ) {
+        int avPairsLength = avPairs != null ? avPairs.length : 0;
+        byte[] temp = new byte[28 + avPairsLength + 4];
 
         Encdec.enc_uint32le(0x00000101, temp, 0); // Header
         Encdec.enc_uint32le(0x00000000, temp, 4); // Reserved
         Encdec.enc_uint64le(nanos1601, temp, 8);
         System.arraycopy(clientChallenge, 0, temp, 16, 8);
         Encdec.enc_uint32le(0x00000000, temp, 24); // Unknown
-        if ( targetInfo != null )
-            System.arraycopy(targetInfo, 0, temp, 28, targetInfoLength);
-        Encdec.enc_uint32le(0x00000000, temp, 28 + targetInfoLength); // mystery bytes!
+        if ( avPairs != null )
+            System.arraycopy(avPairs, 0, temp, 28, avPairsLength);
+        Encdec.enc_uint32le(0x00000000, temp, 28 + avPairsLength); // mystery bytes!
 
         return NtlmUtil.computeResponse(responseKeyNT, serverChallenge, temp, 0, temp.length);
     }

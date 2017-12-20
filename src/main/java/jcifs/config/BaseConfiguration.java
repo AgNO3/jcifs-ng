@@ -77,6 +77,8 @@ public class BaseConfiguration implements Configuration {
     protected int lanmanCompatibility = 3;
     protected boolean allowNTLMFallback = true;
     protected boolean useRawNTLM = false;
+    protected boolean disableSpnegoIntegrity = false;
+    protected boolean enforceSpnegoIntegrity = true;
     protected boolean disablePlainTextPasswords = true;
     protected String oemEncoding = SmbConstants.DEFAULT_OEM_ENCODING;
     protected int flags2 = 0;
@@ -371,6 +373,18 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isUseRawNTLM () {
         return this.useRawNTLM;
+    }
+
+
+    @Override
+    public boolean isDisableSpnegoIntegrity () {
+        return this.disableSpnegoIntegrity;
+    }
+
+
+    @Override
+    public boolean isEnforceSpnegoIntegrity () {
+        return this.enforceSpnegoIntegrity;
     }
 
 

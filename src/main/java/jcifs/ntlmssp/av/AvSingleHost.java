@@ -18,6 +18,7 @@
 package jcifs.ntlmssp.av;
 
 
+import jcifs.Configuration;
 import jcifs.internal.util.SMBUtil;
 
 
@@ -25,41 +26,43 @@ import jcifs.internal.util.SMBUtil;
  * @author mbechler
  *
  */
-public class AvTimestamp extends AvPair {
+public class AvSingleHost extends AvPair {
 
     /**
      * @param raw
      */
-    public AvTimestamp ( byte[] raw ) {
-        super(AvPair.MsvAvTimestamp, raw);
+    public AvSingleHost ( byte[] raw ) {
+        super(AvPair.MsvAvSingleHost, raw);
     }
 
 
     /**
      * 
-     * @param ts
+     * @param cfg
      */
-    public AvTimestamp ( long ts ) {
-        this(encode(ts));
+    public AvSingleHost ( Configuration cfg ) {
+        this(new byte[8], cfg.getMachineId());
     }
 
 
     /**
-     * @param ts
-     * @return
+     * 
+     * @param customData
+     * @param machineId
      */
-    private static byte[] encode ( long ts ) {
-        byte[] data = new byte[8];
-        SMBUtil.writeInt8(ts, data, 0);
-        return data;
+    public AvSingleHost ( byte[] customData, byte[] machineId ) {
+        this(encode(customData, machineId));
     }
 
 
-    /**
-     * @return the timestamp
-     */
-    public long getTimestamp () {
-        return SMBUtil.readInt8(getRaw(), 0);
+    private static byte[] encode ( byte[] customData, byte[] machineId ) {
+        int size = 8 + 8 + 32;
+        byte[] enc = new byte[size];
+        SMBUtil.writeInt4(size, enc, 0);
+        SMBUtil.writeInt4(0, enc, 4);
+        System.arraycopy(customData, 0, enc, 8, 8);
+        System.arraycopy(machineId, 0, enc, 16, 32);
+        return enc;
     }
 
 }

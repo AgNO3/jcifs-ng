@@ -57,6 +57,8 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     private static final Logger log = LoggerFactory.getLogger(Kerb5Authenticator.class);
     private static final String DEFAULT_SERVICE = "cifs";
 
+    private static final Set<ASN1ObjectIdentifier> PREFERRED_MECHS = new HashSet<>();
+
     private Subject subject = null;
     private String user = null;
     private String realm = null;
@@ -64,6 +66,12 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     private int userLifetime = GSSCredential.DEFAULT_LIFETIME;
     private int contextLifetime = GSSContext.DEFAULT_LIFETIME;
     private boolean canFallback = false;
+    private boolean forceFallback;
+
+    static {
+        PREFERRED_MECHS.add(new ASN1ObjectIdentifier("1.2.840.113554.1.2.2"));
+        PREFERRED_MECHS.add(new ASN1ObjectIdentifier("1.2.840.48018.1.2.2"));
+    }
 
 
     /**
@@ -106,6 +114,17 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
 
     /**
+     * Testing only: force fallback to NTLM
+     * 
+     * @param forceFallback
+     *            the forceFallback to set
+     */
+    public void setForceFallback ( boolean forceFallback ) {
+        this.forceFallback = forceFallback;
+    }
+
+
+    /**
      * 
      * {@inheritDoc}
      *
@@ -133,7 +152,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
                 for ( ASN1ObjectIdentifier mech : Kerb5Context.SUPPORTED_MECHS ) {
                     foundKerberos |= mechs.contains(mech);
                 }
-                if ( !foundKerberos && this.canFallback && tc.getConfig().isAllowNTLMFallback() ) {
+                if ( ( !foundKerberos || this.forceFallback ) && this.canFallback && tc.getConfig().isAllowNTLMFallback() ) {
                     log.debug("Falling back to NTLM authentication");
                     return super.createContext(tc, targetDomain, host, initialToken, doSigning);
                 }
@@ -195,6 +214,9 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
         to.setService(from.getService());
         to.setLifeTime(from.getLifeTime());
         to.setUserLifeTime(from.getUserLifeTime());
+
+        to.canFallback = from.canFallback;
+        to.forceFallback = from.forceFallback;
     }
 
 
@@ -334,6 +356,20 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     /**
      * {@inheritDoc}
      *
+     * @see jcifs.smb.NtlmPasswordAuthentication#isPreferredMech(org.bouncycastle.asn1.ASN1ObjectIdentifier)
+     */
+    @Override
+    public boolean isPreferredMech ( ASN1ObjectIdentifier mechanism ) {
+        if ( isAnonymous() ) {
+            return super.isPreferredMech(mechanism);
+        }
+        return PREFERRED_MECHS.contains(mechanism);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
      * @see java.lang.Object#toString()
      */
     @Override
@@ -345,6 +381,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
     private SpnegoContext createContext ( String targetDomain, String host ) throws GSSException {
         return new SpnegoContext(
+            getContext().getConfig(),
             new Kerb5Context(
                 host,
                 this.service,

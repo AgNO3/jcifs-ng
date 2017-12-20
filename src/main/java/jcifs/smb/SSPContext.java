@@ -74,6 +74,13 @@ public interface SSPContext {
 
 
     /**
+     * @param selectedMech
+     * @return whether the specified mechanism is preferred
+     */
+    boolean isPreferredMech ( ASN1ObjectIdentifier selectedMech );
+
+
+    /**
      * @return context flags
      */
     int getFlags ();
@@ -83,5 +90,34 @@ public interface SSPContext {
      * @return array of supported mechanism OIDs
      */
     ASN1ObjectIdentifier[] getSupportedMechs ();
+
+
+    /**
+     * 
+     * @return whether this mechanisms supports integrity
+     */
+    boolean supportsIntegrity ();
+
+
+    /**
+     * @param data
+     * @return MIC
+     * @throws CIFSException
+     */
+    byte[] calculateMIC ( byte[] data ) throws CIFSException;
+
+
+    /**
+     * @param data
+     * @param mic
+     * @throws CIFSException
+     */
+    void verifyMIC ( byte[] data, byte[] mic ) throws CIFSException;
+
+
+    /**
+     * @return whether MIC can be used
+     */
+    boolean isMICAvailable ();
 
 }

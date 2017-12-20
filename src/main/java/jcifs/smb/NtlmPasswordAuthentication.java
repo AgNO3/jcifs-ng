@@ -232,20 +232,21 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
      */
     @Override
     public SSPContext createContext ( CIFSContext tc, String targetDomain, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
-
         if ( tc.getConfig().isUseRawNTLM() ) {
             return new NtlmContext(tc, this, doSigning);
         }
 
         try {
-            NegTokenInit tok = new NegTokenInit(initialToken);
-            if ( log.isDebugEnabled() ) {
-                log.debug("Have initial token " + tok);
-            }
-            if ( tok.getMechanisms() != null ) {
-                Set<ASN1ObjectIdentifier> mechs = new HashSet<>(Arrays.asList(tok.getMechanisms()));
-                if ( !mechs.contains(NtlmContext.NTLMSSP_OID) ) {
-                    throw new SmbUnsupportedOperationException("Server does not support NTLM authentication");
+            if ( initialToken != null ) {
+                NegTokenInit tok = new NegTokenInit(initialToken);
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Have initial token " + tok);
+                }
+                if ( tok.getMechanisms() != null ) {
+                    Set<ASN1ObjectIdentifier> mechs = new HashSet<>(Arrays.asList(tok.getMechanisms()));
+                    if ( !mechs.contains(NtlmContext.NTLMSSP_OID) ) {
+                        throw new SmbUnsupportedOperationException("Server does not support NTLM authentication");
+                    }
                 }
             }
         }
@@ -256,7 +257,7 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
             log.debug("Ignoring invalid initial token", e1);
         }
 
-        return new SpnegoContext(new NtlmContext(tc, this, doSigning));
+        return new SpnegoContext(tc.getConfig(), new NtlmContext(tc, this, doSigning));
     }
 
 
@@ -633,6 +634,15 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
      */
     public boolean areHashesExternal () {
         return this.hashesExternal;
+    }
+
+
+    /**
+     * @param mechanism
+     * @return whether the given mechanism is the preferred one for this credential
+     */
+    public boolean isPreferredMech ( ASN1ObjectIdentifier mechanism ) {
+        return NtlmContext.NTLMSSP_OID.equals(mechanism);
     }
 
 }
