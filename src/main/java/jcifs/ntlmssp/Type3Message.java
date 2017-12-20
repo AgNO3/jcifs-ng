@@ -23,7 +23,7 @@ package jcifs.ntlmssp;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
-import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 
 import javax.crypto.Cipher;
@@ -171,7 +171,7 @@ public class Type3Message extends NtlmMessage {
         case 4:
         case 5:
             byte[] ntlmClientChallengeInfo = type2.getTargetInformation();
-            List<AvPair> avPairs = ntlmClientChallengeInfo != null ? AvPairs.decode(ntlmClientChallengeInfo) : Collections.EMPTY_LIST;
+            List<AvPair> avPairs = ntlmClientChallengeInfo != null ? AvPairs.decode(ntlmClientChallengeInfo) : null;
 
             // if targetInfo has an MsvAvTimestamp
             // client should not send LmChallengeResponse
@@ -190,36 +190,12 @@ public class Type3Message extends NtlmMessage {
             tc.getConfig().getRandom().nextBytes(ntlmClientChallenge);
 
             long ts = ( System.currentTimeMillis() + SmbConstants.MILLISECONDS_BETWEEN_1970_AND_1601 ) * 10000;
-
-            if ( ntlmClientChallengeInfo != null ) {
-                if ( haveTimestamp && !tc.getConfig().isDisableSpnegoIntegrity() && getFlag(NTLMSSP_NEGOTIATE_SIGN) ) {
-                    // should provide MIC
-                    this.micRequired = true;
-                    this.mic = new byte[16];
-                    int curFlags = 0;
-                    AvFlags cur = (AvFlags) AvPairs.get(avPairs, AvPair.MsvAvFlags);
-                    if ( cur != null ) {
-                        curFlags = cur.getFlags();
-                    }
-                    curFlags |= 0x2; // MAC present
-                    AvPairs.replace(avPairs, new AvFlags(curFlags));
-                    ts = ( (AvTimestamp) AvPairs.get(avPairs, AvPair.MsvAvTimestamp) ).getTimestamp();
-                }
-
-                AvPairs.replace(avPairs, new AvTimestamp(ts));
-
-                if ( targetName != null ) {
-                    AvPairs.replace(avPairs, new AvTargetName(targetName));
-                }
-
-                // possibly add channel bindings
-                AvPairs.replace(avPairs, new AvPair(0xa, new byte[16]));
-                AvPairs.replace(avPairs, new AvSingleHost(tc.getConfig()));
-
-                ntlmClientChallengeInfo = AvPairs.encode(avPairs);
+            if ( haveTimestamp ) {
+                ts = ( (AvTimestamp) AvPairs.get(avPairs, AvPair.MsvAvTimestamp) ).getTimestamp();
             }
 
-            setNTResponse(getNTLMv2Response(tc, type2, responseKeyNT, ntlmClientChallenge, ntlmClientChallengeInfo, ts));
+            setNTResponse(
+                getNTLMv2Response(tc, type2, responseKeyNT, ntlmClientChallenge, makeAvPairs(tc, targetName, avPairs, haveTimestamp, ts), ts));
 
             if ( getFlag(NTLMSSP_NEGOTIATE_SIGN) ) {
                 MessageDigest hmac = Crypto.getHMACT64(responseKeyNT);
@@ -246,6 +222,42 @@ public class Type3Message extends NtlmMessage {
             setNTResponse(getNTResponse(tc, type2, password));
         }
 
+    }
+
+
+    private byte[] makeAvPairs ( CIFSContext tc, String targetName, List<AvPair> serverAvPairs, boolean haveServerTimestamp, long ts ) {
+        if ( !tc.getConfig().isEnforceSpnegoIntegrity() && serverAvPairs == null ) {
+            return null;
+        }
+        else if ( serverAvPairs == null ) {
+            serverAvPairs = new LinkedList<>();
+        }
+
+        if ( getFlag(NTLMSSP_NEGOTIATE_SIGN)
+                && ( tc.getConfig().isEnforceSpnegoIntegrity() || ( haveServerTimestamp && !tc.getConfig().isDisableSpnegoIntegrity() ) ) ) {
+            // should provide MIC
+            this.micRequired = true;
+            this.mic = new byte[16];
+            int curFlags = 0;
+            AvFlags cur = (AvFlags) AvPairs.get(serverAvPairs, AvPair.MsvAvFlags);
+            if ( cur != null ) {
+                curFlags = cur.getFlags();
+            }
+            curFlags |= 0x2; // MAC present
+            AvPairs.replace(serverAvPairs, new AvFlags(curFlags));
+        }
+
+        AvPairs.replace(serverAvPairs, new AvTimestamp(ts));
+
+        if ( targetName != null ) {
+            AvPairs.replace(serverAvPairs, new AvTargetName(targetName));
+        }
+
+        // possibly add channel bindings
+        AvPairs.replace(serverAvPairs, new AvPair(0xa, new byte[16]));
+        AvPairs.replace(serverAvPairs, new AvSingleHost(tc.getConfig()));
+
+        return AvPairs.encode(serverAvPairs);
     }
 
 
