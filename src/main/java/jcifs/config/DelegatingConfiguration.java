@@ -826,4 +826,14 @@ public class DelegatingConfiguration implements Configuration {
         return this.delegate.getMaxRequestRetries();
     }
 
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getMachineId()
+     */
+    @Override
+    public byte[] getMachineId () {
+        return this.delegate.getMachineId();
+    }
 }

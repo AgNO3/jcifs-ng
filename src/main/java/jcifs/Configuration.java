@@ -714,4 +714,16 @@ public interface Configuration {
      */
     boolean isAllowCompound ( String command );
 
+
+    /**
+     * Machine identifier
+     * 
+     * ClientGuid, ... are derived from this value.
+     * 
+     * Normally this should be randomly assigned for each client instance/configuration.
+     * 
+     * @return machine identifier (32 byte)
+     */
+    byte[] getMachineId ();
+
 }

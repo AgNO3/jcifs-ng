@@ -133,6 +133,7 @@ public class BaseConfiguration implements Configuration {
     protected DialectVersion minVersion;
     protected DialectVersion maxVersion;
     private boolean requireSecureNegotiate = true;
+    private byte[] machineId;
 
 
     /**
@@ -587,6 +588,18 @@ public class BaseConfiguration implements Configuration {
 
 
     /**
+     * 
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getMachineId()
+     */
+    @Override
+    public byte[] getMachineId () {
+        return this.machineId;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see jcifs.Configuration#getBatchLimit(java.lang.String)
@@ -723,6 +736,12 @@ public class BaseConfiguration implements Configuration {
         this.localPid = (int) ( Math.random() * 65536d );
         this.localTimeZone = TimeZone.getDefault();
         this.random = new SecureRandom();
+
+        if ( this.machineId == null ) {
+            byte[] mid = new byte[32];
+            this.random.nextBytes(mid);
+            this.machineId = mid;
+        }
 
         if ( this.nativeOs == null ) {
             this.nativeOs = System.getProperty("os.name");

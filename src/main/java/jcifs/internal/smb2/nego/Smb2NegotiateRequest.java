@@ -71,6 +71,10 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
             i++;
         }
 
+        if ( config.getMaximumVersion().atLeast(DialectVersion.SMB210) ) {
+            System.arraycopy(config.getMachineId(), 0, this.clientGuid, 0, this.clientGuid.length);
+        }
+
         List<NegotiateContextRequest> negoContexts = new LinkedList<>();
         if ( config.getMaximumVersion() != null && config.getMaximumVersion().atLeast(DialectVersion.SMB311) ) {
             byte[] salt = new byte[32];
