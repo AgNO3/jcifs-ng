@@ -34,8 +34,7 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
     private boolean received;
     private boolean error;
     private Long expiration;
-    private boolean retainPayload;
-    private byte[] rawPayload;
+
     private boolean verifyFailed;
     private Exception exception;
     private boolean asyncHandled;
@@ -201,28 +200,6 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
 
 
     /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.util.transport.Response#retainPayload()
-     */
-    @Override
-    public void retainPayload () {
-        this.retainPayload = true;
-    }
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.util.transport.Response#isRetainPayload()
-     */
-    @Override
-    public boolean isRetainPayload () {
-        return this.retainPayload;
-    }
-
-
-    /**
      * @return whether the interim response has been handled
      */
     public boolean isAsyncHandled () {
@@ -236,27 +213,6 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
      */
     public void setAsyncHandled ( boolean asyncHandled ) {
         this.asyncHandled = asyncHandled;
-    }
-
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.util.transport.Response#getRawPayload()
-     */
-    @Override
-    public byte[] getRawPayload () {
-        return this.rawPayload;
-    }
-
-
-    /**
-     * @param rawPayload
-     *            the rawPayload to set
-     */
-    @Override
-    public void setRawPayload ( byte[] rawPayload ) {
-        this.rawPayload = rawPayload;
     }
 
 

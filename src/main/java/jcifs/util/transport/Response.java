@@ -112,26 +112,6 @@ public interface Response extends Message {
 
 
     /**
-     * Indicate that this message should retain it's raw payload
-     */
-    void retainPayload ();
-
-
-    /**
-     * 
-     * @return whether to retain the message payload
-     */
-    boolean isRetainPayload ();
-
-
-    /**
-     * 
-     * @return the raw response message
-     */
-    byte[] getRawPayload ();
-
-
-    /**
      * 
      */
     public void reset ();
@@ -148,12 +128,6 @@ public interface Response extends Message {
      * @param e
      */
     public void exception ( Exception e );
-
-
-    /**
-     * @param rawPayload
-     */
-    void setRawPayload ( byte[] rawPayload );
 
 
     /**

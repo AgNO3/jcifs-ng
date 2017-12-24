@@ -24,4 +24,28 @@ package jcifs.util.transport;
  */
 public interface Message {
 
+    /**
+     * Indicate that this message should retain it's raw payload
+     */
+    void retainPayload ();
+
+
+    /**
+     * 
+     * @return whether to retain the message payload
+     */
+    boolean isRetainPayload ();
+
+
+    /**
+     * 
+     * @return the raw response message
+     */
+    byte[] getRawPayload ();
+
+
+    /**
+     * @param rawPayload
+     */
+    void setRawPayload ( byte[] rawPayload );
 }

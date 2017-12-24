@@ -113,6 +113,9 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
     private byte errorContextCount;
     private byte[] errorData;
 
+    private boolean retainPayload;
+    private byte[] rawPayload;
+
     private ServerMessageBlock2 next;
 
 
@@ -238,6 +241,30 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
      */
     public final int getCreditCharge () {
         return this.creditCharge;
+    }
+
+
+    @Override
+    public void retainPayload () {
+        this.retainPayload = true;
+    }
+
+
+    @Override
+    public boolean isRetainPayload () {
+        return this.retainPayload;
+    }
+
+
+    @Override
+    public byte[] getRawPayload () {
+        return this.rawPayload;
+    }
+
+
+    @Override
+    public void setRawPayload ( byte[] rawPayload ) {
+        this.rawPayload = rawPayload;
     }
 
 
@@ -464,6 +491,11 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
 
         if ( this.digest != null ) {
             this.digest.sign(dst, this.headerStart, this.length, this, getResponse());
+        }
+
+        if ( isRetainPayload() ) {
+            this.rawPayload = new byte[len];
+            System.arraycopy(dst, start, this.rawPayload, 0, len);
         }
 
         return len;
