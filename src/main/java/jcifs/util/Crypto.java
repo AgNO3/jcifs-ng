@@ -75,6 +75,19 @@ public final class Crypto {
 
 
     /**
+     * @return SHA512 digest
+     */
+    public static MessageDigest getSHA512 () {
+        try {
+            return MessageDigest.getInstance("SHA-512");
+        }
+        catch ( NoSuchAlgorithmException e ) {
+            throw new CIFSUnsupportedCryptoException(e);
+        }
+    }
+
+
+    /**
      * 
      * @param key
      * @return HMACT64 MAC

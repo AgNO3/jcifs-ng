@@ -55,10 +55,11 @@ public class Smb2SigningDigest implements SMBSigningDigest {
     /**
      * @param sessionKey
      * @param dialect
+     * @param preauthIntegrityHash
      * @throws GeneralSecurityException
      * 
      */
-    public Smb2SigningDigest ( byte[] sessionKey, int dialect ) throws GeneralSecurityException {
+    public Smb2SigningDigest ( byte[] sessionKey, int dialect, byte[] preauthIntegrityHash ) throws GeneralSecurityException {
         Mac m;
         byte[] signingKey;
         switch ( dialect ) {
@@ -73,7 +74,12 @@ public class Smb2SigningDigest implements SMBSigningDigest {
             m = Mac.getInstance("AESCMAC", BC);
             break;
         case Smb2Constants.SMB2_DIALECT_0311:
-            throw new IllegalArgumentException("SMB 3.11 not yet supported");
+            if ( preauthIntegrityHash == null ) {
+                throw new IllegalArgumentException("Missing preauthIntegrityHash for SMB 3.1");
+            }
+            signingKey = Smb3KeyDerivation.deriveSigningKey(dialect, sessionKey, preauthIntegrityHash);
+            m = Mac.getInstance("AESCMAC", BC);
+            break;
         default:
             throw new IllegalArgumentException("Unknown dialect");
         }

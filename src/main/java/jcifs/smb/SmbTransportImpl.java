@@ -29,6 +29,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -40,6 +41,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.crypto.Cipher;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +50,7 @@ import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.DfsReferralData;
+import jcifs.DialectVersion;
 import jcifs.SmbConstants;
 import jcifs.SmbTransport;
 import jcifs.internal.CommonServerMessageBlock;
@@ -78,12 +82,14 @@ import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
 import jcifs.internal.smb2.lock.Smb2OplockBreakNotification;
+import jcifs.internal.smb2.nego.EncryptionNegotiateContext;
 import jcifs.internal.smb2.nego.Smb2NegotiateRequest;
 import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
 import jcifs.netbios.Name;
 import jcifs.netbios.NbtException;
 import jcifs.netbios.SessionRequestPacket;
 import jcifs.netbios.SessionServicePacket;
+import jcifs.util.Crypto;
 import jcifs.util.Encdec;
 import jcifs.util.Hexdump;
 import jcifs.util.transport.Request;
@@ -124,6 +130,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     private final Semaphore credits = new Semaphore(1, true);
 
     private final int desiredCredits = 512;
+
+    private byte[] preauthIntegrityHash = new byte[64];
 
 
     SmbTransportImpl ( CIFSContext tc, Address address, int port, InetAddress localAddr, int localPort, boolean forceSigning ) {
@@ -523,7 +531,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
 
             Arrays.fill(this.sbuf, (byte) 0);
-            return new SmbNegotiation(comNeg, resp);
+            return new SmbNegotiation(comNeg, resp, null, null);
         }
     }
 
@@ -608,21 +616,37 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             throw new IOException("No credits for negotiate");
         }
         Smb2NegotiateResponse r = null;
+        byte[] negoReqBuffer = null;
+        byte[] negoRespBuffer = null;
         try {
             smb2neg.setRequestCredits(Math.max(1, this.desiredCredits - this.credits.availablePermits()));
 
-            negotiateWrite(smb2neg, first != null);
+            int reqLen = negotiateWrite(smb2neg, first != null);
+            boolean doPreauth = getContext().getConfig().getMaximumVersion().atLeast(DialectVersion.SMB311);
+            if ( doPreauth ) {
+                negoReqBuffer = new byte[reqLen];
+                System.arraycopy(this.sbuf, 4, negoReqBuffer, 0, reqLen);
+            }
+
             negotiatePeek();
 
             r = smb2neg.initResponse(getContext());
-            r.decode(this.sbuf, 4);
+            int respLen = r.decode(this.sbuf, 4);
             r.received();
+
+            if ( doPreauth ) {
+                negoRespBuffer = new byte[respLen];
+                System.arraycopy(this.sbuf, 4, negoRespBuffer, 0, respLen);
+            }
+            else {
+                negoReqBuffer = null;
+            }
 
             if ( log.isTraceEnabled() ) {
                 log.trace(r.toString());
                 log.trace(Hexdump.toHexString(this.sbuf, 4, size));
             }
-            return new SmbNegotiation(smb2neg, r);
+            return new SmbNegotiation(smb2neg, r, negoReqBuffer, negoRespBuffer);
         }
         finally {
             int grantedCredits = r != null ? r.getGrantedCredits() : 0;
@@ -696,6 +720,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         /* Adjust negotiated values */
         this.tconHostName = this.address.getHostName();
         this.negotiated = resp.getResponse();
+        if ( resp.getResponse().getSelectedDialect().atLeast(DialectVersion.SMB311) ) {
+            updatePreauthHash(resp.getRequestRaw());
+            updatePreauthHash(resp.getResponseRaw());
+            if ( log.isDebugEnabled() ) {
+                log.debug("Preauth hash after negotiate " + Hexdump.toHexString(this.preauthIntegrityHash));
+            }
+        }
     }
 
 
@@ -1692,6 +1723,72 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 log.debug("Got referral " + cur);
             }
             return cur;
+        }
+    }
+
+
+    byte[] getPreauthIntegrityHash () {
+        return this.preauthIntegrityHash;
+    }
+
+
+    private void updatePreauthHash ( byte[] input ) throws CIFSException {
+        synchronized ( this.preauthIntegrityHash ) {
+            this.preauthIntegrityHash = calculatePreauthHash(input, 0, input.length, this.preauthIntegrityHash);
+        }
+    }
+
+
+    byte[] calculatePreauthHash ( byte[] input, int off, int len, byte[] oldHash ) throws CIFSException {
+        if ( !this.smb2 || this.negotiated == null ) {
+            throw new SmbUnsupportedOperationException();
+        }
+
+        Smb2NegotiateResponse resp = (Smb2NegotiateResponse) this.negotiated;
+        if ( !resp.getSelectedDialect().atLeast(DialectVersion.SMB311) ) {
+            throw new SmbUnsupportedOperationException();
+        }
+
+        MessageDigest dgst;
+        switch ( resp.getSelectedPreauthHash() ) {
+        case 1:
+            dgst = Crypto.getSHA512();
+            break;
+        default:
+            throw new SmbUnsupportedOperationException();
+        }
+
+        if ( oldHash != null ) {
+            dgst.update(oldHash);
+        }
+        dgst.update(input, off, len);
+        return dgst.digest();
+    }
+
+
+    Cipher createEncryptionCipher ( byte[] key ) throws CIFSException {
+        if ( !this.smb2 || this.negotiated == null ) {
+            throw new SmbUnsupportedOperationException();
+        }
+
+        Smb2NegotiateResponse resp = (Smb2NegotiateResponse) this.negotiated;
+        int cipherId = -1;
+
+        if ( resp.getSelectedDialect().atLeast(DialectVersion.SMB311) ) {
+            cipherId = resp.getSelectedCipher();
+        }
+        else if ( resp.getSelectedDialect().atLeast(DialectVersion.SMB300) ) {
+            cipherId = EncryptionNegotiateContext.CIPHER_AES128_CCM;
+        }
+        else {
+            throw new SmbUnsupportedOperationException();
+        }
+
+        switch ( cipherId ) {
+        case EncryptionNegotiateContext.CIPHER_AES128_CCM:
+        case EncryptionNegotiateContext.CIPHER_AES128_GCM:
+        default:
+            throw new SmbUnsupportedOperationException();
         }
     }
 

@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbSession;
@@ -64,6 +65,7 @@ import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
 import jcifs.internal.smb2.session.Smb2LogoffRequest;
 import jcifs.internal.smb2.session.Smb2SessionSetupRequest;
 import jcifs.internal.smb2.session.Smb2SessionSetupResponse;
+import jcifs.util.Hexdump;
 
 
 /**
@@ -102,6 +104,8 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
     private final String targetDomain;
     private final String targetHost;
+
+    private byte[] preauthIntegrityHash;
 
 
     SmbSessionImpl ( CIFSContext tf, String targetHost, String targetDomain, SmbTransportImpl transport ) {
@@ -513,6 +517,13 @@ final class SmbSessionImpl implements SmbSessionInternal {
         final boolean doSigning = securityMode != 0 && !anonymous;
         long sessId = 0;
 
+        boolean preauthIntegrity = negoResp.getSelectedDialect().atLeast(DialectVersion.SMB311);
+        this.preauthIntegrityHash = preauthIntegrity ? trans.getPreauthIntegrityHash() : null;
+
+        if ( log.isDebugEnabled() ) {
+            log.debug("Initial session preauth hash " + Hexdump.toHexString(this.preauthIntegrityHash));
+        }
+
         while ( true ) {
             Subject s = this.credentials.getSubject();
             if ( ctx == null ) {
@@ -526,17 +537,11 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 // session setup complete
 
                 request.setSessionId(sessId);
+                request.retainPayload();
 
-                // we can only chain if we don't sign or already have a signing key
-                byte[] sk = ctx.isEstablished() ? ctx.getSigningKey() : null;
-                if ( chain != null && ( anonymous || !isSignatureSetupRequired() || sk != null ) ) {
+                // only chain if there is no signing
+                if ( chain != null && ( anonymous || !isSignatureSetupRequired() ) ) {
                     request.chain(chain);
-                    if ( sk != null && !anonymous && isSignatureSetupRequired() ) {
-                        // session key is truncated to 16 bytes, right padded with 0 if shorter
-                        byte[] key = new byte[16];
-                        System.arraycopy(sk, 0, key, 0, Math.min(16, sk.length));
-                        chain.setDigest(new Smb2SigningDigest(key, negoResp.getDialectRevision()));
-                    }
                 }
 
                 try {
@@ -564,10 +569,14 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     throw new SmbUnsupportedOperationException("Server requires encryption, not yet supported.");
                 }
 
-                if ( request.getDigest() != null ) {
-                    /* success - install the signing digest */
-                    log.debug("Setting digest");
-                    setDigest(request.getDigest());
+                if ( preauthIntegrity ) {
+                    byte[] reqBytes = request.getRawPayload();
+                    this.preauthIntegrityHash = trans.calculatePreauthHash(reqBytes, 0, reqBytes.length, this.preauthIntegrityHash);
+
+                    if ( response.getStatus() == NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED ) {
+                        byte[] respBytes = response.getRawPayload();
+                        this.preauthIntegrityHash = trans.calculatePreauthHash(respBytes, 0, respBytes.length, this.preauthIntegrityHash);
+                    }
                 }
 
                 token = response.getBlob();
@@ -586,7 +595,10 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 if ( !anonymous && isSignatureSetupRequired() ) {
                     byte[] signingKey = ctx.getSigningKey();
                     if ( signingKey != null && response != null ) {
-                        Smb2SigningDigest dgst = new Smb2SigningDigest(this.sessionKey, negoResp.getDialectRevision());
+                        if ( log.isDebugEnabled() ) {
+                            log.debug("Final preauth integrity hash " + Hexdump.toHexString(this.preauthIntegrityHash));
+                        }
+                        Smb2SigningDigest dgst = new Smb2SigningDigest(this.sessionKey, negoResp.getDialectRevision(), this.preauthIntegrityHash);
                         // verify the server signature here, this is not done automatically as we don't set the request
                         // digest
                         response.setDigest(dgst);

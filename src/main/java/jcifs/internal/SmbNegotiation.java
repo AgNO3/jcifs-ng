@@ -22,20 +22,26 @@ package jcifs.internal;
  * @author mbechler
  *
  */
-public class SmbNegotiation {
+public final class SmbNegotiation {
 
     private final SmbNegotiationRequest request;
     private final SmbNegotiationResponse response;
+    private final byte[] negoReqBuffer;
+    private final byte[] negoRespBuffer;
 
 
     /**
      * @param request
      * @param response
+     * @param negoRespBuffer
+     * @param negoReqBuffer
      * 
      */
-    public SmbNegotiation ( SmbNegotiationRequest request, SmbNegotiationResponse response ) {
+    public SmbNegotiation ( SmbNegotiationRequest request, SmbNegotiationResponse response, byte[] negoReqBuffer, byte[] negoRespBuffer ) {
         this.request = request;
         this.response = response;
+        this.negoReqBuffer = negoReqBuffer;
+        this.negoRespBuffer = negoRespBuffer;
     }
 
 
@@ -52,5 +58,21 @@ public class SmbNegotiation {
      */
     public SmbNegotiationResponse getResponse () {
         return this.response;
+    }
+
+
+    /**
+     * @return the negoReqBuffer
+     */
+    public byte[] getRequestRaw () {
+        return this.negoReqBuffer;
+    }
+
+
+    /**
+     * @return the negoRespBuffer
+     */
+    public byte[] getResponseRaw () {
+        return this.negoRespBuffer;
     }
 }
