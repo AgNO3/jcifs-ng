@@ -88,7 +88,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("smb1", "smb2", "smb30", "forceSpnegoIntegrity");
+        return getConfigs("smb1", "smb2", "smb30", "smb31", "forceSpnegoIntegrity");
     }
 
 
