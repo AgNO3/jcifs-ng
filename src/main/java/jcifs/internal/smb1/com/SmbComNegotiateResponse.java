@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
+import jcifs.DialectVersion;
 import jcifs.SmbConstants;
 import jcifs.internal.CommonServerMessageBlock;
 import jcifs.internal.SmbNegotiationRequest;
@@ -73,6 +74,17 @@ public class SmbComNegotiateResponse extends ServerMessageBlock implements SmbNe
         this.recv_buf_size = ctx.getConfig().getRecieveBufferSize();
         this.tx_buf_size = ctx.getConfig().getTransactionBufferSize();
         this.useUnicode = ctx.getConfig().isUseUnicode();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.SmbNegotiationResponse#getSelectedDialect()
+     */
+    @Override
+    public DialectVersion getSelectedDialect () {
+        return DialectVersion.SMB1;
     }
 
 
@@ -231,7 +243,8 @@ public class SmbComNegotiateResponse extends ServerMessageBlock implements SmbNe
             log.error("Signatures are required but the server does not support them");
             return false;
         }
-        else if ( req.isSigningEnforced() || this.server.signaturesRequired || ( this.server.signaturesEnabled && ctx.getConfig().isSigningEnabled() ) ) {
+        else if ( req.isSigningEnforced() || this.server.signaturesRequired
+                || ( this.server.signaturesEnabled && ctx.getConfig().isSigningEnabled() ) ) {
             this.negotiatedFlags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
             if ( req.isSigningEnforced() || isSigningRequired() ) {
                 this.negotiatedFlags2 |= SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;

@@ -61,6 +61,9 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     private byte[] securityBuffer;
     private DialectVersion selectedDialect;
 
+    private int selectedCipher = -1;
+    private int selectedPreauthHash = -1;
+
 
     /**
      * 
@@ -101,8 +104,25 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     /**
      * @return the selectedDialect
      */
+    @Override
     public DialectVersion getSelectedDialect () {
         return this.selectedDialect;
+    }
+
+
+    /**
+     * @return the selectedCipher
+     */
+    public int getSelectedCipher () {
+        return this.selectedCipher;
+    }
+
+
+    /**
+     * @return the selectedPreauthHash
+     */
+    public int getSelectedPreauthHash () {
+        return this.selectedPreauthHash;
     }
 
 
@@ -283,9 +303,11 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
             }
             else if ( !foundEnc && ncr.getContextType() == EncryptionNegotiateContext.NEGO_CTX_ENC_TYPE ) {
                 foundEnc = true;
-                if ( !checkEncryptionContext(req, (EncryptionNegotiateContext) ncr) ) {
+                EncryptionNegotiateContext enc = (EncryptionNegotiateContext) ncr;
+                if ( !checkEncryptionContext(req, enc) ) {
                     return false;
                 }
+                this.selectedCipher = enc.getCiphers()[ 0 ];
             }
             else if ( ncr.getContextType() == EncryptionNegotiateContext.NEGO_CTX_ENC_TYPE ) {
                 log.error("Multiple encryption negotiate contexts");
@@ -293,9 +315,11 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
             }
             else if ( !foundPreauth && ncr.getContextType() == PreauthIntegrityNegotiateContext.NEGO_CTX_PREAUTH_TYPE ) {
                 foundPreauth = true;
-                if ( !checkPreauthContext(req, (PreauthIntegrityNegotiateContext) ncr) ) {
+                PreauthIntegrityNegotiateContext pi = (PreauthIntegrityNegotiateContext) ncr;
+                if ( !checkPreauthContext(req, pi) ) {
                     return false;
                 }
+                this.selectedPreauthHash = pi.getHashAlgos()[ 0 ];
             }
             else if ( ncr.getContextType() == PreauthIntegrityNegotiateContext.NEGO_CTX_PREAUTH_TYPE ) {
                 log.error("Multiple preauth negotiate contexts");

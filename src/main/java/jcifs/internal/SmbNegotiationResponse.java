@@ -19,6 +19,7 @@ package jcifs.internal;
 
 
 import jcifs.CIFSContext;
+import jcifs.DialectVersion;
 import jcifs.util.transport.Response;
 
 
@@ -36,6 +37,13 @@ public interface SmbNegotiationResponse extends CommonServerMessageBlock, Respon
      * @return whether the protocol negotiation was successful
      */
     boolean isValid ( CIFSContext cifsContext, SmbNegotiationRequest request );
+
+
+    /**
+     * 
+     * @return selected dialect
+     */
+    DialectVersion getSelectedDialect ();
 
 
     /**
