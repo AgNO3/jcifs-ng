@@ -72,6 +72,7 @@ public class SessionTest extends BaseCIFSTest {
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
         return getConfigs(
+            "smb1",
             "noSigning",
             "forceSigning",
             "legacyAuth",
@@ -80,7 +81,8 @@ public class SessionTest extends BaseCIFSTest {
             "forceUnicode",
             "noNTStatus",
             "smb2",
-            "smb30");
+            "smb30",
+            "smb31");
     }
 
 

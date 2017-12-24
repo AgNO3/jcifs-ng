@@ -51,7 +51,7 @@ public class SidTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("smb2", "smb30");
+        return getConfigs("smb1", "smb2", "smb30");
     }
 
 

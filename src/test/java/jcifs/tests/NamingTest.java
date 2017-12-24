@@ -64,7 +64,7 @@ public class NamingTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("noUnicode", "forceUnicode", "noUnicode-cp850", "noUnicode-windows-1252", "smb2", "smb30");
+        return getConfigs("smb1", "noUnicode", "forceUnicode", "noUnicode-cp850", "noUnicode-windows-1252", "smb2", "smb30");
     }
 
 
