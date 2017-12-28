@@ -61,6 +61,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
     private byte[] securityBuffer;
     private DialectVersion selectedDialect;
 
+    private boolean supportsEncryption;
     private int selectedCipher = -1;
     private int selectedPreauthHash = -1;
 
@@ -216,6 +217,15 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
 
 
     /**
+     * 
+     * @return whether SMB encryption is supported by the server
+     */
+    public boolean isEncryptionSupported () {
+        return this.supportsEncryption;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see jcifs.internal.SmbNegotiationResponse#canReuse(jcifs.CIFSContext, boolean)
@@ -273,6 +283,10 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         // Filter out unsupported capabilities
         this.commonCapabilities = r.getCapabilities() & this.capabilities;
 
+        if ( ( this.commonCapabilities & Smb2Constants.SMB2_GLOBAL_CAP_ENCRYPTION ) != 0 ) {
+            this.supportsEncryption = tc.getConfig().isEncryptionEnabled();
+        }
+
         if ( this.selectedDialect.atLeast(DialectVersion.SMB311) ) {
             if ( !checkNegotiateContexts(r, this.commonCapabilities) ) {
                 return false;
@@ -308,6 +322,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
                     return false;
                 }
                 this.selectedCipher = enc.getCiphers()[ 0 ];
+                this.supportsEncryption = true;
             }
             else if ( ncr.getContextType() == EncryptionNegotiateContext.NEGO_CTX_ENC_TYPE ) {
                 log.error("Multiple encryption negotiate contexts");
@@ -527,27 +542,28 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         int pad = ( bufferIndex - hdrStart ) % 8;
         bufferIndex += pad;
 
+        int ncpos = getHeaderStart() + negotiateContextOffset;
         if ( negotiateContextOffset != 0 && negotiateContextCount != 0 ) {
             NegotiateContextResponse[] contexts = new NegotiateContextResponse[negotiateContextCount];
             for ( int i = 0; i < negotiateContextCount; i++ ) {
-                int type = SMBUtil.readInt2(buffer, bufferIndex);
-                int dataLen = SMBUtil.readInt2(buffer, bufferIndex + 2);
-                bufferIndex += 4;
-                bufferIndex += 4; // Reserved
+                int type = SMBUtil.readInt2(buffer, ncpos);
+                int dataLen = SMBUtil.readInt2(buffer, ncpos + 2);
+                ncpos += 4;
+                ncpos += 4; // Reserved
                 NegotiateContextResponse ctx = createContext(type);
                 if ( ctx != null ) {
-                    ctx.decode(buffer, bufferIndex, dataLen);
+                    ctx.decode(buffer, ncpos, dataLen);
                     contexts[ i ] = ctx;
                 }
-                bufferIndex += dataLen;
+                ncpos += dataLen;
                 if ( i != negotiateContextCount - 1 ) {
-                    bufferIndex += pad8(bufferIndex);
+                    ncpos += pad8(ncpos);
                 }
             }
             this.negotiateContexts = contexts;
         }
 
-        return bufferIndex - start;
+        return Math.max(bufferIndex, ncpos) - start;
     }
 
 
