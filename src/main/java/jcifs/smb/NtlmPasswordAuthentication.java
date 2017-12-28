@@ -237,7 +237,7 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
         }
 
         try {
-            if ( initialToken != null ) {
+            if ( initialToken != null && initialToken.length > 0 ) {
                 NegTokenInit tok = new NegTokenInit(initialToken);
                 if ( log.isDebugEnabled() ) {
                     log.debug("Have initial token " + tok);
