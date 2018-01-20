@@ -679,6 +679,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
         }
 
+        if ( resp == null || resp.getResponse() == null ) {
+            throw new SmbException("Failed to connect.");
+        }
+
         if ( log.isDebugEnabled() ) {
             log.debug("Negotiation response on " + this.name + " :" + resp);
         }
