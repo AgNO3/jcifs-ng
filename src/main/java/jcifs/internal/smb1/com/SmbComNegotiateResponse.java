@@ -71,7 +71,7 @@ public class SmbComNegotiateResponse extends ServerMessageBlock implements SmbNe
         this.negotiatedFlags2 = ctx.getConfig().getFlags2();
         this.maxMpxCount = ctx.getConfig().getMaxMpxCount();
         this.snd_buf_size = ctx.getConfig().getSendBufferSize();
-        this.recv_buf_size = ctx.getConfig().getRecieveBufferSize();
+        this.recv_buf_size = ctx.getConfig().getReceiveBufferSize();
         this.tx_buf_size = ctx.getConfig().getTransactionBufferSize();
         this.useUnicode = ctx.getConfig().isUseUnicode();
     }

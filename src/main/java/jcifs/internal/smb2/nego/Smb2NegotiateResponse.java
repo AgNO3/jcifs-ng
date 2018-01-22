@@ -294,7 +294,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         }
 
         int maxBufferSize = tc.getConfig().getTransactionBufferSize();
-        this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getRecieveBufferSize(), this.maxReadSize))
+        this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getReceiveBufferSize(), this.maxReadSize))
                 & ~0x7;
         this.maxWriteSize = Math.min(maxBufferSize - Smb2WriteRequest.OVERHEAD, Math.min(tc.getConfig().getSendBufferSize(), this.maxWriteSize))
                 & ~0x7;

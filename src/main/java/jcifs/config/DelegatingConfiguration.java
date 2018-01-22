@@ -226,11 +226,23 @@ public class DelegatingConfiguration implements Configuration {
     /**
      * {@inheritDoc}
      * 
-     * @see jcifs.Configuration#getRecieveBufferSize()
+     * @deprecated use getReceiveBufferSize instead
      */
+    @Deprecated
     @Override
     public int getRecieveBufferSize () {
-        return this.delegate.getRecieveBufferSize();
+        return this.delegate.getReceiveBufferSize();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @see jcifs.Configuration#getReceiveBufferSize()
+     */
+    @Override
+    public int getReceiveBufferSize () {
+        return this.delegate.getReceiveBufferSize();
     }
 
 

@@ -1273,7 +1273,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     protected void doSkip ( Long key ) throws IOException {
         synchronized ( this.inLock ) {
             int size = Encdec.dec_uint16be(this.sbuf, 2) & 0xFFFF;
-            if ( size < 33 || ( 4 + size ) > this.getContext().getConfig().getRecieveBufferSize() ) {
+            if ( size < 33 || ( 4 + size ) > this.getContext().getConfig().getReceiveBufferSize() ) {
                 /* log message? */
                 log.warn("Flusing stream input");
                 this.in.skip(this.in.available());
