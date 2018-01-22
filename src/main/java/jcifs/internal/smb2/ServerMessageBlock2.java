@@ -37,7 +37,7 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
 
     /*
      * These are all the smbs supported by this library. This includes requests
-     * and well as their responses for each type however the actuall implementations
+     * and well as their responses for each type however the actual implementations
      * of the readXxxWireFormat and writeXxxWireFormat methods may not be in
      * place. For example at the time of this writing the readXxxWireFormat
      * for requests and the writeXxxWireFormat for responses are not implemented

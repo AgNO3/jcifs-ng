@@ -66,7 +66,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
 
     /**
-     * Contruct a <code>Kerb5Authenticator</code> object with <code>Subject</code>
+     * Construct a <code>Kerb5Authenticator</code> object with <code>Subject</code>
      * which hold TGT retrieved from KDC. If multiple TGT are contained, the
      * first one will be used to retrieve user principal.
      * 
@@ -83,7 +83,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
 
     /**
-     * Contruct a <code>Kerb5Authenticator</code> object with <code>Subject</code> and
+     * Construct a <code>Kerb5Authenticator</code> object with <code>Subject</code> and
      * potential NTLM fallback (if the server does not support kerberos).
      * 
      * @param tc
@@ -114,7 +114,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     @Override
     public SSPContext createContext ( CIFSContext tc, String targetDomain, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
         if ( host.indexOf('.') < 0 && host.toUpperCase(Locale.ROOT).equals(host) ) {
-            // this is not too good, propably should better pass the address and check that it is a netbios one.
+            // this is not too good, probably should better pass the address and check that it is a netbios one.
             // While we could look up the domain controller/KDC we cannot really make the java kerberos implementation
             // use a KDC of our choice.
             // A potential workaround would be to try to get the server FQDN by reverse lookup, but this might have

@@ -23,7 +23,7 @@ package jcifs.smb;
 public interface WinError {
 
     /*
-     * Don't bother to edit this. Everthing within the interface
+     * Don't bother to edit this. Everything within the interface
      * block is automatically generated from the ntstatus package.
      */
 

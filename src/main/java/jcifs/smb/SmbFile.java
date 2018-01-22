@@ -176,7 +176,7 @@ import jcifs.internal.smb2.info.Smb2SetInfoRequest;
  * <td width="20%">
  * <code>smb://Administrator:P%40ss@msmith1/c/WINDOWS/Desktop/foo.txt</code></td>
  * <td>
- * A relativly sophisticated example that references a file
+ * A relatively sophisticated example that references a file
  * <code>msmith1</code>'s desktop as user <code>Administrator</code>. Notice the '@' is URL encoded with the '%40'
  * hexcode escape.
  * </td>
@@ -234,7 +234,7 @@ import jcifs.internal.smb2.info.Smb2SetInfoRequest;
  * a common base. This is slightly different from the corresponding
  * <code>java.io.File</code> usage; a '/' at the beginning of the second
  * parameter will still use the server component of the first parameter. The
- * examples below illustrate the resulting URLs when this second contructor
+ * examples below illustrate the resulting URLs when this second constructor
  * argument is used.
  *
  * <p>
@@ -407,7 +407,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * @param context
      *            A base <code>SmbFile</code>
      * @param name
-     *            A path string relative to the <code>parent</code> paremeter
+     *            A path string relative to the <code>parent</code> parameter
      * @throws MalformedURLException
      *             If the <code>parent</code> and <code>child</code> parameters
      *             do not follow the prescribed syntax
@@ -887,12 +887,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     /**
      * Everything but the last component of the URL representing this SMB
-     * resource is effectivly it's parent. The root URL <code>smb://</code>
+     * resource is effectively it's parent. The root URL <code>smb://</code>
      * does not have a parent. In this case <code>smb://</code> is returned.
      *
      * @return The parent directory of this SMB resource or
      *         <code>smb://</code> if the resource refers to the root of the URL
-     *         hierarchy which incedentally is also <code>smb://</code>.
+     *         hierarchy which incidentally is also <code>smb://</code>.
      */
     public String getParent () {
         return this.fileLocator.getParent();
@@ -913,7 +913,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     /**
-     * Retuns the Windows UNC style path with backslashs intead of forward slashes.
+     * Returns the Windows UNC style path with backslashes instead of forward slashes.
      *
      * @return The UNC path.
      */
@@ -1510,7 +1510,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 catch ( SmbException se ) {
                     /*
                      * Oracle FilesOnline version 9.0.4 doesn't send '.' and '..' so
-                     * listFiles may generate undesireable "cannot find
+                     * listFiles may generate undesirable "cannot find
                      * the file specified".
                      */
                     log.debug("delete", se);
@@ -1703,7 +1703,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             catch ( SmbException e ) {
                 log.debug("mkdirs", e);
                 // Ignore "Cannot create a file when that file already exists." errors for now as
-                // they seem to be show up under some cinditions most likely due to timing issues.
+                // they seem to be show up under some conditions most likely due to timing issues.
                 if ( e.getNtStatus() != NtStatus.NT_STATUS_OBJECT_NAME_COLLISION ) {
                     throw e;
                 }
@@ -1967,7 +1967,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * Computes a hashCode for this file based on the URL string and IP
      * address if the server. The hashing function uses the hashcode of the
      * server address, the canonical representation of the URL, and does not
-     * compare authentication information. In essance, two
+     * compare authentication information. In essence, two
      * <code>SmbFile</code> objects that refer to
      * the same file should generate the same hashcode provided it is possible
      * to make such a determination.
@@ -1986,7 +1986,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * resource. More specifically, two <code>SmbFile</code> objects are
      * equals if their server IP addresses are equal and the canonicalized
      * representation of their URLs, minus authentication parameters, are
-     * case insensitivly and lexographically equal.
+     * case insensitively and lexographically equal.
      * <br>
      * For example, assuming the server <code>angus</code> resolves to the
      * <code>192.168.1.15</code> IP address, the below URLs would result in

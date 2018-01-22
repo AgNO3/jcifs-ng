@@ -44,7 +44,7 @@ public interface NameServiceClient {
 
 
     /**
-     * @return the numknown name
+     * @return the unknown name
      */
     NetbiosName getUnknownName ();
 
@@ -121,7 +121,7 @@ public interface NameServiceClient {
     /**
      * Determines the address of a host given it's host name. NetBIOS
      * names also have a <code>type</code>. Types(aka Hex Codes)
-     * are used to distiquish the various services on a host. <a
+     * are used to distinguish the various services on a host. <a
      * href="../../../nbtcodes.html">Here</a> is
      * a fairly complete list of NetBIOS hex codes. Scope is not used but is
      * still functional in other NetBIOS products and so for completeness it has been
@@ -150,7 +150,7 @@ public interface NameServiceClient {
     /**
      * Determines the address of a host given it's host name. NetBIOS
      * names also have a <code>type</code>. Types(aka Hex Codes)
-     * are used to distiquish the various services on a host. <a
+     * are used to distinguish the various services on a host. <a
      * href="../../../nbtcodes.html">Here</a> is
      * a fairly complete list of NetBIOS hex codes. Scope is not used but is
      * still functional in other NetBIOS products and so for completeness it has been
@@ -207,7 +207,7 @@ public interface NameServiceClient {
     /**
      * Lookup <tt>hostname</tt> and return it's <tt>UniAddress</tt>. If the
      * <tt>possibleNTDomainOrWorkgroup</tt> parameter is <tt>true</tt> an
-     * addtional name query will be performed to locate a master browser.
+     * additional name query will be performed to locate a master browser.
      * 
      * @param hostname
      * @param possibleNTDomainOrWorkgroup

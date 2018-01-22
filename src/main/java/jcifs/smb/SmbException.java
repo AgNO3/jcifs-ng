@@ -33,8 +33,8 @@ import jcifs.util.Hexdump;
  * are provided.
  * <p>
  * The jCIFS client maps DOS error codes to NTSTATUS codes. This means that
- * the user may recieve a different error from a legacy server than that of
- * a newer varient such as Windows NT and above. If you should encounter
+ * the user may receive a different error from a legacy server than that of
+ * a newer variant such as Windows NT and above. If you should encounter
  * such a case, please report it to jcifs at samba dot org and we will
  * change the mapping.
  */

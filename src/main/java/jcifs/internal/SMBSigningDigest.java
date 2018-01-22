@@ -26,7 +26,7 @@ public interface SMBSigningDigest {
 
     /**
      * Performs MAC signing of the SMB. This is done as follows.
-     * The signature field of the SMB is overwritted with the sequence number;
+     * The signature field of the SMB is overwritten with the sequence number;
      * The MD5 digest of the MAC signing key + the entire SMB is taken;
      * The first 8 bytes of this are placed in the signature field.
      *

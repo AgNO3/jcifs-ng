@@ -114,7 +114,7 @@ public interface FileNotifyInformation {
      */
     public static final int FILE_ACTION_REMOVED = 0x00000002;
     /**
-     * File has been modifed
+     * File has been modified
      */
     public static final int FILE_ACTION_MODIFIED = 0x00000003;
 
