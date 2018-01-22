@@ -28,7 +28,7 @@ import java.util.TimeZone;
  * 
  * 
  * Implementors of this interface should extend {@link jcifs.config.BaseConfiguration} or
- * {@link jcifs.config.DelegatingConfiguration} to get forward compatability.
+ * {@link jcifs.config.DelegatingConfiguration} to get forward compatibility.
  * 
  * @author mbechler
  *

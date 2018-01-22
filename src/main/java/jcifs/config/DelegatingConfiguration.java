@@ -39,7 +39,7 @@ public class DelegatingConfiguration implements Configuration {
 
     /**
      * @param delegate
-     *            delegate to pass all non-overriden method calls to
+     *            delegate to pass all non-overridden method calls to
      * 
      */
     public DelegatingConfiguration ( Configuration delegate ) {

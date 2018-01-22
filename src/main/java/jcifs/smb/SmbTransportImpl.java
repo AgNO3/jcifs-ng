@@ -469,7 +469,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         /*
          * We cannot use Transport.sendrecv() yet because
          * the Transport thread is not setup until doConnect()
-         * returns and we want to supress all communication
+         * returns and we want to suppress all communication
          * until we have properly negotiated.
          */
         synchronized ( this.inLock ) {

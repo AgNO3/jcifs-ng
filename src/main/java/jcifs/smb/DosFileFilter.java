@@ -31,7 +31,7 @@ public class DosFileFilter implements SmbFileFilter {
 
     /**
      * This filter can be considerably more efficient than other file filters
-     * as the specifed wildcard and attributes are passed to the server for
+     * as the specified wildcard and attributes are passed to the server for
      * filtering there (although attributes are largely ignored by servers
      * they are filtered locally by the default accept method).
      * 

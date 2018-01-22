@@ -62,7 +62,7 @@ public interface DfsReferralData {
 
 
     /**
-     * @return the replacement path for this referall
+     * @return the replacement path for this referal
      */
     String getPath ();
 

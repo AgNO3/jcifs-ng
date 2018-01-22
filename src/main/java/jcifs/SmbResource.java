@@ -46,7 +46,7 @@ public interface SmbResource extends AutoCloseable {
     /**
      * The context this file was opened with
      * 
-     * @return the context assoicated with this file
+     * @return the context associated with this file
      */
     CIFSContext getContext ();
 
@@ -213,7 +213,7 @@ public interface SmbResource extends AutoCloseable {
 
 
     /**
-     * Set the last accesss time of the file. The time is specified as milliseconds
+     * Set the last access time of the file. The time is specified as milliseconds
      * from Jan 1, 1970 which is the same as that which is returned by the
      * <tt>lastModified()</tt>, <tt>getLastModified()</tt>, and <tt>getDate()</tt> methods.
      * <br>
@@ -300,7 +300,7 @@ public interface SmbResource extends AutoCloseable {
 
     /**
      * Create a new file but fail if it already exists. The check for
-     * existance of the file and it's creation are an atomic operation with
+     * existence of the file and it's creation are an atomic operation with
      * respect to other filesystem activities.
      * 
      * @throws CIFSException
@@ -380,7 +380,7 @@ public interface SmbResource extends AutoCloseable {
      * <tt>SmbResource</tt> and it's sub-contents to the location specified by the
      * <tt>dest</tt> parameter. This file and the destination file do not
      * need to be on the same host. This operation does not copy extended
-     * file attibutes such as ACLs but it does copy regular attributes as
+     * file attributes such as ACLs but it does copy regular attributes as
      * well as create and last write times. This method is almost twice as
      * efficient as manually copying as it employs an additional write
      * thread to read and write data concurrently.
@@ -399,7 +399,7 @@ public interface SmbResource extends AutoCloseable {
      * Changes the name of the file this <code>SmbResource</code> represents to the name
      * designated by the <code>SmbResource</code> argument.
      * <br>
-     * <i>Remember: <code>SmbResource</code>s are immutible and therefore
+     * <i>Remember: <code>SmbResource</code>s are immutable and therefore
      * the path associated with this <code>SmbResource</code> object will not
      * change). To access the renamed file it is necessary to construct a
      * new <tt>SmbResource</tt></i>.
@@ -417,7 +417,7 @@ public interface SmbResource extends AutoCloseable {
      * Changes the name of the file this <code>SmbResource</code> represents to the name
      * designated by the <code>SmbResource</code> argument.
      * <br>
-     * <i>Remember: <code>SmbResource</code>s are immutible and therefore
+     * <i>Remember: <code>SmbResource</code>s are immutable and therefore
      * the path associated with this <code>SmbResource</code> object will not
      * change). To access the renamed file it is necessary to construct a
      * new <tt>SmbResource</tt></i>.
@@ -671,7 +671,7 @@ public interface SmbResource extends AutoCloseable {
     /**
      * Fetch all children
      * 
-     * @return an interator over the child resources
+     * @return an iterator over the child resources
      * @throws CIFSException
      */
     CloseableIterator<SmbResource> children () throws CIFSException;
@@ -691,7 +691,7 @@ public interface SmbResource extends AutoCloseable {
      * Wildcard expressions will not filter workgroup names or server names.
      * 
      * @param wildcard
-     * @return an interator over the child resources
+     * @return an iterator over the child resources
      * @throws CIFSException
      */
     CloseableIterator<SmbResource> children ( String wildcard ) throws CIFSException;
@@ -700,7 +700,7 @@ public interface SmbResource extends AutoCloseable {
     /**
      * @param filter
      *            filter acting on file names
-     * @return an interator over the child resources
+     * @return an iterator over the child resources
      * @see SmbResource#children(String) for a more efficient way to do this when a pattern on the filename is
      *      sufficient for filtering
      * @throws CIFSException
@@ -711,7 +711,7 @@ public interface SmbResource extends AutoCloseable {
     /**
      * @param filter
      *            filter acting on SmbResource instances
-     * @return an interator over the child resources
+     * @return an iterator over the child resources
      * @see SmbResource#children(String) for a more efficient way to do this when a pattern on the filename is
      *      sufficient for filtering
      * @throws CIFSException
