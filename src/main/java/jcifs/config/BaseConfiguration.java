@@ -667,8 +667,8 @@ public class BaseConfiguration implements Configuration {
         if ( ro == null || ro.length() == 0 ) {
             /*
              * No resolveOrder has been specified, use the
-             * default which is LMHOSTS,WINS,BCAST,DNS or just
-             * LMHOSTS,BCAST,DNS if jcifs.netbios.wins has not
+             * default which is LMHOSTS,DNS,WINS,BCAST or just
+             * LMHOSTS,DNS,BCAST if jcifs.netbios.wins has not
              * been specified.
              */
             if ( this.winsServer.length == 0 ) {
