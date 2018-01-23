@@ -28,14 +28,14 @@ import java.net.URLStreamHandler;
  * A context holds the client configuration, shared services as well as the active credentials.
  * 
  * Usually you will want to create one context per client configuration and then
- * multiple sub-contexts using different credentials (if neccessary).
+ * multiple sub-contexts using different credentials (if necessary).
  * 
  * {@link #withDefaultCredentials()}, {@link #withAnonymousCredentials()}, {@link #withCredentials(Credentials)}
  * allow to create such sub-contexts.
  * 
  * 
  * Implementors of this interface should extend {@link jcifs.context.BaseContext} or
- * {@link jcifs.context.CIFSContextWrapper} to get forward compatability.
+ * {@link jcifs.context.CIFSContextWrapper} to get forward compatibility.
  * 
  * @author mbechler
  *

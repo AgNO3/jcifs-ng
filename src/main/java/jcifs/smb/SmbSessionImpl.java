@@ -1022,7 +1022,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     catch ( SmbException se ) {
                         ex = se;
                         /*
-                         * Apparently once a successfull NTLMSSP login occurs, the
+                         * Apparently once a successful NTLMSSP login occurs, the
                          * server will return "Access denied" even if a logoff is
                          * sent. Unfortunately calling disconnect() doesn't always
                          * actually shutdown the connection before other threads

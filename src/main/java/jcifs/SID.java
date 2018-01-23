@@ -142,7 +142,7 @@ public interface SID {
 
 
     /**
-     * Return text represeting the SID type suitable for display to
+     * Return text representing the SID type suitable for display to
      * users. Text includes 'User', 'Domain group', 'Local group', etc.
      * 
      * @return textual representation of type

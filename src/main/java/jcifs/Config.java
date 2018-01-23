@@ -31,15 +31,15 @@ import jcifs.context.SingletonContext;
 
 
 /**
- * This class now contains only utlities for config parsing.
+ * This class now contains only utilities for config parsing.
  * 
- * We strongly suggest that you create an explicit {@link jcifs.context.CIFSContext}
+ * We strongly suggest that you create an explicit {@link jcifs.context.CIFSContextWrapper}
  * with your desired config. It's base implementation {@link jcifs.context.BaseContext}
  * should be sufficient for most needs.
  * 
  * If you want to retain the classic singleton behavior you can use
  * {@link jcifs.context.SingletonContext#getInstance()}
- * witch is intialized using system properties.
+ * witch is initialized using system properties.
  * 
  */
 @SuppressWarnings ( "javadoc" )
@@ -176,8 +176,8 @@ public class Config {
 
     /**
      * Retrieve an array of <tt>InetAddress</tt> created from a property
-     * value containting a <tt>delim</tt> separated list of hostnames and/or
-     * ipaddresses.
+     * value containing a <tt>delim</tt> separated list of host names and/or
+     * ip addresses.
      */
     public static InetAddress[] getInetAddressArray ( Properties props, String key, String delim, InetAddress[] def ) {
         String p = props.getProperty(key);

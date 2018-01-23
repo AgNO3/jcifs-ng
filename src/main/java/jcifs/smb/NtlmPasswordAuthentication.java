@@ -531,7 +531,7 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
      * their caseless domain and username fields are equal and either both hashes are external and they are equal or
      * both internally supplied passwords are equal. If one <tt>NtlmPasswordAuthentication</tt> object has external
      * hashes (meaning negotiated via NTLM HTTP Authentication) and the other does not they will not be equal. This is
-     * technically not correct however the server 8 byte challage would be required to compute and compare the password
+     * technically not correct however the server 8 byte challenge would be required to compute and compare the password
      * hashes but that it not available with this method.
      */
     @Override
@@ -615,7 +615,7 @@ public class NtlmPasswordAuthentication implements Principal, CredentialsInterna
                 break;
             case 1:
                 /*
-                 * Get ASCII hex value and convert to platform dependant
+                 * Get ASCII hex value and convert to platform dependent
                  * encoding like EBCDIC perhaps
                  */
                 b[ 0 ] = (byte) ( Integer.parseInt(str.substring(i, i + 2), 16) & 0xFF );

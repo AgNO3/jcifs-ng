@@ -115,7 +115,7 @@ public final class NtlmUtil {
     /**
      * 
      * @param password
-     * @return the calulated hash
+     * @return the calculated hash
      */
     public static byte[] nTOWFv1 ( String password ) {
         if ( password == null )

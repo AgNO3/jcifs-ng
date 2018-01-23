@@ -382,7 +382,7 @@ class SmbTreeImpl implements SmbTreeInternal {
 
 
     /**
-     * @return the tree_num (monotoincally increasing counter to track reconnects)
+     * @return the tree_num (monotonically increasing counter to track reconnects)
      */
     public long getTreeNum () {
         return this.treeNum;
@@ -433,7 +433,7 @@ class SmbTreeImpl implements SmbTreeInternal {
             }
 
             // fall trough if the tree connection is already established
-            // and send it as a separate request instread
+            // and send it as a separate request instead
             String svc = null;
             int t = this.tid;
             if ( t == 0 ) {

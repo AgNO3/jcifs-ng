@@ -214,8 +214,15 @@ public class BaseConfiguration implements Configuration {
     }
 
 
+    @Deprecated
     @Override
     public int getRecieveBufferSize () {
+        return this.smbRecvBufferSize;
+    }
+
+
+    @Override
+    public int getReceiveBufferSize () {
         return this.smbRecvBufferSize;
     }
 

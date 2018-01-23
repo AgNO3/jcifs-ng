@@ -28,7 +28,7 @@ import java.util.TimeZone;
  * 
  * 
  * Implementors of this interface should extend {@link jcifs.config.BaseConfiguration} or
- * {@link jcifs.config.DelegatingConfiguration} to get forward compatability.
+ * {@link jcifs.config.DelegatingConfiguration} to get forward compatibility.
  * 
  * @author mbechler
  *
@@ -190,9 +190,20 @@ public interface Configuration {
      * 
      * Property <tt>jcifs.smb.client.rcv_buf_size</tt> (int, default 65535)
      * 
-     * @return recieve buffer size, in bytes
+     * @return receive buffer size, in bytes
+     * @deprecated use getReceiveBufferSize instead
      */
+    @Deprecated
     int getRecieveBufferSize ();
+
+
+    /**
+     * 
+     * Property <tt>jcifs.smb.client.rcv_buf_size</tt> (int, default 65535)
+     * 
+     * @return receive buffer size, in bytes
+     */
+    int getReceiveBufferSize ();
 
 
     /**

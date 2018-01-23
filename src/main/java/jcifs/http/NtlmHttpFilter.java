@@ -102,7 +102,7 @@ public class NtlmHttpFilter implements Filter {
         p.setProperty("jcifs.netbios.cachePolicy", "1200");
         /*
          * The Filter can only work with NTLMv1 as it uses a man-in-the-middle
-         * techinque that NTLMv2 specifically thwarts. A real NTLM Filter would
+         * technique that NTLMv2 specifically thwarts. A real NTLM Filter would
          * need to do a NETLOGON RPC that JCIFS will likely never implement
          * because it requires a lot of extra crypto not used by CIFS.
          */
