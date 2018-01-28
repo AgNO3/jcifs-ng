@@ -521,6 +521,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 if ( r.getDialectRevision() == Smb2Constants.SMB2_DIALECT_ANY ) {
                     return negotiate2(r);
                 }
+		resp = r;
             }
 
             if ( resp != null ) {
