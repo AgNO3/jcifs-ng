@@ -469,7 +469,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         /*
          * We cannot use Transport.sendrecv() yet because
          * the Transport thread is not setup until doConnect()
-         * returns and we want to supress all communication
+         * returns and we want to suppress all communication
          * until we have properly negotiated.
          */
         synchronized ( this.inLock ) {
@@ -1274,7 +1274,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     protected void doSkip ( Long key ) throws IOException {
         synchronized ( this.inLock ) {
             int size = Encdec.dec_uint16be(this.sbuf, 2) & 0xFFFF;
-            if ( size < 33 || ( 4 + size ) > this.getContext().getConfig().getRecieveBufferSize() ) {
+            if ( size < 33 || ( 4 + size ) > this.getContext().getConfig().getReceiveBufferSize() ) {
                 /* log message? */
                 log.warn("Flusing stream input");
                 this.in.skip(this.in.available());

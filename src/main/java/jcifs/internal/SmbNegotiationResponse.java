@@ -112,7 +112,7 @@ public interface SmbNegotiationResponse extends CommonServerMessageBlock, Respon
 
     /**
      * 
-     * @return numer of initial credits the server grants
+     * @return number of initial credits the server grants
      */
     int getInitialCredits ();
 

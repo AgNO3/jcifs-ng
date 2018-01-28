@@ -132,7 +132,7 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
 
             if ( th.hasCapability(SmbConstants.CAP_LARGE_READX) ) {
                 this.largeReadX = true;
-                this.readSize = Math.min(th.getConfig().getRecieveBufferSize() - 70, th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
+                this.readSize = Math.min(th.getConfig().getReceiveBufferSize() - 70, th.areSignaturesActive() ? 0xFFFF - 70 : 0xFFFFFF - 70);
             }
 
             // there seems to be a bug with some servers that causes corruption if using signatures + CAP_LARGE_WRITE

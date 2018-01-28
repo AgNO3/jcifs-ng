@@ -821,7 +821,7 @@ public class DfsImpl implements DfsResolver {
 
         /*
          * Subtract the server and share from the pathConsumed so that
-         * it refects the part of the relative path consumed and not
+         * it reflects the part of the relative path consumed and not
          * the entire path.
          */
         dri.stripPathConsumed(1 + server.length() + 1 + share.length());

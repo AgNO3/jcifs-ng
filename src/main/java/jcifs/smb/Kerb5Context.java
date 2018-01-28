@@ -267,7 +267,7 @@ class Kerb5Context implements SSPContext {
         /*
          * The kerberos session key is not accessible via the JGSS API. IBM and
          * Oracle both implement a similar API to make an ExtendedGSSContext
-         * available. That API is accessed via reflection to make this independend
+         * available. That API is accessed via reflection to make this independent
          * of the runtime JRE
          */
         if ( EXT_GSS_CONTEXT_CLASS == null || INQUIRE_SEC_CONTEXT == null || INQUIRE_TYPE_SESSION_KEY == null ) {
@@ -353,7 +353,7 @@ class Kerb5Context implements SSPContext {
 
     /*
      * Prepare reflective access to ExtendedGSSContext. The reflective access
-     * abstracts the acces so far, that Oracle JDK, Open JDK and IBM JDK are
+     * abstracts the access so far, that Oracle JDK, Open JDK and IBM JDK are
      * supported.
      * 
      * At the time of the first implementation only a test on Oracle JDK was

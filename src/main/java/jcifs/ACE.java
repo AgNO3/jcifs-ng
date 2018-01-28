@@ -167,7 +167,7 @@ public interface ACE {
 
 
     /**
-     * Returns the access mask accociated with this ACE. Use the
+     * Returns the access mask associated with this ACE. Use the
      * constants for <tt>FILE_READ_DATA</tt>, <tt>FILE_WRITE_DATA</tt>,
      * <tt>READ_CONTROL</tt>, <tt>GENERIC_ALL</tt>, etc with bitwise
      * operators to determine which bits of the mask are on or off.

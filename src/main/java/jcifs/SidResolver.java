@@ -97,7 +97,7 @@ public interface SidResolver {
      * This method is designed to assist with computing access control for a
      * given user when the target object's ACL has local groups. Local groups
      * are not listed in a user's group membership (e.g. as represented by the
-     * tokenGroups constructed attribute retrived via LDAP).
+     * tokenGroups constructed attribute retrieved via LDAP).
      * <p/>
      * Domain groups nested inside a local group are currently not expanded. In
      * this case the key (SID) type will be SID_TYPE_DOM_GRP rather than

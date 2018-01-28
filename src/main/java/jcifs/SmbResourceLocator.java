@@ -56,12 +56,12 @@ public interface SmbResourceLocator {
 
     /**
      * Everything but the last component of the URL representing this SMB
-     * resource is effectivly it's parent. The root URL <code>smb://</code>
+     * resource is effectively it's parent. The root URL <code>smb://</code>
      * does not have a parent. In this case <code>smb://</code> is returned.
      *
      * @return The parent directory of this SMB resource or
      *         <code>smb://</code> if the resource refers to the root of the URL
-     *         hierarchy which incedentally is also <code>smb://</code>.
+     *         hierarchy which incidentally is also <code>smb://</code>.
      */
     String getParent ();
 

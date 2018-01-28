@@ -39,7 +39,7 @@ import jcifs.smb.NtlmPasswordAuthentication;
 
 /**
  * This class is used internally by <tt>NtlmHttpFilter</tt>,
- * <tt>NtlmServlet</tt>, and <tt>NetworkExplorer</tt> to negiotiate password
+ * <tt>NtlmServlet</tt>, and <tt>NetworkExplorer</tt> to negotiate password
  * hashes via NTLM SSP with MSIE. It might also be used directly by servlet
  * containers to incorporate similar functionality.
  * <p>

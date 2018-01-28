@@ -141,7 +141,7 @@ public interface NetbiosAddress extends Address {
      * 
      * @param tc
      *            context to use
-     * @return whether this adress is active
+     * @return whether this address is active
      *
      * @throws UnknownHostException
      *             if the host cannot be resolved to find out.

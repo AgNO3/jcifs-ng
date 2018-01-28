@@ -47,7 +47,7 @@ import jcifs.smb.SmbAuthException;
 /**
  * This servlet may be used with pre-2.3 servlet containers
  * to protect content with NTLM HTTP Authentication. Servlets that
- * extend this abstract base class may be authenticatied against an SMB
+ * extend this abstract base class may be authenticated against an SMB
  * server or domain controller depending on how the
  * <tt>jcifs.smb.client.domain</tt> or <tt>jcifs.http.domainController</tt>
  * properties are be specified. <b>With later containers the
