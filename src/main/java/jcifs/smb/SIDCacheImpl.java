@@ -40,6 +40,7 @@ import jcifs.dcerpc.msrpc.SamrAliasHandle;
 import jcifs.dcerpc.msrpc.SamrDomainHandle;
 import jcifs.dcerpc.msrpc.SamrPolicyHandle;
 import jcifs.dcerpc.msrpc.lsarpc;
+import jcifs.dcerpc.msrpc.lsarpc.LsarTranslatedName;
 import jcifs.dcerpc.msrpc.samr;
 
 
@@ -73,26 +74,25 @@ public class SIDCacheImpl implements SidResolver {
         }
 
         for ( int si = 0; si < sids.length; si++ ) {
-            SID s = sids[ si ].unwrap(SID.class);
-            s.type = rpc.names.names[ si ].sid_type;
-            s.domainName = null;
-
-            switch ( s.getType() ) {
+            SID out = sids[ si ].unwrap(SID.class);
+            LsarTranslatedName resp = rpc.names.names[ si ];
+            out.domainName = null;
+            switch ( resp.sid_type ) {
             case jcifs.SID.SID_TYPE_USER:
             case jcifs.SID.SID_TYPE_DOM_GRP:
             case jcifs.SID.SID_TYPE_DOMAIN:
             case jcifs.SID.SID_TYPE_ALIAS:
             case jcifs.SID.SID_TYPE_WKN_GRP:
-                int sid_index = rpc.names.names[ si ].sid_index;
-                rpc.unicode_string ustr = rpc.domains.domains[ sid_index ].name;
-                s.domainName = ( new UnicodeString(ustr, false) ).toString();
+                rpc.unicode_string ustr = rpc.domains.domains[ resp.sid_index ].name;
+                out.domainName = ( new UnicodeString(ustr, false) ).toString();
                 break;
             }
 
-            UnicodeString ucstr = new UnicodeString(rpc.names.names[ si ].name, false);
-            s.acctName = ucstr.toString();
-            s.origin_server = null;
-            s.origin_ctx = null;
+            UnicodeString ucstr = new UnicodeString(resp.name, false);
+            out.acctName = ucstr.toString();
+            out.type = resp.sid_type;
+            out.origin_server = null;
+            out.origin_ctx = null;
         }
     }
 
