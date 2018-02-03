@@ -2205,8 +2205,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         else {
             for ( ai = 0; ai < aces.length; ai++ ) {
-                aces[ ai ].getSID().origin_server = server;
-                aces[ ai ].getSID().origin_ctx = getContext();
+                aces[ ai ].getSID().initContext(server, getContext());
             }
         }
     }
@@ -2293,8 +2292,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 return null;
             }
 
+            String server = this.fileLocator.getServerWithDfs();
             if ( resolve ) {
-                ownerUser.resolve(this.fileLocator.getServerWithDfs(), getContext());
+                ownerUser.resolve(server, getContext());
+            }
+            else {
+                ownerUser.initContext(server, getContext());
             }
             return ownerUser;
         }
@@ -2316,8 +2319,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 return null;
             }
 
+            String server = this.fileLocator.getServerWithDfs();
             if ( resolve ) {
-                ownerGroup.resolve(this.fileLocator.getServerWithDfs(), getContext());
+                ownerGroup.resolve(server, getContext());
+            }
+            else {
+                ownerGroup.initContext(server, getContext());
             }
             return ownerGroup;
         }
@@ -2332,11 +2339,13 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             MsrpcShareGetInfo rpc = new MsrpcShareGetInfo(server, th.getConnectedShare());
             try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + server + "[\\PIPE\\srvsvc]", getContext()) ) {
                 handle.sendrecv(rpc);
-                if ( rpc.retval != 0 )
+                if ( rpc.retval != 0 ) {
                     throw new SmbException(rpc.retval, true);
+                }
                 aces = rpc.getSecurity();
-                if ( aces != null )
+                if ( aces != null ) {
                     processAces(aces, resolveSids);
+                }
             }
             return aces;
         }

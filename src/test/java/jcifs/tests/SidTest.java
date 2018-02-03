@@ -106,4 +106,13 @@ public class SidTest extends BaseCIFSTest {
         }
     }
 
+
+    @Test
+    public void resolveLazyType () throws IOException {
+        String sid = getRequiredProperty(TestProperties.TEST_USER_SID);
+        SID s = new SID(sid);
+        s.initContext(getRequiredProperty(TestProperties.TEST_DOMAIN_DC), withTestNTLMCredentials(getContext()));
+        assertEquals(jcifs.SID.SID_TYPE_USER, s.getType());
+    }
+
 }

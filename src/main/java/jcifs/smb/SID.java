@@ -83,7 +83,6 @@ public class SID extends rpc.sid_t implements jcifs.SID {
      */
     public static SID SYSTEM = null;
 
-
     static {
         try {
             EVERYONE = new SID("S-1-1-0");
@@ -506,6 +505,16 @@ public class SID extends rpc.sid_t implements jcifs.SID {
             return new SID[0];
 
         return tc.getSIDResolver().getGroupMemberSids(tc, authorityServerName, getDomainSid(), getRid(), flags);
+    }
+
+
+    /**
+     * @param context
+     * @param server
+     */
+    public void initContext ( String server, CIFSContext context ) {
+        this.origin_ctx = context;
+        this.origin_server = server;
     }
 
 }
