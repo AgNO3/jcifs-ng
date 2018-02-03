@@ -520,7 +520,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
         boolean preauthIntegrity = negoResp.getSelectedDialect().atLeast(DialectVersion.SMB311);
         this.preauthIntegrityHash = preauthIntegrity ? trans.getPreauthIntegrityHash() : null;
 
-        if ( log.isDebugEnabled() ) {
+        if ( this.preauthIntegrityHash != null && log.isDebugEnabled() ) {
             log.debug("Initial session preauth hash " + Hexdump.toHexString(this.preauthIntegrityHash));
         }
 
@@ -595,7 +595,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 if ( !anonymous && isSignatureSetupRequired() ) {
                     byte[] signingKey = ctx.getSigningKey();
                     if ( signingKey != null && response != null ) {
-                        if ( log.isDebugEnabled() ) {
+                        if ( this.preauthIntegrityHash != null && log.isDebugEnabled() ) {
                             log.debug("Final preauth integrity hash " + Hexdump.toHexString(this.preauthIntegrityHash));
                         }
                         Smb2SigningDigest dgst = new Smb2SigningDigest(this.sessionKey, negoResp.getDialectRevision(), this.preauthIntegrityHash);
