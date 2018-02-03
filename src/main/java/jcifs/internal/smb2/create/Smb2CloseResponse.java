@@ -223,7 +223,7 @@ public class Smb2CloseResponse extends ServerMessageBlock2Response implements Sm
         bufferIndex += 4;
 
         if ( log.isDebugEnabled() ) {
-            log.info(String.format("Closed %s (%s)", Hexdump.toHexString(this.fileId), this.fileName));
+            log.debug(String.format("Closed %s (%s)", Hexdump.toHexString(this.fileId), this.fileName));
         }
 
         return bufferIndex - start;
