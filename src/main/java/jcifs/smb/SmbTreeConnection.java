@@ -297,18 +297,19 @@ class SmbTreeConnection {
 
     <T extends CommonServerMessageBlockResponse> T send ( SmbResourceLocatorImpl loc, CommonServerMessageBlockRequest request, T response,
             Set<RequestParam> params ) throws CIFSException {
-        SmbException last = null;
+        CIFSException last = null;
         RequestWithPath rpath = ( request instanceof RequestWithPath ) ? (RequestWithPath) request : null;
         String savedPath = rpath != null ? rpath.getPath() : null;
         String savedFullPath = rpath != null ? rpath.getFullUNCPath() : null;
 
-        if ( rpath != null ) {
-            String fullPath = "\\" + loc.getServer() + "\\" + loc.getShare() + loc.getUNCPath();
-            rpath.setFullUNCPath(null, null, fullPath);
-        }
-
+        String fullPath = "\\" + loc.getServer() + "\\" + loc.getShare() + loc.getUNCPath();
         int maxRetries = this.ctx.getConfig().getMaxRequestRetries();
         for ( int retries = 1; retries <= maxRetries; retries++ ) {
+
+            if ( rpath != null ) {
+                rpath.setFullUNCPath(null, null, fullPath);
+            }
+
             try {
                 return send0(loc, request, response, params);
             }
@@ -323,8 +324,9 @@ class SmbTreeConnection {
                 log.debug("send", smbe);
                 last = smbe;
             }
-            catch ( IOException e ) {
+            catch ( CIFSException e ) {
                 log.debug("send", e);
+                last = e;
             }
             // If we get here, we got the 'The Parameter is incorrect' error or a transport exception
             // Disconnect and try again from scratch.
@@ -363,8 +365,9 @@ class SmbTreeConnection {
                 rpath.setPath(savedPath);
                 rpath.setFullUNCPath(rpath.getDomain(), rpath.getServer(), savedFullPath);
             }
-            if ( response != null )
+            if ( response != null ) {
                 response.reset();
+            }
 
             try ( SmbTreeHandle th = connectWrapException(loc) ) {
                 log.debug("Have new tree connection for retry");
