@@ -150,9 +150,14 @@ public class FileAttributesTest extends BaseCIFSTest {
     public void testSetCreated () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbResource f = createTestFile() ) {
             try {
+                long orig = f.createTime();
                 long time = System.currentTimeMillis() - 60 * 60 * 12;
                 f.setCreateTime(time);
-                assertEquals(time, f.createTime());
+                long newTime = f.createTime();
+                if ( newTime == orig ) {
+                    Assume.assumeTrue("Create time was not changed", false);
+                }
+                assertEquals(time, newTime);
             }
             catch ( SmbUnsupportedOperationException e ) {
                 Assume.assumeTrue("No Ntsmbs", false);
