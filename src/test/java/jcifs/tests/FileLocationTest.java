@@ -60,6 +60,20 @@ public class FileLocationTest {
 
 
     @Test
+    public void testEmpty () throws MalformedURLException, CIFSException {
+        try ( SmbResource p = new SmbFile("smb:", getContext()) ) {
+            SmbResourceLocator fl = p.getLocator();
+            assertNull(fl.getServer());
+            assertNull(fl.getShare());
+            assertEquals(SmbConstants.TYPE_WORKGROUP, fl.getType());
+            assertEquals("\\", fl.getUNCPath());
+            assertEquals("smb://", fl.getCanonicalURL());
+            assertEquals("/", fl.getURLPath());
+        }
+    }
+
+
+    @Test
     public void testChildHost () throws MalformedURLException, CIFSException, UnknownHostException {
         try ( SmbFile p = new SmbFile("smb://", getContext());
               SmbResource c = new SmbFile(p, "1.2.3.4") ) {
@@ -343,6 +357,15 @@ public class FileLocationTest {
                 // this intentionally sticks to the old name
                 assertEquals("/share/foo/bar/", fl2.getURLPath());
             }
+        }
+    }
+
+
+    // test case for #30
+    @Test ( expected = MalformedURLException.class )
+    public void testInvalid () throws MalformedURLException, CIFSException {
+        try ( SmbResource p = new SmbFile("smb:a", getContext()) ) {
+            p.getType();
         }
     }
 

@@ -18,6 +18,7 @@
 package jcifs.smb;
 
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.Objects;
@@ -30,6 +31,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.DfsReferralData;
 import jcifs.NetbiosAddress;
+import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbResourceLocator;
 import jcifs.internal.util.StringUtil;
@@ -594,25 +596,26 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
 
 
     /**
+     * @throws MalformedURLException
      * 
      */
     private synchronized void canonicalizePath () {
         char[] in = this.url.getPath().toCharArray();
         char[] out = new char[in.length];
-        int length = in.length, i, o, state;
+        int length = in.length, prefixLen = 0, state = 0;
 
         /*
          * The canonicalization routine
          */
-        state = 0;
-        o = 0;
-        for ( i = 0; i < length; i++ ) {
+        for ( int i = 0; i < length; i++ ) {
             switch ( state ) {
             case 0:
                 if ( in[ i ] != '/' ) {
-                    return;
+                    // Checked exception (e.g. MalformedURLException) would be better
+                    // but this would be a nightmare API wise
+                    throw new RuntimeCIFSException("Invalid smb: URL: " + this.url);
                 }
-                out[ o++ ] = in[ i ];
+                out[ prefixLen++ ] = in[ i ];
                 state = 1;
                 break;
             case 1:
@@ -625,12 +628,12 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
                 }
                 else if ( ( i + 1 ) < length && in[ i ] == '.' && in[ i + 1 ] == '.' && ( ( i + 2 ) >= length || in[ i + 2 ] == '/' ) ) {
                     i += 2;
-                    if ( o == 1 )
+                    if ( prefixLen == 1 )
                         break;
                     do {
-                        o--;
+                        prefixLen--;
                     }
-                    while ( o > 1 && out[ o - 1 ] != '/' );
+                    while ( prefixLen > 1 && out[ prefixLen - 1 ] != '/' );
                     break;
                 }
                 state = 2;
@@ -638,30 +641,30 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
                 if ( in[ i ] == '/' ) {
                     state = 1;
                 }
-                out[ o++ ] = in[ i ];
+                out[ prefixLen++ ] = in[ i ];
                 break;
             }
         }
 
-        this.canon = new String(out, 0, o);
-        if ( o > 1 ) {
-            o--;
-            i = this.canon.indexOf('/', 1);
-            if ( i < 0 ) {
+        this.canon = new String(out, 0, prefixLen);
+        if ( prefixLen > 1 ) {
+            prefixLen--;
+            int firstSep = this.canon.indexOf('/', 1);
+            if ( firstSep < 0 ) {
                 this.share = this.canon.substring(1);
                 this.unc = "\\";
             }
-            else if ( i == o ) {
-                this.share = this.canon.substring(1, i);
+            else if ( firstSep == prefixLen ) {
+                this.share = this.canon.substring(1, firstSep);
                 this.unc = "\\";
             }
             else {
-                this.share = this.canon.substring(1, i);
-                this.unc = this.canon.substring(i, o + 1).replace('/', '\\');
-                // this.unc = this.canon.substring(i, out[ o ] == '/' ? o : o + 1).replace('/', '\\');
+                this.share = this.canon.substring(1, firstSep);
+                this.unc = this.canon.substring(firstSep, prefixLen + 1).replace('/', '\\');
             }
         }
         else {
+            this.canon = "/";
             this.share = null;
             this.unc = "\\";
         }
