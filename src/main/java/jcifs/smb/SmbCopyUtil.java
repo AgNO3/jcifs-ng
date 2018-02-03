@@ -340,6 +340,14 @@ final class SmbCopyUtil {
                     dest.setPathInformation(src.getAttributes(), 0L, src.lastModified(), 0L);
                 }
             }
+            catch ( SmbUnsupportedOperationException e ) {
+                if ( src.getContext().getConfig().isIgnoreCopyToException() ) {
+                    log.warn("Failed to set file attributes on " + path, e);
+                }
+                else {
+                    throw e;
+                }
+            }
             catch ( SmbException se ) {
                 log.trace("copyTo0", se);
                 if ( se.getNtStatus() != NtStatus.NT_STATUS_ACCESS_DENIED && se.getNtStatus() != NtStatus.NT_STATUS_OBJECT_NAME_COLLISION ) {
