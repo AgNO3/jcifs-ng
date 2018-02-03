@@ -510,9 +510,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 Smb2NegotiateResponse r = new Smb2NegotiateResponse(getContext().getConfig());
                 r.decode(this.sbuf, 4);
                 r.received();
-                if ( r.getDialectRevision() == Smb2Constants.SMB2_DIALECT_ANY ) {
-                    return negotiate2(r);
+                if ( r.getDialectRevision() != Smb2Constants.SMB2_DIALECT_ANY && r.getDialectRevision() != Smb2Constants.SMB2_DIALECT_0202 ) {
+                    throw new CIFSException("Server returned invalid dialect verison in multi protocol negotiation");
                 }
+                return negotiate2(r);
             }
 
             if ( resp != null ) {
