@@ -1564,12 +1564,12 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         resp.reset();
 
         long k;
-        try {
-            setupBuffers(req, resp);
 
-            /*
-             * First request w/ interim response
-             */
+        /*
+         * First request w/ interim response
+         */
+        try {
+            req.setBuffer(getContext().getBufferCache().getBuffer());
             req.nextElement();
             if ( req.hasMoreElements() ) {
                 SmbComBlankResponse interim = new SmbComBlankResponse(getContext().getConfig());
@@ -1583,8 +1583,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 k = makeKey(req);
             }
 
-            resp.clearReceived();
             try {
+                resp.clearReceived();
                 long timeout = getResponseTimeout(req);
                 if ( !params.contains(RequestParam.NO_TIMEOUT) ) {
                     resp.setExpiration(System.currentTimeMillis() + timeout);
@@ -1592,6 +1592,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 else {
                     resp.setExpiration(null);
                 }
+
+                byte[] txbuf = getContext().getBufferCache().getBuffer();
+                resp.setBuffer(txbuf);
+
                 this.response_map.put(k, resp);
 
                 /*
@@ -1606,52 +1610,48 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 /*
                  * Receive multiple fragments
                  */
-
-                while ( resp.hasMoreElements() ) {
-                    if ( !params.contains(RequestParam.NO_TIMEOUT) ) {
-                        synchronized ( resp ) {
+                synchronized ( resp ) {
+                    while ( !resp.isReceived() || resp.hasMoreElements() ) {
+                        if ( !params.contains(RequestParam.NO_TIMEOUT) ) {
                             resp.wait(timeout);
+                            timeout = resp.getExpiration() - System.currentTimeMillis();
+                            if ( timeout <= 0 ) {
+                                throw new TransportException(this + " timedout waiting for response to " + req);
+                            }
                         }
-                        timeout = resp.getExpiration() - System.currentTimeMillis();
-                        if ( timeout <= 0 ) {
-                            throw new TransportException(this + " timedout waiting for response to " + req);
-                        }
-                    }
-                    else {
-                        synchronized ( resp ) {
+                        else {
                             resp.wait();
-                        }
-                        if ( log.isTraceEnabled() ) {
-                            log.trace("Wait returned " + this.isDisconnected());
-                        }
-                        if ( this.isDisconnected() ) {
-                            throw new EOFException("Transport closed while waiting for result");
+                            if ( log.isTraceEnabled() ) {
+                                log.trace("Wait returned " + isDisconnected());
+                            }
+                            if ( isDisconnected() ) {
+                                throw new EOFException("Transport closed while waiting for result");
+                            }
                         }
                     }
                 }
 
-                if ( response.getErrorCode() != 0 ) {
+                if ( !resp.isReceived() ) {
+                    throw new TransportException("Failed to read response");
+                }
+
+                if ( resp.getErrorCode() != 0 ) {
                     checkStatus(req, resp);
                 }
                 return response;
-            }
-            catch ( InterruptedException ie ) {
-                throw new TransportException(ie);
             }
             finally {
                 this.response_map.remove(k);
             }
         }
-        finally {
-            this.getContext().getBufferCache().releaseBuffer(req.releaseBuffer());
-            this.getContext().getBufferCache().releaseBuffer(resp.releaseBuffer());
+        catch ( InterruptedException ie ) {
+            throw new TransportException(ie);
         }
-    }
+        finally {
+            getContext().getBufferCache().releaseBuffer(req.releaseBuffer());
+            getContext().getBufferCache().releaseBuffer(resp.releaseBuffer());
+        }
 
-
-    void setupBuffers ( SmbComTransaction req, SmbComTransactionResponse rsp ) {
-        req.setBuffer(getContext().getBufferCache().getBuffer());
-        rsp.setBuffer(getContext().getBufferCache().getBuffer());
     }
 
 
