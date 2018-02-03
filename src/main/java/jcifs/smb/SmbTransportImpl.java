@@ -521,16 +521,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 if ( r.getDialectRevision() == Smb2Constants.SMB2_DIALECT_ANY ) {
                     return negotiate2(r);
                 }
-		resp = r;
+                resp = r;
             }
 
-            if ( resp != null ) {
-                int permits = resp.getInitialCredits() - 1;
-                if ( permits > 0 ) {
-                    this.credits.release(permits);
-                }
+            int permits = resp.getInitialCredits() - 1;
+            if ( permits > 0 ) {
+                this.credits.release(permits);
             }
-
             Arrays.fill(this.sbuf, (byte) 0);
             return new SmbNegotiation(comNeg, resp, null, null);
         }
@@ -1358,6 +1355,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         case NtStatus.NT_STATUS_ACCOUNT_LOCKED_OUT:
         case NtStatus.NT_STATUS_TRUSTED_DOMAIN_FAILURE:
             throw new SmbAuthException(resp.getErrorCode());
+        case 0xC00000BB: // NT_STATUS_NOT_SUPPORTED
+            throw new SmbUnsupportedOperationException();
         case NtStatus.NT_STATUS_PATH_NOT_COVERED:
             // samba fails to report the proper status for some operations
         case 0xC00000A2: // NT_STATUS_MEDIA_WRITE_PROTECTED
@@ -1410,6 +1409,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         case 0x10B: // NT_STATUS_NOTIFY_CLEANUP
         case 0x10C:
             break;
+        case 0xC00000BB: // NT_STATUS_NOT_SUPPORTED
+            throw new SmbUnsupportedOperationException();
         case NtStatus.NT_STATUS_PATH_NOT_COVERED:
             if ( ! ( req instanceof RequestWithPath ) ) {
                 throw new SmbException("Invalid request for a DFS NT_STATUS_PATH_NOT_COVERED response " + req.getClass().getName());
