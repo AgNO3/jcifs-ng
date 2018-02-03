@@ -29,6 +29,7 @@ import org.junit.Test;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.DfsReferralData;
+import jcifs.RuntimeCIFSException;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.SmbResourceLocator;
@@ -362,7 +363,7 @@ public class FileLocationTest {
 
 
     // test case for #30
-    @Test ( expected = MalformedURLException.class )
+    @Test ( expected = RuntimeCIFSException.class )
     public void testInvalid () throws MalformedURLException, CIFSException {
         try ( SmbResource p = new SmbFile("smb:a", getContext()) ) {
             p.getType();

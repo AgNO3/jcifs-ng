@@ -391,10 +391,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      *
      * @param url
      *            The URL of the target resource
-     * @throws MalformedURLException
      */
     @Deprecated
-    public SmbFile ( URL url ) throws MalformedURLException {
+    public SmbFile ( URL url ) {
         this(url, SingletonContext.getInstance().withCredentials(new NtlmPasswordAuthentication(SingletonContext.getInstance(), url.getUserInfo())));
     }
 
@@ -443,13 +442,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
      * @param url
      * @param tc
      *            context to use
-     * @throws MalformedURLException
      */
-    public SmbFile ( URL url, CIFSContext tc ) throws MalformedURLException {
+    public SmbFile ( URL url, CIFSContext tc ) {
         super(url);
-        if ( url.getPath() != null && !url.getPath().isEmpty() && url.getPath().charAt(0) != '/' ) {
-            throw new MalformedURLException("Invalid SMB URL: " + url);
-        }
         this.transportContext = tc;
         this.fileLocator = new SmbResourceLocatorImpl(tc, url);
         this.treeConnection = new SmbTreeConnection(tc);
