@@ -446,7 +446,7 @@ class SmbTreeImpl implements SmbTreeInternal {
 
             }
 
-            if ( this.inDfs && !"IPC".equals(svc) && request instanceof RequestWithPath ) {
+            if ( this.inDfs && !"IPC".equals(svc) && !"IPC$".equals(this.share) && request instanceof RequestWithPath ) {
                 /*
                  * When DFS is in action all request paths are
                  * full UNC paths minus the first backslash like
