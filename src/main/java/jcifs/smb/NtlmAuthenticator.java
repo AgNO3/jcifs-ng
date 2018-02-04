@@ -74,7 +74,7 @@ public abstract class NtlmAuthenticator {
      * @param sae
      * @return credentials returned by prompt
      */
-    public static NtlmPasswordAuthentication requestNtlmPasswordAuthentication ( String url, SmbAuthException sae ) {
+    public static NtlmPasswordAuthenticator requestNtlmPasswordAuthentication ( String url, SmbAuthException sae ) {
         return requestNtlmPasswordAuthentication(auth, url, sae);
     }
 
@@ -85,7 +85,7 @@ public abstract class NtlmAuthenticator {
      * @param sae
      * @return credentials returned by prompt
      */
-    public static NtlmPasswordAuthentication requestNtlmPasswordAuthentication ( NtlmAuthenticator a, String url, SmbAuthException sae ) {
+    public static NtlmPasswordAuthenticator requestNtlmPasswordAuthentication ( NtlmAuthenticator a, String url, SmbAuthException sae ) {
         if ( a == null ) {
             return null;
         }
@@ -104,7 +104,7 @@ public abstract class NtlmAuthenticator {
      * If this method returns <tt>null</tt> the <tt>SmbAuthException</tt> that triggered the authenticator check will
      * simply be rethrown. The default implementation returns <tt>null</tt>.
      */
-    protected NtlmPasswordAuthentication getNtlmPasswordAuthentication () {
+    protected NtlmPasswordAuthenticator getNtlmPasswordAuthentication () {
         return null;
     }
 }

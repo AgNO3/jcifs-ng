@@ -35,7 +35,6 @@ import javax.security.auth.login.LoginException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.CIFSContext;
 import jcifs.CIFSException;
 
 
@@ -71,11 +70,10 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
      * 
      * This will require that a keytab is configured in this service.
      * 
-     * @param tc
      * 
      */
-    public JAASAuthenticator ( CIFSContext tc ) {
-        this(tc, "jcifs");
+    public JAASAuthenticator () {
+        this("jcifs");
     }
 
 
@@ -84,13 +82,11 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
      * 
      * This will require that a keytab is configured in this service.
      * 
-     * @param tc
-     *            context to use
      * @param serviceName
      *            JAAS configuration name
      */
-    public JAASAuthenticator ( CIFSContext tc, String serviceName ) {
-        super(tc, null);
+    public JAASAuthenticator ( String serviceName ) {
+        super(null);
         this.serviceName = serviceName;
     }
 
@@ -98,16 +94,14 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
     /**
      * Create an authenticator using the given JAAS service and the specified credentials
      * 
-     * @param tc
-     *            context to use
      * @param serviceName
      *            JAAS configuration name
      * @param domain
      * @param username
      * @param password
      */
-    public JAASAuthenticator ( CIFSContext tc, String serviceName, String domain, String username, String password ) {
-        super(tc, null, domain, username, password);
+    public JAASAuthenticator ( String serviceName, String domain, String username, String password ) {
+        super(null, domain, username, password);
         this.serviceName = serviceName;
     }
 
@@ -117,14 +111,12 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
      * 
      * This will create a JAAS configuration that is used to obtain a TGT.
      * 
-     * @param tc
-     *            context to use
      * @param domain
      * @param username
      * @param password
      */
-    public JAASAuthenticator ( CIFSContext tc, String domain, String username, String password ) {
-        this(tc, new HashMap<String, String>(), domain, username, password);
+    public JAASAuthenticator ( String domain, String username, String password ) {
+        this(new HashMap<String, String>(), domain, username, password);
 
     }
 
@@ -134,16 +126,14 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
      * 
      * This will create a JAAS configuration with the specified properties that is used to obtain a TGT.
      * 
-     * @param tc
-     *            context to use
      * @param properties
      *            JAAS properties to set
      * @param domain
      * @param username
      * @param password
      */
-    public JAASAuthenticator ( CIFSContext tc, Map<String, ?> properties, String domain, String username, String password ) {
-        super(tc, null, domain, username, password);
+    public JAASAuthenticator ( Map<String, ?> properties, String domain, String username, String password ) {
+        super(null, domain, username, password);
         this.serviceName = "static";
         this.configuration = new StaticJAASConfiguration(properties);
     }
@@ -163,7 +153,7 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.NtlmPasswordAuthentication#isGuest()
+     * @see jcifs.smb.NtlmPasswordAuthenticator#isGuest()
      */
     @Override
     public boolean isGuest () {
@@ -173,7 +163,7 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
 
     @Override
     public Kerb5Authenticator clone () {
-        JAASAuthenticator auth = new JAASAuthenticator(this.getContext());
+        JAASAuthenticator auth = new JAASAuthenticator();
         cloneInternal(auth, this);
         return auth;
     }

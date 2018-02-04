@@ -27,7 +27,7 @@ import jcifs.SmbConstants;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbException;
 
 
@@ -58,8 +58,8 @@ public class SmbComSessionSetupAndX extends AndXServerMessageBlock {
         this.capabilities = negotiated.getNegotiatedCapabilities();
         ServerData server = negotiated.getServerData();
         if ( server.security == SmbConstants.SECURITY_USER ) {
-            if ( cred instanceof NtlmPasswordAuthentication ) {
-                NtlmPasswordAuthentication a = (NtlmPasswordAuthentication) cred;
+            if ( cred instanceof NtlmPasswordAuthenticator ) {
+                NtlmPasswordAuthenticator a = (NtlmPasswordAuthenticator) cred;
                 if ( a.isAnonymous() ) {
                     this.lmHash = new byte[0];
                     this.ntHash = new byte[0];
@@ -109,8 +109,8 @@ public class SmbComSessionSetupAndX extends AndXServerMessageBlock {
             }
         }
         else if ( server.security == SmbConstants.SECURITY_SHARE ) {
-            if ( cred instanceof NtlmPasswordAuthentication ) {
-                NtlmPasswordAuthentication a = (NtlmPasswordAuthentication) cred;
+            if ( cred instanceof NtlmPasswordAuthenticator ) {
+                NtlmPasswordAuthenticator a = (NtlmPasswordAuthenticator) cred;
                 this.lmHash = new byte[0];
                 this.ntHash = new byte[0];
                 if ( !a.isAnonymous() ) {

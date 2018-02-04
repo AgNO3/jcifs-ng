@@ -51,7 +51,7 @@ import jcifs.spnego.NegTokenInit;
  * See <a href="https://support.microsoft.com/en-us/kb/244380">KB-244380</a> for compatible server configuration.
  * See {@link jcifs.Configuration#isDfsConvertToFQDN()} for a workaround.
  */
-public class Kerb5Authenticator extends NtlmPasswordAuthentication {
+public class Kerb5Authenticator extends NtlmPasswordAuthenticator {
 
     private static final long serialVersionUID = 1999400043787454432L;
     private static final Logger log = LoggerFactory.getLogger(Kerb5Authenticator.class);
@@ -79,14 +79,11 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * which hold TGT retrieved from KDC. If multiple TGT are contained, the
      * first one will be used to retrieve user principal.
      * 
-     * @param tc
-     *            context to use
      * @param subject
      *            represents the user who perform Kerberos authentication.
      *            It contains tickets retrieve from KDC.
      */
-    public Kerb5Authenticator ( CIFSContext tc, Subject subject ) {
-        super(tc);
+    public Kerb5Authenticator ( Subject subject ) {
         this.subject = subject;
     }
 
@@ -95,8 +92,6 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * Construct a <code>Kerb5Authenticator</code> object with <code>Subject</code> and
      * potential NTLM fallback (if the server does not support kerberos).
      * 
-     * @param tc
-     *            context to use
      * @param subject
      *            represents the user who perform Kerberos authentication. Should at least contain a TGT for the user.
      * @param domain
@@ -106,8 +101,8 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * @param password
      *            password for NTLM fallback
      */
-    public Kerb5Authenticator ( CIFSContext tc, Subject subject, String domain, String username, String password ) {
-        super(tc, domain, username, password);
+    public Kerb5Authenticator ( Subject subject, String domain, String username, String password ) {
+        super(domain, username, password);
         this.canFallback = true;
         this.subject = subject;
     }
@@ -128,7 +123,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.NtlmPasswordAuthentication#createContext(jcifs.CIFSContext, java.lang.String, java.lang.String,
+     * @see jcifs.smb.NtlmPasswordAuthenticator#createContext(jcifs.CIFSContext, java.lang.String, java.lang.String,
      *      byte[], boolean)
      */
     @Override
@@ -169,7 +164,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
         }
 
         try {
-            return createContext(targetDomain, host);
+            return createContext(tc, targetDomain, host);
         }
         catch ( GSSException e ) {
             throw new SmbException("Context setup failed", e);
@@ -195,7 +190,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
 
     @Override
     public Kerb5Authenticator clone () {
-        Kerb5Authenticator auth = new Kerb5Authenticator(this.getContext(), this.getSubject());
+        Kerb5Authenticator auth = new Kerb5Authenticator(getSubject());
         cloneInternal(auth, this);
         return auth;
     }
@@ -208,7 +203,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * @param from
      */
     public static void cloneInternal ( Kerb5Authenticator to, Kerb5Authenticator from ) {
-        NtlmPasswordAuthentication.cloneInternal(to, from);
+        NtlmPasswordAuthenticator.cloneInternal(to, from);
         to.setUser(from.getUser());
         to.setRealm(from.getRealm());
         to.setService(from.getService());
@@ -356,7 +351,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     /**
      * {@inheritDoc}
      *
-     * @see jcifs.smb.NtlmPasswordAuthentication#isPreferredMech(org.bouncycastle.asn1.ASN1ObjectIdentifier)
+     * @see jcifs.smb.NtlmPasswordAuthenticator#isPreferredMech(org.bouncycastle.asn1.ASN1ObjectIdentifier)
      */
     @Override
     public boolean isPreferredMech ( ASN1ObjectIdentifier mechanism ) {
@@ -379,9 +374,9 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
     }
 
 
-    private SpnegoContext createContext ( String targetDomain, String host ) throws GSSException {
+    private SpnegoContext createContext ( CIFSContext tc, String targetDomain, String host ) throws GSSException {
         return new SpnegoContext(
-            getContext().getConfig(),
+            tc.getConfig(),
             new Kerb5Context(
                 host,
                 this.service,
@@ -396,7 +391,7 @@ public class Kerb5Authenticator extends NtlmPasswordAuthentication {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.smb.NtlmPasswordAuthentication#equals(java.lang.Object)
+     * @see jcifs.smb.NtlmPasswordAuthenticator#equals(java.lang.Object)
      */
     @Override
     public boolean equals ( Object other ) {

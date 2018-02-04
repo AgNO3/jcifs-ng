@@ -1702,13 +1702,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             long expiration = System.currentTimeMillis() + ( ctx.getConfig().getDfsTtl() * 1000 );
             Referral[] refs = dfsResp.getReferrals();
             for ( int di = 0; di < rn; di++ ) {
-                /*
-                 * NTLM HTTP Authentication must be re-negotiated
-                 * with challenge from 'server' to access DFS vol.
-                 */
-                NtlmPasswordAuthentication ntlmCreds = ctx.getCredentials().unwrap(NtlmPasswordAuthentication.class);
-                DfsReferralDataImpl dr = DfsReferralDataImpl
-                        .fromReferral(refs[ di ], path, expiration, dfsResp.getPathConsumed(), ntlmCreds.areHashesExternal());
+                DfsReferralDataImpl dr = DfsReferralDataImpl.fromReferral(refs[ di ], path, expiration, dfsResp.getPathConsumed());
                 dr.setDomain(targetDomain);
 
                 if ( ( dfsResp.getTflags() & 0x2 ) == 0 && ( dr.getFlags() & 0x2 ) == 0 ) {

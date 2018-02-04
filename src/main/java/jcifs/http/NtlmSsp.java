@@ -51,7 +51,7 @@ import jcifs.smb.NtlmPasswordAuthentication;
  * href="../../../ntlmhttpauth.html">jCIFS NTLM HTTP Authentication and
  * the Network Explorer Servlet</a> related information.
  */
-
+@Deprecated
 public class NtlmSsp implements NtlmFlags {
 
     /**

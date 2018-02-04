@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Credentials;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 
 
 /**
@@ -63,7 +63,7 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
      */
     @Override
     public CIFSContext withAnonymousCredentials () {
-        return withCredentials(new NtlmPasswordAuthentication(this));
+        return withCredentials(new NtlmPasswordAuthenticator());
     }
 
 
@@ -85,7 +85,7 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
      */
     @Override
     public CIFSContext withGuestCrendentials () {
-        return withCredentials(new NtlmPasswordAuthentication(this, null, "GUEST", ""));
+        return withCredentials(new NtlmPasswordAuthenticator(null, "GUEST", ""));
     }
 
 

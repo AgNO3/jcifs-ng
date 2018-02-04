@@ -330,10 +330,9 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
      * @param reqPath
      * @param expire
      * @param consumed
-     * @param rh
      * @return referral data
      */
-    public static DfsReferralDataImpl fromReferral ( Referral ref, String reqPath, long expire, int consumed, boolean rh ) {
+    public static DfsReferralDataImpl fromReferral ( Referral ref, String reqPath, long expire, int consumed ) {
         DfsReferralDataImpl dr = new DfsReferralDataImpl();
         String[] arr = new String[4];
         dr.ttl = ref.getTtl();

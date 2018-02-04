@@ -36,7 +36,7 @@ import jcifs.smb.BufferCacheImpl;
 import jcifs.smb.CredentialsInternal;
 import jcifs.smb.DfsImpl;
 import jcifs.smb.Handler;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SIDCacheImpl;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbNamedPipe;
@@ -74,7 +74,7 @@ public class BaseContext extends AbstractCIFSContext {
         this.nameServiceClient = new NameServiceClientImpl(this);
         this.bufferCache = new BufferCacheImpl(this.config);
         this.transportPool = new SmbTransportPoolImpl();
-        this.defaultCredentials = new NtlmPasswordAuthentication(this, null, null, null);
+        this.defaultCredentials = new NtlmPasswordAuthenticator();
     }
 
 

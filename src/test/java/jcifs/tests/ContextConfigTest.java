@@ -35,7 +35,7 @@ import jcifs.Config;
 import jcifs.Credentials;
 import jcifs.SmbResource;
 import jcifs.context.SingletonContext;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbFile;
 
 
@@ -75,22 +75,22 @@ public class ContextConfigTest {
     @Test
     public void testFixedCredentials () {
         Credentials guestCreds = this.context.withGuestCrendentials().getCredentials();
-        assertThat(guestCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-        NtlmPasswordAuthentication ntlmGuestCreds = guestCreds.unwrap(NtlmPasswordAuthentication.class);
+        assertThat(guestCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
+        NtlmPasswordAuthenticator ntlmGuestCreds = guestCreds.unwrap(NtlmPasswordAuthenticator.class);
         assertEquals("GUEST", ntlmGuestCreds.getUsername());
         assertThat("anonymous", ntlmGuestCreds.isAnonymous(), CoreMatchers.is(true));
 
         Credentials anonCreds = this.context.withAnonymousCredentials().getCredentials();
-        assertThat(anonCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-        NtlmPasswordAuthentication ntlmAnonCreds = anonCreds.unwrap(NtlmPasswordAuthentication.class);
+        assertThat(anonCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
+        NtlmPasswordAuthenticator ntlmAnonCreds = anonCreds.unwrap(NtlmPasswordAuthenticator.class);
         assertEquals("", ntlmAnonCreds.getUsername());
         assertEquals("", ntlmAnonCreds.getPassword());
         assertThat("anonymous", ntlmAnonCreds.isAnonymous(), CoreMatchers.is(true));
 
-        CIFSContext testCtx = this.context.withCredentials(new NtlmPasswordAuthentication(this.context, "TEST", "test-user", "test-pw"));
+        CIFSContext testCtx = this.context.withCredentials(new NtlmPasswordAuthenticator("TEST", "test-user", "test-pw"));
         Credentials setCreds = testCtx.getCredentials();
-        assertThat(setCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-        NtlmPasswordAuthentication setCredsNtlm = setCreds.unwrap(NtlmPasswordAuthentication.class);
+        assertThat(setCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
+        NtlmPasswordAuthenticator setCredsNtlm = setCreds.unwrap(NtlmPasswordAuthenticator.class);
         assertEquals("TEST", setCredsNtlm.getUserDomain());
         assertEquals("test-user", setCredsNtlm.getUsername());
         assertEquals("test-pw", setCredsNtlm.getPassword());
@@ -113,8 +113,8 @@ public class ContextConfigTest {
         URL u = new URL("smb://DOMAIN;foo:bar@localhost/test");
         try ( SmbResource f = new SmbFile(u) ) {
             Credentials c = f.getContext().getCredentials();
-            assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-            NtlmPasswordAuthentication ntlm = c.unwrap(NtlmPasswordAuthentication.class);
+            assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
+            NtlmPasswordAuthenticator ntlm = c.unwrap(NtlmPasswordAuthenticator.class);
             assertEquals("foo", ntlm.getUsername());
             assertEquals("DOMAIN", ntlm.getUserDomain());
             assertEquals("bar", ntlm.getPassword());
@@ -127,8 +127,8 @@ public class ContextConfigTest {
     public void testLegacyStringConstructor () throws IOException {
         try ( SmbResource f = new SmbFile("smb://DOMAIN;foo:bar@localhost/test") ) {
             Credentials c = f.getContext().getCredentials();
-            assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthentication.class)));
-            NtlmPasswordAuthentication ntlm = c.unwrap(NtlmPasswordAuthentication.class);
+            assertThat(c, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
+            NtlmPasswordAuthenticator ntlm = c.unwrap(NtlmPasswordAuthenticator.class);
             assertEquals("foo", ntlm.getUsername());
             assertEquals("DOMAIN", ntlm.getUserDomain());
             assertEquals("bar", ntlm.getPassword());

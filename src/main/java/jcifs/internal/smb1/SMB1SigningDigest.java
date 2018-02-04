@@ -30,7 +30,7 @@ import jcifs.internal.SMBSigningDigest;
 import jcifs.internal.smb1.com.SmbComReadAndXResponse;
 import jcifs.internal.smb1.trans.nt.SmbComNtCancel;
 import jcifs.internal.util.SMBUtil;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbTransportInternal;
 import jcifs.util.Crypto;
@@ -116,7 +116,7 @@ public class SMB1SigningDigest implements SMBSigningDigest {
      * @param auth
      * @throws SmbException
      */
-    public SMB1SigningDigest ( SmbTransportInternal transport, NtlmPasswordAuthentication auth ) throws SmbException {
+    public SMB1SigningDigest ( SmbTransportInternal transport, NtlmPasswordAuthenticator auth ) throws SmbException {
         this.digest = Crypto.getMD5();
         try {
             byte[] serverEncryptionKey = transport.getServerEncryptionKey();

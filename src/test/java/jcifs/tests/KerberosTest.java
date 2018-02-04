@@ -101,8 +101,7 @@ public class KerberosTest extends BaseCIFSTest {
     @Test
     public void testKRB () throws Exception {
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), null);
-        CIFSContext ctx = getContext()
-                .withCredentials(new Kerb5Authenticator(getContext(), s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
+        CIFSContext ctx = getContext().withCredentials(new Kerb5Authenticator(s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
         try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
             f.exists();
         }
@@ -114,8 +113,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Test
     public void testJAAS () throws CIFSException, MalformedURLException {
-        CIFSContext ctx = getContext()
-                .withCredentials(new JAASAuthenticator(getContext(), getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
+        CIFSContext ctx = getContext().withCredentials(new JAASAuthenticator(getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
         try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
             f.exists();
         }
@@ -128,7 +126,7 @@ public class KerberosTest extends BaseCIFSTest {
     @Test
     public void testFallback () throws Exception {
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), null);
-        Kerb5Authenticator auth = new Kerb5Authenticator(getContext(), s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword());
+        Kerb5Authenticator auth = new Kerb5Authenticator(s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword());
         auth.setForceFallback(true);
         CIFSContext ctx = getContext().withCredentials(auth);
         try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
@@ -143,12 +141,7 @@ public class KerberosTest extends BaseCIFSTest {
     @Test
     public void testReauthenticate () throws Exception {
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), null);
-        Kerb5Authenticator creds = new RefreshableKerb5Authenticator(
-            getContext(),
-            s,
-            getTestUserDomainRequired(),
-            getTestUser(),
-            getTestUserPassword());
+        Kerb5Authenticator creds = new RefreshableKerb5Authenticator(s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword());
         CIFSContext ctx = getContext().withCredentials(creds);
         try ( SmbFile f = new SmbFile(getTestShareURL(), ctx);
               SmbTreeHandleInternal th = (SmbTreeHandleInternal) f.getTreeHandle();
@@ -170,12 +163,7 @@ public class KerberosTest extends BaseCIFSTest {
         int wait = 10 * 1000;
         long princExp = start + ( wait / 2 );
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), princExp);
-        Kerb5Authenticator creds = new RefreshableKerb5Authenticator(
-            getContext(),
-            s,
-            getTestUserDomainRequired(),
-            getTestUser(),
-            getTestUserPassword());
+        Kerb5Authenticator creds = new RefreshableKerb5Authenticator(s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword());
         CIFSContext ctx = getContext().withCredentials(creds);
         try ( SmbFile f = new SmbFile(getTestShareURL(), ctx) ) {
             try ( SmbTreeHandle th = f.getTreeHandle() ) {
@@ -269,8 +257,8 @@ public class KerberosTest extends BaseCIFSTest {
         private static final long serialVersionUID = -4979600496889213143L;
 
 
-        public RefreshableKerb5Authenticator ( CIFSContext tc, Subject subject, String domain, String username, String password ) {
-            super(tc, subject, domain, username, password);
+        public RefreshableKerb5Authenticator ( Subject subject, String domain, String username, String password ) {
+            super(subject, domain, username, password);
         }
 
 
@@ -289,7 +277,7 @@ public class KerberosTest extends BaseCIFSTest {
 
         @Override
         public Kerb5Authenticator clone () {
-            Kerb5Authenticator auth = new RefreshableKerb5Authenticator(this.getContext(), getSubject(), getUserDomain(), getUser(), getPassword());
+            Kerb5Authenticator auth = new RefreshableKerb5Authenticator(getSubject(), getUserDomain(), getUser(), getPassword());
             cloneInternal(auth, this);
             return auth;
         }

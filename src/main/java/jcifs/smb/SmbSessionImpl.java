@@ -832,11 +832,11 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 }
 
                 log.debug("Performing legacy session setup");
-                if ( ! ( this.credentials instanceof NtlmPasswordAuthentication ) ) {
+                if ( ! ( this.credentials instanceof NtlmPasswordAuthenticator ) ) {
                     throw new SmbAuthException("Incompatible credentials");
                 }
 
-                NtlmPasswordAuthentication npa = (NtlmPasswordAuthentication) this.credentials;
+                NtlmPasswordAuthenticator npa = (NtlmPasswordAuthenticator) this.credentials;
 
                 request = new SmbComSessionSetupAndX(this.getContext(), negoResp, andx, getCredentials());
                 // if the connection already has a digest set up this needs to be used
@@ -850,7 +850,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                  * blank password initializes signing.
                  */
                 if ( !anonymous && isSignatureSetupRequired() ) {
-                    if ( npa.areHashesExternal() && getContext().getConfig().getDefaultPassword() != null ) {
+                    if ( isExternalAuth(getContext(), npa) ) {
                         /*
                          * preauthentication
                          */
@@ -1083,6 +1083,13 @@ final class SmbSessionImpl implements SmbSessionInternal {
             }
         }
         while ( state != 0 );
+    }
+
+
+    @SuppressWarnings ( "deprecation" )
+    private static boolean isExternalAuth ( CIFSContext tc, NtlmPasswordAuthenticator npa ) {
+        return npa instanceof jcifs.smb.NtlmPasswordAuthentication && ( (NtlmPasswordAuthentication) npa ).areHashesExternal()
+                && tc.getConfig().getDefaultPassword() != null;
     }
 
 

@@ -22,7 +22,7 @@ import jcifs.CIFSContext;
 import jcifs.Credentials;
 import jcifs.smb.CredentialsInternal;
 import jcifs.smb.NtlmAuthenticator;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbRenewableCredentials;
 
@@ -78,7 +78,7 @@ public final class CIFSContextCredentialWrapper extends CIFSContextWrapper imple
         }
         NtlmAuthenticator auth = NtlmAuthenticator.getDefault();
         if ( auth != null ) {
-            NtlmPasswordAuthentication newAuth = NtlmAuthenticator
+            NtlmPasswordAuthenticator newAuth = NtlmAuthenticator
                     .requestNtlmPasswordAuthentication(auth, locationHint, ( error instanceof SmbAuthException ) ? (SmbAuthException) error : null);
             if ( newAuth != null ) {
                 this.creds = newAuth;

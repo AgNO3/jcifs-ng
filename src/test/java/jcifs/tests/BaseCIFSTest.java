@@ -43,7 +43,7 @@ import jcifs.config.DelegatingConfiguration;
 import jcifs.config.PropertyConfiguration;
 import jcifs.context.BaseContext;
 import jcifs.context.CIFSContextWrapper;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbFile;
 
 
@@ -160,7 +160,7 @@ public abstract class BaseCIFSTest {
 
 
     protected CIFSContext withTestNTLMCredentials ( CIFSContext ctx ) {
-        return ctx.withCredentials(new NtlmPasswordAuthentication(ctx, getTestUserDomain(), getTestUser(), getTestUserPassword()));
+        return ctx.withCredentials(new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), getTestUserPassword()));
     }
 
 

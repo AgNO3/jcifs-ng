@@ -29,7 +29,7 @@ import jcifs.SmbConstants;
 import jcifs.internal.smb1.AndXServerMessageBlock;
 import jcifs.internal.smb1.ServerMessageBlock;
 import jcifs.internal.util.SMBUtil;
-import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.util.Hexdump;
 
 
@@ -90,9 +90,9 @@ public class SmbComTreeConnectAndX extends AndXServerMessageBlock {
 
     @Override
     protected int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
-        if ( this.server.security == SmbConstants.SECURITY_SHARE && this.ctx.getCredentials() instanceof NtlmPasswordAuthentication ) {
-            NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.ctx.getCredentials();
-            if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
+        if ( this.server.security == SmbConstants.SECURITY_SHARE && this.ctx.getCredentials() instanceof NtlmPasswordAuthenticator ) {
+            NtlmPasswordAuthenticator pwAuth = (NtlmPasswordAuthenticator) this.ctx.getCredentials();
+            if ( isExternalAuth(pwAuth) ) {
                 this.passwordLength = 1;
             }
             else if ( this.server.encryptedPasswords ) {
@@ -126,12 +126,19 @@ public class SmbComTreeConnectAndX extends AndXServerMessageBlock {
     }
 
 
+    @SuppressWarnings ( "deprecation" )
+    private static boolean isExternalAuth ( NtlmPasswordAuthenticator pwAuth ) {
+        return pwAuth instanceof jcifs.smb.NtlmPasswordAuthentication && ! ( (jcifs.smb.NtlmPasswordAuthentication) pwAuth ).areHashesExternal()
+                && pwAuth.getPassword().isEmpty();
+    }
+
+
     @Override
     protected int writeBytesWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
-        if ( this.server.security == SmbConstants.SECURITY_SHARE && this.ctx.getCredentials() instanceof NtlmPasswordAuthentication ) {
-            NtlmPasswordAuthentication pwAuth = (NtlmPasswordAuthentication) this.ctx.getCredentials();
-            if ( !pwAuth.areHashesExternal() && pwAuth.getPassword().isEmpty() ) {
+        if ( this.server.security == SmbConstants.SECURITY_SHARE && this.ctx.getCredentials() instanceof NtlmPasswordAuthenticator ) {
+            NtlmPasswordAuthenticator pwAuth = (NtlmPasswordAuthenticator) this.ctx.getCredentials();
+            if ( isExternalAuth(pwAuth) ) {
                 dst[ dstIndex++ ] = (byte) 0x00;
             }
             else {

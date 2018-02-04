@@ -72,7 +72,7 @@ public class NtlmContext implements SSPContext {
         }
     }
 
-    private NtlmPasswordAuthentication auth;
+    private NtlmPasswordAuthenticator auth;
     private int ntlmsspFlags;
     private String workstation;
     private boolean isEstablished = false;
@@ -107,7 +107,7 @@ public class NtlmContext implements SSPContext {
      * @param doSigning
      *            whether signing is requested
      */
-    public NtlmContext ( CIFSContext tc, NtlmPasswordAuthentication auth, boolean doSigning ) {
+    public NtlmContext ( CIFSContext tc, NtlmPasswordAuthenticator auth, boolean doSigning ) {
         this.transportContext = tc;
         this.auth = auth;
         this.ntlmsspFlags = this.ntlmsspFlags | NtlmFlags.NTLMSSP_REQUEST_TARGET | NtlmFlags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY
