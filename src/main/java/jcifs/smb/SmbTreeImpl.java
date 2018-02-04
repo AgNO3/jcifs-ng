@@ -55,10 +55,10 @@ import jcifs.internal.smb1.trans.SmbComTransaction;
 import jcifs.internal.smb1.trans2.Trans2FindFirst2;
 import jcifs.internal.smb1.trans2.Trans2FindFirst2Response;
 import jcifs.internal.smb2.ServerMessageBlock2;
-import jcifs.internal.smb2.ioctl.ValidateNegotiateInfoRequest;
-import jcifs.internal.smb2.ioctl.ValidateNegotiateInfoResponse;
 import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
 import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
+import jcifs.internal.smb2.ioctl.ValidateNegotiateInfoRequest;
+import jcifs.internal.smb2.ioctl.ValidateNegotiateInfoResponse;
 import jcifs.internal.smb2.nego.Smb2NegotiateRequest;
 import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
 import jcifs.internal.smb2.tree.Smb2TreeConnectRequest;
@@ -453,7 +453,7 @@ class SmbTreeImpl implements SmbTreeInternal {
 
             }
 
-            if ( this.inDfs && !"IPC".equals(svc) && request instanceof RequestWithPath ) {
+            if ( this.inDfs && !"IPC".equals(svc) && !"IPC$".equals(this.share) && request instanceof RequestWithPath ) {
                 /*
                  * When DFS is in action all request paths are
                  * full UNC paths minus the first backslash like
