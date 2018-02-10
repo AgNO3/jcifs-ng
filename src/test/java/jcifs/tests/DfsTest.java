@@ -75,6 +75,18 @@ public class DfsTest extends BaseCIFSTest {
     }
 
 
+    /**
+     * @return
+     */
+    private String getTestDfsTargetServer () {
+        String dfsTargetServer = getProperties().get("test.server.dfs");
+        if ( dfsTargetServer != null ) {
+            return dfsTargetServer;
+        }
+        return getTestServer();
+    }
+
+
     @Test
     public void resolveDC () throws CIFSException {
         CIFSContext context = withAnonymousCredentials();
@@ -113,7 +125,7 @@ public class DfsTest extends BaseCIFSTest {
         DfsReferralData ref = doResolve(null, "", true);
 
         assertNotNull(ref);
-        assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
+        assertEquals(getTestDfsTargetServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
 
     }
 
@@ -249,13 +261,13 @@ public class DfsTest extends BaseCIFSTest {
         DfsReferralData ref = doResolve(dfsTestSharePath, "", true);
 
         assertNotNull(ref);
-        assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
+        assertEquals(getTestDfsTargetServer().toLowerCase(Locale.ROOT), ref.getServer().toLowerCase(Locale.ROOT));
         assertEquals(dfsTestSharePath.length() - 1, ref.getPathConsumed());
 
         DfsReferralData ref2 = doResolve(dfsTestSharePath, "", true, true);
 
         assertNotNull(ref2);
-        assertEquals(getTestServer().toLowerCase(Locale.ROOT), ref2.getServer().toLowerCase(Locale.ROOT));
+        assertEquals(getTestDfsTargetServer().toLowerCase(Locale.ROOT), ref2.getServer().toLowerCase(Locale.ROOT));
         assertEquals(dfsTestSharePath.length() - 1, ref2.getPathConsumed());
     }
 
