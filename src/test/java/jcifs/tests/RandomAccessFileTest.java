@@ -274,6 +274,36 @@ public class RandomAccessFileTest extends BaseCIFSTest {
     }
 
 
+    @Test
+    public void testReadFullyMultipleWrites () throws IOException {
+        try ( SmbFile f = createTestFile() ) {
+
+            try ( SmbRandomAccess raf = f.openRandomAccess("rw") ) {
+
+                raf.write(new byte[] {
+                    0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8
+                });
+                raf.seek(0);
+                assertEquals(0, raf.getFilePointer());
+
+                byte[] buf = new byte[4];
+
+                raf.readFully(buf);
+                assertArrayEquals(new byte[] {
+                    0x1, 0x2, 0x3, 0x4
+                }, buf);
+                assertEquals(4, raf.getFilePointer());
+
+                raf.readFully(buf);
+                assertArrayEquals(new byte[] {
+                    0x5, 0x6, 0x7, 0x8
+                }, buf);
+                assertEquals(8, raf.getFilePointer());
+            }
+        }
+    }
+
+
     private static void verifyZero ( int cnt, InputStream is ) throws IOException {
         byte[] offBuf = new byte[cnt];
         int pos = 0;
