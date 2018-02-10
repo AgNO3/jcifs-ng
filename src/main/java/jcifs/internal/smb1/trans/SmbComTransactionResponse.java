@@ -62,8 +62,8 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
 
     int dataCount;
     byte subCommand;
-    boolean hasMore = true;
-    boolean isPrimary = true;
+    volatile boolean hasMore = true;
+    volatile boolean isPrimary = true;
     byte[] txn_buf;
 
     /* for doNetEnum and doFindFirstNext */
@@ -264,11 +264,6 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
         bufferIndex += 2;
         this.setupCount = buffer[ bufferIndex ] & 0xFF;
         bufferIndex += 2;
-        if ( this.setupCount != 0 ) {
-            if ( log.isInfoEnabled() ) {
-                log.info("setupCount is not zero: " + this.setupCount);
-            }
-        }
 
         return bufferIndex - start;
     }
@@ -302,9 +297,9 @@ public abstract class SmbComTransactionResponse extends ServerMessageBlock imple
         }
 
         if ( this.parametersDone && this.dataDone ) {
-            this.hasMore = false;
             readParametersWireFormat(this.txn_buf, this.bufParameterStart, this.totalParameterCount);
             readDataWireFormat(this.txn_buf, this.bufDataStart, this.totalDataCount);
+            this.hasMore = false;
         }
 
         return this.pad + this.parameterCount + this.pad1 + this.dataCount;

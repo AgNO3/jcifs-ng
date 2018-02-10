@@ -215,7 +215,8 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
 
     private byte command, flags;
     protected int headerStart, length, batchLevel, errorCode, flags2, tid, pid, uid, mid, wordCount, byteCount;
-    private boolean useUnicode, forceUnicode, received, extendedSecurity;
+    private boolean useUnicode, forceUnicode, extendedSecurity;
+    private volatile boolean received;
     private int signSeq;
     private boolean verifyFailed;
     protected String path;
