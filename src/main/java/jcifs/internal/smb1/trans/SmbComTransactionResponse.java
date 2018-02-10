@@ -21,13 +21,9 @@ package jcifs.internal.smb1.trans;
 
 import java.util.Enumeration;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jcifs.Configuration;
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.smb1.ServerMessageBlock;
-import jcifs.internal.smb1.trans.nt.SmbComNtTransactionResponse;
 import jcifs.internal.util.SMBUtil;
 import jcifs.smb.FileEntry;
 
@@ -36,8 +32,6 @@ import jcifs.smb.FileEntry;
  * 
  */
 public abstract class SmbComTransactionResponse extends ServerMessageBlock implements Enumeration<SmbComTransactionResponse> {
-
-    private static final Logger log = LoggerFactory.getLogger(SmbComNtTransactionResponse.class);
 
     // relative to headerStart
     static final int SETUP_OFFSET = 61;
