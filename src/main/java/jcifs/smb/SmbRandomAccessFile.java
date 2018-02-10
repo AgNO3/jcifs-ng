@@ -282,7 +282,6 @@ public class SmbRandomAccessFile implements SmbRandomAccess {
             if ( count < 0 )
                 throw new SmbEndOfFileException();
             n += count;
-            this.fp += count;
         }
         while ( n < len );
     }
