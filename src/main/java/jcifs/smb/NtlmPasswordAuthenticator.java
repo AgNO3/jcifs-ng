@@ -286,7 +286,8 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
             NtlmPasswordAuthenticator ntlm = (NtlmPasswordAuthenticator) obj;
             String domA = ntlm.getUserDomain() != null ? ntlm.getUserDomain().toUpperCase() : null;
             String domB = this.getUserDomain() != null ? this.getUserDomain().toUpperCase() : null;
-            return Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUsername());
+            return Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUsername())
+                    && Objects.equals(getPassword(), ntlm.getPassword());
         }
         return false;
     }

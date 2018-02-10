@@ -166,6 +166,9 @@ public class NtlmPasswordAuthentication extends NtlmPasswordAuthenticator {
     @Override
     public boolean equals ( Object obj ) {
         if ( super.equals(obj) ) {
+            if ( ! ( obj instanceof NtlmPasswordAuthentication ) ) {
+                return !this.areHashesExternal();
+            }
             NtlmPasswordAuthentication ntlm = (NtlmPasswordAuthentication) obj;
             if ( this.areHashesExternal() && ntlm.areHashesExternal() ) {
                 return Arrays.equals(this.ansiHash, ntlm.ansiHash) && Arrays.equals(this.unicodeHash, ntlm.unicodeHash);
@@ -175,9 +178,7 @@ public class NtlmPasswordAuthentication extends NtlmPasswordAuthenticator {
                  * though they may be.
                  */
             }
-            else if ( !this.areHashesExternal() && this.getPassword().equals(ntlm.getPassword()) ) {
-                return true;
-            }
+            return true;
         }
         return false;
     }
