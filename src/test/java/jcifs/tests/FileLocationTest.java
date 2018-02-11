@@ -98,8 +98,8 @@ public class FileLocationTest {
             assertEquals(SmbConstants.TYPE_SHARE, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\", fl.getUNCPath());
-            assertEquals("smb://1.2.3.4/share", fl.getCanonicalURL());
-            assertEquals("/share", fl.getURLPath());
+            assertEquals("smb://1.2.3.4/share/", fl.getCanonicalURL());
+            assertEquals("/share/", fl.getURLPath());
         }
     }
 
@@ -113,8 +113,8 @@ public class FileLocationTest {
             assertEquals(SmbConstants.TYPE_SHARE, fl.getType());
             assertEquals("share", fl.getShare());
             assertEquals("\\", fl.getUNCPath());
-            assertEquals("smb://1.2.3.4/share", fl.getCanonicalURL());
-            assertEquals("/share", fl.getURLPath());
+            assertEquals("smb://1.2.3.4/share/", fl.getCanonicalURL());
+            assertEquals("/share/", fl.getURLPath());
         }
     }
 
@@ -367,6 +367,63 @@ public class FileLocationTest {
     public void testInvalid () throws MalformedURLException, CIFSException {
         try ( SmbResource p = new SmbFile("smb:a", getContext()) ) {
             p.getType();
+        }
+    }
+
+
+    // #41
+    @Test
+    public void testGetName () throws MalformedURLException, CIFSException {
+        try ( SmbResource p = new SmbFile("smb://MYSERVER/Public/MyVideo.mkv", getContext()) ) {
+
+            SmbResourceLocator fl = p.getLocator();
+
+            assertEquals("MYSERVER", fl.getServer());
+            assertEquals("MYSERVER", fl.getServerWithDfs());
+            assertEquals("Public", fl.getShare());
+            assertEquals("\\MyVideo.mkv", fl.getUNCPath());
+            assertEquals("/Public/MyVideo.mkv", fl.getURLPath());
+
+            assertEquals("MyVideo.mkv", p.getName());
+        }
+    }
+
+
+    // #41
+    @Test
+    public void testGetNameShare () throws MalformedURLException, CIFSException {
+        try ( SmbResource r = new SmbFile("smb://MYSERVER/Public/", getContext());
+              SmbResource p = r.resolve("MyVideo.mkv") ) {
+
+            SmbResourceLocator fl = p.getLocator();
+
+            assertEquals("MYSERVER", fl.getServer());
+            assertEquals("MYSERVER", fl.getServerWithDfs());
+            assertEquals("Public", fl.getShare());
+            assertEquals("\\MyVideo.mkv", fl.getUNCPath());
+            assertEquals("/Public/MyVideo.mkv", fl.getURLPath());
+
+            assertEquals("MyVideo.mkv", p.getName());
+        }
+    }
+
+
+    // #41
+    @Test
+    public void testGetNameServer () throws MalformedURLException, CIFSException {
+        try ( SmbResource r = new SmbFile("smb://0.0.0.0/", getContext());
+              SmbResource s = r.resolve("Public/");
+              SmbResource p = s.resolve("MyVideo.mkv"); ) {
+
+            SmbResourceLocator fl = p.getLocator();
+
+            assertEquals("0.0.0.0", fl.getServer());
+            assertEquals("0.0.0.0", fl.getServerWithDfs());
+            assertEquals("Public", fl.getShare());
+            assertEquals("\\MyVideo.mkv", fl.getUNCPath());
+            assertEquals("/Public/MyVideo.mkv", fl.getURLPath());
+
+            assertEquals("MyVideo.mkv", p.getName());
         }
     }
 

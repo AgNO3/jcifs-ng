@@ -147,7 +147,7 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
             else {
                 this.unc = "\\";
                 if ( this.share != null ) {
-                    this.canon = "/" + this.share;
+                    this.canon = "/" + this.share + ( trailingSlash ? "/" : "" );
                 }
                 else {
                     this.canon = "/";
