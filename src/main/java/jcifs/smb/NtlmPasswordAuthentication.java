@@ -151,6 +151,9 @@ public class NtlmPasswordAuthentication extends NtlmPasswordAuthenticator {
             to.ansiHash = from.ansiHash != null ? Arrays.copyOf(from.ansiHash, from.ansiHash.length) : null;
             to.unicodeHash = from.unicodeHash != null ? Arrays.copyOf(from.unicodeHash, from.unicodeHash.length) : null;
         }
+        else {
+            NtlmPasswordAuthenticator.cloneInternal(to, from);
+        }
     }
 
 

@@ -19,7 +19,9 @@ package jcifs.tests;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,8 +40,10 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.Credentials;
 import jcifs.SmbResource;
 import jcifs.SmbTransport;
+import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSessionInternal;
@@ -203,6 +207,50 @@ public class SessionTest extends BaseCIFSTest {
                 }
                 assertEquals(0, t.getInflightRequests());
             }
+        }
+    }
+
+
+    // #46
+    @Test
+    public void testCredentialURLs () throws MalformedURLException, SmbException {
+        testCredentialUrl(
+            String.format("smb://%s:%s@%s/%s/doesnotexist", getTestUser(), getTestUserPassword(), getTestServer(), getTestShare()),
+            getTestUser(),
+            getTestUserPassword(),
+            null);
+
+        if ( getTestUserDomain() != null ) {
+            testCredentialUrl(
+                String.format(
+                    "smb://%s;%s:%s@%s/%s/doesnotexist",
+                    getTestUserDomain(),
+                    getTestUser(),
+                    getTestUserPassword(),
+                    getTestServer(),
+                    getTestShare()),
+                getTestUser(),
+                getTestUserPassword(),
+                getTestUserDomain());
+        }
+    }
+
+
+    @SuppressWarnings ( "deprecation" )
+    protected void testCredentialUrl ( String url, String user, String pass, String dom ) throws SmbException, MalformedURLException {
+        try ( SmbFile f = new SmbFile(url) ) {
+            Credentials creds = f.getContext().getCredentials();
+
+            assertFalse(creds.isAnonymous());
+            assertFalse(creds.isGuest());
+            assertTrue(creds instanceof NtlmPasswordAuthenticator);
+            NtlmPasswordAuthenticator ntcreds = (NtlmPasswordAuthenticator) creds;
+
+            assertEquals(user, ntcreds.getUsername());
+            assertEquals(dom, ntcreds.getUserDomain());
+            assertEquals(pass, ntcreds.getPassword());
+
+            f.exists();
         }
     }
 
