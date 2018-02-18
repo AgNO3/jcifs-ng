@@ -809,4 +809,30 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
         return dunc;
     }
 
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString () {
+        StringBuilder sb = new StringBuilder(this.url.toString());
+        sb.append('[');
+        if ( this.unc != null ) {
+            sb.append("unc=");
+            sb.append(this.unc);
+        }
+        if ( this.canon != null ) {
+            sb.append("canon=");
+            sb.append(this.canon);
+        }
+        if ( this.dfsReferral != null ) {
+            sb.append("dfsReferral=");
+            sb.append(this.dfsReferral);
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
 }
