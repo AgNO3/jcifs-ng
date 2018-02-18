@@ -458,7 +458,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     : new URL(context.getLocator().getURL(), checkName(name) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
             context.getContext());
 
-        setContext(context, name + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" ));
+        if ( !isWorkgroup(context) ) {
+            setContext(context, name + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" ));
+        }
 
         /*
          * why? am I going around in circles?
