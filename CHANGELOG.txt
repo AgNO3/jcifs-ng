@@ -11,6 +11,20 @@ jcifs-ng 2.1.0
   or enforced generally jcifs.smb.client.enforceSpnegoIntegrity
 - Disable jcifs.smb.client.ignoreCopyToException by default.
 
+jcifs-ng 2.0.5
+- Fix path canonicalization when constructing share URLs, retain traling slash (#41)
+- Fix SmbRandomAccessFile.readFully advancing the file pointer twice (#42)
+- Add DFS excemption for IPC$ share, working around servers (NetApp) settings
+  wrong share flags (#35).
+- Fix infinite loop when resolving SIDs (#34)
+- Some javadoc fixes (Thanks to Urs Joss)
+- Properly reset original path for retries, fixing NPE with nested DFS links
+  (#24)
+- Fix possible NPE when an invalid smb: URL is supplied (#30)
+- Fix waiting for SmbComTransaction responses, fixing various race conditions
+  (#33)
+- Handle 2.02 dialect correctly in SMB2 negotitation (#26)
+
 jcifs-ng 2.0.4
 - [SECURITY] Do not leak NTLM session keys
 - Fix file enumeration when entry count exceeds listCount (SMB1, #16)
