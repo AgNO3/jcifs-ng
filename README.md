@@ -2,6 +2,15 @@
 
 A cleaned-up and improved version of the jCIFS library
 
+Latest stable release:
+```
+<dependency>
+    <groupId>eu.agno3.jcifs</groupId>
+    <artifactId>jcifs-ng</artifactId>
+    <version>2.0.5</version>
+</dependency>
+```
+
 ### Changes
 
  * SMB2 (2.02 protocol level) support, some SMB3 support
