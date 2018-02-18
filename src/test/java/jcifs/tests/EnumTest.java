@@ -28,6 +28,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -45,10 +46,13 @@ import org.slf4j.LoggerFactory;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
+import jcifs.ResolverType;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.SmbTreeHandle;
 import jcifs.config.DelegatingConfiguration;
+import jcifs.context.CIFSContextWrapper;
+import jcifs.netbios.NameServiceClientImpl;
 import jcifs.smb.DosFileFilter;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -106,11 +110,60 @@ public class EnumTest extends BaseCIFSTest {
         CIFSContext ctx = withAnonymousCredentials();
         try ( SmbFile smbFile = new SmbFile("smb://" + getRequiredProperty(TestProperties.TEST_DOMAIN_SHORT), ctx) ) {
             // if domain is resolved through DNS this will be treated as a server and will enumerate shares instead
-            Assume.assumeTrue("Is workgroup", SmbConstants.TYPE_WORKGROUP == smbFile.getType());
+            Assume.assumeTrue("Not workgroup", SmbConstants.TYPE_WORKGROUP == smbFile.getType());
             try ( CloseableIterator<SmbResource> it = smbFile.children() ) {
                 while ( it.hasNext() ) {
                     try ( SmbResource serv = it.next() ) {
                         System.err.println(serv.getName());
+                        assertEquals(SmbConstants.TYPE_SERVER, serv.getType());
+                        assertTrue(serv.isDirectory());
+                    }
+                }
+            }
+        }
+        catch ( SmbUnsupportedOperationException e ) {
+            Assume.assumeTrue("Browsing unsupported", false);
+        }
+    }
+
+
+    @Test
+    public void testBrowseDomainNetbios () throws MalformedURLException, CIFSException {
+
+        // only do this if a WINS server is enabled
+        getRequiredProperty("jcifs.netbios.wins");
+
+        CIFSContext bctx = withAnonymousCredentials();
+
+        // ensure that the domain name gets resolved through WINS so that
+        // it gets the workgroup type.
+        CIFSContext ctx = withConfig(bctx, new DelegatingConfiguration(bctx.getConfig()) {
+
+            @Override
+            public List<ResolverType> getResolveOrder () {
+                return Arrays.asList(ResolverType.RESOLVER_WINS);
+            }
+        });
+
+        // need to override NameServiceClient as it otherwise gets initialized with the original config
+        final NameServiceClientImpl nsc = new NameServiceClientImpl(ctx);
+        ctx = new CIFSContextWrapper(ctx) {
+
+            @Override
+            public jcifs.NameServiceClient getNameServiceClient () {
+                return nsc;
+            }
+        };
+
+        try ( SmbFile smbFile = new SmbFile("smb://" + getRequiredProperty(TestProperties.TEST_DOMAIN_SHORT), ctx) ) {
+            // if domain is resolved through DNS this will be treated as a server and will enumerate shares instead
+            Assume.assumeTrue("Not workgroup", SmbConstants.TYPE_WORKGROUP == smbFile.getType());
+            try ( CloseableIterator<SmbResource> it = smbFile.children() ) {
+                while ( it.hasNext() ) {
+                    try ( SmbResource serv = it.next() ) {
+                        System.err.println(serv.getName());
+                        assertEquals(SmbConstants.TYPE_SERVER, serv.getType());
+                        assertTrue(serv.isDirectory());
                     }
                 }
             }
