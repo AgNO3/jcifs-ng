@@ -210,12 +210,16 @@ public class JAASAuthenticator extends Kerb5Authenticator implements CallbackHan
             log.debug("Logging on");
             LoginContext lc;
 
+	    Subject ps = super.getSubject();
+
             if ( this.configuration != null ) {
-                lc = new LoginContext(this.serviceName, super.getSubject(), this, this.configuration);
+                lc = new LoginContext(this.serviceName, ps, this, this.configuration);
             }
-            else {
-                lc = new LoginContext(this.serviceName, super.getSubject(), this);
-            }
+            else if ( ps != null ) {
+                lc = new LoginContext(this.serviceName, ps, this);
+            } else {
+                lc = new LoginContext(this.serviceName, this);
+	    }
             lc.login();
 
             Subject s = lc.getSubject();
