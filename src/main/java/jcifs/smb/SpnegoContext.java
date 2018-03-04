@@ -304,7 +304,7 @@ class SpnegoContext implements SSPContext {
             return null;
         }
 
-        return new NegTokenTarg(NegTokenTarg.UNSPECIFIED_RESULT, this.selectedMech, responseToken, mechMIC);
+        return new NegTokenTarg(NegTokenTarg.UNSPECIFIED_RESULT, null, responseToken, mechMIC);
     }
 
 
