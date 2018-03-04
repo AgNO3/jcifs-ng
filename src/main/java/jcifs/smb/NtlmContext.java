@@ -113,8 +113,7 @@ public class NtlmContext implements SSPContext {
         this.ntlmsspFlags = this.ntlmsspFlags | NtlmFlags.NTLMSSP_REQUEST_TARGET | NtlmFlags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY
                 | NtlmFlags.NTLMSSP_NEGOTIATE_128;
         if ( !auth.isAnonymous() ) {
-            this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_SIGN | NtlmFlags.NTLMSSP_NEGOTIATE_SEAL | NtlmFlags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN
-                    | NtlmFlags.NTLMSSP_NEGOTIATE_KEY_EXCH;
+            this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_SIGN | NtlmFlags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NtlmFlags.NTLMSSP_NEGOTIATE_KEY_EXCH;
         }
         else {
             this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_ANONYMOUS;

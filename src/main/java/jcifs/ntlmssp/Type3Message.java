@@ -185,6 +185,11 @@ public class Type3Message extends NtlmMessage {
                 setLMResponse(new byte[24]);
             }
 
+            if ( avPairs != null ) {
+                // make sure to set the TARGET_INFO flag as we are sending
+                setFlag(NtlmFlags.NTLMSSP_NEGOTIATE_TARGET_INFO, true);
+            }
+
             byte[] responseKeyNT = NtlmUtil.nTOWFv2(domain, user, password);
             byte[] ntlmClientChallenge = new byte[8];
             tc.getConfig().getRandom().nextBytes(ntlmClientChallenge);
