@@ -41,7 +41,7 @@ public final class Smb2Constants {
     /**
      * 
      */
-    public static final int SMB2_NEGOTIATE_SIGNING_REQUIRED = 0x0001;
+    public static final int SMB2_NEGOTIATE_SIGNING_REQUIRED = 0x0002;
 
     /**
      * 
