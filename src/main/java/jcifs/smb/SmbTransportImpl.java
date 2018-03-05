@@ -599,13 +599,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     private SmbNegotiation negotiate2 ( Smb2NegotiateResponse first ) throws IOException, SocketException {
         int size = 0;
 
-        int securityMode = 0;
-        if ( this.signingEnforced || ( first != null && first.isSigningRequired() ) ) {
-            securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED | Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
-        }
-        else if ( ( first == null && getContext().getConfig().isSigningEnabled() ) || ( first != null && first.isSigningNegotiated() ) ) {
-            securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
-        }
+        int securityMode = getRequestSecurityMode();
 
         // further negotiation needed
         Smb2NegotiateRequest smb2neg = new Smb2NegotiateRequest(getContext().getConfig(), securityMode);
@@ -1790,6 +1784,18 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         default:
             throw new SmbUnsupportedOperationException();
         }
+    }
+
+    public int getRequestSecurityMode() {
+        // https://msdn.microsoft.com/en-us/library/cc246563.aspx
+        // When SMB2_NEGOTIATE_SIGNING_REQUIRED set, indicates that security signatures are enabled on the client. 
+        // The client MUST set this bit if the SMB2_NEGOTIATE_SIGNING_REQUIRED bit is not set, 
+        // and MUST NOT set this bit if the SMB2_NEGOTIATE_SIGNING_REQUIRED bit is set. The server MUST ignore this bit.
+        if ( this.signingEnforced ) {
+            return Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED;
+        }
+        
+         return Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
     }
 
 }
