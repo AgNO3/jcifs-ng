@@ -291,10 +291,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
         if ( cur != null ) {
             return false;
         }
-        else if ( this.transport.isSigningEnforced() ) {
-            return true;
-        }
-        return this.transport.getNegotiateResponse().isSigningNegotiated();
+        return this.transport.isSigningEnforced();
     }
 
 
@@ -512,7 +509,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
         SmbException ex = null;
         SSPContext ctx = null;
         byte[] token = negoResp.getSecurityBlob();
-        final int securityMode = negoResp.getSecurityMode();
+        final int securityMode = trans.getRequestSecurityMode();
         boolean anonymous = this.credentials.isAnonymous();
         final boolean doSigning = securityMode != 0 && !anonymous;
         long sessId = 0;
@@ -726,7 +723,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                 if ( token != null ) {
                     Smb2SessionSetupRequest request = new Smb2SessionSetupRequest(
                         getContext(),
-                        negoResp.getSecurityMode(),
+                        trans.getRequestSecurityMode(),
                         negoResp.getCommonCapabilities(),
                         curSessId,
                         token);
