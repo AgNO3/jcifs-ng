@@ -599,13 +599,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     private SmbNegotiation negotiate2 ( Smb2NegotiateResponse first ) throws IOException, SocketException {
         int size = 0;
 
-        int securityMode = 0;
-        if ( this.signingEnforced || ( first != null && first.isSigningRequired() ) ) {
-            securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED | Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
-        }
-        else if ( ( first == null && getContext().getConfig().isSigningEnabled() ) || ( first != null && first.isSigningNegotiated() ) ) {
-            securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
-        }
+        int securityMode = getRequestSecurityMode(first);
 
         // further negotiation needed
         Smb2NegotiateRequest smb2neg = new Smb2NegotiateRequest(getContext().getConfig(), securityMode);
@@ -1792,4 +1786,12 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         }
     }
 
+    public int getRequestSecurityMode( Smb2NegotiateResponse first ) {
+        int securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
+        if ( this.signingEnforced || ( first != null && first.isSigningRequired() ) ) {
+            securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED | Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
+        }
+        
+        return securityMode;
+    }
 }
