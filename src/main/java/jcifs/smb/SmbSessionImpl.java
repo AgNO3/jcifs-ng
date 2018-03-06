@@ -291,10 +291,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
         if ( cur != null ) {
             return false;
         }
-        else if ( this.transport.isSigningEnforced() ) {
-            return true;
-        }
-        return this.transport.getNegotiateResponse().isSigningNegotiated();
+        return this.transport.isSigningEnforced();
     }
 
 
