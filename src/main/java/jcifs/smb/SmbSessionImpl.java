@@ -589,7 +589,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     System.arraycopy(sk, 0, key, 0, Math.min(16, sk.length));
                     this.sessionKey = key;
                 }
-                if ( !anonymous && isSignatureSetupRequired() ) {
+                if ( !anonymous && (isSignatureSetupRequired() || response.isSessionSigned()) ) {
                     byte[] signingKey = ctx.getSigningKey();
                     if ( signingKey != null && response != null ) {
                         if ( this.preauthIntegrityHash != null && log.isDebugEnabled() ) {
