@@ -150,5 +150,11 @@ public class Smb2SessionSetupResponse extends ServerMessageBlock2Response {
     public byte[] getBlob () {
         return this.blob;
     }
-
+    
+     /**
+     * @return whether the packet has been signed.
+     */
+    public boolean isSessionSigned() {
+        return ( this.sessionFlags & SMB2_FLAGS_SIGNED ) != 0;
+    }
 }
