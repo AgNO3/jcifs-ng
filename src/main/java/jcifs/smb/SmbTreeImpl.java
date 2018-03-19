@@ -700,7 +700,7 @@ class SmbTreeImpl implements SmbTreeInternal {
             log.debug("Secure negotiation does not apply, is SMB3.1");
             return;
         }
-        Smb2NegotiateRequest negoReq = new Smb2NegotiateRequest(sess.getConfig(), 1);
+        Smb2NegotiateRequest negoReq = new Smb2NegotiateRequest(sess.getConfig(), trans.getRequestSecurityMode(nego));
 
         log.debug("Sending VALIDATE_NEGOTIATE_INFO");
         Smb2IoctlRequest req = new Smb2IoctlRequest(sess.getConfig(), Smb2IoctlRequest.FSCTL_VALIDATE_NEGOTIATE_INFO);
