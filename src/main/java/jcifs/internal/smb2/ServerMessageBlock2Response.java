@@ -178,6 +178,14 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
 
 
     /**
+     * @return whether the packet has been signed.
+     */
+    public boolean isSigned () {
+        return ( getFlags() & SMB2_FLAGS_SIGNED ) != 0;
+    }
+
+
+    /**
      * {@inheritDoc}
      *
      * @see jcifs.util.transport.Response#getExpiration()
