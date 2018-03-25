@@ -599,12 +599,18 @@ final class SmbSessionImpl implements SmbSessionInternal {
                             log.debug("Final preauth integrity hash " + Hexdump.toHexString(this.preauthIntegrityHash));
                         }
                         Smb2SigningDigest dgst = new Smb2SigningDigest(this.sessionKey, negoResp.getDialectRevision(), this.preauthIntegrityHash);
-                        // verify the server signature here, this is not done automatically as we don't set the request
-                        // digest
-                        response.setDigest(dgst);
-                        byte[] payload = response.getRawPayload();
-                        if ( !response.verifySignature(payload, 0, payload.length) ) {
-                            throw new SmbException("Signature validation failed");
+                        // verify the server signature here, this is not done automatically as we don't set the
+                        // request digest
+                        // Ignore a missing signature for SMB < 3.0, as
+                        // - the specification does not clearly require that (it does for SMB3+)
+                        // - there seem to be server implementations (known: EMC Isilon) that do not sign the final
+                        // response
+                        if ( negoResp.getSelectedDialect().atLeast(DialectVersion.SMB300) || response.isSigned() ) {
+                            response.setDigest(dgst);
+                            byte[] payload = response.getRawPayload();
+                            if ( !response.verifySignature(payload, 0, payload.length) ) {
+                                throw new SmbException("Signature validation failed");
+                            }
                         }
                         setDigest(dgst);
                     }
