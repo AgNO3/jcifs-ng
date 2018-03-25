@@ -219,7 +219,7 @@ class SpnegoContext implements SSPContext {
                         throw new SmbException("SPNEGO mechanism was rejected");
                     }
                 }
-                return new NegTokenTarg(result, currentMech, mechToken, mechMIC).toByteArray();
+                return new NegTokenTarg(result, null, mechToken, mechMIC).toByteArray();
             }
 
             return null;
