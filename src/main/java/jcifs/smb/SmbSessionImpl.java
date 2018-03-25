@@ -60,6 +60,7 @@ import jcifs.internal.smb1.com.SmbComSessionSetupAndXResponse;
 import jcifs.internal.smb1.com.SmbComTreeConnectAndX;
 import jcifs.internal.smb2.ServerMessageBlock2;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
+import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.smb2.Smb2SigningDigest;
 import jcifs.internal.smb2.nego.Smb2NegotiateResponse;
 import jcifs.internal.smb2.session.Smb2LogoffRequest;
@@ -512,9 +513,9 @@ final class SmbSessionImpl implements SmbSessionInternal {
         SmbException ex = null;
         SSPContext ctx = null;
         byte[] token = negoResp.getSecurityBlob();
-        final int securityMode = negoResp.getSecurityMode();
+        final int securityMode = ( ( negoResp.getSecurityMode() & Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED ) != 0 ) || trans.isSigningEnforced()
+                ? Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED : Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
         boolean anonymous = this.credentials.isAnonymous();
-        final boolean doSigning = securityMode != 0 && !anonymous;
         long sessId = 0;
 
         boolean preauthIntegrity = negoResp.getSelectedDialect().atLeast(DialectVersion.SMB311);
@@ -527,7 +528,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
         while ( true ) {
             Subject s = this.credentials.getSubject();
             if ( ctx == null ) {
-                ctx = createContext(trans, tdomain, negoResp, doSigning, s);
+                ctx = createContext(trans, tdomain, negoResp, !anonymous, s);
             }
             token = createToken(ctx, token, s);
 
@@ -538,11 +539,6 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 request.setSessionId(sessId);
                 request.retainPayload();
-
-                // only chain if there is no signing
-                if ( chain != null && ( anonymous || !isSignatureSetupRequired() ) ) {
-                    request.chain(chain);
-                }
 
                 try {
                     response = trans.send(request, null, EnumSet.of(RequestParam.RETAIN_PAYLOAD));
@@ -592,7 +588,9 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     System.arraycopy(sk, 0, key, 0, Math.min(16, sk.length));
                     this.sessionKey = key;
                 }
-                if ( !anonymous && isSignatureSetupRequired() ) {
+
+                boolean signed = response != null && response.isSigned();
+                if ( !anonymous && ( isSignatureSetupRequired() || signed ) ) {
                     byte[] signingKey = ctx.getSigningKey();
                     if ( signingKey != null && response != null ) {
                         if ( this.preauthIntegrityHash != null && log.isDebugEnabled() ) {
@@ -615,7 +613,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         setDigest(dgst);
                     }
                     else {
-                        throw new SmbException("Signing required but no session key available");
+                        throw new SmbException("Signing enabled but no session key available");
                     }
                 }
                 else if ( log.isDebugEnabled() ) {
