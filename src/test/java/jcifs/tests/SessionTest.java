@@ -77,6 +77,8 @@ public class SessionTest extends BaseCIFSTest {
     public static Collection<Object> configs () {
         return getConfigs(
             "smb1",
+            "smb1-noSigning",
+            "smb1-forceSigning",
             "noSigning",
             "forceSigning",
             "legacyAuth",
