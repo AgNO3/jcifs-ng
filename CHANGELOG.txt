@@ -11,6 +11,14 @@ jcifs-ng 2.1.0
   or enforced generally jcifs.smb.client.enforceSpnegoIntegrity
 - Disable jcifs.smb.client.ignoreCopyToException by default.
 
+jcifs-ng 2.0.6
+- Only enforce signing for DFS IPC when signing is enabled 
+- Fix SMB2_NEGOTIATE_SIGNING_REQUIRED value resulting in wrong 
+  signing negotation (probably still incomplete)
+- Don't send selectedMech in SPNEGO follow ups 
+- Ignore missing signatures on final SessionSetup response (#57)
+- Fix "invalid null Subject provided" when using a JAAS config file (#52)
+
 jcifs-ng 2.0.5
 - Fix path canonicalization when constructing share URLs, retain traling slash (#41)
 - Fix SmbRandomAccessFile.readFully advancing the file pointer twice (#42)
