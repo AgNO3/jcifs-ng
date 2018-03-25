@@ -238,13 +238,12 @@ public class DfsImpl implements DfsResolver {
                 do {
                     if ( dr.getServer() != null && !dr.getServer().isEmpty() ) {
                         try {
-                            SmbTransportImpl transport = tf.getTransportPool()
-                                    .getSmbTransport(
-                                        tf,
-                                        dr.getServer(),
-                                        0,
-                                        false,
-                                        !tf.getCredentials().isAnonymous() && tf.getConfig().isIpcSigningEnforced())
+                            SmbTransportImpl transport = tf.getTransportPool().getSmbTransport(
+                                tf,
+                                dr.getServer(),
+                                0,
+                                false,
+                                !tf.getCredentials().isAnonymous() && tf.getConfig().isSigningEnabled() && tf.getConfig().isIpcSigningEnforced())
                                     .unwrap(SmbTransportImpl.class);
                             transport.ensureConnected();
                             return transport;
