@@ -446,7 +446,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
      */
     @Override
     public boolean isSigningEnabled () {
-        return ( this.securityMode & ( Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED ) ) != 0;
+        return ( this.securityMode & ( Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED ) ) != 0;
     }
 
 
