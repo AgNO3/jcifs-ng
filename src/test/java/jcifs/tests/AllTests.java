@@ -69,6 +69,28 @@ public class AllTests {
 
 
     static {
+        MUTATIONS.put("smb2-noSigning", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.enableSMB2", "true");
+                cfg.put("jcifs.smb.client.signingPreferred", "false");
+                cfg.put("jcifs.smb.client.signingEnforced", "false");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("smb2-forceSigning", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.enableSMB2", "true");
+                cfg.put("jcifs.smb.client.signingPreferred", "true");
+                cfg.put("jcifs.smb.client.signingEnforced", "true");
+                return cfg;
+            }
+        });
+
         MUTATIONS.put("noSigning", new TestMutation() {
 
             @Override
