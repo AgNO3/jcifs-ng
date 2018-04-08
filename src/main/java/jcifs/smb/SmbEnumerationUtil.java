@@ -33,6 +33,7 @@ import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
+import jcifs.Credentials;
 import jcifs.ResourceFilter;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
@@ -62,31 +63,36 @@ final class SmbEnumerationUtil {
     private SmbEnumerationUtil () {}
 
 
-    static FileEntry[] doDfsRootEnum ( CIFSContext ctx, SmbResourceLocator loc ) throws IOException {
-        MsrpcDfsRootEnum rpc;
-        try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + loc.getAddress().getHostAddress() + "[\\PIPE\\netdfs]", ctx) ) {
-            rpc = new MsrpcDfsRootEnum(loc.getServer());
+    private static String getRPCTarget ( CIFSContext ctx, SmbResourceLocator loc, Address serverAddress ) {
+        // Try to stick to the same server. However if we are using kerberos authentication we need to use the name.
+        // The comment about composite share lists was wrong, we do not iterate over multiple targets.
+        Credentials creds = ctx.getCredentials();
+        if ( creds instanceof Kerb5Authenticator && serverAddress.getHostName() != null ) {
+            return serverAddress.getHostName();
+        }
+        return serverAddress.getHostAddress();
+    }
+
+
+    static FileEntry[] doDfsRootEnum ( CIFSContext ctx, SmbResourceLocator loc, Address address ) throws IOException {
+        try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + getRPCTarget(ctx, loc, address) + "[\\PIPE\\netdfs]", ctx) ) {
+            MsrpcDfsRootEnum rpc = new MsrpcDfsRootEnum(loc.getServer());
             handle.sendrecv(rpc);
-            if ( rpc.retval != 0 )
+            if ( rpc.retval != 0 ) {
                 throw new SmbException(rpc.retval, true);
+            }
             return rpc.getEntries();
         }
     }
 
 
-    static FileEntry[] doMsrpcShareEnum ( CIFSContext ctx, String host, Address address ) throws IOException {
-        MsrpcShareEnum rpc = new MsrpcShareEnum(host);
-        /*
-         * JCIFS will build a composite list of shares if the target host has
-         * multiple IP addresses such as when domain-based DFS is in play. Because
-         * of this, to ensure that we query each IP individually without re-resolving
-         * the hostname and getting a different IP, we must use the current addresses
-         * IP rather than just url.getHost() like we were using prior to 1.2.16.
-         */
-        try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + address.getHostAddress() + "[\\PIPE\\srvsvc]", ctx) ) {
+    static FileEntry[] doMsrpcShareEnum ( CIFSContext ctx, SmbResourceLocator loc, Address address ) throws IOException {
+        try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + getRPCTarget(ctx, loc, address) + "[\\PIPE\\srvsvc]", ctx) ) {
+            MsrpcShareEnum rpc = new MsrpcShareEnum(loc.getServer());
             handle.sendrecv(rpc);
-            if ( rpc.retval != 0 )
+            if ( rpc.retval != 0 ) {
                 throw new SmbException(rpc.retval, true);
+            }
             return rpc.getEntries();
         }
     }
@@ -126,7 +132,7 @@ final class SmbEnumerationUtil {
              * domain. Add DFS roots to the list.
              */
             try {
-                entries = doDfsRootEnum(tc, locator);
+                entries = doDfsRootEnum(tc, locator, locator.getAddress());
                 for ( int ei = 0; ei < entries.length; ei++ ) {
                     FileEntry e = entries[ ei ];
                     if ( !set.contains(e) && ( fnf == null || fnf.accept(parent, e.getName()) ) ) {
@@ -144,7 +150,7 @@ final class SmbEnumerationUtil {
               SmbSessionImpl session = th.getSession();
               SmbTransportImpl transport = session.getTransport() ) {
             try {
-                entries = doMsrpcShareEnum(tc, locator.getURL().getHost(), transport.getRemoteAddress());
+                entries = doMsrpcShareEnum(tc, locator, transport.getRemoteAddress());
             }
             catch ( IOException ioe ) {
                 if ( th.isSMB2() ) {
