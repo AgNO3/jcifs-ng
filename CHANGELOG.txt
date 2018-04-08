@@ -5,6 +5,9 @@ jcifs-ng 2.0.6
 - Don't send selectedMech in SPNEGO follow ups 
 - Ignore missing signatures on final SessionSetup response (#57)
 - Fix "invalid null Subject provided" when using a JAAS config file (#52)
+- Allow tid = 0 for SMB1 (#63)
+- Use hostname in share enumeration when using kerberos authentication (#62)
+- Don't add duplicate trailing slash in Trans2FindFirst2 (#61)
 
 jcifs-ng 2.0.5
 - Fix path canonicalization when constructing share URLs, retain traling slash (#41)
