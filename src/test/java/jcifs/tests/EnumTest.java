@@ -640,13 +640,6 @@ public class EnumTest extends BaseCIFSTest {
     // BUG #61
     public void testListTrailingSlash () throws MalformedURLException, UnknownHostException, CIFSException {
         CIFSContext ctx = getContext();
-        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
-
-            @Override
-            public boolean isDfsDisabled () {
-                return true;
-            }
-        });
         try ( SmbFile f = createTestDirectory() ) {
             try ( SmbFile a = new SmbFile(f, "a/");
                   SmbFile b = new SmbFile(a, "b.txt");
