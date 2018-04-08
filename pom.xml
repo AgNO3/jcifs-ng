@@ -236,6 +236,15 @@
 							<from>*</from>
 							<to>*</to>
 						</difference>
+
+						<difference>
+							<!-- added 2.0.6 - needed for #63 fix -->
+							<className>jcifs/internal/TreeConnectResponse</className>
+							<differenceType>7012</differenceType>
+							<method>boolean isValidTid()</method>
+							<from>*</from>
+							<to>*</to>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>

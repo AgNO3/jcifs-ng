@@ -214,7 +214,8 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
      */
 
     private byte command, flags;
-    protected int headerStart, length, batchLevel, errorCode, flags2, tid, pid, uid, mid, wordCount, byteCount;
+    protected int headerStart, length, batchLevel, errorCode, flags2, pid, uid, mid, wordCount, byteCount;
+    protected int tid = 0xFFFF;
     private boolean useUnicode, forceUnicode, extendedSecurity;
     private volatile boolean received;
     private int signSeq;
@@ -984,7 +985,7 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
         this.received = false;
         this.digest = null;
         this.uid = 0;
-        this.tid = 0;
+        this.tid = 0xFFFF;
     }
 
 

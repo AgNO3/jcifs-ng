@@ -85,6 +85,17 @@ public class SmbComTreeConnectAndXResponse extends AndXServerMessageBlock implem
     }
 
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.TreeConnectResponse#isValidTid()
+     */
+    @Override
+    public boolean isValidTid () {
+        return getTid() != 0xFFFF;
+    }
+
+
     @Override
     protected int writeParameterWordsWireFormat ( byte[] dst, int dstIndex ) {
         return 0;

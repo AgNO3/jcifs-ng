@@ -41,4 +41,10 @@ public interface TreeConnectResponse extends CommonServerMessageBlockResponse {
      */
     boolean isShareDfs ();
 
+
+    /**
+     * @return whether the tree id is a valid one
+     */
+    boolean isValidTid ();
+
 }

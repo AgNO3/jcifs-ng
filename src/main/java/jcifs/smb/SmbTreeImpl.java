@@ -642,11 +642,10 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @throws SmbException
      */
     private void treeConnected ( SmbTransportImpl transport, TreeConnectResponse response ) throws SmbException {
-        int treeId = response.getTid();
-        if ( treeId == 0 ) {
-            throw new SmbException("TreeID is NULL");
+        if ( !response.isValidTid() ) {
+            throw new SmbException("TreeID is invalid");
         }
-        this.tid = treeId;
+        this.tid = response.getTid();
         String rsvc = response.getService();
         if ( rsvc == null && !transport.isSMB2() ) {
             throw new SmbException("Service is NULL");
