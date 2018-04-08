@@ -72,8 +72,11 @@ public class Trans2FindFirst2 extends SmbComTransaction {
         if ( filename.equals("\\") ) {
             this.path = filename;
         }
-        else {
+        else if ( filename.charAt(filename.length() - 1) != '\\' ) {
             this.path = filename + "\\";
+        }
+        else {
+            this.path = filename;
         }
         this.wildcard = wildcard;
         this.searchAttributes = searchAttributes & 0x37; /* generally ignored tho */
