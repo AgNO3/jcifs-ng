@@ -778,8 +778,11 @@ class SmbTreeImpl implements SmbTreeInternal {
             try {
                 treeConnect(null, null);
             }
+            catch ( SmbException e ) {
+                throw e;
+            }
             catch ( CIFSException e ) {
-                SmbException.wrap(e);
+                throw SmbException.wrap(e);
             }
         }
         else {

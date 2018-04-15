@@ -179,10 +179,10 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             public int compare ( Address o1, Address o2 ) {
                 Integer fail1 = SmbTransportPoolImpl.this.failCounts.get(o1.getHostAddress());
                 Integer fail2 = SmbTransportPoolImpl.this.failCounts.get(o2.getHostAddress());
-                if(fail1 == null) {
+                if ( fail1 == null ) {
                     fail1 = 0;
                 }
-                if(fail2 == null) {
+                if ( fail2 == null ) {
                     fail2 = 0;
                 }
                 return Integer.compare(fail1, fail2);
@@ -221,9 +221,10 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             catch ( IOException e ) {
                 String hostAddress = addr.getHostAddress();
                 Integer failCount = this.failCounts.get(hostAddress);
-                if(failCount == null) {
+                if ( failCount == null ) {
                     this.failCounts.put(hostAddress, 1);
-                } else {
+                }
+                else {
                     this.failCounts.put(hostAddress, failCount + 1);
                 }
                 ex = e;
@@ -321,7 +322,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     public void logon ( CIFSContext tf, Address dc, int port ) throws SmbException {
         try ( SmbTransportInternal smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced())
                 .unwrap(SmbTransportInternal.class);
-              SmbSessionInternal smbSession = smbTransport.getSmbSession(tf).unwrap(SmbSessionInternal.class);
+              SmbSessionInternal smbSession = smbTransport.getSmbSession(tf, dc.getHostName(), null).unwrap(SmbSessionInternal.class);
               SmbTreeInternal tree = smbSession.getSmbTree(tf.getConfig().getLogonShare(), null).unwrap(SmbTreeInternal.class) ) {
             tree.connectLogon(tf);
         }

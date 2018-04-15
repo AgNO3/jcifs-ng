@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 
@@ -44,6 +45,7 @@ import jcifs.Credentials;
 import jcifs.SmbResource;
 import jcifs.SmbTransport;
 import jcifs.smb.NtlmPasswordAuthenticator;
+import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbSessionInternal;
@@ -254,6 +256,30 @@ public class SessionTest extends BaseCIFSTest {
 
             f.exists();
         }
+    }
+
+
+    // #68
+    @Test
+    public void testPoolLogonSuccess () throws CIFSException, UnknownHostException {
+        CIFSContext ctx = withTestNTLMCredentials(getContext());
+        ctx.getTransportPool().logon(ctx, ctx.getNameServiceClient().getByName(getTestServer()));
+    }
+
+
+    // #68
+    @Test ( expected = SmbAuthException.class )
+    public void testPoolLogonInvalid () throws CIFSException, UnknownHostException {
+        CIFSContext ctx = getContext().withCredentials(new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), "invalid"));
+        ctx.getTransportPool().logon(ctx, ctx.getNameServiceClient().getByName(getTestServer()));
+    }
+
+
+    // #68
+    @Test ( expected = SmbException.class )
+    public void testPoolLogonFail () throws CIFSException, UnknownHostException {
+        CIFSContext ctx = withTestNTLMCredentials(getContext());
+        ctx.getTransportPool().logon(ctx, ctx.getNameServiceClient().getByName(getTestServer()), 12345);
     }
 
 
