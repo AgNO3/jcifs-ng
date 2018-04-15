@@ -1,4 +1,5 @@
 jcifs-ng 2.0.6
+- [SECURITY] Properly throws exceptions from SmbTransportPool.logon (#68)
 - Only enforce signing for DFS IPC when signing is enabled 
 - Fix SMB2_NEGOTIATE_SIGNING_REQUIRED value resulting in wrong 
   signing negotation (probably still incomplete)
