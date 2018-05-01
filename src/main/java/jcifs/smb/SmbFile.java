@@ -1314,9 +1314,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 log.debug("renameTo: " + getUncPath() + " -> " + dest.getUncPath());
             }
 
-            this.attrExpiration = this.sizeExpiration = 0;
             dest.attrExpiration = 0;
-
             /*
              * Rename Request / Response
              */
@@ -1332,6 +1330,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 }
                 sh.send(new SmbComRename(sh.getConfig(), getUncPath(), dest.getUncPath()), new SmbComBlankResponse(sh.getConfig()));
             }
+
+            this.attrExpiration = this.sizeExpiration = 0;
         }
         catch ( CIFSException e ) {
             throw SmbException.wrap(e);
