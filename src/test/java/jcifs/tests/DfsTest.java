@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -84,6 +85,14 @@ public class DfsTest extends BaseCIFSTest {
             return dfsTargetServer;
         }
         return getTestServer();
+    }
+
+
+    @Override
+    @Before
+    public void setUp () throws Exception {
+        super.setUp();
+        Assume.assumeFalse(getContext().getConfig().isDfsDisabled());
     }
 
 
