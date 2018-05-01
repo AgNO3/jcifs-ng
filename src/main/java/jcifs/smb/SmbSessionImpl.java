@@ -251,19 +251,22 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
 
     @Override
-    public synchronized SmbTreeImpl getSmbTree ( String share, String service ) {
+    public SmbTreeImpl getSmbTree ( String share, String service ) {
         if ( share == null ) {
             share = "IPC$";
         }
-        for ( SmbTreeImpl t : this.trees ) {
-            if ( t.matches(share, service) ) {
-                return t.acquire();
+
+        synchronized ( this.trees ) {
+            for ( SmbTreeImpl t : this.trees ) {
+                if ( t.matches(share, service) ) {
+                    return t.acquire();
+                }
             }
+            SmbTreeImpl t = new SmbTreeImpl(this, share, service);
+            t.acquire();
+            this.trees.add(t);
+            return t;
         }
-        SmbTreeImpl t = new SmbTreeImpl(this, share, service);
-        t.acquire();
-        this.trees.add(t);
-        return t;
     }
 
 
@@ -1111,19 +1114,21 @@ final class SmbSessionImpl implements SmbSessionInternal {
 
                 this.netbiosName = null;
 
-                long us = this.usageCount.get();
-                if ( ( inUse && us != 1 ) || ( !inUse && us > 0 ) ) {
-                    log.warn("Logging off session while still in use " + this + ":" + this.trees);
-                    wasInUse = true;
-                }
-
-                for ( SmbTreeImpl t : this.trees ) {
-                    try {
-                        log.debug("Disconnect tree on logoff");
-                        wasInUse |= t.treeDisconnect(inError, false);
+                synchronized ( this.trees ) {
+                    long us = this.usageCount.get();
+                    if ( ( inUse && us != 1 ) || ( !inUse && us > 0 ) ) {
+                        log.warn("Logging off session while still in use " + this + ":" + this.trees);
+                        wasInUse = true;
                     }
-                    catch ( Exception e ) {
-                        log.warn("Failed to disconnect tree " + t, e);
+
+                    for ( SmbTreeImpl t : this.trees ) {
+                        try {
+                            log.debug("Disconnect tree on logoff");
+                            wasInUse |= t.treeDisconnect(inError, false);
+                        }
+                        catch ( Exception e ) {
+                            log.warn("Failed to disconnect tree " + t, e);
+                        }
                     }
                 }
 
