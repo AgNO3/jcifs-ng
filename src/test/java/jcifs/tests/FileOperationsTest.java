@@ -19,6 +19,7 @@ package jcifs.tests;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -74,6 +75,40 @@ public class FileOperationsTest extends BaseCIFSTest {
                 try {
                     assertTrue(f2.exists());
                     renamed = true;
+                }
+                finally {
+                    f2.delete();
+                }
+            }
+            finally {
+                if ( !renamed && f.exists() ) {
+                    f.delete();
+                }
+            }
+        }
+    }
+
+
+    @Test
+    // BUG #69
+    public void testRenameFileAttrCache () throws CIFSException, MalformedURLException, UnknownHostException {
+        String nameSrc = makeRandomName();
+        String nameTgt = makeRandomName();
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbResource f = new SmbFile(defaultShareRoot, nameSrc);
+              SmbFile f2 = new SmbFile(defaultShareRoot, nameTgt) ) {
+            f.createNewFile();
+            boolean renamed = false;
+            try {
+                f.renameTo(f2);
+                try {
+                    assertTrue(f2.exists());
+                    renamed = true;
+
+                    assertEquals(nameSrc, f.getName());
+                    assertEquals(nameTgt, f2.getName());
+
+                    assertFalse(f.exists());
                 }
                 finally {
                     f2.delete();
