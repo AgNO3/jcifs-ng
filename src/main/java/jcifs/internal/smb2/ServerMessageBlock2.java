@@ -598,10 +598,6 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
      */
     protected int readErrorResponse ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int start = bufferIndex;
-        int structureSize = SMBUtil.readInt2(buffer, bufferIndex);
-        if ( structureSize != 9 ) {
-            throw new SMBProtocolDecodingException("Error structureSize should be 9");
-        }
         this.errorContextCount = buffer[ bufferIndex + 2 ];
         bufferIndex += 4;
 
