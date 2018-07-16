@@ -11,6 +11,11 @@ jcifs-ng 2.1.0
   or enforced generally jcifs.smb.client.enforceSpnegoIntegrity
 - Disable jcifs.smb.client.ignoreCopyToException by default.
 
+jcifs-ng 2.0.7
+- Clear attribute cache after rename operation (#69)
+- Fix possible deadlock in tree handling (#72)
+- Fix NPE when checking status of disconnected SmbTransport (#85)
+
 jcifs-ng 2.0.6
 - [SECURITY] Properly throws exceptions from SmbTransportPool.logon (#68)
 - Only enforce signing for DFS IPC when signing is enabled 
