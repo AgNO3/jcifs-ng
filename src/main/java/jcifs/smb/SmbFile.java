@@ -940,7 +940,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     public String getDfsPath () throws SmbException {
         try {
             String path = this.treeConnection.ensureDFSResolved(this.fileLocator).getDfsPath();
-            if ( isDirectory() ) {
+            if ( path != null && isDirectory() ) {
                 path += '/';
             }
             return path;
