@@ -185,13 +185,15 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
     @Override
     public boolean isDisconnected () {
-        return super.isDisconnected() || this.socket.isClosed();
+        Socket s = this.socket;
+        return super.isDisconnected() || s == null || s.isClosed();
     }
 
 
     @Override
     public boolean isFailed () {
-        return super.isFailed() || this.socket.isClosed();
+        Socket s = this.socket;
+        return super.isFailed() || s == null || s.isClosed();
     }
 
 
