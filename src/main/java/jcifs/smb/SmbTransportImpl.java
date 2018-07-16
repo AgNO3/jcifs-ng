@@ -194,13 +194,15 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
     @Override
     public boolean isDisconnected () {
-        return super.isDisconnected() || this.socket.isClosed();
+        Socket s = this.socket;
+        return super.isDisconnected() || s == null || s.isClosed();
     }
 
 
     @Override
     public boolean isFailed () {
-        return super.isFailed() || this.socket.isClosed();
+        Socket s = this.socket;
+        return super.isFailed() || s == null || s.isClosed();
     }
 
 
@@ -1786,12 +1788,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         }
     }
 
-    public int getRequestSecurityMode( Smb2NegotiateResponse first ) {
+
+    public int getRequestSecurityMode ( Smb2NegotiateResponse first ) {
         int securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
         if ( this.signingEnforced || ( first != null && first.isSigningRequired() ) ) {
             securityMode = Smb2Constants.SMB2_NEGOTIATE_SIGNING_REQUIRED | Smb2Constants.SMB2_NEGOTIATE_SIGNING_ENABLED;
         }
-        
+
         return securityMode;
     }
 }
