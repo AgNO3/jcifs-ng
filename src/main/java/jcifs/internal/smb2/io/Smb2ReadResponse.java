@@ -23,6 +23,7 @@ import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.util.SMBUtil;
+import jcifs.smb.NtStatus;
 
 
 /**
@@ -114,5 +115,16 @@ public class Smb2ReadResponse extends ServerMessageBlock2Response {
         bufferIndex = Math.max(bufferIndex, dataStart + this.dataLength);
         return bufferIndex - start;
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb2.ServerMessageBlock2#isErrorResponseStatus()
+     */
+    @Override
+    protected boolean isErrorResponseStatus () {
+        return getStatus() != NtStatus.NT_STATUS_BUFFER_OVERFLOW && super.isErrorResponseStatus();
+    }
+
 
 }
