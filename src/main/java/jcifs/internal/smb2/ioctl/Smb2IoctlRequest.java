@@ -162,7 +162,7 @@ public class Smb2IoctlRequest extends ServerMessageBlock2Request<Smb2IoctlRespon
 
     @Override
     protected Smb2IoctlResponse createResponse ( CIFSContext tc, ServerMessageBlock2Request<Smb2IoctlResponse> req ) {
-        return new Smb2IoctlResponse(tc.getConfig(), this.outputBuffer);
+        return new Smb2IoctlResponse(tc.getConfig(), this.outputBuffer, this.controlCode);
     }
 
 

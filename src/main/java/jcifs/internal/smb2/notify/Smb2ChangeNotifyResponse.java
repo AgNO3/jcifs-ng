@@ -28,6 +28,7 @@ import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.smb1.trans.nt.FileNotifyInformationImpl;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.util.SMBUtil;
+import jcifs.smb.NtStatus;
 
 
 /**
@@ -106,5 +107,16 @@ public class Smb2ChangeNotifyResponse extends ServerMessageBlock2Response implem
     public List<FileNotifyInformation> getNotifyInformation () {
         return this.notifyInformation;
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.internal.smb2.ServerMessageBlock2#isErrorResponseStatus()
+     */
+    @Override
+    protected boolean isErrorResponseStatus () {
+        return getStatus() != NtStatus.NT_STATUS_NOTIFY_ENUM_DIR && super.isErrorResponseStatus();
+    }
+
 
 }
