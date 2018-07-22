@@ -73,7 +73,7 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
         this.transact = ( pipe.getPipeType() & SmbPipeResource.PIPE_TYPE_TRANSACT ) == SmbPipeResource.PIPE_TYPE_TRANSACT;
         this.call = ( pipe.getPipeType() & SmbPipeResource.PIPE_TYPE_CALL ) == SmbPipeResource.PIPE_TYPE_CALL;
         this.openFlags = ( pipe.getPipeType() & 0xFFFF00FF ) | SmbConstants.O_EXCL;
-        this.access = ( pipe.getPipeType() >>> 16 ) & 0xFFFF | SmbConstants.FILE_WRITE_DATA | 0x20000;
+        this.access = (pipe.getPipeType() & 7) | 0x20000;
         this.uncPath = this.pipe.getUncPath();
     }
 

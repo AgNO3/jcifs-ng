@@ -19,7 +19,9 @@
 package jcifs.smb;
 
 
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import jcifs.CIFSException;
 import jcifs.util.Hexdump;
@@ -45,6 +47,46 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
      * 
      */
     private static final long serialVersionUID = 484863569441792249L;
+    
+    // to replace a bunch of one-off binary searches
+    private static final Map<Integer, String> errorCodeMessages;
+    private static final Map<Integer, String> winErrorCodeMessages;
+    private static final Map<Integer, Integer> dosErrorCodeStatuses;
+
+    static {
+        Map<Integer, String> errorCodeMessagesTmp = new HashMap<>();
+        for (int i = 0; i < NT_STATUS_CODES.length; i++) {
+            errorCodeMessagesTmp.put(NT_STATUS_CODES[i], NT_STATUS_MESSAGES[i]);
+        }
+
+        Map<Integer, Integer> dosErrorCodeStatusesTmp = new HashMap<>();
+        for (int i = 0; i < DOS_ERROR_CODES.length; i++) {
+            dosErrorCodeStatusesTmp.put(DOS_ERROR_CODES[i][0], DOS_ERROR_CODES[i][1]);
+            int mappedNtCode = DOS_ERROR_CODES[i][1];
+            String mappedNtMessage = errorCodeMessagesTmp.get(mappedNtCode);
+            if (mappedNtMessage != null) {
+                errorCodeMessagesTmp.put(DOS_ERROR_CODES[i][0], mappedNtMessage);
+            }
+        }
+        
+        // for backward compatibility since this is was different message in the NtStatus.NT_STATUS_CODES than returned
+        // by getMessageByCode
+        errorCodeMessagesTmp.put(0, "NT_STATUS_SUCCESS");
+
+        errorCodeMessages = Collections.unmodifiableMap(errorCodeMessagesTmp);
+        dosErrorCodeStatuses = Collections.unmodifiableMap(dosErrorCodeStatusesTmp);
+
+        Map<Integer, String> winErrorCodeMessagesTmp = new HashMap<>();
+        for (int i = 0; i < WINERR_CODES.length; i++) {
+            winErrorCodeMessagesTmp.put(WINERR_CODES[i], WINERR_MESSAGES[i]);
+        }
+
+        winErrorCodeMessages = Collections.unmodifiableMap(winErrorCodeMessagesTmp);
+
+    }
+
+
+
 
 
     /**
@@ -54,88 +96,33 @@ public class SmbException extends CIFSException implements NtStatus, DosError, W
      * @internal
      */
     public static String getMessageByCode ( int errcode ) {
-        /*
-         * Note there's a signedness error here because 0xC0000000 based values are
-         * negative so it with NT_STATUS_SUCCESS (0) the binary search will not be
-         * performed properly. The effect is that the code at index 1 is never found
-         * (NT_STATUS_UNSUCCESSFUL). So here we factor out NT_STATUS_SUCCESS
-         * as a special case (which it is).
-         */
-        if ( errcode == 0 ) {
-            return "NT_STATUS_SUCCESS";
+        String message = errorCodeMessages.get(errcode);
+        if (message == null) {
+            message =  "0x" + Hexdump.toHexString(errcode, 8);
         }
-        if ( ( errcode & 0xC0000000 ) == 0xC0000000 ) {
-            int found = Arrays.binarySearch(NT_STATUS_CODES, errcode);
-            if ( found >= 0 && NT_STATUS_CODES[ found ] == errcode ) {
-                return NT_STATUS_MESSAGES[ found ];
-            }
-        }
-        else {
-            int min = 0;
-            int max = DOS_ERROR_CODES.length - 1;
-
-            while ( max >= min ) {
-                int mid = ( min + max ) / 2;
-
-                if ( errcode > DOS_ERROR_CODES[ mid ][ 0 ] ) {
-                    min = mid + 1;
-                }
-                else if ( errcode < DOS_ERROR_CODES[ mid ][ 0 ] ) {
-                    max = mid - 1;
-                }
-                else {
-                    return DOS_ERROR_MESSAGES[ mid ];
-                }
-            }
-        }
-        return "0x" + Hexdump.toHexString(errcode, 8);
+        return message;
     }
 
 
     static int getStatusByCode ( int errcode ) {
+        int statusCode;
         if ( ( errcode & 0xC0000000 ) != 0 ) {
-            return errcode;
+            statusCode = errcode;
+        } else if (dosErrorCodeStatuses.containsKey(errcode)) {
+            statusCode = dosErrorCodeStatuses.get(errcode);
+        } else {
+            statusCode = NT_STATUS_UNSUCCESSFUL;
         }
-
-        int min = 0;
-        int max = DOS_ERROR_CODES.length - 1;
-
-        while ( max >= min ) {
-            int mid = ( min + max ) / 2;
-
-            if ( errcode > DOS_ERROR_CODES[ mid ][ 0 ] ) {
-                min = mid + 1;
-            }
-            else if ( errcode < DOS_ERROR_CODES[ mid ][ 0 ] ) {
-                max = mid - 1;
-            }
-            else {
-                return DOS_ERROR_CODES[ mid ][ 1 ];
-            }
-        }
-        return NT_STATUS_UNSUCCESSFUL;
+        return statusCode;
     }
 
 
     static String getMessageByWinerrCode ( int errcode ) {
-        int min = 0;
-        int max = WINERR_CODES.length - 1;
-
-        while ( max >= min ) {
-            int mid = ( min + max ) / 2;
-
-            if ( errcode > WINERR_CODES[ mid ] ) {
-                min = mid + 1;
-            }
-            else if ( errcode < WINERR_CODES[ mid ] ) {
-                max = mid - 1;
-            }
-            else {
-                return WINERR_MESSAGES[ mid ];
-            }
+        String message = winErrorCodeMessages.get(errcode);
+        if (message == null) {
+            message = "W" + Hexdump.toHexString(errcode, 8);
         }
-
-        return "W" + Hexdump.toHexString(errcode, 8);
+        return message;
     }
 
     private int status;
