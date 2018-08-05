@@ -173,7 +173,6 @@
 					</execution>
 				</executions>
 				<configuration>
-					<skip>true</skip> <!-- for 2.1 -->
 					<ignored>
 						<difference>
 							<!-- seems to be a clirr bug that it cannot handle the different inherited 
