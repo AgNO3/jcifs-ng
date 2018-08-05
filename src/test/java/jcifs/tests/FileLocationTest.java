@@ -426,6 +426,15 @@ public class FileLocationTest {
         }
     }
 
+
+    // #87
+    @Test
+    public void testIPCHidden () throws MalformedURLException, CIFSException {
+        try ( SmbResource r = new SmbFile("smb://0.0.0.0/IPC$/", getContext()) ) {
+            assert ( r.isHidden() );
+        }
+    }
+
     private static class TestDfsReferral implements DfsReferralData {
 
         private String server;
