@@ -1037,7 +1037,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public boolean isDirectory () throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             return true;
         }
         if ( !exists() )
@@ -1048,7 +1048,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public boolean isFile () throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             return false;
         }
         exists();
@@ -1061,7 +1061,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         if ( this.fileLocator.getShare() == null ) {
             return false;
         }
-        else if ( this.fileLocator.isRoot() ) {
+        else if ( this.fileLocator.isRootOrShare() ) {
             if ( this.fileLocator.getShare().endsWith("$") ) {
                 return true;
             }
@@ -1074,7 +1074,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public long createTime () throws SmbException {
-        if ( !this.fileLocator.isRoot() ) {
+        if ( !this.fileLocator.isRootOrShare() ) {
             exists();
             return this.createTime;
         }
@@ -1084,7 +1084,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public long lastModified () throws SmbException {
-        if ( !this.fileLocator.isRoot() ) {
+        if ( !this.fileLocator.isRootOrShare() ) {
             exists();
             return this.lastModified;
         }
@@ -1094,7 +1094,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public long lastAccess () throws SmbException {
-        if ( !this.fileLocator.isRoot() ) {
+        if ( !this.fileLocator.isRootOrShare() ) {
             exists();
             return this.lastAccess;
         }
@@ -1297,7 +1297,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             exists();
             dest.exists();
 
-            if ( this.fileLocator.isRoot() || dest.getLocator().isRoot() ) {
+            if ( this.fileLocator.isRootOrShare() || dest.fileLocator.isRootOrShare() ) {
                 throw new SmbException("Invalid operation for workgroups, servers, or shares");
             }
 
@@ -1456,7 +1456,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     void delete ( String fileName ) throws CIFSException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
@@ -1801,7 +1801,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public void createNewFile () throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
@@ -1865,7 +1865,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public void setCreateTime ( long time ) throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
@@ -1880,7 +1880,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public void setLastModified ( long time ) throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
@@ -1895,7 +1895,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public void setLastAccess ( long time ) throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
 
@@ -1910,7 +1910,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public int getAttributes () throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             return 0;
         }
         exists();
@@ -1920,7 +1920,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public void setAttributes ( int attrs ) throws SmbException {
-        if ( this.fileLocator.isRoot() ) {
+        if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
         }
         try {

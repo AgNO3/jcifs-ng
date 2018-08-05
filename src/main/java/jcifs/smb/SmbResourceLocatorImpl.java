@@ -595,6 +595,12 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
     }
 
 
+    boolean isRootOrShare () {
+        // length == 0 should not happen
+        return getUNCPath().length() <= 1;
+    }
+
+
     /**
      * @throws MalformedURLException
      * 
