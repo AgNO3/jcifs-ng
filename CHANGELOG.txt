@@ -2,6 +2,11 @@ jcifs-ng 2.0.7
 - Clear attribute cache after rename operation (#69)
 - Fix possible deadlock in tree handling (#72)
 - Fix NPE when checking status of disconnected SmbTransport (#85)
+- Fix hiding of internal shares (#87)
+Big thanks to Shon Vella:
+- Fix SmbFile.getDfsPath() retuing "null/" (#86)
+- Fix parsing of response messages for certain exceptional status codes (#92)
+- Add missing Pipe available() SMB2 implementation (#92)
 
 jcifs-ng 2.0.6
 - [SECURITY] Properly throws exceptions from SmbTransportPool.logon (#68)
