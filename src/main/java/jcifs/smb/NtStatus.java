@@ -29,6 +29,8 @@ public interface NtStatus {
 
     public static final int NT_STATUS_OK = 0x00000000;
     public static final int NT_STATUS_PENDING = 0x00000103;
+    public static final int NT_STATUS_NOTIFY_ENUM_DIR = 0x0000010C;
+    public static final int NT_STATUS_BUFFER_OVERFLOW = 0x80000005;
     public static final int NT_STATUS_UNSUCCESSFUL = 0xC0000001;
     public static final int NT_STATUS_NOT_IMPLEMENTED = 0xC0000002;
     public static final int NT_STATUS_INVALID_INFO_CLASS = 0xC0000003;
@@ -96,7 +98,8 @@ public interface NtStatus {
     public static final int NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED = 0xC0000279;
 
     static final int[] NT_STATUS_CODES = {
-        NT_STATUS_OK, NT_STATUS_PENDING, NT_STATUS_UNSUCCESSFUL, NT_STATUS_NOT_IMPLEMENTED, NT_STATUS_INVALID_INFO_CLASS, NT_STATUS_ACCESS_VIOLATION,
+        NT_STATUS_OK, NT_STATUS_PENDING, NT_STATUS_NOTIFY_ENUM_DIR, NT_STATUS_BUFFER_OVERFLOW, NT_STATUS_UNSUCCESSFUL,
+        NT_STATUS_NOT_IMPLEMENTED, NT_STATUS_INVALID_INFO_CLASS, NT_STATUS_ACCESS_VIOLATION,
         NT_STATUS_INVALID_HANDLE, NT_STATUS_INVALID_PARAMETER, NT_STATUS_NO_SUCH_DEVICE, NT_STATUS_NO_SUCH_FILE, NT_STATUS_MORE_PROCESSING_REQUIRED,
         NT_STATUS_ACCESS_DENIED, NT_STATUS_BUFFER_TOO_SMALL, NT_STATUS_OBJECT_NAME_INVALID, NT_STATUS_OBJECT_NAME_NOT_FOUND,
         NT_STATUS_OBJECT_NAME_COLLISION, NT_STATUS_PORT_DISCONNECTED, NT_STATUS_OBJECT_PATH_INVALID, NT_STATUS_OBJECT_PATH_NOT_FOUND,
@@ -114,7 +117,8 @@ public interface NtStatus {
     };
 
     static final String[] NT_STATUS_MESSAGES = {
-        "The operation completed successfully.", "Request is pending", "A device attached to the system is not functioning.", "Incorrect function.",
+        "The operation completed successfully.", "Request is pending", "A notify change request is being completed.", 
+        "The data was too large to fit into the specified buffer.", "A device attached to the system is not functioning.", "Incorrect function.", 
         "The parameter is incorrect.", "Invalid access to memory location.", "The handle is invalid.", "The parameter is incorrect.",
         "The system cannot find the file specified.", "The system cannot find the file specified.", "More data is available.", "Access is denied.",
         "The data area passed to a system call is too small.", "The filename, directory name, or volume label syntax is incorrect.",
