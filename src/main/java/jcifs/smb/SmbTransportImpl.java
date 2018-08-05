@@ -1,17 +1,17 @@
 /* jcifs smb client library in Java
  * Copyright (C) 2005  "Michael B. Allen" <jcifs at samba dot org>
  *                  "Eric Glass" <jcifs at samba dot org>
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -80,7 +80,9 @@ import jcifs.internal.smb2.ServerMessageBlock2;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
+import jcifs.internal.smb2.io.Smb2ReadResponse;
 import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
 import jcifs.internal.smb2.lock.Smb2OplockBreakNotification;
 import jcifs.internal.smb2.nego.EncryptionNegotiateContext;
 import jcifs.internal.smb2.nego.Smb2NegotiateRequest;
@@ -99,7 +101,7 @@ import jcifs.util.transport.TransportException;
 
 
 /**
- * 
+ *
  */
 class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbConstants {
 
@@ -178,7 +180,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
 
     /**
-     * 
+     *
      * @return number of sessions on this transport
      */
     public int getNumSessions () {
@@ -326,7 +328,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
 
     /**
-     * 
+     *
      * @param tf
      * @return a session for the context
      */
@@ -337,7 +339,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
 
     /**
-     * 
+     *
      * @param tf
      *            context to use
      * @return a session for the context
@@ -655,7 +657,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
     /**
      * Connect the transport
-     * 
+     *
      * @throws SmbException
      */
     @Override
@@ -1235,7 +1237,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 throw new IOException("Invalid payload size: " + size);
             }
             int errorCode = Encdec.dec_uint32le(buffer, 9) & 0xFFFFFFFF;
-            if ( resp.getCommand() == ServerMessageBlock.SMB_COM_READ_ANDX && ( errorCode == 0 || errorCode == 0x80000005 ) ) {
+            if ( resp.getCommand() == ServerMessageBlock.SMB_COM_READ_ANDX && ( errorCode == 0 || errorCode == NtStatus.NT_STATUS_BUFFER_OVERFLOW ) ) {
                 // overflow indicator normal for pipe
                 SmbComReadAndXResponse r = (SmbComReadAndXResponse) resp;
                 int off = SMB1_HEADER_LENGTH;
@@ -1357,7 +1359,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             // samba fails to report the proper status for some operations
         case 0xC00000A2: // NT_STATUS_MEDIA_WRITE_PROTECTED
             checkReferral(resp, req.getPath(), req);
-        case 0x80000005: /* STATUS_BUFFER_OVERFLOW */
+        case NtStatus.NT_STATUS_BUFFER_OVERFLOW:
             break; /* normal for DCERPC named pipes */
         case NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED:
             break; /* normal for NTLMSSP */
@@ -1402,8 +1404,8 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             throw new SmbAuthException(resp.getErrorCode());
         case NtStatus.NT_STATUS_MORE_PROCESSING_REQUIRED:
             break; /* normal for SPNEGO */
-        case 0x10B: // NT_STATUS_NOTIFY_CLEANUP
-        case 0x10C:
+        case 0x10B: // NT_STATUS_NOTIFY_CLEANUP:
+        case NtStatus.NT_STATUS_NOTIFY_ENUM_DIR:
             break;
         case 0xC00000BB: // NT_STATUS_NOT_SUPPORTED
             throw new SmbUnsupportedOperationException();
@@ -1413,6 +1415,20 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
             String path = ( (RequestWithPath) req ).getFullUNCPath();
             checkReferral(resp, path, ( (RequestWithPath) req ));
+            // checkReferral always throws and exception but put break here for clarity
+            break;
+        case NtStatus.NT_STATUS_BUFFER_OVERFLOW:
+            if (resp instanceof Smb2ReadResponse) {
+                break;
+            }
+            if ( resp instanceof Smb2IoctlResponse ) {
+                int ctlCode = ((Smb2IoctlResponse) resp).getCtlCode();
+                if (ctlCode == Smb2IoctlRequest.FSCTL_PIPE_TRANSCEIVE ||
+                        ctlCode == Smb2IoctlRequest.FSCTL_PIPE_PEEK) {
+                    break;
+                }
+            }
+            // fall through
         default:
             if ( log.isDebugEnabled() ) {
                 log.debug("Error code: 0x" + Hexdump.toHexString(resp.getErrorCode(), 8) + " for " + req.getClass().getSimpleName());
