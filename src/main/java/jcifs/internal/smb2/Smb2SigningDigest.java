@@ -120,10 +120,10 @@ public class Smb2SigningDigest implements SMBSigningDigest {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.internal.SMBSigningDigest#verify(byte[], int, int, jcifs.internal.CommonServerMessageBlock)
+     * @see jcifs.internal.SMBSigningDigest#verify(byte[], int, int, int, jcifs.internal.CommonServerMessageBlock)
      */
     @Override
-    public synchronized boolean verify ( byte[] data, int offset, int length, CommonServerMessageBlock msg ) {
+    public synchronized boolean verify ( byte[] data, int offset, int length, int extraPad, CommonServerMessageBlock msg ) {
         this.digest.reset();
 
         int flags = SMBUtil.readInt4(data, offset + 16);

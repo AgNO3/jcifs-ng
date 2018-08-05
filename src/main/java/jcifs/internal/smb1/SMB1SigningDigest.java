@@ -237,10 +237,10 @@ public class SMB1SigningDigest implements SMBSigningDigest {
      * 
      * {@inheritDoc}
      *
-     * @see jcifs.internal.SMBSigningDigest#verify(byte[], int, int, jcifs.internal.CommonServerMessageBlock)
+     * @see jcifs.internal.SMBSigningDigest#verify(byte[], int, int, int, jcifs.internal.CommonServerMessageBlock)
      */
     @Override
-    public boolean verify ( byte[] data, int offset, int l, CommonServerMessageBlock m ) {
+    public boolean verify ( byte[] data, int offset, int l, int extraPad, CommonServerMessageBlock m ) {
 
         ServerMessageBlock msg = (ServerMessageBlock) m;
 

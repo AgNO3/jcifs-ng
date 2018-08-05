@@ -307,7 +307,7 @@ public abstract class ServerMessageBlock2Response extends ServerMessageBlock2 im
         if ( dgst != null && !isAsync() && ( getConfig().isRequireSecureNegotiate() || getErrorCode() == NtStatus.NT_STATUS_OK ) ) {
             // TODO: SMB2 - do we need to check the MIDs?
             // We only read what we were waiting for, so first guess would be no.
-            boolean verify = dgst.verify(buffer, i, size, this);
+            boolean verify = dgst.verify(buffer, i, size, 0, this);
             this.verifyFailed = verify;
             return !verify;
         }

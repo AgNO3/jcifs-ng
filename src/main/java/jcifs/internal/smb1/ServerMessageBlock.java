@@ -1016,7 +1016,7 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
          * SMB_COM_SESSION_SETUP_ANDX Request (section 2.2.4.53.1).
          */
         if ( this.digest != null && getErrorCode() == 0 ) {
-            boolean verify = this.digest.verify(buffer, i, size, this);
+            boolean verify = this.digest.verify(buffer, i, size, 0, this);
             this.verifyFailed = verify;
             return !verify;
         }

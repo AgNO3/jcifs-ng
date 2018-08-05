@@ -53,10 +53,12 @@ public interface SMBSigningDigest {
      * @param offset
      *            The starting offset at which the SMB header begins.
      * @param length
+     * @param extraPad
+     *            extra padding to include in signature
      * @param msg
      *            The message to verify
      * @return whether verification was unsuccessful
      */
-    boolean verify ( byte[] data, int offset, int length, CommonServerMessageBlock msg );
+    boolean verify ( byte[] data, int offset, int length, int extraPad, CommonServerMessageBlock msg );
 
 }
