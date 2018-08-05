@@ -46,7 +46,7 @@ public class Smb2IoctlResponse extends ServerMessageBlock2Response {
     /**
      * @param config
      */
-    public Smb2IoctlResponse ( Configuration config) {
+    public Smb2IoctlResponse ( Configuration config ) {
         super(config);
         this.outputBuffer = null;
     }
@@ -61,17 +61,19 @@ public class Smb2IoctlResponse extends ServerMessageBlock2Response {
         this.outputBuffer = outputBuffer;
     }
 
+
     /**
      * @param config
      * @param outputBuffer
      * @param ctlCode
      */
-    public Smb2IoctlResponse ( Configuration config, byte[] outputBuffer,  int ctlCode ) {
+    public Smb2IoctlResponse ( Configuration config, byte[] outputBuffer, int ctlCode ) {
         super(config);
         this.outputBuffer = outputBuffer;
         this.ctlCode = ctlCode;
     }
-    
+
+
     /**
      * @return the ctlCode
      */
@@ -139,15 +141,12 @@ public class Smb2IoctlResponse extends ServerMessageBlock2Response {
     @Override
     protected boolean isErrorResponseStatus () {
         int status = getStatus();
-        return status != NtStatus.NT_STATUS_INVALID_PARAMETER &&
-                !( status == NtStatus.NT_STATUS_INVALID_PARAMETER &&
-                        ( ctlCode == Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK ||
-                                ctlCode == Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK_WRITE ) ) && 
-                !( status == NtStatus.NT_STATUS_BUFFER_OVERFLOW &&
-                        ( ctlCode == Smb2IoctlRequest.FSCTL_PIPE_TRANSCEIVE ||
-                                ctlCode == Smb2IoctlRequest.FSCTL_PIPE_PEEK ||
-                                ctlCode == Smb2IoctlRequest.FSCTL_DFS_GET_REFERRALS ) ) &&         
-                super.isErrorResponseStatus();
+        return status != NtStatus.NT_STATUS_INVALID_PARAMETER
+                && ! ( status == NtStatus.NT_STATUS_INVALID_PARAMETER
+                        && ( this.ctlCode == Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK || this.ctlCode == Smb2IoctlRequest.FSCTL_SRV_COPYCHUNK_WRITE ) )
+                && ! ( status == NtStatus.NT_STATUS_BUFFER_OVERFLOW && ( this.ctlCode == Smb2IoctlRequest.FSCTL_PIPE_TRANSCEIVE
+                        || this.ctlCode == Smb2IoctlRequest.FSCTL_PIPE_PEEK || this.ctlCode == Smb2IoctlRequest.FSCTL_DFS_GET_REFERRALS ) )
+                && super.isErrorResponseStatus();
     }
 
 

@@ -30,12 +30,12 @@ import jcifs.internal.util.SMBUtil;
 public class SrvPipePeekResponse implements Decodable {
 
     // see https://msdn.microsoft.com/en-us/library/dd414577.aspx
-    
+
     private int namedPipeState;
     private int readDataAvailable;
     private int numberOfMessages;
     private int messageLength;
-    private byte [] data; 
+    private byte[] data;
 
 
     /**
@@ -61,6 +61,7 @@ public class SrvPipePeekResponse implements Decodable {
         return this.numberOfMessages;
     }
 
+
     /**
      * @return the totalBytesWritten
      */
@@ -68,12 +69,14 @@ public class SrvPipePeekResponse implements Decodable {
         return this.messageLength;
     }
 
+
     /**
      * @return the totalBytesWritten
      */
-    public byte [] getData () {
+    public byte[] getData () {
         return this.data;
     }
+
 
     /**
      * {@inheritDoc}
@@ -91,11 +94,11 @@ public class SrvPipePeekResponse implements Decodable {
         bufferIndex += 4;
         this.messageLength = SMBUtil.readInt4(buffer, bufferIndex);
         bufferIndex += 4;
-        data = new byte[len - 16];
-        if (data.length > 0) {
-            System.arraycopy(buffer, bufferIndex, data, 0, data.length);
+        this.data = new byte[len - 16];
+        if ( this.data.length > 0 ) {
+            System.arraycopy(buffer, bufferIndex, this.data, 0, this.data.length);
         }
-        return 0;
+        return bufferIndex - start;
     }
 
 }
