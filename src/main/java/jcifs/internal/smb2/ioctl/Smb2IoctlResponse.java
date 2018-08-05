@@ -208,6 +208,8 @@ public class Smb2IoctlResponse extends ServerMessageBlock2Response {
             return new SrvCopyChunkCopyResponse();
         case Smb2IoctlRequest.FSCTL_VALIDATE_NEGOTIATE_INFO:
             return new ValidateNegotiateInfoResponse();
+        case Smb2IoctlRequest.FSCTL_PIPE_PEEK:
+            return new SrvPipePeekResponse();
         }
         return null;
     }

@@ -23,6 +23,9 @@ import java.io.IOException;
 import jcifs.CIFSException;
 import jcifs.internal.smb1.trans.TransPeekNamedPipe;
 import jcifs.internal.smb1.trans.TransPeekNamedPipeResponse;
+import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
+import jcifs.internal.smb2.ioctl.SrvPipePeekResponse;
 
 
 /**
@@ -67,6 +70,13 @@ public class SmbPipeInputStream extends SmbFileInputStream {
     public int available () throws IOException {
         try ( SmbFileHandleImpl fd = this.handle.ensureOpen();
               SmbTreeHandleImpl th = fd.getTree() ) {
+            if ( th.isSMB2() ) {
+                Smb2IoctlRequest req = new Smb2IoctlRequest(th.getConfig(), Smb2IoctlRequest.FSCTL_PIPE_PEEK, fd.getFileId());
+                req.setMaxOutputResponse(16);
+                req.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+                Smb2IoctlResponse resp = th.send(req, RequestParam.NO_RETRY);
+                return ((SrvPipePeekResponse)resp.getOutputData()).getReadDataAvailable();
+            }
             TransPeekNamedPipe req = new TransPeekNamedPipe(th.getConfig(), this.handle.getUncPath(), fd.getFid());
             TransPeekNamedPipeResponse resp = new TransPeekNamedPipeResponse(th.getConfig());
             th.send(req, resp, RequestParam.NO_RETRY);
