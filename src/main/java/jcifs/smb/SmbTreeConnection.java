@@ -611,7 +611,7 @@ class SmbTreeConnection {
         }
         catch ( SmbAuthException sae ) {
             log.debug("Authentication failed", sae);
-            if ( loc.shouldForceSigning() ) { // IPC$ - try "anonymous" credentials
+            if ( t.getSession().getCredentials().isAnonymous() ) { // anonymous session, refresh
                 try ( SmbSessionInternal s = trans.getSmbSession(this.ctx.withAnonymousCredentials()).unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(null, null).unwrap(SmbTreeImpl.class) ) {
                     tr.treeConnect(null, null);
@@ -620,7 +620,8 @@ class SmbTreeConnection {
             }
             else if ( this.ctx.renewCredentials(loc.getURL().toString(), sae) ) {
                 log.debug("Trying to renew credentials after auth error");
-                try ( SmbSessionInternal s = trans.getSmbSession(this.ctx, t.getSession().getTargetHost(), t.getSession().getTargetDomain()).unwrap(SmbSessionInternal.class);
+                try ( SmbSessionInternal s = trans.getSmbSession(this.ctx, t.getSession().getTargetHost(), t.getSession().getTargetDomain())
+                        .unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(share, null).unwrap(SmbTreeImpl.class) ) {
                     if ( referral != null ) {
                         tr.markDomainDfs();
