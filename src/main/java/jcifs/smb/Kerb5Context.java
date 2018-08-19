@@ -297,7 +297,7 @@ class Kerb5Context implements SSPContext {
             return this.gssContext.initSecContext(token, off, len);
         }
         catch ( GSSException e ) {
-            throw new SmbException("GSSAPI mechanism failed", e);
+            throw new SmbAuthException("GSSAPI mechanism failed", e);
         }
     }
 

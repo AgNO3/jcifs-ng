@@ -74,6 +74,7 @@ public final class CIFSContextCredentialWrapper extends CIFSContextWrapper imple
             CredentialsInternal renewed = renewable.renew();
             if ( renewed != null ) {
                 this.creds = renewed;
+                return true;
             }
         }
         NtlmAuthenticator auth = NtlmAuthenticator.getDefault();

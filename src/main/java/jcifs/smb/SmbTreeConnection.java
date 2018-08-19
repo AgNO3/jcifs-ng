@@ -592,7 +592,7 @@ class SmbTreeConnection {
      * @param t
      * @throws CIFSException
      */
-    private SmbTreeImpl connectTree ( SmbResourceLocator loc, String addr, String share, SmbTransportInternal trans, SmbTreeImpl t,
+    private SmbTreeImpl connectTree ( SmbResourceLocatorImpl loc, String addr, String share, SmbTransportInternal trans, SmbTreeImpl t,
             DfsReferralData referral ) throws CIFSException {
         if ( log.isDebugEnabled() && trans.isSigningOptional() && !loc.isIPC() && !this.ctx.getConfig().isSigningEnforced() ) {
             log.debug("Signatures for file enabled but not required " + this);
@@ -611,7 +611,7 @@ class SmbTreeConnection {
         }
         catch ( SmbAuthException sae ) {
             log.debug("Authentication failed", sae);
-            if ( loc.isIPC() ) { // IPC$ - try "anonymous" credentials
+            if ( loc.shouldForceSigning() ) { // IPC$ - try "anonymous" credentials
                 try ( SmbSessionInternal s = trans.getSmbSession(this.ctx.withAnonymousCredentials()).unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(null, null).unwrap(SmbTreeImpl.class) ) {
                     tr.treeConnect(null, null);
@@ -620,7 +620,7 @@ class SmbTreeConnection {
             }
             else if ( this.ctx.renewCredentials(loc.getURL().toString(), sae) ) {
                 log.debug("Trying to renew credentials after auth error");
-                try ( SmbSessionInternal s = trans.getSmbSession(this.ctx).unwrap(SmbSessionInternal.class);
+                try ( SmbSessionInternal s = trans.getSmbSession(this.ctx, t.getSession().getTargetHost(), t.getSession().getTargetDomain()).unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(share, null).unwrap(SmbTreeImpl.class) ) {
                     if ( referral != null ) {
                         tr.markDomainDfs();
