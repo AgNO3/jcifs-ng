@@ -973,7 +973,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                         break;
                     }
                     catch ( InterruptedException e ) {
-                        throw new InterruptedIOException("Failed to acquire credits, exzessive parallelism?");
+                        InterruptedIOException ie = new InterruptedIOException("Interrupted while acquiring credits");
+                        ie.initCause(e);
+                        throw ie;
                     }
                 }
                 else {
