@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Map;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -115,6 +116,19 @@ public class SessionTest extends BaseCIFSTest {
     public void logonGuest () throws IOException {
         try ( SmbResource f = new SmbFile(getTestShareGuestURL(), withTestGuestCredentials()) ) {
             checkConnection(f);
+        }
+    }
+
+
+    @Test
+    public void logonUserNoDomain () throws IOException {
+        Assume.assumeTrue(getTestDomain().equalsIgnoreCase(getTestUserDomain()));
+        CIFSContext ctx = getContext();
+        try ( SmbResource f = new SmbFile(
+            getTestShareURL(),
+            ctx.withCredentials(new NtlmPasswordAuthenticator(null, getTestUser(), getTestUserPassword()))); ) {
+            checkConnection(f);
+            f.resolve("test").exists();
         }
     }
 

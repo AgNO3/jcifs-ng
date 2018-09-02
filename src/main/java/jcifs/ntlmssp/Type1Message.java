@@ -61,9 +61,6 @@ public class Type1Message extends NtlmMessage {
     public Type1Message ( CIFSContext tc, int flags, String suppliedDomain, String suppliedWorkstation ) {
         setFlags(getDefaultFlags(tc) | flags);
         setSuppliedDomain(suppliedDomain);
-        if ( suppliedWorkstation == null ) {
-            suppliedWorkstation = tc.getNameServiceClient().getLocalHost().getHostName();
-        }
         setSuppliedWorkstation(suppliedWorkstation);
     }
 

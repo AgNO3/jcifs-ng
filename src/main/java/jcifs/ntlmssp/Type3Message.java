@@ -97,12 +97,6 @@ public class Type3Message extends NtlmMessage {
     public Type3Message ( CIFSContext tc, Type2Message type2, String targetName, String password, String domain, String user, String workstation,
             int flags ) throws GeneralSecurityException, CIFSException {
         setFlags(flags | getDefaultFlags(tc, type2));
-        if ( domain == null || domain.length() == 0 ) {
-            domain = "?";
-        }
-        if ( workstation == null ) {
-            workstation = tc.getNameServiceClient().getLocalHost().getHostName();
-        }
         setWorkstation(workstation);
         setDomain(domain);
         setUser(user);
