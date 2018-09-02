@@ -119,7 +119,7 @@ public class NtlmContext implements SSPContext {
             this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_ANONYMOUS;
         }
         this.requireKeyExchange = doSigning;
-        this.workstation = tc.getNameServiceClient().getLocalHost().getHostName();
+        this.workstation = tc.getConfig().getNetbiosHostname();
     }
 
 
