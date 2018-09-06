@@ -1381,6 +1381,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         boolean cont = false;
         switch ( resp.getErrorCode() ) {
         case NtStatus.NT_STATUS_OK:
+        case NtStatus.NT_STATUS_NO_MORE_FILES:
             cont = true;
             break;
         case NtStatus.NT_STATUS_PENDING:
