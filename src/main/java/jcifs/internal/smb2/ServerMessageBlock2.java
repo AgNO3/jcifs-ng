@@ -534,20 +534,14 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
     }
 
 
-    @Override
-    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
-        return decode(buffer, bufferIndex, false);
-    }
-
-
     /**
      * @param buffer
      * @param bufferIndex
-     * @param compound
      * @return decoded length
      * @throws SMBProtocolDecodingException
      */
-    public int decode ( byte[] buffer, int bufferIndex, boolean compound ) throws SMBProtocolDecodingException {
+    @Override
+    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int start = this.headerStart = bufferIndex;
         bufferIndex += readHeaderWireFormat(buffer, bufferIndex);
         if ( isErrorResponseStatus() ) {
@@ -560,7 +554,7 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
         this.length = bufferIndex - start;
         int len = this.length;
 
-        if ( compound || this.nextCommand != 0 ) {
+        if ( this.nextCommand != 0 ) {
             // padding becomes part of signature if this is _PART_ of a compound chain
             len += pad8(bufferIndex);
         }
