@@ -166,7 +166,7 @@ public class SmbFileOutputStream extends OutputStream {
         // there seems to be a bug with some servers that causes corruption if using signatures +
         // CAP_LARGE_WRITE
         if ( th.hasCapability(SmbConstants.CAP_LARGE_WRITEX) && !th.areSignaturesActive() ) {
-            this.writeSizeFile = Math.min(sendBufferSize - 70, 0xFFFF - 70);
+            this.writeSizeFile = Math.min(th.getConfig().getSendBufferSize() - 70, 0xFFFF - 70);
         }
         else {
             log.debug("No support or SMB signing is enabled, not enabling large writes");
