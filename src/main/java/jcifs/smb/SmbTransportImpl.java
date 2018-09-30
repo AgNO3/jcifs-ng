@@ -1174,6 +1174,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             System.arraycopy(this.sbuf, 4, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
             readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
 
+            cur.setReadSize(rl);
             int len = cur.decode(buffer, 0);
 
             if ( len > rl ) {
@@ -1207,6 +1208,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     log.debug(String.format("Compound next command %d read size %d remain %d", nextCommand, rl, size));
                 }
 
+                cur.setReadSize(rl);
                 readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
 
                 len = cur.decode(buffer, 0, true);

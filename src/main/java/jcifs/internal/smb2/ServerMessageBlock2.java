@@ -107,6 +107,7 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
     private int status;
     private int credit;
     private int nextCommand;
+    private int readSize;
     private boolean async;
     private int treeId;
     private long mid, asyncId, sessionId;
@@ -161,6 +162,15 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
      */
     public final int getNextCommandOffset () {
         return this.nextCommand;
+    }
+
+
+    /**
+     * @param readSize
+     *            the readSize to set
+     */
+    public void setReadSize ( int readSize ) {
+        this.readSize = readSize;
     }
 
 
@@ -560,9 +570,18 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
         this.length = bufferIndex - start;
         int len = this.length;
 
-        if ( compound || this.nextCommand != 0 ) {
+        if ( this.nextCommand != 0 ) {
             // padding becomes part of signature if this is _PART_ of a compound chain
             len += pad8(bufferIndex);
+        }
+        else if ( compound && this.nextCommand == 0 && this.readSize > 0 ) {
+            // TODO: only apply this for actual compound chains, or is this correct for single responses, too?
+            // 3.2.5.1.9 Handling Compounded Responses
+            // The final response in the compounded response chain will have NextCommand equal to 0,
+            // and it MUST be processed as an individual message of a size equal to the number of bytes
+            // remaining in this receive.
+            int rem = this.readSize - this.length;
+            len += rem;
         }
 
         haveResponse(buffer, start, len);
