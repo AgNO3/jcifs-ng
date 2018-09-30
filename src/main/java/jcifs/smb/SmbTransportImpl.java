@@ -494,6 +494,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 this.in = this.socket.getInputStream();
             }
 
+            if ( this.credits.drainPermits() == 0 ) {
+                log.debug("It appears we previously lost some credits");
+            }
+
             if ( this.smb2 || this.getContext().getConfig().isUseSMB2OnlyNegotiation() ) {
                 log.debug("Using SMB2 only negotiation");
                 return negotiate2(null);
@@ -528,7 +532,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 return negotiate2(r);
             }
 
-            int permits = resp.getInitialCredits() - 1;
+            int permits = resp.getInitialCredits();
             if ( permits > 0 ) {
                 this.credits.release(permits);
             }
@@ -607,10 +611,6 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
         // further negotiation needed
         Smb2NegotiateRequest smb2neg = new Smb2NegotiateRequest(getContext().getConfig(), securityMode);
-
-        if ( this.credits.drainPermits() == 0 ) {
-            throw new IOException("No credits for negotiate");
-        }
         Smb2NegotiateResponse r = null;
         byte[] negoReqBuffer = null;
         byte[] negoRespBuffer = null;
