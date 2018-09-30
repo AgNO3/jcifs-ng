@@ -32,7 +32,6 @@ import java.util.Map;
 
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -134,12 +133,12 @@ public class SessionTest extends BaseCIFSTest {
 
 
     @Test
-    @Ignore
     public void transportReconnects () throws IOException {
         try ( SmbFile f = getDefaultShareRoot() ) {
             // transport disconnects can happen pretty much any time
             assertNotNull(f);
             f.connect();
+            f.exists();
             assertNotNull(f);
             try ( SmbTreeHandleInternal treeHandle = (SmbTreeHandleInternal) f.getTreeHandle();
                   SmbSessionInternal session = treeHandle.getSession().unwrap(SmbSessionInternal.class) ) {
@@ -149,6 +148,7 @@ public class SessionTest extends BaseCIFSTest {
                     transport.disconnect(true, true);
                     assertNotNull(f);
                     checkConnection(f);
+                    f.exists();
                 }
             }
         }
@@ -160,7 +160,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     @Test
-    @Ignore
     public void transportReuseSimple () throws CIFSException {
         CIFSContext ctx = withTestNTLMCredentials(getContext());
         String loc = getTestShareURL();
@@ -175,7 +174,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     @Test
-    @Ignore
     public void transportReuseAnon () throws CIFSException {
         CIFSContext ctx1 = withTestNTLMCredentials(getContext());
         CIFSContext ctx2 = withAnonymousCredentials();
@@ -191,7 +189,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     @Test
-    @Ignore
     // BUG #14
     public void testNoLeakRequest () throws CIFSException, MalformedURLException {
         try ( SmbFile f = getDefaultShareRoot() ) {
@@ -208,7 +205,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     @Test
-    @Ignore
     // BUG #14
     public void testNoLeakRequestError () throws IOException {
         try ( SmbResource f = getDefaultShareRoot().resolve("doesnotexist") ) {
