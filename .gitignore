@@ -17,4 +17,8 @@ hs_err_pid*
 .project
 .settings
 
+# intellij
+*.iml
+.idea/
+
 .repository
