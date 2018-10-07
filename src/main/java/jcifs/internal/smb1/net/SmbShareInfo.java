@@ -134,8 +134,7 @@ public class SmbShareInfo implements FileEntry {
 
     @Override
     public int hashCode () {
-        int hashCode = this.netName.hashCode();
-        return hashCode;
+        return this.netName != null ? this.netName.hashCode() : 0;
     }
 
 
