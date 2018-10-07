@@ -1211,7 +1211,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 cur.setReadSize(rl);
                 readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
 
-                len = cur.decode(buffer, 0, true);
+                len = cur.decode(buffer, 0);
                 if ( len > rl ) {
                     throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
                 }

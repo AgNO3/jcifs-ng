@@ -544,20 +544,14 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
     }
 
 
-    @Override
-    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
-        return decode(buffer, bufferIndex, false);
-    }
-
-
     /**
      * @param buffer
      * @param bufferIndex
-     * @param compound
      * @return decoded length
      * @throws SMBProtocolDecodingException
      */
-    public int decode ( byte[] buffer, int bufferIndex, boolean compound ) throws SMBProtocolDecodingException {
+    @Override
+    public int decode ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
         int start = this.headerStart = bufferIndex;
         bufferIndex += readHeaderWireFormat(buffer, bufferIndex);
         if ( isErrorResponseStatus() ) {
