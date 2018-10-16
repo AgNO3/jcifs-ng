@@ -54,4 +54,12 @@ public class EmptyIterator implements CloseableIterator<SmbResource> {
     @Override
     public void close () throws CIFSException {}
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.CloseableIterator#remove()
+     */
+    @Override
+    public void remove() {
+    }
 }

@@ -224,7 +224,8 @@ public class KerberosTest extends BaseCIFSTest {
 
 
     private static KerberosTicket getKerberosTicket ( KerberosPrincipal principal, String password, Long expire ) throws Exception {
-        PrincipalName principalName = new PrincipalName(principal.getName(), PrincipalName.KRB_NT_PRINCIPAL, principal.getRealm());
+        PrincipalName principalName = new PrincipalName(principal.getName(), PrincipalName.KRB_NT_PRINCIPAL);
+        principalName.setRealm(principal.getRealm());
         KrbAsReqBuilder builder = new KrbAsReqBuilder(principalName, password != null ? password.toCharArray() : new char[0]);
 
         if ( expire != null ) {
