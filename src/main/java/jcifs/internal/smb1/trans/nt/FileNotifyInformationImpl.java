@@ -84,6 +84,10 @@ public class FileNotifyInformationImpl implements FileNotifyInformation, Decodab
 
     @Override
     public int decode ( byte[] buffer, int bufferIndex, int len ) throws SMBProtocolDecodingException {
+        if (len == 0) {
+        	// nothing to do
+        	return 0;
+        }
         int start = bufferIndex;
 
         this.nextEntryOffset = SMBUtil.readInt4(buffer, bufferIndex);
