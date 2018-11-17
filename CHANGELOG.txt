@@ -26,6 +26,14 @@ jcifs-ng 2.1.0
   or enforced generally jcifs.smb.client.enforceSpnegoIntegrity
 - Disable jcifs.smb.client.ignoreCopyToException by default.
 
+jcifs-ng 2.0.8
+- Properly compute length of last compound response in a chain (#103)
+- Prevent fallback to anonymous session on auth failures of an authenticated
+one (can be a security issue).
+- Fix LARGE__WRITEX buffer size negotiation (SMB1,#106)
+- Fix possible NPE in in SmbShareInfo (#108)
+- Fix timeout handling when acquiring credits (#99)
+
 jcifs-ng 2.0.7
 - Clear attribute cache after rename operation (#69)
 - Fix possible deadlock in tree handling (#72)
