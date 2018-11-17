@@ -139,10 +139,14 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
         query.setFileIndex(results[ results.length - 1 ].getFileIndex());
         query.setQueryFlags(Smb2QueryDirectoryRequest.SMB2_INDEX_SPECIFIED);
         try {
-            this.response = th.send(query);
+            Smb2QueryDirectoryResponse r = th.send(query);
+            if ( r.getStatus() == NtStatus.NT_STATUS_NO_MORE_FILES ) {
+                return false;
+            }
+            this.response = r;
         }
         catch ( SmbException e ) {
-            if ( e.getNtStatus() == 0x80000006 ) { // NO_MORE_FILES
+            if ( e.getNtStatus() == NtStatus.NT_STATUS_NO_MORE_FILES ) {
                 log.debug("End of listing", e);
                 return false;
             }

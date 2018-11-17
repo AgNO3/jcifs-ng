@@ -123,10 +123,10 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
         this.response.reset();
         try {
             getTreeHandle().send(this.nextRequest, this.response);
-            return true;
+            return this.response.getStatus() != NtStatus.NT_STATUS_NO_MORE_FILES;
         }
         catch ( SmbException e ) {
-            if ( e.getNtStatus() == 0x80000006 ) {
+            if ( e.getNtStatus() == NtStatus.NT_STATUS_NO_MORE_FILES ) {
                 log.debug("No more entries", e);
                 return false;
             }
