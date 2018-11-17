@@ -1,3 +1,18 @@
+jcifs-ng 2.1.1
+- Properly compute length of last compound response in a chain (#103)
+- Do not send workstation name by default, do not send a wrong domain name
+  (#98)
+- Prevent fallback to anonymous session on auth failures of an authenticated
+  one (can be a security issue).
+- Fix LARGE__WRITEX buffer size negotiation (SMB1,#106)
+- More graceful handling of NO_MORE_FILES status
+- Ignore empty notifications (#117)
+- Fix timeout handling when acquiring credits (#99)
+- Fix test build on Java 7 (#113)
+- Fix possible NPE in in SmbShareInfo (#108)
+- Always reset credits on reconnect (#99)
+
+
 jcifs-ng 2.1.0
 - Basic SMB 3.0 support (signing)
 - Enable SMB2 support by default. Protocol versions to enable/disable

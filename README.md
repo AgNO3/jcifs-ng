@@ -7,7 +7,7 @@ Latest stable release:
 <dependency>
     <groupId>eu.agno3.jcifs</groupId>
     <artifactId>jcifs-ng</artifactId>
-    <version>2.1.0</version>
+    <version>2.1.1</version>
 </dependency>
 ```
 
