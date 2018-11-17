@@ -62,6 +62,7 @@ import sun.security.krb5.EncryptionKey;
 import sun.security.krb5.KrbAsReqBuilder;
 import sun.security.krb5.KrbException;
 import sun.security.krb5.PrincipalName;
+import sun.security.krb5.RealmException;
 import sun.security.krb5.internal.KerberosTime;
 
 
@@ -200,7 +201,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     private static KerberosTicket getKerberosTicket ( KeyTab keytab, final KerberosPrincipal principal )
             throws Asn1Exception, KrbException, IOException {
-        PrincipalName principalName = new PrincipalName(principal.toString(), PrincipalName.KRB_NT_PRINCIPAL);
+        PrincipalName principalName = convertPrincipal(principal);
         EncryptionKey[] keys = Krb5Util.keysFromJavaxKeyTab(keytab, principalName);
 
         if ( keys == null || keys.length == 0 ) {
@@ -224,8 +225,7 @@ public class KerberosTest extends BaseCIFSTest {
 
 
     private static KerberosTicket getKerberosTicket ( KerberosPrincipal principal, String password, Long expire ) throws Exception {
-        PrincipalName principalName = new PrincipalName(principal.getName(), PrincipalName.KRB_NT_PRINCIPAL);
-        principalName.setRealm(principal.getRealm());
+        PrincipalName principalName = convertPrincipal(principal);
         KrbAsReqBuilder builder = new KrbAsReqBuilder(principalName, password != null ? password.toCharArray() : new char[0]);
 
         if ( expire != null ) {
@@ -242,6 +242,19 @@ public class KerberosTest extends BaseCIFSTest {
         KerberosTicket ticket = Krb5Util.credsToTicket(creds);
         System.out.println("Ends " + ticket.getEndTime().getTime());
         return ticket;
+    }
+
+
+    /**
+     * @param principal
+     * @return
+     * @throws RealmException
+     */
+    protected static PrincipalName convertPrincipal ( KerberosPrincipal principal ) throws RealmException {
+        PrincipalName principalName = new PrincipalName(
+            principal.getName() + PrincipalName.NAME_REALM_SEPARATOR + principal.getRealm(),
+            PrincipalName.KRB_NT_PRINCIPAL);
+        return principalName;
     }
 
 
