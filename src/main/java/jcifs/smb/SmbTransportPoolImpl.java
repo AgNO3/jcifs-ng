@@ -190,20 +190,21 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
         });
 
-        for ( Address addr : addrs ) {
-            SmbTransportImpl found = findConnection(
-                tf,
-                addr,
-                port,
-                tf.getConfig().getLocalAddr(),
-                tf.getConfig().getLocalPort(),
-                name,
-                forceSigning,
-                true);
-            if ( found != null ) {
-                return found;
+        synchronized ( this.connections ) {
+            for ( Address addr : addrs ) {
+                SmbTransportImpl found = findConnection(
+                    tf,
+                    addr,
+                    port,
+                    tf.getConfig().getLocalAddr(),
+                    tf.getConfig().getLocalPort(),
+                    name,
+                    forceSigning,
+                    true);
+                if ( found != null ) {
+                    return found;
+                }
             }
-
         }
 
         IOException ex = null;
