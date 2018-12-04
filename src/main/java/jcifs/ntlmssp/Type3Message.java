@@ -725,6 +725,7 @@ public class Type3Message extends NtlmMessage {
         if ( readULong(material, pos) != NTLMSSP_TYPE3 ) {
             throw new IOException("Not a Type 3 message.");
         }
+        pos += 4;
 
         byte[] lmResponseBytes = readSecurityBuffer(material, pos);
         setLMResponse(lmResponseBytes);
