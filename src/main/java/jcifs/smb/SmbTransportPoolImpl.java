@@ -271,20 +271,22 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     @Override
     public boolean close () throws CIFSException {
         boolean inUse = false;
+        
+        List<SmbTransportImpl> toClose;
         synchronized ( this.connections ) {
             log.debug("Closing pool");
-            List<SmbTransportImpl> toClose = new LinkedList<>(this.connections);
+            toClose = new LinkedList<>(this.connections);
             toClose.addAll(this.nonPooledConnections);
-            for ( SmbTransportImpl conn : toClose ) {
-                try {
-                    inUse |= conn.disconnect(false, false);
-                }
-                catch ( IOException e ) {
-                    log.warn("Failed to close connection", e);
-                }
-            }
             this.connections.clear();
             this.nonPooledConnections.clear();
+        }
+        for ( SmbTransportImpl conn : toClose ) {
+            try {
+                inUse |= conn.disconnect(false, false);
+            }
+            catch ( IOException e ) {
+                log.warn("Failed to close connection", e);
+            }
         }
         return inUse;
     }
