@@ -54,9 +54,9 @@ import jcifs.context.BaseContext;
  */
 @RunWith ( Suite.class )
 @SuiteClasses ( {
-    ContextConfigTest.class, PACTest.class, FileLocationTest.class, SessionTest.class, KerberosTest.class, TimeoutTest.class, SidTest.class,
-    NamingTest.class, DfsTest.class, FileAttributesTest.class, EnumTest.class, PipeTest.class, FileOperationsTest.class, WatchTest.class,
-    ReadWriteTest.class, ConcurrencyTest.class, RandomAccessFileTest.class, OplockTests.class
+    ContextConfigTest.class, PACTest.class, NtlmTest.class, FileLocationTest.class, SessionTest.class, KerberosTest.class, TimeoutTest.class,
+    SidTest.class, NamingTest.class, DfsTest.class, FileAttributesTest.class, EnumTest.class, PipeTest.class, FileOperationsTest.class,
+    WatchTest.class, ReadWriteTest.class, ConcurrencyTest.class, RandomAccessFileTest.class, OplockTests.class
 } )
 
 public class AllTests {
