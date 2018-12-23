@@ -109,8 +109,9 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         if ( this.handle.isStale() ) {
             throw new IOException("DCERPC pipe is no longer open");
         }
-
-        return this.handle.sendrecv(buf, off, length, inB, getMaxRecv());
+        
+        int len = this.handle.sendrecv(buf, off, length, inB, getMaxRecv());
+        return doReceiveRestOfFragment(inB, len);
     }
 
 
@@ -124,27 +125,45 @@ public class DcerpcPipeHandle extends DcerpcHandle {
 
 
     @Override
-    protected int doReceiveFragment ( byte[] buf ) throws IOException {
-        if ( buf.length < getMaxRecv() ) {
-            throw new IllegalArgumentException("buffer too small");
-        }
-
-        int off = this.handle.recv(buf, 0, buf.length);
-        if ( buf[ 0 ] != 5 && buf[ 1 ] != 0 ) {
+    protected byte[] doReceiveFragment ( ) throws IOException {
+    	// Minimum buffer size is with max receive length
+    	byte[] buf = new byte[getMaxRecv()];
+    	
+    	// Validate it's a DCERPC message
+        int off = this.handle.recv(buf, 0, getMaxRecv());
+        if ( buf[ 0 ] != 5 || buf[ 1 ] != 0 ) {
             throw new IOException("Unexpected DCERPC PDU header");
         }
-
-        int length = Encdec.dec_uint16le(buf, 8);
-        if ( length > getMaxRecv() ) {
-            throw new IOException("Unexpected fragment length: " + length);
+        
+        // Get the message total length and resize the buffer if needed
+        int length = Encdec.dec_uint16le(buf, 8); 
+        if ( ( length ) > buf.length ) {
+            byte[] tmp = new byte[length];
+            System.arraycopy(buf, 0, tmp, 0, getMaxRecv());
+            buf = tmp;
         }
 
-        while ( off < length ) {
-            off += this.handle.recv(buf, off, length - off);
-        }
-        return off;
+        doReceiveRestOfFragment(buf, off);
+        
+        return buf;
     }
+    
+    // Receive more data into fragment until we get all the message length
+    // buffer should be initialize with the DCERPC message header
+    private int doReceiveRestOfFragment ( byte[] buf, int off ) throws IOException {
+    	
+    	int length = Encdec.dec_uint16le(buf, 8);   
+    	
+    	if ( buf.length < length) {
+    		throw new IllegalArgumentException("buffer too small");
+    	}
+    	 
+    	while (off < length) {
+    		off += this.handle.recv(buf, off, getMaxRecv());
+    	}
 
+    	return off;
+    }
 
     @Override
     public void close () throws IOException {
