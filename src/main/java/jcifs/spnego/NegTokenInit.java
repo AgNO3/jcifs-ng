@@ -48,13 +48,13 @@ import jcifs.util.Hexdump;
 @SuppressWarnings ( "javadoc" )
 public class NegTokenInit extends SpnegoToken {
 
-    public static final int DELEGATION = 0x40;
-    public static final int MUTUAL_AUTHENTICATION = 0x20;
-    public static final int REPLAY_DETECTION = 0x10;
-    public static final int SEQUENCE_CHECKING = 0x08;
-    public static final int ANONYMITY = 0x04;
-    public static final int CONFIDENTIALITY = 0x02;
-    public static final int INTEGRITY = 0x01;
+    public static final int DELEGATION = 0x80;
+    public static final int MUTUAL_AUTHENTICATION = 0x40;
+    public static final int REPLAY_DETECTION = 0x20;
+    public static final int SEQUENCE_CHECKING = 0x10;
+    public static final int ANONYMITY = 0x08;
+    public static final int CONFIDENTIALITY = 0x04;
+    public static final int INTEGRITY = 0x02;
 
     private static final ASN1ObjectIdentifier SPNEGO_OID = new ASN1ObjectIdentifier(SpnegoConstants.SPNEGO_MECHANISM);
 
