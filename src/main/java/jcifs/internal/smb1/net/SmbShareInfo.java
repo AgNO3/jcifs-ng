@@ -19,6 +19,8 @@
 package jcifs.internal.smb1.net;
 
 
+import java.util.Objects;
+
 import jcifs.SmbConstants;
 import jcifs.smb.FileEntry;
 import jcifs.util.Hexdump;
@@ -126,7 +128,7 @@ public class SmbShareInfo implements FileEntry {
     public boolean equals ( Object obj ) {
         if ( obj instanceof SmbShareInfo ) {
             SmbShareInfo si = (SmbShareInfo) obj;
-            return this.netName.equals(si.netName);
+            return Objects.equals(this.netName, si.netName);
         }
         return false;
     }
@@ -134,7 +136,7 @@ public class SmbShareInfo implements FileEntry {
 
     @Override
     public int hashCode () {
-        return this.netName != null ? this.netName.hashCode() : 0;
+        return Objects.hashCode(this.netName);
     }
 
 
