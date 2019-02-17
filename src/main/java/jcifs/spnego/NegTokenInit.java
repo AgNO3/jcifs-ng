@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Enumeration;
 
+import org.bouncycastle.asn1.ASN1ApplicationSpecific;
+import org.bouncycastle.asn1.ASN1BitString;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Object;
@@ -168,7 +170,7 @@ public class NegTokenInit extends SpnegoToken {
     protected void parse ( byte[] token ) throws IOException {
 
         try ( ASN1InputStream is = new ASN1InputStream(token) ) {
-            DERApplicationSpecific constructed = (DERApplicationSpecific) is.readObject();
+            ASN1ApplicationSpecific constructed = (ASN1ApplicationSpecific) is.readObject();
             if ( constructed == null || !constructed.isConstructed() )
                 throw new IOException(
                     "Malformed SPNEGO token " + constructed
@@ -197,7 +199,7 @@ public class NegTokenInit extends SpnegoToken {
                         setMechanisms(mechs);
                         break;
                     case 1:
-                        DERBitString ctxFlags = DERBitString.getInstance(tagged, true);
+                        ASN1BitString ctxFlags = DERBitString.getInstance(tagged, true);
                         setContextFlags(ctxFlags.getBytes()[ 0 ] & 0xff);
                         break;
                     case 2:
