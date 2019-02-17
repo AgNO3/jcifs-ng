@@ -263,7 +263,9 @@ public class SessionTest extends BaseCIFSTest {
             assertNotNull(ntcreds.getUsername());
             assertEquals(user, ntcreds.getUsername());
             assertNotNull(ntcreds.getUserDomain());
-            assertEquals(dom, ntcreds.getUserDomain());
+            if ( dom != null ) {
+                assertEquals(dom, ntcreds.getUserDomain());
+            }
             assertNotNull(ntcreds.getPassword());
             assertEquals(pass, ntcreds.getPassword());
 
