@@ -141,9 +141,9 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
             user = userInfo.substring(u, i);
         }
 
-        this.domain = dom != null ? dom : defDomain;
-        this.username = user != null ? user : defUser;
-        this.password = pass != null ? pass : defPassword;
+        this.domain = dom != null ? dom : ( defDomain != null ? defDomain : "" );
+        this.username = user != null ? user : ( defUser != null ? defUser : "" );
+        this.password = pass != null ? pass : ( defPassword != null ? defPassword : "" );
     }
 
 
