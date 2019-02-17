@@ -292,6 +292,36 @@ public class EnumTest extends BaseCIFSTest {
 
 
     @Test
+    public void testEnumDeepVirgin () throws IOException {
+
+        try ( SmbFile r = getDefaultShareRoot();
+              SmbFile f = new SmbFile(r, "x-test/") ) {
+            if ( !f.exists() ) {
+                f.mkdirs();
+            }
+        }
+
+        // fresh connection
+        CIFSContext ctx = getNewContext();
+        try ( SmbFile r = new SmbFile(getTestShareURL(), withTestNTLMCredentials(ctx));
+              SmbFile f = new SmbFile(r, "x-test/") ) {
+
+            Set<String> names = new HashSet<>();
+            try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                while ( chld.hasNext() ) {
+
+                    try ( SmbResource next = chld.next() ) {
+                        try ( CloseableIterator<SmbResource> children = next.children() ) {}
+                        names.add(next.getName());
+                    }
+                }
+            }
+        }
+
+    }
+
+
+    @Test
     public void testEnumDeepUnresolvedCasing () throws IOException {
 
         String testShareURL = getTestShareURL().toUpperCase(Locale.ROOT);

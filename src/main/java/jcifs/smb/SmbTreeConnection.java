@@ -687,7 +687,7 @@ class SmbTreeConnection {
 
             String rpath = request != null ? request.getPath() : loc.getUNCPath();
             String rfullpath = request != null ? request.getFullUNCPath() : ( '\\' + loc.getServer() + '\\' + loc.getShare() + loc.getUNCPath() );
-            if ( !t.isPossiblyDfs() ) {
+            if ( t.isInDomainDfs() || !t.isPossiblyDfs() ) {
                 if ( t.isInDomainDfs() ) {
                     // need to adjust request path
                     DfsReferralData dr = t.getTreeReferral();
