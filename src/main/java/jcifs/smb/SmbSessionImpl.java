@@ -615,7 +615,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         }
                         setDigest(dgst);
                     }
-                    else {
+                    else if ( trans.getContext().getConfig().isSigningEnabled() ) {
                         throw new SmbException("Signing enabled but no session key available");
                     }
                 }
@@ -1074,7 +1074,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         byte[] signingKey = ctx.getSigningKey();
                         if ( signingKey != null && response != null )
                             setDigest(new SMB1SigningDigest(signingKey, 2));
-                        else {
+                        else if ( trans.getContext().getConfig().isSigningEnabled() ) {
                             throw new SmbException("Signing required but no session key available");
                         }
                         this.sessionKey = signingKey;
