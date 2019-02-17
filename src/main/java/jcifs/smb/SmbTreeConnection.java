@@ -573,7 +573,7 @@ class SmbTreeConnection {
             }
             catch ( IOException e ) {
                 last = e;
-                log.warn("Referral failed, trying next", e);
+                log.debug("Referral failed, trying next", e);
             }
 
             if ( dr != null ) {
