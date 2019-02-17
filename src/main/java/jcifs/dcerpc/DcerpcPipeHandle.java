@@ -110,7 +110,22 @@ public class DcerpcPipeHandle extends DcerpcHandle {
             throw new IOException("DCERPC pipe is no longer open");
         }
 
-        return this.handle.sendrecv(buf, off, length, inB, getMaxRecv());
+        int have = this.handle.sendrecv(buf, off, length, inB, getMaxRecv());
+
+        int fraglen = Encdec.dec_uint16le(inB, 8);
+        if ( fraglen > getMaxRecv() ) {
+            throw new IOException("Unexpected fragment length: " + length);
+        }
+
+        while ( have < fraglen ) {
+            int r = this.handle.recv(buf, have, length - have);
+            if ( r == 0 ) {
+                throw new IOException("Unexpected EOF");
+            }
+            have += r;
+        }
+
+        return have;
     }
 
 
@@ -130,7 +145,7 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         }
 
         int off = this.handle.recv(buf, 0, buf.length);
-        if ( buf[ 0 ] != 5 && buf[ 1 ] != 0 ) {
+        if ( buf[ 0 ] != 5 || buf[ 1 ] != 0 ) {
             throw new IOException("Unexpected DCERPC PDU header");
         }
 
@@ -140,7 +155,11 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         }
 
         while ( off < length ) {
-            off += this.handle.recv(buf, off, length - off);
+            int r = this.handle.recv(buf, off, length - off);
+            if ( r == 0 ) {
+                throw new IOException("Unexpected EOF");
+            }
+            off += r;
         }
         return off;
     }
