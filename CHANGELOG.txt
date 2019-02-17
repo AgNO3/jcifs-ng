@@ -1,3 +1,13 @@
+jcifs-ng 2.1.2
+- Fix processing of multi fragment DCERPC responses (#130)
+- Fix processing of DCERPC fragments longer than recv size (#130)
+- Fix GSS-API context flag defintions (#130)
+- Fix NPE when specifiying user via URL userinfo and domain unset (#113)
+- Fix possible NPE in in SmbShareInfo (#136)
+- Fix NTLM Type3 parsing error (#120)
+- Fix some concurrency issues obtaining/closing connections (#118,#126)
+- Be more tolerant when resolving owner user/group SID
+
 jcifs-ng 2.1.1
 - Properly compute length of last compound response in a chain (#103)
 - Do not send workstation name by default, do not send a wrong domain name
