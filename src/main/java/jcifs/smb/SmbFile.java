@@ -760,7 +760,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
          */
 
         if ( th.isSMB2() ) {
-            return ( SmbBasicFileInfo ) withOpen(th, null); // just open and close. withOpen will store the attributes
+            return (SmbBasicFileInfo) withOpen(th, null); // just open and close. withOpen will store the attributes
         }
         else if ( th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
             /*
@@ -780,7 +780,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 this.lastModified = info.getLastWriteTime();
                 this.lastAccess = info.getLastAccessTime();
                 this.attrExpiration = System.currentTimeMillis() + th.getConfig().getAttributeCacheTimeout();
-            } else if ( info instanceof FileStandardInfo ) {
+            }
+            else if ( info instanceof FileStandardInfo ) {
                 this.size = info.getSize();
                 this.sizeExpiration = System.currentTimeMillis() + th.getConfig().getAttributeCacheTimeout();
             }
@@ -1306,7 +1307,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
               SmbTreeHandleImpl th = dest.ensureTreeConnected() ) {
 
             // this still might be required for standalone DFS
-            if ( ! exists() ) {
+            if ( !exists() ) {
                 throw new SmbException(NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND, null);
             }
             dest.exists();
@@ -1382,7 +1383,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         SmbFile dest = (SmbFile) d;
         try ( SmbTreeHandleImpl sh = ensureTreeConnected();
               SmbTreeHandleImpl dh = dest.ensureTreeConnected() ) {
-            if ( ! exists() ) {
+            if ( !exists() ) {
                 throw new SmbException(NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND, null);
             }
 
@@ -1459,7 +1460,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
 
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
-            if ( ! exists() ) {
+            if ( !exists() ) {
                 throw new SmbException(NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND, null);
             }
 
@@ -1811,7 +1812,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     void setPathInformation ( int attrs, long ctime, long mtime, long atime ) throws CIFSException {
         try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
-            if ( ! exists() ) {
+            if ( !exists() ) {
                 throw new SmbException(NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND, null);
             }
 
@@ -2279,7 +2280,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
             String server = this.fileLocator.getServerWithDfs();
             if ( resolve ) {
-                ownerUser.resolve(server, getContext());
+                try {
+                    ownerUser.resolve(server, getContext());
+                }
+                catch ( IOException e ) {
+                    log.warn("Failed to resolve SID " + ownerUser.toString(), e);
+                }
             }
             else {
                 ownerUser.initContext(server, getContext());
@@ -2306,7 +2312,12 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
             String server = this.fileLocator.getServerWithDfs();
             if ( resolve ) {
-                ownerGroup.resolve(server, getContext());
+                try {
+                    ownerGroup.resolve(server, getContext());
+                }
+                catch ( IOException e ) {
+                    log.warn("Failed to resolve SID " + ownerGroup.toString(), e);
+                }
             }
             else {
                 ownerGroup.initContext(server, getContext());
