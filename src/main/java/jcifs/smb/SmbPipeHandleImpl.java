@@ -73,7 +73,7 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
         this.transact = ( pipe.getPipeType() & SmbPipeResource.PIPE_TYPE_TRANSACT ) == SmbPipeResource.PIPE_TYPE_TRANSACT;
         this.call = ( pipe.getPipeType() & SmbPipeResource.PIPE_TYPE_CALL ) == SmbPipeResource.PIPE_TYPE_CALL;
         this.openFlags = ( pipe.getPipeType() & 0xFFFF00FF ) | SmbConstants.O_EXCL;
-        this.access = (pipe.getPipeType() & 7) | 0x20000;
+        this.access = ( pipe.getPipeType() & 7 ) | 0x20000;
         this.uncPath = this.pipe.getUncPath();
     }
 
@@ -166,7 +166,7 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
             try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
 
                 if ( th.isSMB2() ) {
-                    this.handle = this.pipe.openUnshared(this.uncPath, this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0);
+                    this.handle = this.pipe.openUnshared(this.uncPath, 0, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0);
                     return this.handle.acquire();
                 }
 
