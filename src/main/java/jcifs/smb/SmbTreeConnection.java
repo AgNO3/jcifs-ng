@@ -612,7 +612,9 @@ class SmbTreeConnection {
         catch ( SmbAuthException sae ) {
             log.debug("Authentication failed", sae);
             if ( t.getSession().getCredentials().isAnonymous() ) { // anonymous session, refresh
-                try ( SmbSessionInternal s = trans.getSmbSession(this.ctx.withAnonymousCredentials()).unwrap(SmbSessionInternal.class);
+                try ( SmbSessionInternal s = trans
+                        .getSmbSession(this.ctx.withAnonymousCredentials(), t.getSession().getTargetHost(), t.getSession().getTargetDomain())
+                        .unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(null, null).unwrap(SmbTreeImpl.class) ) {
                     tr.treeConnect(null, null);
                     return tr.acquire();
