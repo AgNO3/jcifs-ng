@@ -252,15 +252,12 @@ public class NtlmContext implements SSPContext {
             this.serverChallenge = msg2.getChallenge();
 
             if ( this.requireKeyExchange ) {
-                if ( !this.transportContext.getConfig().isEnforceSpnegoIntegrity() && ( !msg2.getFlag(NtlmFlags.NTLMSSP_NEGOTIATE_KEY_EXCH)
+                if ( this.transportContext.getConfig().isEnforceSpnegoIntegrity() && ( !msg2.getFlag(NtlmFlags.NTLMSSP_NEGOTIATE_KEY_EXCH)
                         || !msg2.getFlag(NtlmFlags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY) ) ) {
                     throw new SmbUnsupportedOperationException("Server does not support extended NTLMv2 key exchange");
                 }
 
-                if ( !msg2.getFlag(NtlmFlags.NTLMSSP_NEGOTIATE_SIGN) ) {
-                    throw new SmbUnsupportedOperationException("Server does not support basic NTLM signature key exchange");
-                }
-                else if ( !msg2.getFlag(NtlmFlags.NTLMSSP_NEGOTIATE_128) ) {
+                if ( !msg2.getFlag(NtlmFlags.NTLMSSP_NEGOTIATE_128) ) {
                     throw new SmbUnsupportedOperationException("Server does not support 128-bit keys");
                 }
             }
@@ -285,12 +282,11 @@ public class NtlmContext implements SSPContext {
                 log.trace(msg3.toString());
                 log.trace(Hexdump.toHexString(token, 0, token.length));
             }
-            if ( ( this.ntlmsspFlags & NtlmFlags.NTLMSSP_NEGOTIATE_SIGN ) != 0 ) {
-                this.masterKey = msg3.getMasterKey();
 
-                if ( ( this.ntlmsspFlags & NtlmFlags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY ) != 0 ) {
-                    initSessionSecurity(msg3.getMasterKey());
-                }
+            this.masterKey = msg3.getMasterKey();
+
+            if ( this.masterKey != null && ( this.ntlmsspFlags & NtlmFlags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY ) != 0 ) {
+                initSessionSecurity(msg3.getMasterKey());
             }
 
             this.isEstablished = true;

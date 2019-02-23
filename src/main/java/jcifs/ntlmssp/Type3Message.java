@@ -128,31 +128,29 @@ public class Type3Message extends NtlmMessage {
                 setLMResponse(clientChallenge);
                 setNTResponse(ntlm2Response);
 
-                if ( getFlag(NTLMSSP_NEGOTIATE_SIGN) ) {
-                    byte[] sessionNonce = new byte[16];
-                    System.arraycopy(type2.getChallenge(), 0, sessionNonce, 0, 8);
-                    System.arraycopy(clientChallenge, 0, sessionNonce, 8, 8);
+                byte[] sessionNonce = new byte[16];
+                System.arraycopy(type2.getChallenge(), 0, sessionNonce, 0, 8);
+                System.arraycopy(clientChallenge, 0, sessionNonce, 8, 8);
 
-                    MessageDigest md4 = Crypto.getMD4();
-                    md4.update(responseKeyNT);
-                    byte[] userSessionKey = md4.digest();
+                MessageDigest md4 = Crypto.getMD4();
+                md4.update(responseKeyNT);
+                byte[] userSessionKey = md4.digest();
 
-                    MessageDigest hmac = Crypto.getHMACT64(userSessionKey);
-                    hmac.update(sessionNonce);
-                    byte[] ntlm2SessionKey = hmac.digest();
+                MessageDigest hmac = Crypto.getHMACT64(userSessionKey);
+                hmac.update(sessionNonce);
+                byte[] ntlm2SessionKey = hmac.digest();
 
-                    if ( getFlag(NTLMSSP_NEGOTIATE_KEY_EXCH) ) {
-                        this.masterKey = new byte[16];
-                        tc.getConfig().getRandom().nextBytes(this.masterKey);
+                if ( getFlag(NTLMSSP_NEGOTIATE_KEY_EXCH) ) {
+                    this.masterKey = new byte[16];
+                    tc.getConfig().getRandom().nextBytes(this.masterKey);
 
-                        byte[] exchangedKey = new byte[16];
-                        Cipher arcfour = Crypto.getArcfour(ntlm2SessionKey);
-                        arcfour.update(this.masterKey, 0, 16, exchangedKey, 0);
-                        setEncryptedSessionKey(exchangedKey);
-                    }
-                    else {
-                        this.masterKey = ntlm2SessionKey;
-                    }
+                    byte[] exchangedKey = new byte[16];
+                    Cipher arcfour = Crypto.getArcfour(ntlm2SessionKey);
+                    arcfour.update(this.masterKey, 0, 16, exchangedKey, 0);
+                    setEncryptedSessionKey(exchangedKey);
+                }
+                else {
+                    this.masterKey = ntlm2SessionKey;
                 }
             }
             break;
@@ -196,23 +194,21 @@ public class Type3Message extends NtlmMessage {
             setNTResponse(
                 getNTLMv2Response(tc, type2, responseKeyNT, ntlmClientChallenge, makeAvPairs(tc, targetName, avPairs, haveTimestamp, ts), ts));
 
-            if ( getFlag(NTLMSSP_NEGOTIATE_SIGN) ) {
-                MessageDigest hmac = Crypto.getHMACT64(responseKeyNT);
-                hmac.update(this.ntResponse, 0, 16); // only first 16 bytes of ntResponse
-                byte[] userSessionKey = hmac.digest();
+            MessageDigest hmac = Crypto.getHMACT64(responseKeyNT);
+            hmac.update(this.ntResponse, 0, 16); // only first 16 bytes of ntResponse
+            byte[] userSessionKey = hmac.digest();
 
-                if ( getFlag(NTLMSSP_NEGOTIATE_KEY_EXCH) ) {
-                    this.masterKey = new byte[16];
-                    tc.getConfig().getRandom().nextBytes(this.masterKey);
+            if ( getFlag(NTLMSSP_NEGOTIATE_KEY_EXCH) ) {
+                this.masterKey = new byte[16];
+                tc.getConfig().getRandom().nextBytes(this.masterKey);
 
-                    byte[] encryptedKey = new byte[16];
-                    Cipher rc4 = Crypto.getArcfour(userSessionKey);
-                    rc4.update(this.masterKey, 0, 16, encryptedKey, 0);
-                    setEncryptedSessionKey(encryptedKey);
-                }
-                else {
-                    this.masterKey = userSessionKey;
-                }
+                byte[] encryptedKey = new byte[16];
+                Cipher rc4 = Crypto.getArcfour(userSessionKey);
+                rc4.update(this.masterKey, 0, 16, encryptedKey, 0);
+                setEncryptedSessionKey(encryptedKey);
+            }
+            else {
+                this.masterKey = userSessionKey;
             }
 
             break;
