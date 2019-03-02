@@ -719,7 +719,10 @@ class SmbTreeImpl implements SmbTreeInternal {
             throw new SMBProtocolDowngradeException("Signature error during negotiate validation", e);
         }
         catch ( SmbException e ) {
-            log.debug("VALIDATE_NEGOTIATE_INFO returned error", e);
+            if ( log.isDebugEnabled() ) {
+                log.debug(String.format("VALIDATE_NEGOTIATE_INFO response code 0x%x", e.getNtStatus()));
+            }
+            log.trace("VALIDATE_NEGOTIATE_INFO returned error", e);
             if ( ( req.getResponse().isReceived() && req.getResponse().isVerifyFailed() ) || e.getNtStatus() == NtStatus.NT_STATUS_ACCESS_DENIED ) {
                 // this is the signature error
                 throw new SMBProtocolDowngradeException("Signature error during negotiate validation", e);
