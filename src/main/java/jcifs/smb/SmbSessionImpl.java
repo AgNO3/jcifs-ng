@@ -178,9 +178,11 @@ final class SmbSessionImpl implements SmbSessionInternal {
         }
 
         if ( usage == 1 ) {
-            if ( this.transportAcquired.compareAndSet(false, true) ) {
-                log.debug("Reacquire transport");
-                this.transport.acquire();
+            synchronized (this) {
+                if (this.transportAcquired.compareAndSet(false, true)) {
+                    log.debug("Reacquire transport");
+                    this.transport.acquire();
+                }
             }
         }
 
