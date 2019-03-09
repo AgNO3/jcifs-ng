@@ -4,9 +4,16 @@ jcifs-ng 2.1.2
 - Fix GSS-API context flag defintions (#130)
 - Fix NPE when specifiying user via URL userinfo and domain unset (#113)
 - Fix possible NPE in in SmbShareInfo (#136)
+- Work around issues resolving DFS paths when target share has DFS flag (#134)
+- Fix wrong disposition when opening SMB2 pipes (#138)
 - Fix NTLM Type3 parsing error (#120)
+- Fix NTLM flag interpretation/enforcement  (#135)
 - Fix some concurrency issues obtaining/closing connections (#118,#126)
+- Fix race condition resulting in unbalanced acquire/release (#147)
+- Fix deadlock on connection failure (#143)
+- Update bouncycastle dependency, fix compatiblity issue
 - Be more tolerant when resolving owner user/group SID
+- Silence some logging a bit
 
 jcifs-ng 2.1.1
 - Properly compute length of last compound response in a chain (#103)
