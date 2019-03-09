@@ -538,12 +538,12 @@ public abstract class Transport implements Runnable, AutoCloseable {
                 switch ( st ) {
                 case 1: /* doConnect never returned */
                     this.state = 6;
-                    cleanupThread();
+                    cleanupThread(timeout);
                     throw new ConnectionTimeoutException("Connection timeout");
                 case 2:
                     if ( this.te != null ) { /* doConnect throw Exception */
                         this.state = 4; /* error */
-                        cleanupThread();
+                        cleanupThread(timeout);
                         throw this.te;
                     }
                     this.state = 3; /* Success! */
@@ -583,14 +583,10 @@ public abstract class Transport implements Runnable, AutoCloseable {
                 switch ( st ) {
                 case 1: /* doConnect never returned */
                     this.state = 6;
-                    cleanupThread();
-                    // allow to retry the connection
-                    this.state = 0;
                     throw new ConnectionTimeoutException("Connection timeout");
                 case 2:
                     if ( this.te != null ) { /* doConnect throw Exception */
                         this.state = 4; /* error */
-                        cleanupThread();
                         throw this.te;
                     }
                     this.state = 3; /* Success! */
@@ -602,10 +598,20 @@ public abstract class Transport implements Runnable, AutoCloseable {
                 }
             }
         }
+        catch ( ConnectionTimeoutException e ) {
+            cleanupThread(timeout);
+            // allow to retry the connection
+            this.state = 0;
+            throw e;
+        }
         catch ( InterruptedException ie ) {
             this.state = 6;
-            cleanupThread();
+            cleanupThread(timeout);
             throw new TransportException(ie);
+        }
+        catch ( TransportException e ) {
+            cleanupThread(timeout);
+            throw e;
         }
         finally {
             /*
@@ -615,17 +621,18 @@ public abstract class Transport implements Runnable, AutoCloseable {
             if ( st != 0 && st != 3 && st != 4 && st != 5 && st != 6 ) {
                 log.error("Invalid state: " + st);
                 this.state = 6;
-                cleanupThread();
+                cleanupThread(timeout);
             }
         }
     }
 
 
     /**
+     * @param timeout
      * @throws TransportException
      * 
      */
-    private synchronized void cleanupThread () throws TransportException {
+    private synchronized void cleanupThread ( long timeout ) throws TransportException {
         Thread t = this.thread;
         if ( t != null && Thread.currentThread() != t ) {
             this.thread = null;
@@ -633,7 +640,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                 log.debug("Interrupting transport thread");
                 t.interrupt();
                 log.debug("Joining transport thread");
-                t.join();
+                t.join(timeout);
                 log.debug("Joined transport thread");
             }
             catch ( InterruptedException e ) {
