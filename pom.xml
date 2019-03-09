@@ -402,8 +402,8 @@
 			<id>eclipse</id>
 			<properties>
 				<!-- within eclipse parsedVersion is not properly expanded, so just set this to a unqualified version -->
-				<osgi.version>2.1.0</osgi.version>
-				<osgi.pkg.version>2.1.0</osgi.pkg.version>
+				<osgi.version>2.1.2</osgi.version>
+				<osgi.pkg.version>2.1.2</osgi.pkg.version>
 			</properties>
 		</profile>
 		<profile>
