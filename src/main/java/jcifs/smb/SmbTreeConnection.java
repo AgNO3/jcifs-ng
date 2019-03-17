@@ -23,6 +23,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -501,7 +502,7 @@ class SmbTreeConnection {
                     log.debug("Tree is " + t);
                 }
 
-                if ( loc.getShare().equals(t.getShare()) ) {
+                if ( Objects.equals(loc.getShare(), t.getShare()) ) {
                     try ( SmbSessionImpl session = t.getSession() ) {
                         targetDomain = session.getTargetDomain();
                         if ( !session.isFailed() ) {
