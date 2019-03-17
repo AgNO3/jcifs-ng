@@ -83,7 +83,7 @@ class SmbTreeImpl implements SmbTreeInternal {
     private final String service0;
     private final SmbSessionImpl session;
 
-    private volatile int tid;
+    private volatile int tid = -1;
     private volatile String service = "?????";
     private volatile boolean inDfs, inDomainDfs;
     private volatile long treeNum; // used by SmbFile.isOpen
@@ -275,7 +275,7 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @return whether the tree is connected
      */
     public boolean isConnected () {
-        return this.tid != 0 && this.session.isConnected() && this.connectionState.get() == 2;
+        return this.tid != -1 && this.session.isConnected() && this.connectionState.get() == 2;
     }
 
 
@@ -436,9 +436,6 @@ class SmbTreeImpl implements SmbTreeInternal {
             // and send it as a separate request instead
             String svc = null;
             int t = this.tid;
-            if ( t == 0 ) {
-                throw new SmbException("Tree id is 0");
-            }
             request.setTid(t);
 
             if ( !transport.isSMB2() ) {
@@ -827,7 +824,7 @@ class SmbTreeImpl implements SmbTreeInternal {
                         }
                     }
 
-                    if ( !inError && this.tid != 0 ) {
+                    if ( !inError && this.tid != -1 ) {
                         try {
                             if ( transport.isSMB2() ) {
                                 Smb2TreeDisconnectRequest req = new Smb2TreeDisconnectRequest(sess.getConfig());
