@@ -61,15 +61,18 @@ public class DcerpcPipeHandle extends DcerpcHandle {
         DcerpcBinding binding = getBinding();
         String url = "smb://" + binding.getServer() + "/IPC$/" + binding.getEndpoint().substring(6);
 
-        String params = "", server, address;
-        server = (String) binding.getOption("server");
-        if ( server != null )
+        String params = "";
+        String server = (String) binding.getOption("server");
+        if ( server != null ) {
             params += "&server=" + server;
-        address = (String) binding.getOption("address");
-        if ( server != null )
+        }
+        String address = (String) binding.getOption("address");
+        if ( address != null ) {
             params += "&address=" + address;
-        if ( params.length() > 0 )
+        }
+        if ( params.length() > 0 ) {
             url += "?" + params.substring(1);
+        }
 
         return url;
     }

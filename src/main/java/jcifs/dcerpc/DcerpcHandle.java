@@ -92,6 +92,7 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
                 }
                 else if ( ch == ',' || ch == ']' ) {
                     String val = str.substring(mark, si).trim();
+                    mark = si + 1;
                     if ( key == null )
                         key = "endpoint";
                     if ( binding != null ) {
@@ -147,7 +148,7 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
     /**
      * @return the binding
      */
-    DcerpcBinding getBinding () {
+    public DcerpcBinding getBinding () {
         return this.binding;
     }
 

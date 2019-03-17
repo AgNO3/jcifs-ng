@@ -21,11 +21,13 @@ package jcifs.tests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 
 import org.junit.Test;
 
+import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.DfsReferralData;
@@ -34,6 +36,8 @@ import jcifs.SmbResource;
 import jcifs.SmbResourceLocator;
 import jcifs.config.BaseConfiguration;
 import jcifs.context.BaseContext;
+import jcifs.dcerpc.DcerpcException;
+import jcifs.dcerpc.DcerpcHandle;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbResourceLocatorInternal;
 
@@ -432,6 +436,26 @@ public class FileLocationTest {
     public void testIPCHidden () throws MalformedURLException, CIFSException {
         try ( SmbResource r = new SmbFile("smb://0.0.0.0/IPC$/", getContext()) ) {
             assert ( r.isHidden() );
+        }
+    }
+
+
+    @Test
+    public void testSetAddress () throws MalformedURLException, CIFSException {
+        try ( SmbResource r = new SmbFile("smb://TESTING/IPC$/?address=1.2.3.4", getContext()) ) {
+            Address a = r.getLocator().getAddress();
+            assertEquals("1.2.3.4", a.getHostAddress());
+        }
+    }
+
+
+    @Test
+    public void testBindingAddress () throws DcerpcException, MalformedURLException, CIFSException, IOException {
+        try ( DcerpcHandle h = DcerpcHandle
+                .getHandle(String.format("ncacn_np:%s[endpoint=%s,address=%s]", "testing", "\\pipe\\srvsvc", "1.2.3.4"), getContext()) ) {
+
+            assertEquals("testing", h.getServer());
+            assertEquals("1.2.3.4", h.getBinding().getOptions().get("address"));
         }
     }
 
