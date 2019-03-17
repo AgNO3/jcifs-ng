@@ -19,6 +19,7 @@ package jcifs.smb;
 
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -33,12 +34,12 @@ import jcifs.Address;
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
-import jcifs.Credentials;
 import jcifs.ResourceFilter;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.SmbResourceLocator;
+import jcifs.dcerpc.DcerpcException;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcDfsRootEnum;
 import jcifs.dcerpc.msrpc.MsrpcShareEnum;
@@ -63,19 +64,14 @@ final class SmbEnumerationUtil {
     private SmbEnumerationUtil () {}
 
 
-    private static String getRPCTarget ( CIFSContext ctx, SmbResourceLocator loc, Address serverAddress ) {
-        // Try to stick to the same server. However if we are using kerberos authentication we need to use the name.
-        // The comment about composite share lists was wrong, we do not iterate over multiple targets.
-        Credentials creds = ctx.getCredentials();
-        if ( creds instanceof Kerb5Authenticator && serverAddress.getHostName() != null ) {
-            return serverAddress.getHostName();
-        }
-        return serverAddress.getHostAddress();
+    private static DcerpcHandle getHandle ( CIFSContext ctx, SmbResourceLocator loc, Address address, String ep )
+            throws MalformedURLException, DcerpcException {
+        return DcerpcHandle.getHandle(String.format("ncacn_np:%s[endpoint=%s,address=%s]", loc.getServer(), ep, address.getHostAddress()), ctx);
     }
 
 
     static FileEntry[] doDfsRootEnum ( CIFSContext ctx, SmbResourceLocator loc, Address address ) throws IOException {
-        try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + getRPCTarget(ctx, loc, address) + "[\\PIPE\\netdfs]", ctx) ) {
+        try ( DcerpcHandle handle = getHandle(ctx, loc, address, "\\PIPE\\netdfs") ) {
             MsrpcDfsRootEnum rpc = new MsrpcDfsRootEnum(loc.getServer());
             handle.sendrecv(rpc);
             if ( rpc.retval != 0 ) {
@@ -87,7 +83,7 @@ final class SmbEnumerationUtil {
 
 
     static FileEntry[] doMsrpcShareEnum ( CIFSContext ctx, SmbResourceLocator loc, Address address ) throws IOException {
-        try ( DcerpcHandle handle = DcerpcHandle.getHandle("ncacn_np:" + getRPCTarget(ctx, loc, address) + "[\\PIPE\\srvsvc]", ctx) ) {
+        try ( DcerpcHandle handle = getHandle(ctx, loc, address, "\\PIPE\\srvsvc") ) {
             MsrpcShareEnum rpc = new MsrpcShareEnum(loc.getServer());
             handle.sendrecv(rpc);
             if ( rpc.retval != 0 ) {
