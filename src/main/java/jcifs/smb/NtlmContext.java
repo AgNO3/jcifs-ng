@@ -268,9 +268,9 @@ public class NtlmContext implements SSPContext {
                 this.transportContext,
                 msg2,
                 this.targetName,
-                this.auth.getPassword(),
-                this.auth.getUserDomain(),
-                this.auth.getUsername(),
+                this.auth.isGuest() ? "invalid" : this.auth.getPassword(),
+                this.auth.isGuest() ? "." : this.auth.getUserDomain(),
+                this.auth.isGuest() ? "GUEST" : this.auth.getUsername(),
                 this.workstation,
                 this.ntlmsspFlags);
 

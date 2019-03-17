@@ -104,7 +104,6 @@ public class Type3Message extends NtlmMessage {
         if ( password == null || password.length() == 0 ) {
             setLMResponse(null);
             setNTResponse(null);
-            setUser(null);
             return;
         }
 
