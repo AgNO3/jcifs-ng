@@ -867,7 +867,7 @@ class SmbTreeConnection {
     public boolean isSame ( SmbTreeConnection other ) {
         try ( SmbTreeImpl t1 = getTree();
               SmbTreeImpl t2 = other.getTree() ) {
-            return t1.equals(t2);
+            return t1 == t2;
         }
     }
 
