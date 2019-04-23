@@ -144,14 +144,14 @@ public class NtlmContext implements SSPContext {
             ret += "null";
         }
         else {
-            ret += Hexdump.toHexString(this.serverChallenge, 0, this.serverChallenge.length * 2);
+            ret += Hexdump.toHexString(this.serverChallenge);
         }
         ret += ",signingKey=";
         if ( this.masterKey == null ) {
             ret += "null";
         }
         else {
-            ret += Hexdump.toHexString(this.masterKey, 0, this.masterKey.length * 2);
+            ret += Hexdump.toHexString(this.masterKey);
         }
         ret += "]";
         return ret;
@@ -246,7 +246,7 @@ public class NtlmContext implements SSPContext {
 
             if ( log.isTraceEnabled() ) {
                 log.trace(msg2.toString());
-                log.trace(Hexdump.toHexString(token, 0, token.length));
+                log.trace(Hexdump.toHexString(token));
             }
 
             this.serverChallenge = msg2.getChallenge();
@@ -280,7 +280,7 @@ public class NtlmContext implements SSPContext {
 
             if ( log.isTraceEnabled() ) {
                 log.trace(msg3.toString());
-                log.trace(Hexdump.toHexString(token, 0, token.length));
+                log.trace(Hexdump.toHexString(token));
             }
 
             this.masterKey = msg3.getMasterKey();
@@ -309,7 +309,7 @@ public class NtlmContext implements SSPContext {
 
         if ( log.isTraceEnabled() ) {
             log.trace(msg1.toString());
-            log.trace(Hexdump.toHexString(out, 0, out.length));
+            log.trace(Hexdump.toHexString(out));
         }
 
         this.state++;
