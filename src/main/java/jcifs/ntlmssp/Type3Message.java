@@ -96,12 +96,43 @@ public class Type3Message extends NtlmMessage {
      */
     public Type3Message ( CIFSContext tc, Type2Message type2, String targetName, String password, String domain, String user, String workstation,
             int flags ) throws GeneralSecurityException, CIFSException {
+        // keep old behavior of anonymous auth when no password is provided
+        this(tc, type2, targetName, password, domain, user, workstation, flags, false);
+    }
+
+
+    /**
+     * Creates a Type-3 message in response to the given Type-2 message.
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message which this represents a response to.
+     * @param targetName
+     *            SPN of the target system, optional
+     * @param password
+     *            The password to use when constructing the response.
+     * @param domain
+     *            The domain in which the user has an account.
+     * @param user
+     *            The username for the authenticating user.
+     * @param workstation
+     *            The workstation from which authentication is
+     *            taking place.
+     * @param flags
+     * @param nonAnonymous
+     *            actually perform authentication with empty password
+     * @throws GeneralSecurityException
+     * @throws CIFSException
+     */
+    public Type3Message ( CIFSContext tc, Type2Message type2, String targetName, String password, String domain, String user, String workstation,
+            int flags, boolean nonAnonymous ) throws GeneralSecurityException, CIFSException {
         setFlags(flags | getDefaultFlags(tc, type2));
         setWorkstation(workstation);
         setDomain(domain);
         setUser(user);
 
-        if ( password == null || password.length() == 0 ) {
+        if ( password == null || ( !nonAnonymous && password.length() == 0 ) ) {
             setLMResponse(null);
             setNTResponse(null);
             return;

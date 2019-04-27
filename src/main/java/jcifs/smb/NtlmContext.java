@@ -272,7 +272,8 @@ public class NtlmContext implements SSPContext {
                 this.auth.isGuest() ? "." : this.auth.getUserDomain(),
                 this.auth.isGuest() ? "GUEST" : this.auth.getUsername(),
                 this.workstation,
-                this.ntlmsspFlags);
+                this.ntlmsspFlags,
+                !this.auth.isAnonymous());
 
             msg3.setupMIC(this.type1Bytes, token);
 
