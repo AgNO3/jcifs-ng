@@ -553,6 +553,10 @@ class SmbTreeImpl implements SmbTreeInternal {
                     return null;
                 }
 
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Connection state was " + before);
+                }
+
                 try {
                     /*
                      * The hostname to use in the path is only known for

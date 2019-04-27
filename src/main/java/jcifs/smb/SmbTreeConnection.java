@@ -618,7 +618,12 @@ class SmbTreeConnection {
                         .unwrap(SmbSessionInternal.class);
                       SmbTreeImpl tr = s.getSmbTree(null, null).unwrap(SmbTreeImpl.class) ) {
                     tr.treeConnect(null, null);
+                    log.debug("Anonymous retry succeeded");
                     return tr.acquire();
+                }
+                catch ( Exception e ) {
+                    log.debug("Retry also failed", e);
+                    throw sae;
                 }
             }
             else if ( this.ctx.renewCredentials(loc.getURL().toString(), sae) ) {
