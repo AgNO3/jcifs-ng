@@ -1,3 +1,13 @@
+jcifs-ng 2.1.3
+- Allow authentication with empty password (#158)
+- Fix NPE in Hex trace output in NtlmContext (#160) 
+- Fix 2.02 only multi-protocol negotiation behavior (#156) 
+- Fix isSameTree check, resulting in copy failure for same name shares (#157)
+- Fix share enumeration server stickyness, keep server name (#149)
+- Fix guest login
+- Allow tid=0, which is valid according to the specification (#149) 
+- Fix DCERPC Binding option parser
+
 jcifs-ng 2.1.2
 - Fix processing of multi fragment DCERPC responses (#130)
 - Fix processing of DCERPC fragments longer than recv size (#130)
