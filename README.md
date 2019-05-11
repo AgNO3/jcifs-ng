@@ -119,3 +119,22 @@ replace it with
 SingletonContext.getInstance().withCredentials(ntlmPasswordAuthentication)
 ```
 
+### Building from sources
+
+Run the following to install the newest master version into your local `~/.m2/repository`:
+
+```bash
+mvn -C clean install -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true
+```
+
+On Java 11+ you will need to add the following into your `pom.xml`'s `<dependencies>` element:
+
+```xml
+<dependency>
+  <groupId>javax.annotation</groupId>
+  <artifactId>javax.annotation-api</artifactId>
+  <version>1.3.2</version>
+  <scope>provided</scope>
+</dependency>
+```
+
