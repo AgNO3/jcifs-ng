@@ -7,6 +7,8 @@ jcifs-ng 2.1.3
 - Fix guest login
 - Allow tid=0, which is valid according to the specification (#149) 
 - Fix DCERPC Binding option parser
+- Fix DCERPC IPv6 server specifictions (#165)
+- Remove broken Java 7 check in registerSmbURLHandler (#167)
 
 jcifs-ng 2.1.2
 - Fix processing of multi fragment DCERPC responses (#130)
