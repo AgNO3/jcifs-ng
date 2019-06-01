@@ -357,6 +357,7 @@ class SmbTreeConnection {
             }
 
             if ( request != null ) {
+                log.debug("Restting request");
                 request.reset();
             }
             if ( rpath != null ) {

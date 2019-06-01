@@ -450,7 +450,7 @@ class SmbTreeImpl implements SmbTreeInternal {
 
             }
 
-            if ( this.inDfs && !"IPC".equals(svc) && !"IPC$".equals(this.share) && request instanceof RequestWithPath ) {
+            if ( this.isDfs() && !"IPC".equals(svc) && !"IPC$".equals(this.share) && request instanceof RequestWithPath ) {
                 /*
                  * When DFS is in action all request paths are
                  * full UNC paths minus the first backslash like
@@ -460,6 +460,9 @@ class SmbTreeImpl implements SmbTreeInternal {
                  */
                 RequestWithPath preq = (RequestWithPath) request;
                 if ( preq.getPath() != null && preq.getPath().length() > 0 ) {
+                    if ( log.isDebugEnabled() ) {
+                        log.debug(String.format("Setting DFS request path from %s to %s", preq.getPath(), preq.getFullUNCPath()));
+                    }
                     preq.setResolveInDfs(true);
                     preq.setPath(preq.getFullUNCPath());
                 }

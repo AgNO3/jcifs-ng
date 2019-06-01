@@ -29,6 +29,7 @@ import jcifs.internal.RequestWithPath;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.util.SMBUtil;
+import jcifs.util.Hexdump;
 
 
 /**
@@ -457,6 +458,7 @@ public class Smb2CreateRequest extends ServerMessageBlock2Request<Smb2CreateResp
 
         if ( log.isDebugEnabled() ) {
             log.debug("Opening " + this.name);
+            log.debug("Flags are " + Hexdump.toHexString(getFlags(), 4));
         }
 
         SMBUtil.writeInt2(57, dst, dstIndex);
@@ -567,6 +569,6 @@ public class Smb2CreateRequest extends ServerMessageBlock2Request<Smb2CreateResp
 
     @Override
     public String toString () {
-        return "[" + super.toString() + ",name=" + this.name + "]";
+        return "[" + super.toString() + ",name=" + this.name + ",resolveDfs=" + this.resolveDfs + "]";
     }
 }
