@@ -78,9 +78,19 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
             case 2:
                 if ( ch == '[' ) {
                     String server = str.substring(mark, si).trim();
-                    if ( server.length() == 0 )
-                        server = "127.0.0.1";
-                    binding = new DcerpcBinding(proto, str.substring(mark, si));
+                    if ( server.length() == 0 ) {
+                        // this can also be a v6 address within brackets, look ahead required
+                        int nexts = str.indexOf('[', si + 1);
+                        int nexte = str.indexOf(']', si);
+                        if ( nexts >= 0 && nexte >= 0 && nexte == nexts - 1 ) {
+                            server = str.substring(si, nexte + 1);
+                            si = nexts;
+                        }
+                        else {
+                            server = "127.0.0.1";
+                        }
+                    }
+                    binding = new DcerpcBinding(proto, server);
                     mark = si + 1;
                     state = 5;
                 }

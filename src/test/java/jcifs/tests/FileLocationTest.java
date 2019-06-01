@@ -459,6 +459,15 @@ public class FileLocationTest {
         }
     }
 
+
+    // #165
+    @Test
+    public void testV6DCE () throws MalformedURLException, CIFSException {
+        try ( SmbFile f = new SmbFile("smb://[::1]/", getContext()) ) {
+            f.list();
+        }
+    }
+
     private static class TestDfsReferral implements DfsReferralData {
 
         private String server;
