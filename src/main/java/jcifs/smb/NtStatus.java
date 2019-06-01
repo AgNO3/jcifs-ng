@@ -39,6 +39,7 @@ public interface NtStatus {
     public static final int NT_STATUS_INVALID_PARAMETER = 0xC000000d;
     public static final int NT_STATUS_NO_SUCH_DEVICE = 0xC000000e;
     public static final int NT_STATUS_NO_SUCH_FILE = 0xC000000f;
+    public static final int NT_STATUS_END_OF_FILE = 0xC0000011;
     public static final int NT_STATUS_MORE_PROCESSING_REQUIRED = 0xC0000016;
     public static final int NT_STATUS_ACCESS_DENIED = 0xC0000022;
     public static final int NT_STATUS_BUFFER_TOO_SMALL = 0xC0000023;
@@ -99,15 +100,15 @@ public interface NtStatus {
     public static final int NT_STATUS_NO_MORE_FILES = 0x80000006;
 
     static final int[] NT_STATUS_CODES = {
-        NT_STATUS_OK, NT_STATUS_PENDING, NT_STATUS_NOTIFY_ENUM_DIR, NT_STATUS_BUFFER_OVERFLOW, NT_STATUS_UNSUCCESSFUL,
-        NT_STATUS_NOT_IMPLEMENTED, NT_STATUS_INVALID_INFO_CLASS, NT_STATUS_ACCESS_VIOLATION,
-        NT_STATUS_INVALID_HANDLE, NT_STATUS_INVALID_PARAMETER, NT_STATUS_NO_SUCH_DEVICE, NT_STATUS_NO_SUCH_FILE, NT_STATUS_MORE_PROCESSING_REQUIRED,
-        NT_STATUS_ACCESS_DENIED, NT_STATUS_BUFFER_TOO_SMALL, NT_STATUS_OBJECT_NAME_INVALID, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-        NT_STATUS_OBJECT_NAME_COLLISION, NT_STATUS_PORT_DISCONNECTED, NT_STATUS_OBJECT_PATH_INVALID, NT_STATUS_OBJECT_PATH_NOT_FOUND,
-        NT_STATUS_OBJECT_PATH_SYNTAX_BAD, NT_STATUS_SHARING_VIOLATION, NT_STATUS_DELETE_PENDING, NT_STATUS_NO_LOGON_SERVERS, NT_STATUS_USER_EXISTS,
-        NT_STATUS_NO_SUCH_USER, NT_STATUS_WRONG_PASSWORD, NT_STATUS_LOGON_FAILURE, NT_STATUS_ACCOUNT_RESTRICTION, NT_STATUS_INVALID_LOGON_HOURS,
-        NT_STATUS_INVALID_WORKSTATION, NT_STATUS_PASSWORD_EXPIRED, NT_STATUS_ACCOUNT_DISABLED, NT_STATUS_NONE_MAPPED, NT_STATUS_INVALID_SID,
-        NT_STATUS_DISK_FULL, NT_STATUS_INSTANCE_NOT_AVAILABLE, NT_STATUS_PIPE_NOT_AVAILABLE, NT_STATUS_INVALID_PIPE_STATE, NT_STATUS_PIPE_BUSY,
+        NT_STATUS_OK, NT_STATUS_PENDING, NT_STATUS_NOTIFY_ENUM_DIR, NT_STATUS_BUFFER_OVERFLOW, NT_STATUS_UNSUCCESSFUL, NT_STATUS_NOT_IMPLEMENTED,
+        NT_STATUS_INVALID_INFO_CLASS, NT_STATUS_ACCESS_VIOLATION, NT_STATUS_INVALID_HANDLE, NT_STATUS_INVALID_PARAMETER, NT_STATUS_NO_SUCH_DEVICE,
+        NT_STATUS_NO_SUCH_FILE, NT_STATUS_END_OF_FILE, NT_STATUS_MORE_PROCESSING_REQUIRED, NT_STATUS_ACCESS_DENIED, NT_STATUS_BUFFER_TOO_SMALL,
+        NT_STATUS_OBJECT_NAME_INVALID, NT_STATUS_OBJECT_NAME_NOT_FOUND, NT_STATUS_OBJECT_NAME_COLLISION, NT_STATUS_PORT_DISCONNECTED,
+        NT_STATUS_OBJECT_PATH_INVALID, NT_STATUS_OBJECT_PATH_NOT_FOUND, NT_STATUS_OBJECT_PATH_SYNTAX_BAD, NT_STATUS_SHARING_VIOLATION,
+        NT_STATUS_DELETE_PENDING, NT_STATUS_NO_LOGON_SERVERS, NT_STATUS_USER_EXISTS, NT_STATUS_NO_SUCH_USER, NT_STATUS_WRONG_PASSWORD,
+        NT_STATUS_LOGON_FAILURE, NT_STATUS_ACCOUNT_RESTRICTION, NT_STATUS_INVALID_LOGON_HOURS, NT_STATUS_INVALID_WORKSTATION,
+        NT_STATUS_PASSWORD_EXPIRED, NT_STATUS_ACCOUNT_DISABLED, NT_STATUS_NONE_MAPPED, NT_STATUS_INVALID_SID, NT_STATUS_DISK_FULL,
+        NT_STATUS_INSTANCE_NOT_AVAILABLE, NT_STATUS_PIPE_NOT_AVAILABLE, NT_STATUS_INVALID_PIPE_STATE, NT_STATUS_PIPE_BUSY,
         NT_STATUS_PIPE_DISCONNECTED, NT_STATUS_PIPE_CLOSING, NT_STATUS_PIPE_LISTENING, NT_STATUS_FILE_IS_A_DIRECTORY, NT_STATUS_DUPLICATE_NAME,
         NT_STATUS_NETWORK_NAME_DELETED, NT_STATUS_NETWORK_ACCESS_DENIED, NT_STATUS_BAD_DEVICE_TYPE, NT_STATUS_BAD_NETWORK_NAME,
         NT_STATUS_REQUEST_NOT_ACCEPTED, NT_STATUS_CANT_ACCESS_DOMAIN_INFO, NT_STATUS_NO_SUCH_DOMAIN, NT_STATUS_NOT_A_DIRECTORY,
@@ -118,13 +119,14 @@ public interface NtStatus {
     };
 
     static final String[] NT_STATUS_MESSAGES = {
-        "The operation completed successfully.", "Request is pending", "A notify change request is being completed.", 
-        "The data was too large to fit into the specified buffer.", "A device attached to the system is not functioning.", "Incorrect function.", 
+        "The operation completed successfully.", "Request is pending", "A notify change request is being completed.",
+        "The data was too large to fit into the specified buffer.", "A device attached to the system is not functioning.", "Incorrect function.",
         "The parameter is incorrect.", "Invalid access to memory location.", "The handle is invalid.", "The parameter is incorrect.",
-        "The system cannot find the file specified.", "The system cannot find the file specified.", "More data is available.", "Access is denied.",
-        "The data area passed to a system call is too small.", "The filename, directory name, or volume label syntax is incorrect.",
-        "The system cannot find the file specified.", "Cannot create a file when that file already exists.", "The handle is invalid.",
-        "The specified path is invalid.", "The system cannot find the path specified.", "The specified path is invalid.",
+        "The system cannot find the file specified.", "The system cannot find the file specified.", "End of file", "More data is available.",
+        "Access is denied.", "The data area passed to a system call is too small.",
+        "The filename, directory name, or volume label syntax is incorrect.", "The system cannot find the file specified.",
+        "Cannot create a file when that file already exists.", "The handle is invalid.", "The specified path is invalid.",
+        "The system cannot find the path specified.", "The specified path is invalid.",
         "The process cannot access the file because it is being used by another process.", "Access is denied.",
         "There are currently no logon servers available to service the logon request.", "The specified user already exists.",
         "The specified user does not exist.", "The specified network password is not correct.", "Logon failure: unknown user name or bad password.",
