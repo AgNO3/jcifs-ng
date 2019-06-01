@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
-import jcifs.RuntimeCIFSException;
 import jcifs.config.PropertyConfiguration;
 
 
@@ -119,15 +118,8 @@ public class SingletonContext extends BaseContext implements CIFSContext {
      * 
      */
     public static void registerSmbURLHandler () {
-        String pkgs;
-        float ver = Float.parseFloat(Runtime.class.getPackage().getSpecificationVersion());
-        String vendor = System.getProperty("java.vendor.url");
-        if ( ! ( vendor != null && vendor.startsWith("http://www.android.com") ) && ver < 1.7f ) {
-            throw new RuntimeCIFSException("jcifs-ng requires Java 1.7 or above. You are running " + ver);
-        }
-
         SingletonContext.getInstance();
-        pkgs = System.getProperty("java.protocol.handler.pkgs");
+        String pkgs = System.getProperty("java.protocol.handler.pkgs");
         if ( pkgs == null ) {
             System.setProperty("java.protocol.handler.pkgs", "jcifs");
         }
