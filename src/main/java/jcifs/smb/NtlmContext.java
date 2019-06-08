@@ -115,6 +115,9 @@ public class NtlmContext implements SSPContext {
         if ( !auth.isAnonymous() ) {
             this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_SIGN | NtlmFlags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NtlmFlags.NTLMSSP_NEGOTIATE_KEY_EXCH;
         }
+        else if ( auth.isGuest() ) {
+            this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_KEY_EXCH;
+        }
         else {
             this.ntlmsspFlags |= NtlmFlags.NTLMSSP_NEGOTIATE_ANONYMOUS;
         }
@@ -269,7 +272,7 @@ public class NtlmContext implements SSPContext {
                 msg2,
                 this.targetName,
                 this.auth.isGuest() ? "invalid" : this.auth.getPassword(),
-                this.auth.isGuest() ? "." : this.auth.getUserDomain(),
+                this.auth.isGuest() ? null : this.auth.getUserDomain(),
                 this.auth.isGuest() ? "GUEST" : this.auth.getUsername(),
                 this.workstation,
                 this.ntlmsspFlags,
