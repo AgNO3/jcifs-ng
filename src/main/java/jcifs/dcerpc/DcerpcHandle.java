@@ -344,8 +344,7 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
      * @throws NdrException
      */
     private byte[] receiveMoreFragments ( DcerpcMessage msg, byte[] in ) throws IOException, DcerpcException, NdrException {
-        int off = 0;
-        int len = msg.ptype == 2 ? msg.length : 24;
+        int off = msg.ptype == 2 ? msg.length : 24;
         byte[] fragBytes = new byte[this.max_recv];
         NdrBuffer fragBuf = new NdrBuffer(fragBytes, 0);
         while ( !msg.isFlagSet(DCERPC_LAST_FRAG) ) {
@@ -357,11 +356,11 @@ public abstract class DcerpcHandle implements DcerpcConstants, AutoCloseable {
             if ( ( off + stub_frag_len ) > in.length ) {
                 // shouldn't happen if alloc_hint is correct or greater
                 byte[] tmp = new byte[off + stub_frag_len];
-                System.arraycopy(in, 0, tmp, 0, len);
+                System.arraycopy(in, 0, tmp, 0, off);
                 in = tmp;
             }
-            System.arraycopy(fragBytes, 24, in, len, stub_frag_len);
-            len += stub_frag_len;
+            System.arraycopy(fragBytes, 24, in, off, stub_frag_len);
+            off += stub_frag_len;
         }
         return in;
     }
