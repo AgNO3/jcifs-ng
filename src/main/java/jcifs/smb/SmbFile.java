@@ -1440,20 +1440,6 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         close();
     }
 
-
-    /**
-     * {@inheritDoc}
-     *
-     * @see java.lang.Object#finalize()
-     */
-    @Override
-    protected void finalize () throws Throwable {
-        if ( this.treeHandle != null ) {
-            log.debug("File was not properly released " + this);
-        }
-    }
-
-
     void delete ( String fileName ) throws CIFSException {
         if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
