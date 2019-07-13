@@ -651,7 +651,13 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 Smb2CreateRequest req = new Smb2CreateRequest(config, uncPath);
                 req.setDesiredAccess(access);
 
-                if ( ( flags & SmbConstants.O_EXCL ) == O_EXCL ) {
+                if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC && ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
+                    req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE_IF);
+                }
+                else if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC ) {
+                    req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE);
+                }
+                else if ( ( flags & SmbConstants.O_EXCL ) == O_EXCL ) {
                     req.setCreateDisposition(Smb2CreateRequest.FILE_CREATE);
                 }
                 else if ( ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
@@ -660,6 +666,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 else {
                     req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN);
                 }
+
                 req.setShareAccess(sharing);
                 req.setFileAttributes(attrs);
                 Smb2CreateResponse resp = h.send(req);
@@ -1439,6 +1446,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         close();
     }
+
 
     void delete ( String fileName ) throws CIFSException {
         if ( this.fileLocator.isRootOrShare() ) {

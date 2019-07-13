@@ -292,6 +292,43 @@ public class FileOperationsTest extends BaseCIFSTest {
     }
 
 
+    // #173
+    @Test
+    public void testCopyTargetExists () throws IOException {
+        int bufSize = 65536;
+        long length = 4096 * 16;
+        try ( SmbFile f = createTestFile() ) {
+            try ( SmbFile d1 = createTestDirectory();
+                  SmbFile t = new SmbFile(d1, makeRandomName()) ) {
+                try {
+                    try ( OutputStream os = f.getOutputStream() ) {
+                        ReadWriteTest.writeRandom(bufSize, length, os);
+                    }
+
+                    try ( OutputStream os = t.getOutputStream() ) {
+                        ReadWriteTest.writeRandom(bufSize, 2 * length, os);
+                    }
+
+                    f.copyTo(t);
+                    assertTrue(f.exists());
+                    assertEquals(f.length(), t.length());
+                    assertEquals(f.getAttributes(), t.getAttributes());
+
+                    try ( InputStream is = t.getInputStream() ) {
+                        ReadWriteTest.verifyRandom(bufSize, length, is);
+                    }
+                }
+                finally {
+                    d1.delete();
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
     @Test
     public void testCopyFileLarge () throws IOException {
         long length = 4096 * 16 * 1024;
