@@ -38,6 +38,7 @@ import jcifs.config.BaseConfiguration;
 import jcifs.context.BaseContext;
 import jcifs.dcerpc.DcerpcException;
 import jcifs.dcerpc.DcerpcHandle;
+import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbResourceLocatorInternal;
 
@@ -465,6 +466,9 @@ public class FileLocationTest {
     public void testV6DCE () throws MalformedURLException, CIFSException {
         try ( SmbFile f = new SmbFile("smb://[::1]/", getContext()) ) {
             f.list();
+        }
+        catch ( SmbException e ) {
+            assertEquals("Failed to connect: /0:0:0:0:0:0:0:1", e.getMessage());
         }
     }
 
