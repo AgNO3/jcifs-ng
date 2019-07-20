@@ -1,10 +1,16 @@
 jcifs-ng 2.1.3
+- Truncate existing file when copying (#173)
+- Fix DCERPC fragment receive buffer resizing strategy
+  causing ArrayIndexOutOfBoundsException (#170)
 - Allow authentication with empty password (#158)
+- Fix guest login (#166)
 - Fix NPE in Hex trace output in NtlmContext (#160) 
 - Fix 2.02 only multi-protocol negotiation behavior (#156) 
 - Fix isSameTree check, resulting in copy failure for same name shares (#157)
 - Fix share enumeration server stickyness, keep server name (#149)
-- Fix guest login
+- Remove finalizers on often created classes to avoid performance issues,
+  getting noticed about resources that are not released properly now
+  required setting jcifs.traceResources=true (#171)
 - Allow tid=0, which is valid according to the specification (#149) 
 - Fix DCERPC Binding option parser
 - Fix DCERPC IPv6 server specifictions (#165)
