@@ -341,7 +341,7 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
         if ( this.dfsReferral == null ) {
             return null;
         }
-        return "smb:/" + this.dfsReferral.getServer() + "/" + this.dfsReferral.getShare() + this.getUNCPath().replace('\\', '/');
+        return "smb://" + this.dfsReferral.getServer() + "/" + this.dfsReferral.getShare() + this.getUNCPath().replace('\\', '/');
     }
 
 
