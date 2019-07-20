@@ -141,7 +141,7 @@ final class SmbEnumerationUtil {
             }
         }
 
-        SmbTreeConnection treeConn = new SmbTreeConnection(tc);
+        SmbTreeConnection treeConn = SmbTreeConnection.create(tc);
         try ( SmbTreeHandleImpl th = treeConn.connectHost(locator, locator.getServerWithDfs());
               SmbSessionImpl session = th.getSession();
               SmbTransportImpl transport = session.getTransport() ) {

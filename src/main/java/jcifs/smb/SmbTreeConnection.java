@@ -76,22 +76,31 @@ class SmbTreeConnection {
     private static final Random RAND = new Random();
 
 
-    /**
-     * @param ctx
-     * 
-     */
-    public SmbTreeConnection ( CIFSContext ctx ) {
+    protected SmbTreeConnection ( CIFSContext ctx ) {
         this.ctx = ctx;
         this.delegate = null;
     }
 
 
-    /**
-     * @param treeConnection
-     */
-    public SmbTreeConnection ( SmbTreeConnection treeConnection ) {
+    protected SmbTreeConnection ( SmbTreeConnection treeConnection ) {
         this.ctx = treeConnection.ctx;
         this.delegate = treeConnection;
+    }
+
+
+    static SmbTreeConnection create ( CIFSContext c ) {
+        if ( c.getConfig().isTraceResourceUsage() ) {
+            return new SmbTreeConnectionTrace(c);
+        }
+        return new SmbTreeConnection(c);
+    }
+
+
+    static SmbTreeConnection create ( SmbTreeConnection c ) {
+        if ( c.ctx.getConfig().isTraceResourceUsage() ) {
+            return new SmbTreeConnectionTrace(c);
+        }
+        return new SmbTreeConnection(c);
     }
 
 
@@ -251,13 +260,7 @@ class SmbTreeConnection {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see java.lang.Object#finalize()
-     */
-    @Override
-    protected void finalize () throws Throwable {
+    protected void checkRelease () {
         if ( isConnected() && this.usageCount.get() != 0 ) {
             log.warn("Tree connection was not properly released " + this);
         }

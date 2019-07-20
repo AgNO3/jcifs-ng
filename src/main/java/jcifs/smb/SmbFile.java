@@ -453,7 +453,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         this.transportContext = tc;
         this.fileLocator = new SmbResourceLocatorImpl(tc, url);
-        this.treeConnection = new SmbTreeConnection(tc);
+        this.treeConnection = SmbTreeConnection.create(tc);
     }
 
 
@@ -567,10 +567,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     private void setContext ( SmbResource context, String name ) {
         this.fileLocator.resolveInContext(context.getLocator(), name);
         if ( context.getLocator().getShare() != null && ( context instanceof SmbFile ) ) {
-            this.treeConnection = new SmbTreeConnection( ( (SmbFile) context ).treeConnection);
+            this.treeConnection = SmbTreeConnection.create( ( (SmbFile) context ).treeConnection);
         }
         else {
-            this.treeConnection = new SmbTreeConnection(context.getContext());
+            this.treeConnection = SmbTreeConnection.create(context.getContext());
         }
     }
 
