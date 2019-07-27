@@ -227,7 +227,11 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         catch ( IOException ioe ) {
             throw new SmbException(ioe.getMessage(), ioe);
         }
-        return this.negotiated;
+        SmbNegotiationResponse r = this.negotiated;
+        if ( r == null ) {
+            throw new SmbException("Connection did not complete, failed to get negotiation response");
+        }
+        return r;
     }
 
 
