@@ -543,7 +543,7 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         bufferIndex += pad;
 
         int ncpos = getHeaderStart() + negotiateContextOffset;
-        if ( negotiateContextOffset != 0 && negotiateContextCount != 0 ) {
+        if ( this.dialectRevision == 0x0311 && negotiateContextOffset != 0 && negotiateContextCount != 0 ) {
             NegotiateContextResponse[] contexts = new NegotiateContextResponse[negotiateContextCount];
             for ( int i = 0; i < negotiateContextCount; i++ ) {
                 int type = SMBUtil.readInt2(buffer, ncpos);
