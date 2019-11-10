@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     private final List<SmbTransportImpl> connections = new LinkedList<>();
     private final List<SmbTransportImpl> nonPooledConnections = new LinkedList<>();
+    private final ConcurrentLinkedQueue<SmbTransportImpl> toRemove = new ConcurrentLinkedQueue<>();
     final Map<String, Integer> failCounts = new ConcurrentHashMap<>();
 
 
@@ -79,6 +81,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             port = SmbConstants.DEFAULT_PORT;
         }
         synchronized ( this.connections ) {
+            cleanup();
             if ( log.isTraceEnabled() ) {
                 log.trace("Exclusive " + nonPooled + " enforced signing " + forceSigning);
             }
@@ -119,7 +122,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             if ( conn.matches(address, port, localAddr, localPort, hostName)
                     && ( tc.getConfig().getSessionLimit() == 0 || conn.getNumSessions() < tc.getConfig().getSessionLimit() ) ) {
                 try {
-                    if ( connectedOnly && conn.isDisconnected() ) {
+                    if ( conn.isFailed() || ( connectedOnly && conn.isDisconnected() ) ) {
                         continue;
                     }
 
@@ -246,6 +249,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
      */
     public boolean contains ( SmbTransport trans ) {
         synchronized ( this.connections ) {
+            cleanup();
             return this.connections.contains(trans);
         }
     }
@@ -253,12 +257,24 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
     @Override
     public void removeTransport ( SmbTransport trans ) {
+        if ( log.isDebugEnabled() ) {
+            log.debug("Scheduling transport connection for removal " + trans + " (" + System.identityHashCode(trans) + ")");
+        }
+        this.toRemove.add((SmbTransportImpl) trans);
+    }
+
+
+    private void cleanup () {
         synchronized ( this.connections ) {
-            if ( log.isDebugEnabled() ) {
-                log.debug("Removing transport connection " + trans + " (" + System.identityHashCode(trans) + ")");
+            SmbTransportImpl trans;
+            while ( ( trans = this.toRemove.poll() ) != null ) {
+
+                if ( log.isDebugEnabled() ) {
+                    log.debug("Removing transport connection " + trans + " (" + System.identityHashCode(trans) + ")");
+                }
+                this.connections.remove(trans);
+                this.nonPooledConnections.remove(trans);
             }
-            this.connections.remove(trans);
-            this.nonPooledConnections.remove(trans);
         }
     }
 
@@ -271,9 +287,10 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
     @Override
     public boolean close () throws CIFSException {
         boolean inUse = false;
-        
+
         List<SmbTransportImpl> toClose;
         synchronized ( this.connections ) {
+            cleanup();
             log.debug("Closing pool");
             toClose = new LinkedList<>(this.connections);
             toClose.addAll(this.nonPooledConnections);
@@ -287,6 +304,9 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
             catch ( IOException e ) {
                 log.warn("Failed to close connection", e);
             }
+        }
+        synchronized ( this.connections ) {
+            cleanup();
         }
         return inUse;
     }

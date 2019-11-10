@@ -192,7 +192,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
      * @return whether the transport is marked failed
      */
     public boolean isFailed () {
-        return this.state == 6;
+        return this.state == 5 || this.state == 6;
     }
 
 
