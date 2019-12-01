@@ -620,7 +620,7 @@ class SmbTreeConnection {
                 try ( SmbSessionInternal s = trans
                         .getSmbSession(this.ctx.withAnonymousCredentials(), t.getSession().getTargetHost(), t.getSession().getTargetDomain())
                         .unwrap(SmbSessionInternal.class);
-                      SmbTreeImpl tr = s.getSmbTree(null, null).unwrap(SmbTreeImpl.class) ) {
+                      SmbTreeImpl tr = s.getSmbTree(share, null).unwrap(SmbTreeImpl.class) ) {
                     tr.treeConnect(null, null);
                     log.debug("Anonymous retry succeeded");
                     return tr.acquire();
