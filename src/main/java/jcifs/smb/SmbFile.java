@@ -419,7 +419,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     public SmbFile ( SmbResource context, String name ) throws MalformedURLException, UnknownHostException {
         this(
             isWorkgroup(context) ? new URL(null, "smb://" + checkName(name), context.getContext().getUrlHandler())
-                    : new URL(context.getLocator().getURL(), checkName(name), context.getContext().getUrlHandler()),
+                    : new URL(context.getLocator().getURL(), encodeRelativePath(checkName(name)), context.getContext().getUrlHandler()),
             context.getContext());
         setContext(context, name);
     }
@@ -461,7 +461,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             long lastAccess, long size ) throws MalformedURLException {
         this(
             isWorkgroup(context) ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
-                    : new URL(context.getLocator().getURL(), checkName(name) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
+                    : new URL(
+                        context.getLocator().getURL(),
+                        encodeRelativePath(checkName(name)) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),
             context.getContext());
 
         if ( !isWorkgroup(context) ) {
@@ -483,6 +485,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         if ( loadedAttributes ) {
             this.attrExpiration = this.sizeExpiration = System.currentTimeMillis() + getContext().getConfig().getAttributeCacheTimeout();
         }
+    }
+
+
+    private static String encodeRelativePath ( String name ) {
+        return name;
     }
 
 

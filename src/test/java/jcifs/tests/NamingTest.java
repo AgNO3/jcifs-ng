@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -136,6 +137,27 @@ public class NamingTest extends BaseCIFSTest {
     public void testUnicode () throws UnknownHostException, CIFSException, MalformedURLException {
         Assume.assumeTrue("No unicode support", getContext().getConfig().isUseUnicode());
         runFilenameTest(Strings.UNICODE_STRINGS);
+    }
+
+
+    @Test
+    @Ignore
+    public void testWhitespacePrefix () throws Exception {
+        runFilenameTest(" wsprefix");
+    }
+
+
+    @Test
+    @Ignore
+    public void testWhitespaceSuffix () throws Exception {
+        runFilenameTest("wssuffix ");
+    }
+
+
+    @Test
+    @Ignore
+    public void testHash () throws Exception {
+        runFilenameTest("hash#tag");
     }
 
 

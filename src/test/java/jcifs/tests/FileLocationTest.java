@@ -451,6 +451,45 @@ public class FileLocationTest {
 
 
     @Test
+    public void testRelativeWhitespaceStart () throws Exception {
+        try ( SmbResource r = new SmbFile("smb://0.0.0.0/asdasf/", getContext());
+              SmbResource c = new SmbFile(r, " test") ) {
+            assertEquals(' ', c.getName().charAt(0));
+            assertEquals(" test", c.getName());
+            try ( SmbFile t = new SmbFile(c.getLocator().getURL(), getContext()) ) {
+                assertEquals(" test", t.getName());
+            }
+        }
+    }
+
+
+    @Test
+    public void testRelativeWhitespaceEnd () throws Exception {
+        try ( SmbResource r = new SmbFile("smb://0.0.0.0/asdasf/", getContext());
+              SmbResource c = new SmbFile(r, "test ") ) {
+            assertEquals(' ', c.getName().charAt(c.getName().length() - 1));
+            assertEquals("test ", c.getName());
+            try ( SmbFile t = new SmbFile(c.getLocator().getURL(), getContext()) ) {
+                assertEquals("test ", t.getName());
+            }
+        }
+    }
+
+
+    @Test
+    public void testURLCharacter () throws Exception {
+        // ? is invalid in filenames, still this should not matter for the url
+        try ( SmbResource r = new SmbFile("smb://0.0.0.0/asdasf/", getContext());
+              SmbResource c = new SmbFile(r, "test?#foo") ) {
+            assertEquals("test?#foo", c.getName());
+            try ( SmbFile t = new SmbFile(c.getLocator().getURL(), getContext()) ) {
+                assertEquals("test?#foo", t.getName());
+            }
+        }
+    }
+
+
+    @Test
     public void testBindingAddress () throws DcerpcException, MalformedURLException, CIFSException, IOException {
         try ( DcerpcHandle h = DcerpcHandle
                 .getHandle(String.format("ncacn_np:%s[endpoint=%s,address=%s]", "testing", "\\pipe\\srvsvc", "1.2.3.4"), getContext()) ) {
