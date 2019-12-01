@@ -225,6 +225,21 @@ public class SessionTest extends BaseCIFSTest {
     }
 
 
+    @Test
+    public void testAuthErrorNoConnLeak () throws Exception {
+        CIFSContext cifsContext = getNewContext().withCredentials(new NtlmPasswordAuthenticator("wrong", "wrong", "wrong"));
+        try ( SmbFile f = new SmbFile("smb://" + getTestServer() + "/IPC$/test", cifsContext); ) {
+            f.connect();
+            assertFalse(true);
+        }
+        catch ( SmbAuthException e ) {
+            // ignore
+        }
+
+        assertFalse(cifsContext.close());
+    }
+
+
     // #46
     @Test
     public void testCredentialURLs () throws MalformedURLException, SmbException {
