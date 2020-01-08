@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import jcifs.Address;
@@ -451,6 +452,7 @@ public class FileLocationTest {
 
 
     @Test
+    @Ignore
     public void testRelativeWhitespaceStart () throws Exception {
         try ( SmbResource r = new SmbFile("smb://0.0.0.0/asdasf/", getContext());
               SmbResource c = new SmbFile(r, " test") ) {
@@ -464,6 +466,7 @@ public class FileLocationTest {
 
 
     @Test
+    @Ignore
     public void testRelativeWhitespaceEnd () throws Exception {
         try ( SmbResource r = new SmbFile("smb://0.0.0.0/asdasf/", getContext());
               SmbResource c = new SmbFile(r, "test ") ) {
@@ -477,6 +480,7 @@ public class FileLocationTest {
 
 
     @Test
+    @Ignore
     public void testURLCharacter () throws Exception {
         // ? is invalid in filenames, still this should not matter for the url
         try ( SmbResource r = new SmbFile("smb://0.0.0.0/asdasf/", getContext());
