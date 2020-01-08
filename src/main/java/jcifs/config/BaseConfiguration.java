@@ -134,7 +134,7 @@ public class BaseConfiguration implements Configuration {
     protected Set<String> disallowCompound;
     protected DialectVersion minVersion;
     protected DialectVersion maxVersion;
-    private boolean requireSecureNegotiate = true;
+    protected boolean requireSecureNegotiate = true;
     private byte[] machineId;
 
 
