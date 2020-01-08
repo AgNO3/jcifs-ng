@@ -157,6 +157,16 @@ public class SmbFileInputStream extends InputStream {
 
 
     /**
+     * Ensures that the file descriptor is openend
+     * 
+     * @throws CIFSException
+     */
+    public void open () throws CIFSException {
+        try ( SmbFileHandleImpl fh = ensureOpen() ) {}
+    }
+
+
+    /**
      * @param file
      * @param openFlags
      * @return
