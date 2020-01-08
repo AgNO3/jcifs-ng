@@ -691,8 +691,7 @@ class SmbTreeImpl implements SmbTreeInternal {
      * 
      */
     private void validateNegotiation ( SmbTransportImpl trans, SmbSessionImpl sess ) throws CIFSException {
-        if ( !trans.isSMB2() || sess.getCredentials().isAnonymous() || sess.getCredentials().isGuest()
-                || !sess.getConfig().isRequireSecureNegotiate() ) {
+        if ( !trans.isSMB2() || trans.getDigest() == null || !sess.getConfig().isRequireSecureNegotiate() ) {
             log.debug("Secure negotiation does not apply");
             return;
         }
