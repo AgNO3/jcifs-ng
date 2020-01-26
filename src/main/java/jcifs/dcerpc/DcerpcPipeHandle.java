@@ -117,11 +117,11 @@ public class DcerpcPipeHandle extends DcerpcHandle {
 
         int fraglen = Encdec.dec_uint16le(inB, 8);
         if ( fraglen > getMaxRecv() ) {
-            throw new IOException("Unexpected fragment length: " + length);
+            throw new IOException("Unexpected fragment length: " + fraglen);
         }
 
         while ( have < fraglen ) {
-            int r = this.handle.recv(buf, have, length - have);
+            int r = this.handle.recv(inB, have, fraglen - have);
             if ( r == 0 ) {
                 throw new IOException("Unexpected EOF");
             }
