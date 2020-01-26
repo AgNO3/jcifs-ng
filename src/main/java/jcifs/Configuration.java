@@ -756,4 +756,12 @@ public interface Configuration {
      */
     boolean isEnforceSpnegoIntegrity ();
 
+
+    /**
+     * Property <tt>jcifs.smb.client.SendNTLMTargetName</tt> (boolean, true)
+     * 
+     * @return whether to send an AvTargetName with the NTLM exchange
+     */
+    boolean isSendNTLMTargetName ();
+
 }

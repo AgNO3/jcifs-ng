@@ -178,8 +178,8 @@ final class SmbSessionImpl implements SmbSessionInternal {
         }
 
         if ( usage == 1 ) {
-            synchronized (this) {
-                if (this.transportAcquired.compareAndSet(false, true)) {
+            synchronized ( this ) {
+                if ( this.transportAcquired.compareAndSet(false, true) ) {
                     log.debug("Reacquire transport");
                     this.transport.acquire();
                 }
@@ -669,12 +669,16 @@ final class SmbSessionImpl implements SmbSessionInternal {
      */
     protected SSPContext createContext ( SmbTransportImpl trans, final String tdomain, final Smb2NegotiateResponse negoResp, final boolean doSigning,
             Subject s ) throws SmbException {
-        String host = trans.getRemoteAddress().getHostAddress();
-        try {
-            host = trans.getRemoteAddress().getHostName();
-        }
-        catch ( Exception e ) {
-            log.debug("Failed to resolve host name", e);
+
+        String host = getTargetHost();
+        if ( host == null ) {
+            host = trans.getRemoteAddress().getHostAddress();
+            try {
+                host = trans.getRemoteAddress().getHostName();
+            }
+            catch ( Exception e ) {
+                log.debug("Failed to resolve host name", e);
+            }
         }
 
         if ( log.isDebugEnabled() ) {

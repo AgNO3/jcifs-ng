@@ -135,6 +135,7 @@ public class BaseConfiguration implements Configuration {
     protected DialectVersion minVersion;
     protected DialectVersion maxVersion;
     protected boolean requireSecureNegotiate = true;
+    protected boolean sendNTLMTargetName = true;
     private byte[] machineId;
 
 
@@ -605,6 +606,17 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isStrictResourceLifecycle () {
         return this.strictResourceLifecycle;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isSendNTLMTargetName()
+     */
+    @Override
+    public boolean isSendNTLMTargetName () {
+        return this.sendNTLMTargetName;
     }
 
 

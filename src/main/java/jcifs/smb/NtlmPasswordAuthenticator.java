@@ -177,7 +177,7 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
     @Override
     public SSPContext createContext ( CIFSContext tc, String targetDomain, String host, byte[] initialToken, boolean doSigning ) throws SmbException {
         if ( tc.getConfig().isUseRawNTLM() ) {
-            return new NtlmContext(tc, this, doSigning);
+            return setupTargetName(tc, host, new NtlmContext(tc, this, doSigning));
         }
 
         try {
@@ -201,7 +201,15 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
             log.debug("Ignoring invalid initial token", e1);
         }
 
-        return new SpnegoContext(tc.getConfig(), new NtlmContext(tc, this, doSigning));
+        return new SpnegoContext(tc.getConfig(), setupTargetName(tc, host, new NtlmContext(tc, this, doSigning)));
+    }
+
+
+    private static SSPContext setupTargetName ( CIFSContext tc, String host, NtlmContext ntlmContext ) {
+        if ( host != null && tc.getConfig().isSendNTLMTargetName() ) {
+            ntlmContext.setTargetName(String.format("cifs/%s", host));
+        }
+        return ntlmContext;
     }
 
 

@@ -105,6 +105,17 @@ public class DelegatingConfiguration implements Configuration {
     /**
      * {@inheritDoc}
      *
+     * @see jcifs.Configuration#isSendNTLMTargetName()
+     */
+    @Override
+    public boolean isSendNTLMTargetName () {
+        return this.delegate.isSendNTLMTargetName();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
      * @see jcifs.Configuration#isPort139FailoverEnabled()
      */
     @Override
