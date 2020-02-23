@@ -1,3 +1,15 @@
+jcifs-ng 2.1.4
+- Send AvTargetName during SMB SessionSetup with NTLM (#203)
+- Add methods to ensure opening of the target files (#199)
+- Fix DCERPC resonse fragment handling (again)
+- Only perform parameter validation if signing is possible (#192)
+- Add missing option to disable secure SMB2.1 negotation (#192)
+- Fix session/connection leak on authentication errors (#191)
+- Use correct share when retrying guest/anonymous auth (#193
+- Lazily remove connections from pool to avoid deadlocks (#188)
+- Only try to parse negotiate contexts if dialect is 3.11 (#178)
+- More meaningful exception when no negotation info is present (#178)
+
 jcifs-ng 2.1.3
 - Truncate existing file when copying (#173)
 - Fix DCERPC fragment receive buffer resizing strategy
