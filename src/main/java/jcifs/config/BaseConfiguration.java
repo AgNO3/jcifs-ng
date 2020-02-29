@@ -48,7 +48,7 @@ import jcifs.SmbConstants;
  */
 public class BaseConfiguration implements Configuration {
 
-    private static final Logger log = LoggerFactory.getLogger(PropertyConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(BaseConfiguration.class);
     private static final Map<String, Integer> DEFAULT_BATCH_LIMITS = new HashMap<>();
 
     static {
