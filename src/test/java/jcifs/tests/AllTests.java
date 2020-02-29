@@ -288,54 +288,74 @@ public class AllTests {
 
                 while ( it.hasNext() ) {
                     Path config = it.next();
-                    String fname = config.getFileName().toString();
-                    if ( !fname.endsWith(".conf") ) {
-                        continue;
-                    }
-                    Properties props = new Properties();
-                    try ( FileChannel ch = FileChannel.open(config, StandardOpenOption.READ);
-                          InputStream is = Channels.newInputStream(ch) ) {
-                        props.load(is);
-
-                    }
-                    if ( !props.isEmpty() ) {
-                        Map<String, String> map = toMap(props);
-                        String cfgname = fname.substring(0, fname.length() - 5);
-                        configs.put(cfgname, map);
-                        Set<String> apply = new HashSet<>(Arrays.asList(applyMutations));
-
-                        Set<String> excludes = new HashSet<>();
-                        if ( map.get(TestProperties.EXCLUDE_TEST_MUTATIONS) != null ) {
-                            excludes.addAll(Arrays.asList(map.get(TestProperties.EXCLUDE_TEST_MUTATIONS).split("\\s*,\\s*")));
-                        }
-                        if ( applyMutations != null && applyMutations.length > 0 && map.get(TestProperties.TEST_MUTATIONS) != null ) {
-                            for ( String mutate : map.get(TestProperties.TEST_MUTATIONS).split("\\s*,\\s*") ) {
-                                if ( excludes.contains(mutate) || shouldSkip(excludes, mutate) ) {
-                                    continue;
-                                }
-                                if ( apply.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
-                                    configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
-                                }
-                            }
-                        }
-                        else if ( applyMutations != null && applyMutations.length > 0 ) {
-                            for ( String mutate : applyMutations ) {
-                                if ( excludes.contains(mutate) || shouldSkip(excludes, mutate) ) {
-                                    continue;
-                                }
-                                if ( MUTATIONS.containsKey(mutate) ) {
-                                    configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
-                                }
-                            }
-                        }
-                    }
+                    loadConfigFile(config, applyMutations, configs);
                 }
             }
             catch ( IOException e ) {
                 log.error("Failed to load test config directory " + System.getProperty(TestProperties.TEST_CONFIG_DIR), e);
             }
         }
+        else if ( System.getProperties().containsKey(TestProperties.TEST_CONFIG_FILE) ) {
+            Path configFile = Paths.get(System.getProperty(TestProperties.TEST_CONFIG_FILE));
+            try {
+                loadConfigFile(configFile, applyMutations, configs);
+            }
+            catch ( IOException e ) {
+                log.error("Failed to load test config file " + System.getProperty(TestProperties.TEST_CONFIG_FILE), e);
+            }
+        }
         return configs;
+    }
+
+
+    /**
+     * @param config
+     * @param applyMutations
+     * @param configs
+     * @throws IOException
+     */
+    protected static void loadConfigFile ( Path config, String[] applyMutations, Map<String, Map<String, String>> configs ) throws IOException {
+        String fname = config.getFileName().toString();
+        if ( !fname.endsWith(".conf") ) {
+            return;
+        }
+        Properties props = new Properties();
+        try ( FileChannel ch = FileChannel.open(config, StandardOpenOption.READ);
+              InputStream is = Channels.newInputStream(ch) ) {
+            props.load(is);
+
+        }
+        if ( !props.isEmpty() ) {
+            Map<String, String> map = toMap(props);
+            String cfgname = fname.substring(0, fname.length() - 5);
+            configs.put(cfgname, map);
+            Set<String> apply = new HashSet<>(Arrays.asList(applyMutations));
+
+            Set<String> excludes = new HashSet<>();
+            if ( map.get(TestProperties.EXCLUDE_TEST_MUTATIONS) != null ) {
+                excludes.addAll(Arrays.asList(map.get(TestProperties.EXCLUDE_TEST_MUTATIONS).split("\\s*,\\s*")));
+            }
+            if ( applyMutations != null && applyMutations.length > 0 && map.get(TestProperties.TEST_MUTATIONS) != null ) {
+                for ( String mutate : map.get(TestProperties.TEST_MUTATIONS).split("\\s*,\\s*") ) {
+                    if ( excludes.contains(mutate) || shouldSkip(excludes, mutate) ) {
+                        continue;
+                    }
+                    if ( apply.contains(mutate) && MUTATIONS.containsKey(mutate) ) {
+                        configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
+                    }
+                }
+            }
+            else if ( applyMutations != null && applyMutations.length > 0 ) {
+                for ( String mutate : applyMutations ) {
+                    if ( excludes.contains(mutate) || shouldSkip(excludes, mutate) ) {
+                        continue;
+                    }
+                    if ( MUTATIONS.containsKey(mutate) ) {
+                        configs.put(cfgname + "-" + mutate, MUTATIONS.get(mutate).mutate(new HashMap<>(map)));
+                    }
+                }
+            }
+        }
     }
 
 

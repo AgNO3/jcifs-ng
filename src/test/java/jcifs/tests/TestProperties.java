@@ -51,6 +51,7 @@ public final class TestProperties {
     static final String TEST_GROUP_NAME = "test.group.name";
 
     static final String TEST_CONFIG_DIR = "test.config.dir";
+    static final String TEST_CONFIG_FILE = "test.config.file";
 
     static final String TEST_MUTATIONS = "test.mutations";
 

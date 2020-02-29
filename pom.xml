@@ -190,6 +190,11 @@
 							<from>*</from>
 							<to>*</to>
 						</difference>
+						<difference>
+							<className>jcifs/Configuration</className>
+							<differenceType>7012</differenceType>
+							<method>boolean isSendNTLMTargetName()</method>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>
