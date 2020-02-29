@@ -230,8 +230,15 @@ public class DfsImpl implements DfsResolver {
     public SmbTransport getDc ( CIFSContext tf, String domain ) throws SmbAuthException {
         if ( tf.getConfig().isDfsDisabled() )
             return null;
+        SmbTransportImpl transport = getReferralTransport( tf, getDcReferrals( tf, domain ) );
+        if ( transport == null && log.isDebugEnabled() ) {
+            log.debug( String.format( "Failed to connect to domain controller for %s", domain ) );
+        }
+        return transport;
+    }
+
+    private SmbTransportImpl getReferralTransport ( CIFSContext tf, DfsReferralData dr ) throws SmbAuthException {
         try {
-            DfsReferralData dr = getDcReferrals(tf, domain);
             if ( dr != null ) {
                 DfsReferralData start = dr;
                 IOException e = null;
@@ -264,9 +271,6 @@ public class DfsImpl implements DfsResolver {
             }
         }
         catch ( IOException ioe ) {
-            if ( log.isDebugEnabled() ) {
-                log.debug(String.format("Failed to connect to domain controller for %s", domain), ioe);
-            }
             if ( tf.getConfig().isDfsStrictView() && ioe instanceof SmbAuthException ) {
                 throw (SmbAuthException) ioe;
             }
@@ -462,7 +466,6 @@ public class DfsImpl implements DfsResolver {
      * @param domain
      * @param root
      * @param path
-     * @param dr
      * @param now
      * @param roots
      * @return
@@ -494,11 +497,14 @@ public class DfsImpl implements DfsResolver {
         if ( links == null ) {
             log.trace("Loadings roots");
             String refServerName = domain;
-            dr = fetchRootReferral(tf, domain, root, path, refServerName);
-            links = cacheRootReferral(tf, domain, root, path, roots, dr, links);
+            dr = fetchRootReferral( tf, domain, root, refServerName );
+            links = cacheRootReferral( tf, domain, root, roots, dr, links );
         }
         else if ( links instanceof NegativeCacheEntry ) {
             links = null;
+        }
+        else {
+            dr = links.map.get( "\\" );
         }
 
         if ( links != null ) {
@@ -512,44 +518,27 @@ public class DfsImpl implements DfsResolver {
      * @param tf
      * @param domain
      * @param root
-     * @param path
      * @param roots
      * @param dr
      * @param links
      * @return
      */
-    private static CacheEntry<DfsReferralDataInternal> cacheRootReferral ( CIFSContext tf, String domain, String root, String path,
-            Map<String, CacheEntry<DfsReferralDataInternal>> roots, DfsReferralDataInternal dr, CacheEntry<DfsReferralDataInternal> links ) {
+    private static CacheEntry<DfsReferralDataInternal> cacheRootReferral ( CIFSContext tf, String domain, String root,
+           Map<String, CacheEntry<DfsReferralDataInternal>> roots, DfsReferralDataInternal dr, CacheEntry<DfsReferralDataInternal> links ) {
         if ( dr != null ) {
             links = new CacheEntry<>(tf.getConfig().getDfsTtl());
+            links.map.put( "\\", dr );
             DfsReferralDataInternal tmp = dr;
             do {
-                int consumedRoot = 1 + domain.length() + 1 + root.length();
-                if ( path == null ) {
-
-                    if ( log.isTraceEnabled() ) {
-                        log.trace("Path is empty, insert root " + tmp);
-                    }
-                    /*
-                     * Store references to the map and key so that
-                     * SmbFile.resolveDfs can re-insert the dr list with
-                     * the dr that was successful so that subsequent
-                     * attempts to resolve DFS use the last successful
-                     * referral first.
-                     */
-                    tmp.setCacheMap(links.map);
-                    tmp.setKey("\\");
-                }
-                log.debug("Stripping " + consumedRoot + " root " + root + " domain " + domain + " referral " + tmp);
-                tmp.stripPathConsumed(consumedRoot);
-
-                if ( path != null && tmp.getPathConsumed() > 0 ) {
-                    int actualPathConsumed = tmp.getPathConsumed();
-                    String link = path.substring(0, actualPathConsumed);
-                    tmp.setKey(link);
-                    links.map.put(dr.getKey(), dr);
-                }
-
+                /*
+                 * Store references to the map and key so that
+                 * SmbFile.resolveDfs can re-insert the dr list with
+                 * the dr that was successful so that subsequent
+                 * attempts to resolve DFS use the last successful
+                 * referral first.
+                 */
+                tmp.setCacheMap( links.map );
+                tmp.setKey( "\\" );
                 tmp = tmp.next();
             }
             while ( tmp != dr );
@@ -560,7 +549,7 @@ public class DfsImpl implements DfsResolver {
 
             roots.put(root, links);
         }
-        else if ( path == null ) {
+        else {
             roots.put(root, new NegativeCacheEntry<DfsReferralDataInternal>(tf.getConfig().getDfsTtl()));
         }
         return links;
@@ -571,12 +560,11 @@ public class DfsImpl implements DfsResolver {
      * @param tf
      * @param domain
      * @param root
-     * @param path
      * @param refServerName
      * @return
      * @throws SmbAuthException
      */
-    private DfsReferralDataInternal fetchRootReferral ( CIFSContext tf, String domain, String root, String path, String refServerName )
+    private DfsReferralDataInternal fetchRootReferral ( CIFSContext tf, String domain, String root, String refServerName )
             throws SmbAuthException {
         DfsReferralDataInternal dr;
         try ( SmbTransport dc = getDc(tf, domain) ) {
@@ -601,7 +589,7 @@ public class DfsImpl implements DfsResolver {
                 catch ( IOException e ) {
                     log.warn("Failed to connect to domain controller", e);
                 }
-                dr = getReferral(tf, trans, domain, domain, refServerName, root, path);
+                dr = getReferral( tf, trans, domain, domain, refServerName, root, null );
             }
         }
 
@@ -609,7 +597,7 @@ public class DfsImpl implements DfsResolver {
             log.trace("Have DC referral " + dr);
         }
 
-        if ( dr != null && path == null && domain.equals(dr.getServer()) && root.equals(dr.getShare()) ) {
+        if ( dr != null && domain.equals( dr.getServer() ) && root.equals( dr.getShare() ) ) {
             // If we do cache these we never get to the properly cached
             // standalone referral we might have.
             log.warn("Dropping self-referential referral " + dr);
@@ -624,14 +612,15 @@ public class DfsImpl implements DfsResolver {
      * @param domain
      * @param root
      * @param path
-     * @param dr
+     * @param rootDr
      * @param now
      * @param links
      * @return
      * @throws SmbAuthException
      */
-    private DfsReferralDataInternal getLinkReferral ( CIFSContext tf, String domain, String root, String path, DfsReferralDataInternal dr, long now,
-            CacheEntry<DfsReferralDataInternal> links ) throws SmbAuthException {
+    private DfsReferralDataInternal getLinkReferral ( CIFSContext tf, String domain, String root, String path, DfsReferralDataInternal rootDr, long now,
+          CacheEntry<DfsReferralDataInternal> links ) throws SmbAuthException {
+        DfsReferralDataInternal dr = rootDr;
         String link;
 
         if ( path == null || path.length() <= 1 ) {
@@ -687,7 +676,7 @@ public class DfsImpl implements DfsResolver {
         }
 
         if ( dr == null ) {
-            try ( SmbTransportInternal trans = getDc(tf, domain).unwrap(SmbTransportInternal.class) ) {
+            try ( SmbTransportInternal trans = getReferralTransport( tf, rootDr ) ) {
                 if ( trans == null )
                     return null;
 
@@ -727,7 +716,6 @@ public class DfsImpl implements DfsResolver {
      * @param domain
      * @param root
      * @param path
-     * @param dr
      * @param now
      * @return
      */
