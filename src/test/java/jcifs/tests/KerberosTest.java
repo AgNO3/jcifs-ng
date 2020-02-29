@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSContext;
 import jcifs.CIFSException;
+import jcifs.ResolverType;
 import jcifs.SmbResource;
 import jcifs.SmbTreeHandle;
 import jcifs.smb.JAASAuthenticator;
@@ -101,6 +102,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Test
     public void testKRB () throws Exception {
+        Assume.assumeTrue(getContext().getConfig().getResolveOrder().contains(ResolverType.RESOLVER_DNS));
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), null);
         CIFSContext ctx = getContext().withCredentials(new Kerb5Authenticator(s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
         try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
@@ -114,6 +116,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Test
     public void testJAAS () throws CIFSException, MalformedURLException {
+        Assume.assumeTrue(getContext().getConfig().getResolveOrder().contains(ResolverType.RESOLVER_DNS));
         CIFSContext ctx = getContext().withCredentials(new JAASAuthenticator(getTestUserDomainRequired(), getTestUser(), getTestUserPassword()));
         try ( SmbResource f = new SmbFile(getTestShareURL(), ctx) ) {
             f.exists();
@@ -157,6 +160,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Test
     public void testSessionExpiration () throws Exception {
+        Assume.assumeTrue(getContext().getConfig().getResolveOrder().contains(ResolverType.RESOLVER_DNS));
         long start = System.currentTimeMillis() / 1000 * 1000;
         // this is not too great as it depends on timing/clockskew
         // first we need to obtain a ticket, therefor need valid credentials
