@@ -9,6 +9,7 @@ jcifs-ng 2.1.4
 - Lazily remove connections from pool to avoid deadlocks (#188)
 - Only try to parse negotiate contexts if dialect is 3.11 (#178)
 - More meaningful exception when no negotation info is present (#178)
+- Avoid possible deadlock when exceptions occur during session setup 
 
 jcifs-ng 2.1.3
 - Truncate existing file when copying (#173)

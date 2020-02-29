@@ -486,7 +486,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                     sessionSetupSMB1(trans, this.targetDomain, (ServerMessageBlock) chained, (ServerMessageBlock) chainedResponse);
                     return chainedResponse;
                 }
-                catch ( CIFSException se ) {
+                catch ( Exception se ) {
                     log.debug("Session setup failed", se);
                     if ( this.connectionState.compareAndSet(1, 0) ) {
                         // only try to logoff if we have not completed the session setup, ignore errors from chained
