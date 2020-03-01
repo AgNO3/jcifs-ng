@@ -122,6 +122,8 @@ public class SessionTest extends BaseCIFSTest {
     @Test
     public void logonUserNoDomain () throws IOException {
         Assume.assumeTrue(getTestDomain().equalsIgnoreCase(getTestUserDomain()));
+        // without a domain name, at this point we do not resolve the domain DFS roots
+        Assume.assumeTrue(getProperties().get("test.share.dfsroot.url") == null);
         CIFSContext ctx = getContext();
         try ( SmbResource f = new SmbFile(
             getTestShareURL(),
