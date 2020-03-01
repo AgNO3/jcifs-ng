@@ -76,11 +76,17 @@ public class DfsTest extends BaseCIFSTest {
     }
 
 
-    /**
-     * @return
-     */
     private String getTestDfsTargetServer () {
         String dfsTargetServer = getProperties().get("test.server.dfs");
+        if ( dfsTargetServer != null ) {
+            return dfsTargetServer;
+        }
+        return getTestServer();
+    }
+
+
+    private String getTestDC () {
+        String dfsTargetServer = getProperties().get("test.domain.dc");
         if ( dfsTargetServer != null ) {
             return dfsTargetServer;
         }
@@ -106,7 +112,7 @@ public class DfsTest extends BaseCIFSTest {
             String remoteHostName = dc.getRemoteHostName();
             assertNotNull(addr);
             assertNotNull(remoteHostName);
-            assertEquals(getTestServer(), remoteHostName);
+            assertEquals(getTestDC(), remoteHostName);
         }
     }
 

@@ -144,6 +144,7 @@ public class KerberosTest extends BaseCIFSTest {
 
     @Test
     public void testReauthenticate () throws Exception {
+        Assume.assumeTrue(getContext().getConfig().getResolveOrder().contains(ResolverType.RESOLVER_DNS));
         Subject s = getInitiatorSubject(getTestUser(), getTestUserPassword(), getTestUserDomainRequired(), null);
         Kerb5Authenticator creds = new RefreshableKerb5Authenticator(s, getTestUserDomainRequired(), getTestUser(), getTestUserPassword());
         CIFSContext ctx = getContext().withCredentials(creds);
