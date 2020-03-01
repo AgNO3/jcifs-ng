@@ -245,24 +245,33 @@ public class SessionTest extends BaseCIFSTest {
     // #46
     @Test
     public void testCredentialURLs () throws MalformedURLException, SmbException {
-        testCredentialUrl(
-            String.format("smb://%s:%s@%s/%s/doesnotexist", getTestUser(), getTestUserPassword(), getTestServer(), getTestShare()),
-            getTestUser(),
-            getTestUserPassword(),
-            null);
-
-        if ( getTestUserDomain() != null ) {
+        try {
             testCredentialUrl(
-                String.format(
-                    "smb://%s;%s:%s@%s/%s/doesnotexist",
-                    getTestUserDomain(),
-                    getTestUser(),
-                    getTestUserPassword(),
-                    getTestServer(),
-                    getTestShare()),
+                String.format("smb://%s:%s@%s/%s/doesnotexist", getTestUser(), getTestUserPassword(), getTestServer(), getTestShare()),
                 getTestUser(),
                 getTestUserPassword(),
-                getTestUserDomain());
+                null);
+
+            if ( getTestUserDomain() != null ) {
+                testCredentialUrl(
+                    String.format(
+                        "smb://%s;%s:%s@%s/%s/doesnotexist",
+                        getTestUserDomain(),
+                        getTestUser(),
+                        getTestUserPassword(),
+                        getTestServer(),
+                        getTestShare()),
+                    getTestUser(),
+                    getTestUserPassword(),
+                    getTestUserDomain());
+            }
+        }
+        catch ( SmbException e ) {
+            // no setup to resolve hostname if netbios is used
+            if ( e.getCause() instanceof UnknownHostException ) {
+                Assume.assumeTrue(false);
+            }
+            throw e;
         }
     }
 
@@ -311,7 +320,7 @@ public class SessionTest extends BaseCIFSTest {
     @Test ( expected = SmbException.class )
     public void testPoolLogonFail () throws CIFSException, UnknownHostException {
         CIFSContext ctx = withTestNTLMCredentials(getContext());
-        ctx.getTransportPool().logon(ctx, ctx.getNameServiceClient().getByName(getTestServer()), 12345);
+        ctx.getTransportPool().logon(ctx, ctx.getNameServiceClient().getByName("0.0.0.0"), 12345);
     }
 
 

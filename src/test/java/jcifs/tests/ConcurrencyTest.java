@@ -365,6 +365,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
 
     @Test
     public void testMultiThread () throws InterruptedException {
+        withTestNTLMCredentials(getContext());
         List<MutiThreadTestCase> runnables = new ArrayList<>();
         for ( int i = 0; i < 20; i++ ) {
             runnables.add(new MutiThreadTestCase());
