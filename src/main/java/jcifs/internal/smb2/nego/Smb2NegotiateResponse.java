@@ -542,8 +542,8 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         int pad = ( bufferIndex - hdrStart ) % 8;
         bufferIndex += pad;
 
-        int ncpos = getHeaderStart() + negotiateContextOffset;
         if ( this.dialectRevision == 0x0311 && negotiateContextOffset != 0 && negotiateContextCount != 0 ) {
+            int ncpos = getHeaderStart() + negotiateContextOffset;
             NegotiateContextResponse[] contexts = new NegotiateContextResponse[negotiateContextCount];
             for ( int i = 0; i < negotiateContextCount; i++ ) {
                 int type = SMBUtil.readInt2(buffer, ncpos);
@@ -561,9 +561,10 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
                 }
             }
             this.negotiateContexts = contexts;
+            return Math.max(bufferIndex, ncpos) - start;
         }
 
-        return Math.max(bufferIndex, ncpos) - start;
+        return bufferIndex - start;
     }
 
 
