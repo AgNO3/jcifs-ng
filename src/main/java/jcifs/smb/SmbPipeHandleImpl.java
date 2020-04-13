@@ -265,13 +265,13 @@ class SmbPipeHandleImpl implements SmbPipeHandleInternal {
                     req.setMaxDataCount(1024);
                 }
                 th.send(req, resp, RequestParam.NO_RETRY);
-                return resp.getByteCount();
+                return resp.getResponseLength();
             }
             else if ( this.call ) {
                 th.send(new TransWaitNamedPipe(th.getConfig(), this.uncPath), new TransWaitNamedPipeResponse(th.getConfig()));
                 TransCallNamedPipeResponse resp = new TransCallNamedPipeResponse(th.getConfig(), inB);
                 th.send(new TransCallNamedPipe(th.getConfig(), this.uncPath, buf, off, length), resp);
-                return resp.getByteCount();
+                return resp.getResponseLength();
             }
             else {
                 SmbPipeOutputStream out = getOutput();

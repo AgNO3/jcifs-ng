@@ -86,4 +86,13 @@ public class TransTransactNamedPipeResponse extends SmbComTransactionResponse {
     public String toString () {
         return new String("TransTransactNamedPipeResponse[" + super.toString() + "]");
     }
+
+
+    /**
+     * 
+     * @return response data length
+     */
+    public int getResponseLength () {
+        return getDataCount();
+    }
 }
