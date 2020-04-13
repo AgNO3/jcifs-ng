@@ -35,6 +35,7 @@ public interface SmbTreeInternal extends SmbTree {
      * @param tf
      * @throws SmbException
      */
+    @Deprecated
     void connectLogon ( CIFSContext tf ) throws SmbException;
 
 

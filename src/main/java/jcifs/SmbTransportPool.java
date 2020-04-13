@@ -144,6 +144,7 @@ public interface SmbTransportPool {
      * @param tc
      * @throws CIFSException
      */
+    @Deprecated
     void logon ( CIFSContext tc, Address dc ) throws CIFSException;
 
 
@@ -163,6 +164,7 @@ public interface SmbTransportPool {
      * @param tc
      * @throws CIFSException
      */
+    @Deprecated
     void logon ( CIFSContext tc, Address dc, int port ) throws CIFSException;
 
 
@@ -174,6 +176,7 @@ public interface SmbTransportPool {
      * @return NTLM challenge
      * @throws CIFSException
      */
+    @Deprecated
     byte[] getChallenge ( CIFSContext tc, Address dc ) throws CIFSException;
 
 
@@ -186,6 +189,7 @@ public interface SmbTransportPool {
      * @return NTLM challenge
      * @throws CIFSException
      */
+    @Deprecated
     byte[] getChallenge ( CIFSContext tc, Address dc, int port ) throws CIFSException;
 
 }
