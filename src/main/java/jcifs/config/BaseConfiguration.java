@@ -740,6 +740,10 @@ public class BaseConfiguration implements Configuration {
     protected void initProtocolVersions ( DialectVersion min, DialectVersion max ) {
         this.minVersion = min != null ? min : DialectVersion.SMB1;
         this.maxVersion = max != null ? max : DialectVersion.SMB210;
+
+        if ( this.minVersion.atLeast(this.maxVersion) ) {
+            this.maxVersion = this.minVersion;
+        }
     }
 
 
