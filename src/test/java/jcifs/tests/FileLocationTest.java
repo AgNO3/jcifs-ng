@@ -515,6 +515,14 @@ public class FileLocationTest {
         }
     }
 
+
+    @Test
+    public void testShareNoSlash () throws MalformedURLException, CIFSException {
+        try ( SmbResource r = new SmbFile("smb://domain;user;passwort@0.0.0.0/test", getContext()) ) {
+            assertEquals(SmbConstants.TYPE_SHARE, r.getLocator().getType());
+        }
+    }
+
     private static class TestDfsReferral implements DfsReferralData {
 
         private String server;

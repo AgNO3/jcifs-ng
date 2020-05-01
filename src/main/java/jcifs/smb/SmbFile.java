@@ -853,6 +853,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     if ( this.fileLocator.getType() == TYPE_SHARE ) {
                         // treeConnect is good enough, but we need to do this after resolving DFS
                         try ( SmbTreeHandleImpl th2 = ensureTreeConnected() ) {}
+                        this.attributes &= ~ATTR_READONLY;
                     }
                     else {
                         queryPath(th, this.fileLocator.getUNCPath(), FileInformation.FILE_BASIC_INFO);

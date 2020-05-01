@@ -261,6 +261,16 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
+    // #219
+    public void testShareWrite () throws MalformedURLException, CIFSException {
+        try ( SmbResource f = getDefaultShareRoot() ) {
+            checkConnection(f);
+            assertTrue(f.canWrite());
+        }
+    }
+
+
+    @Test
     public void testShareSecurity () throws IOException {
         try ( SmbResource f = getDefaultShareRoot() ) {
             try {
