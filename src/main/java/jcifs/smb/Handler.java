@@ -96,6 +96,14 @@ public class Handler extends URLStreamHandler {
         else if ( spec.startsWith("smb://") == false && host != null && host.length() == 0 ) {
             spec = "//" + spec;
             limit += 2;
+        } else {
+        	// TODO: verify that this is a valid rule!
+        	// Change made to fix problems when deleting directory children recursively        	
+        	if (u.getPath() != null) {
+        		String separator = u.getPath().endsWith("/") || spec.startsWith("/") ? "" : "/";
+    			spec = u.getPath() + separator + spec;
+    			limit = spec.length();
+        	}
         }
         super.parseURL(u, spec, start, limit);
         path = u.getPath();
@@ -109,4 +117,5 @@ public class Handler extends URLStreamHandler {
         }
         setURL(u, "smb", u.getHost(), port, u.getAuthority(), u.getUserInfo(), path, u.getQuery(), null);
     }
+
 }
