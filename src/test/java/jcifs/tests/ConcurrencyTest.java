@@ -141,12 +141,40 @@ public class ConcurrencyTest extends BaseCIFSTest {
               SmbResource exclFile = new SmbFile(sr, fname) ) {
 
             try ( OutputStream s = exclFile.openOutputStream(false, SmbConstants.FILE_NO_SHARE);
-                  InputStream is = exclFile.openInputStream(SmbConstants.FILE_NO_SHARE) ) {}
+                  InputStream is = exclFile.openInputStream(SmbConstants.FILE_NO_SHARE) ) {
+                fail("No sharing violation");
+            }
             catch ( SmbException e ) {
                 if ( e.getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
                     return;
                 }
                 throw e;
+            }
+            finally {
+                exclFile.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testOpenReadLocked () throws IOException {
+        String fname = makeRandomName();
+        try ( SmbFile sr = getDefaultShareRoot();
+              SmbResource exclFile = new SmbFile(sr, fname) ) {
+
+            exclFile.createNewFile();
+            try {
+                try ( InputStream is = exclFile.openInputStream(SmbConstants.FILE_NO_SHARE);
+                      InputStream is2 = exclFile.openInputStream(SmbConstants.FILE_NO_SHARE) ) {
+                    fail("No sharing violation");
+                }
+                catch ( SmbException e ) {
+                    if ( e.getNtStatus() == NtStatus.NT_STATUS_SHARING_VIOLATION ) {
+                        return;
+                    }
+                    throw e;
+                }
             }
             finally {
                 exclFile.delete();

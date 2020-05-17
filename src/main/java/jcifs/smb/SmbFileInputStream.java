@@ -47,7 +47,7 @@ public class SmbFileInputStream extends InputStream {
 
     private SmbFileHandleImpl handle;
     private long fp;
-    private int readSize, readSizeFile, openFlags, access;
+    private int readSize, readSizeFile, openFlags, access, sharing;
     private byte[] tmp = new byte[1];
 
     SmbFile file;
@@ -92,6 +92,7 @@ public class SmbFileInputStream extends InputStream {
         this.unsharedFile = unshared;
         this.openFlags = openFlags;
         this.access = access;
+        this.sharing = sharing;
 
         try ( SmbTreeHandleInternal th = file.ensureTreeConnected() ) {
             this.smb2 = th.isSMB2();
@@ -179,19 +180,12 @@ public class SmbFileInputStream extends InputStream {
                 this.handle = this.file.openUnshared(
                     SmbConstants.O_EXCL,
                     ( (SmbNamedPipe) this.file ).getPipeType() & 0xFF0000,
-                    SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE,
+                    this.sharing,
                     SmbConstants.ATTR_NORMAL,
                     0);
             }
             else {
-                this.handle = this.file
-                        .openUnshared(
-                            this.openFlags,
-                            this.access,
-                            SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE,
-                            SmbConstants.ATTR_NORMAL,
-                            0)
-                        .acquire();
+                this.handle = this.file.openUnshared(this.openFlags, this.access, this.sharing, SmbConstants.ATTR_NORMAL, 0).acquire();
             }
             return this.handle;
         }
