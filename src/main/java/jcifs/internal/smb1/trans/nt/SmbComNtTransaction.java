@@ -31,7 +31,7 @@ import jcifs.internal.util.SMBUtil;
 public abstract class SmbComNtTransaction extends SmbComTransaction {
 
     // relative to headerStart
-    private static final int NTT_PRIMARY_SETUP_OFFSET = 69;
+    private static final int NTT_PRIMARY_SETUP_OFFSET = 71;
     private static final int NTT_SECONDARY_PARAMETER_OFFSET = 51;
 
     /**

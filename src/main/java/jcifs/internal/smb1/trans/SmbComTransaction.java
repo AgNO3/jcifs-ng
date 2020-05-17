@@ -39,11 +39,11 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
     static final int DISCONNECT_TID = 0x01;
     static final int ONE_WAY_TRANSACTION = 0x02;
 
-    static final int PADDING_SIZE = 2;
+    static final int PADDING_SIZE = 4;
 
     private int tflags = 0x00;
-    private int pad = 0;
     private int pad1 = 0;
+    private int pad2 = 0;
     private boolean hasMore = true;
     private boolean isPrimary = true;
     private int bufParameterOffset;
@@ -219,18 +219,21 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
         if ( this.isPrimary ) {
             this.isPrimary = false;
 
-            this.parameterOffset = this.primarySetupOffset + ( this.setupCount * 2 ) + 2;
-            if ( this.getCommand() != SMB_COM_NT_TRANSACT ) {
-                if ( this.getCommand() == SMB_COM_TRANSACTION && isResponse() == false ) {
-                    this.parameterOffset += stringWireLength(this.name, this.parameterOffset);
-                }
+            // primarySetupOffset
+            // SMB_COM_TRANSACTION: 61 = 32 SMB header + 1 (word count) + 28 (fixed words)
+            // SMB_COM_NT_TRANSACTION: 69 = 32 SMB header + 1 (word count) + 38 (fixed words)
+            this.parameterOffset = this.primarySetupOffset;
+
+            // 2* setupCount
+            this.parameterOffset += this.setupCount * 2;
+            this.parameterOffset += 2; // ByteCount
+
+            if ( this.getCommand() == SMB_COM_TRANSACTION && isResponse() == false ) {
+                this.parameterOffset += stringWireLength(this.name, this.parameterOffset);
             }
-            else if ( this.getCommand() == SMB_COM_NT_TRANSACT ) {
-                this.parameterOffset += 2;
-            }
-            this.pad = this.parameterOffset % getPadding();
-            this.pad = this.pad == 0 ? 0 : getPadding() - this.pad;
-            this.parameterOffset += this.pad;
+
+            this.pad1 = pad(this.parameterOffset);
+            this.parameterOffset += this.pad1;
 
             this.totalParameterCount = writeParametersWireFormat(this.txn_buf, this.bufParameterOffset);
             this.bufDataOffset = this.totalParameterCount; // data comes right after data
@@ -240,9 +243,8 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
             available -= this.parameterCount;
 
             this.dataOffset = this.parameterOffset + this.parameterCount;
-            this.pad1 = this.dataOffset % getPadding();
-            this.pad1 = this.pad1 == 0 ? 0 : getPadding() - this.pad1;
-            this.dataOffset += this.pad1;
+            this.pad2 = this.pad(this.dataOffset);
+            this.dataOffset += this.pad2;
 
             this.totalDataCount = writeDataWireFormat(this.txn_buf, this.bufDataOffset);
 
@@ -259,26 +261,24 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
 
             this.parameterOffset = SECONDARY_PARAMETER_OFFSET;
             if ( ( this.totalParameterCount - this.parameterDisplacement ) > 0 ) {
-                this.pad = this.parameterOffset % getPadding();
-                this.pad = this.pad == 0 ? 0 : getPadding() - this.pad;
-                this.parameterOffset += this.pad;
+                this.pad1 = this.pad(this.parameterOffset);
+                this.parameterOffset += this.pad1;
             }
 
             // caclulate parameterDisplacement before calculating new parameterCount
             this.parameterDisplacement += this.parameterCount;
 
-            int available = this.maxBufferSize - this.parameterOffset - this.pad;
+            int available = this.maxBufferSize - this.parameterOffset - this.pad1;
             this.parameterCount = Math.min(this.totalParameterCount - this.parameterDisplacement, available);
             available -= this.parameterCount;
 
             this.dataOffset = this.parameterOffset + this.parameterCount;
-            this.pad1 = this.dataOffset % getPadding();
-            this.pad1 = this.pad1 == 0 ? 0 : getPadding() - this.pad1;
-            this.dataOffset += this.pad1;
+            this.pad2 = this.pad(this.dataOffset);
+            this.dataOffset += this.pad2;
 
             this.dataDisplacement += this.dataCount;
 
-            available -= this.pad1;
+            available -= this.pad2;
             this.dataCount = Math.min(this.totalDataCount - this.dataDisplacement, available);
         }
         if ( ( this.parameterDisplacement + this.parameterCount ) >= this.totalParameterCount
@@ -286,6 +286,18 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
             this.hasMore = false;
         }
         return this;
+    }
+
+
+    /**
+     * @return
+     */
+    protected int pad ( int offset ) {
+        int p = offset % getPadding();
+        if ( p == 0 ) {
+            return 0;
+        }
+        return getPadding() - p;
     }
 
 
@@ -350,32 +362,25 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
     @Override
     protected int writeBytesWireFormat ( byte[] dst, int dstIndex ) {
         int start = dstIndex;
-        int p = this.pad;
 
         if ( this.getCommand() == SMB_COM_TRANSACTION && isResponse() == false ) {
             dstIndex += writeString(this.name, dst, dstIndex);
         }
 
-        if ( this.parameterCount > 0 ) {
-            while ( p-- > 0 ) {
-                dst[ dstIndex++ ] = (byte) 0x00; // Pad
-            }
+        int end = dstIndex + this.pad1;
 
-            System.arraycopy(this.txn_buf, this.bufParameterOffset, dst, dstIndex, this.parameterCount);
-            dstIndex += this.parameterCount;
+        if ( this.parameterCount > 0 ) {
+            System.arraycopy(this.txn_buf, this.bufParameterOffset, dst, this.headerStart + this.parameterOffset, this.parameterCount);
+            end = Math.max(end, this.headerStart + this.parameterOffset + this.parameterCount + this.pad2);
         }
 
         if ( this.dataCount > 0 ) {
-            p = this.pad1;
-            while ( p-- > 0 ) {
-                dst[ dstIndex++ ] = (byte) 0x00; // Pad1
-            }
-            System.arraycopy(this.txn_buf, this.bufDataOffset, dst, dstIndex, this.dataCount);
+            System.arraycopy(this.txn_buf, this.bufDataOffset, dst, this.headerStart + this.dataOffset, this.dataCount);
             this.bufDataOffset += this.dataCount;
-            dstIndex += this.dataCount;
+            end = Math.max(end, this.headerStart + this.dataOffset + this.dataCount);
         }
 
-        return dstIndex - start;
+        return end - start;
     }
 
 
@@ -417,7 +422,7 @@ public abstract class SmbComTransaction extends ServerMessageBlock implements En
                     + Hexdump.toHexString(this.tflags, 2) + ",timeout=" + this.timeout + ",parameterCount=" + this.parameterCount
                     + ",parameterOffset=" + this.parameterOffset + ",parameterDisplacement=" + this.parameterDisplacement + ",dataCount="
                     + this.dataCount + ",dataOffset=" + this.dataOffset + ",dataDisplacement=" + this.dataDisplacement + ",setupCount="
-                    + this.setupCount + ",pad=" + this.pad + ",pad1=" + this.pad1);
+                    + this.setupCount + ",pad=" + this.pad1 + ",pad1=" + this.pad2);
     }
 
 }
