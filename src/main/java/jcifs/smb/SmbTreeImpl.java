@@ -779,6 +779,7 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @see jcifs.smb.SmbTreeInternal#connectLogon(jcifs.CIFSContext)
      */
     @Override
+    @Deprecated
     public void connectLogon ( CIFSContext tf ) throws SmbException {
         if ( tf.getConfig().getLogonShare() == null ) {
             try {

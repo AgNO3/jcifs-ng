@@ -301,6 +301,7 @@ public class SessionTest extends BaseCIFSTest {
 
 
     // #68
+    @SuppressWarnings ( "deprecation" )
     @Test
     public void testPoolLogonSuccess () throws CIFSException, UnknownHostException {
         CIFSContext ctx = withTestNTLMCredentials(getContext());
@@ -309,6 +310,7 @@ public class SessionTest extends BaseCIFSTest {
 
 
     // #68
+    @SuppressWarnings ( "deprecation" )
     @Test ( expected = SmbAuthException.class )
     public void testPoolLogonInvalid () throws CIFSException, UnknownHostException {
         CIFSContext ctx = getContext().withCredentials(new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), "invalid"));
@@ -317,6 +319,7 @@ public class SessionTest extends BaseCIFSTest {
 
 
     // #68
+    @SuppressWarnings ( "deprecation" )
     @Test ( expected = SmbException.class )
     public void testPoolLogonFail () throws CIFSException, UnknownHostException {
         CIFSContext ctx = withTestNTLMCredentials(getContext());

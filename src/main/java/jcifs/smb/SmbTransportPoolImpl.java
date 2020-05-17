@@ -342,6 +342,7 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
 
     @Override
+    @Deprecated
     public void logon ( CIFSContext tf, Address dc, int port ) throws SmbException {
         try ( SmbTransportInternal smbTransport = tf.getTransportPool().getSmbTransport(tf, dc, port, false, tf.getConfig().isIpcSigningEnforced())
                 .unwrap(SmbTransportInternal.class);
