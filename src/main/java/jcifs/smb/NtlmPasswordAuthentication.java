@@ -34,6 +34,8 @@ import jcifs.CIFSContext;
  * <p>
  * Read <a href="../../../authhandler.html">jCIFS Exceptions and
  * NtlmAuthenticator</a> for related information.
+ * 
+ * @deprecated use {@link NtlmPasswordAuthenticator} instead
  */
 @Deprecated
 public class NtlmPasswordAuthentication extends NtlmPasswordAuthenticator {

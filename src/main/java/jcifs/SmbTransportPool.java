@@ -143,6 +143,8 @@ public interface SmbTransportPool {
      * @param dc
      * @param tc
      * @throws CIFSException
+     * @deprecated functionality is broken and will be removed at some point,
+     *             use actual Active Directory authentication instead
      */
     @Deprecated
     void logon ( CIFSContext tc, Address dc ) throws CIFSException;
@@ -163,6 +165,8 @@ public interface SmbTransportPool {
      * @param port
      * @param tc
      * @throws CIFSException
+     * @deprecated functionality is broken and will be removed at some point,
+     *             use actual Active Directory authentication instead
      */
     @Deprecated
     void logon ( CIFSContext tc, Address dc, int port ) throws CIFSException;
@@ -175,6 +179,8 @@ public interface SmbTransportPool {
      * @param tc
      * @return NTLM challenge
      * @throws CIFSException
+     * @deprecated functionality is broken and will be removed at some point,
+     *             use actual Active Directory authentication instead
      */
     @Deprecated
     byte[] getChallenge ( CIFSContext tc, Address dc ) throws CIFSException;
@@ -188,6 +194,8 @@ public interface SmbTransportPool {
      * @param tc
      * @return NTLM challenge
      * @throws CIFSException
+     * @deprecated functionality is broken and will be removed at some point,
+     *             use actual Active Directory authentication instead
      */
     @Deprecated
     byte[] getChallenge ( CIFSContext tc, Address dc, int port ) throws CIFSException;

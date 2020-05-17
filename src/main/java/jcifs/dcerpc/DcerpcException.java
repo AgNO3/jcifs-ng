@@ -95,6 +95,7 @@ public class DcerpcException extends CIFSException implements DcerpcError, WinEr
     /**
      * 
      * @return the root cause
+     * @deprecated use {@link #getCause()}
      */
     @Deprecated
     public Throwable getRootCause () {
