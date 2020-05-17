@@ -163,6 +163,36 @@ public class ContextConfigTest {
 
         // needs to be adjusted when default changes
         assertEquals(DialectVersion.SMB210, p3.getMaximumVersion());
+
+    }
+
+
+    @Test
+    // #226
+    public void testLegacyConfig () throws CIFSException {
+        Properties prop1 = new Properties();
+        prop1.setProperty("jcifs.smb.client.enableSMB2", "false");
+        prop1.setProperty("jcifs.smb.client.disableSMB1", "false");
+        PropertyConfiguration p1 = new PropertyConfiguration(prop1);
+
+        assertEquals(DialectVersion.SMB1, p1.getMinimumVersion());
+        assertEquals(DialectVersion.SMB1, p1.getMaximumVersion());
+
+        Properties prop2 = new Properties();
+        prop2.setProperty("jcifs.smb.client.enableSMB2", "true");
+        prop2.setProperty("jcifs.smb.client.disableSMB1", "false");
+        PropertyConfiguration p2 = new PropertyConfiguration(prop2);
+
+        assertEquals(DialectVersion.SMB1, p2.getMinimumVersion());
+        // needs to be adjusted when default changes
+        assertEquals(DialectVersion.SMB210, p2.getMaximumVersion());
+
+        Properties prop3 = new Properties();
+        prop3.setProperty("jcifs.smb.client.enableSMB2", "true");
+        prop3.setProperty("jcifs.smb.client.disableSMB1", "true");
+        PropertyConfiguration p3 = new PropertyConfiguration(prop3);
+
+        assertEquals(DialectVersion.SMB202, p3.getMinimumVersion());
     }
 
 }
