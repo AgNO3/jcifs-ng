@@ -85,6 +85,8 @@ public class SessionTest extends BaseCIFSTest {
             "forceSigning",
             "legacyAuth",
             "forceSpnegoIntegrity",
+            "noSpnegoIntegrity",
+            "rawNTLM",
             "noUnicode",
             "forceUnicode",
             "noNTStatus",

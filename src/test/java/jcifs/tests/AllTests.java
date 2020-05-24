@@ -131,6 +131,24 @@ public class AllTests {
             }
         });
 
+        MUTATIONS.put("noSpnegoIntegrity", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.disableSpnegoIntegrity", "true");
+                return cfg;
+            }
+        });
+
+        MUTATIONS.put("rawNTLM", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.useRawNTLM", "true");
+                return cfg;
+            }
+        });
+
         MUTATIONS.put("noUnicode", new TestMutation() {
 
             @Override
