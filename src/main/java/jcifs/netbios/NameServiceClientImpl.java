@@ -423,7 +423,8 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
         if ( max == 0 ) {
             max = 1; /* No WINs, try only bcast addr */
-        }
+        } else
+            request.addr = getWINSAddress();
 
         synchronized ( response ) {
             while ( max-- > 0 ) {
