@@ -460,7 +460,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     SmbFile ( SmbResource context, String name, boolean loadedAttributes, int type, int attributes, long createTime, long lastModified,
             long lastAccess, long size ) throws MalformedURLException {
         this(
-            isWorkgroup(context) ? new URL(null, "smb://" + checkName(name) + "/", Handler.SMB_HANDLER)
+            isWorkgroup(context) ? new URL(null, "smb://" + checkName(name) + "/", context.getContext().getUrlHandler())
                     : new URL(
                         context.getLocator().getURL(),
                         encodeRelativePath(checkName(name)) + ( ( attributes & ATTR_DIRECTORY ) > 0 ? "/" : "" )),

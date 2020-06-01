@@ -39,7 +39,6 @@ import jcifs.context.SingletonContext;
 public class Handler extends URLStreamHandler {
 
     private static final Logger log = LoggerFactory.getLogger(Handler.class);
-    static final URLStreamHandler SMB_HANDLER = new Handler();
     private CIFSContext transportContext;
 
 
