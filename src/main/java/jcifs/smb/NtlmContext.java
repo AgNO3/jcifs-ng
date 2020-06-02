@@ -267,16 +267,17 @@ public class NtlmContext implements SSPContext {
 
             this.ntlmsspFlags &= msg2.getFlags();
 
+            boolean anonymous = this.auth.isAnonymous();
             Type3Message msg3 = new Type3Message(
                 this.transportContext,
                 msg2,
                 this.targetName,
-                this.auth.isGuest() ? "invalid" : this.auth.getPassword(),
-                this.auth.isGuest() ? null : this.auth.getUserDomain(),
-                this.auth.isGuest() ? "GUEST" : this.auth.getUsername(),
+                this.auth.isGuest() ? "invalid" : anonymous ? " " : this.auth.getPassword(),
+                this.auth.isGuest() ? null      : anonymous ? " " : this.auth.getUserDomain(),
+                this.auth.isGuest() ? "GUEST"   : anonymous ? " " : this.auth.getUsername(),
                 this.workstation,
                 this.ntlmsspFlags,
-                !this.auth.isAnonymous());
+                !anonymous);
 
             msg3.setupMIC(this.type1Bytes, token);
 
