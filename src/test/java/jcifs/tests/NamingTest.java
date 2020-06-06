@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 
 import org.junit.Assume;
 import org.junit.Ignore;
@@ -44,6 +45,8 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.SmbResource;
+import jcifs.config.PropertyConfiguration;
+import jcifs.context.BaseContext;
 import jcifs.smb.SmbFile;
 
 
@@ -60,6 +63,20 @@ public class NamingTest extends BaseCIFSTest {
 
     public NamingTest ( String name, Map<String, String> properties ) {
         super(name, properties);
+    }
+
+
+    @Test
+    public void testWINSOnly () throws CIFSException, UnknownHostException {
+        Properties prop = new Properties();
+        prop.setProperty("jcifs.resolveOrder", "WINS");
+        prop.setProperty("jcifs.netbios.wins", getRequiredProperty("jcifs.netbios.wins"));
+
+        PropertyConfiguration cfg = new PropertyConfiguration(prop);
+        BaseContext c = new BaseContext(cfg);
+
+        c.getNameServiceClient().getByName(getRequiredProperty("test.server.netbios"));
+        c.getNameServiceClient().getAllByName(getRequiredProperty("test.server.netbios"), true);
     }
 
 
