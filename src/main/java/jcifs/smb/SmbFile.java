@@ -1854,6 +1854,21 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     @Override
+    public void setFileTimes( long createTime, long lastLastModified, long lastLastAccess ) throws SmbException {
+        if ( this.fileLocator.isRootOrShare() ) {
+            throw new SmbException("Invalid operation for workgroups, servers, or shares");
+        }
+
+        try {
+            setPathInformation(0, createTime, lastLastModified, lastLastAccess);
+        }
+        catch ( CIFSException e ) {
+            throw SmbException.wrap(e);
+        }
+    }
+
+
+    @Override
     public void setCreateTime ( long time ) throws SmbException {
         if ( this.fileLocator.isRootOrShare() ) {
             throw new SmbException("Invalid operation for workgroups, servers, or shares");
