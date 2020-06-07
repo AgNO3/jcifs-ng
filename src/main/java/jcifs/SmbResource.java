@@ -213,9 +213,33 @@ public interface SmbResource extends AutoCloseable {
 
 
     /**
+     * Set the create, last modified and last access time of the file. The time is specified
+     * as milliseconds from Jan 1, 1970 which is the same as that which is returned by the
+     * <tt>createTime()</tt>, <tt>lastModified()</tt>, <tt>lastAccess()</tt> methods.
+     * <br>
+     * This method does not apply to workgroups, servers, or shares.
+     * 
+     * @see setCreateTime
+     * @see setLastAccess
+     * @see setLastModified
+     *
+     * @param createTime
+     *            the create time as milliseconds since Jan 1, 1970
+     * @param time
+     *            the last modified time as milliseconds since Jan 1, 1970
+     * @param lastLastAccess
+     *            the last access time as milliseconds since Jan 1, 1970
+     * @throws CIFSException
+     * @throws jcifs.smb.SmbUnsupportedOperationException
+     *             if CAP_NT_SMBS is unavailable
+     */
+     void setFileTimes ( long createTime, long lastLastModified, long lastLastAccess ) throws CIFSException;
+
+
+    /**
      * Set the last access time of the file. The time is specified as milliseconds
      * from Jan 1, 1970 which is the same as that which is returned by the
-     * <tt>lastModified()</tt>, <tt>getLastModified()</tt>, and <tt>getDate()</tt> methods.
+     * <tt>lastAccess()</tt> method.
      * <br>
      * This method does not apply to workgroups, servers, or shares.
      *
@@ -231,7 +255,7 @@ public interface SmbResource extends AutoCloseable {
     /**
      * Set the last modified time of the file. The time is specified as milliseconds
      * from Jan 1, 1970 which is the same as that which is returned by the
-     * <tt>lastModified()</tt>, <tt>getLastModified()</tt>, and <tt>getDate()</tt> methods.
+     * <tt>lastModified()</tt> method.
      * <br>
      * This method does not apply to workgroups, servers, or shares.
      *
