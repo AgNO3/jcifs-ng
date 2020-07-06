@@ -239,12 +239,7 @@ public class SmbComNegotiateResponse extends ServerMessageBlock implements SmbNe
             return false;
         }
 
-        if ( req.isSigningEnforced() && !this.server.signaturesEnabled ) {
-            log.error("Signatures are required but the server does not support them");
-            return false;
-        }
-        else if ( req.isSigningEnforced() || this.server.signaturesRequired
-                || ( this.server.signaturesEnabled && ctx.getConfig().isSigningEnabled() ) ) {
+        if ( req.isSigningEnforced() || this.server.signaturesRequired || ( this.server.signaturesEnabled && ctx.getConfig().isSigningEnabled() ) ) {
             this.negotiatedFlags2 |= SmbConstants.FLAGS2_SECURITY_SIGNATURES;
             if ( req.isSigningEnforced() || isSigningRequired() ) {
                 this.negotiatedFlags2 |= SmbConstants.FLAGS2_SECURITY_REQUIRE_SIGNATURES;
