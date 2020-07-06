@@ -44,6 +44,9 @@ import jcifs.CIFSException;
 import jcifs.Credentials;
 import jcifs.SmbResource;
 import jcifs.SmbTransport;
+import jcifs.config.DelegatingConfiguration;
+import jcifs.smb.NtStatus;
+import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbException;
@@ -64,7 +67,9 @@ import jcifs.smb.SmbTreeHandleInternal;
  *
  */
 @RunWith ( Parameterized.class )
-@SuppressWarnings ( "javadoc" )
+@SuppressWarnings ( {
+    "javadoc", "deprecation"
+} )
 public class SessionTest extends BaseCIFSTest {
 
     private static final Logger log = LoggerFactory.getLogger(SessionTest.class);
@@ -110,6 +115,12 @@ public class SessionTest extends BaseCIFSTest {
         try ( SmbResource f = new SmbFile(getTestShareGuestURL(), withAnonymousCredentials()) ) {
             checkConnection(f);
         }
+        catch ( SmbAuthException e ) {
+            if ( e.getNtStatus() != NtStatus.NT_STATUS_ACCESS_DENIED ) {
+                throw e;
+            }
+            Assume.assumeNoException(e);
+        }
     }
 
 
@@ -118,6 +129,87 @@ public class SessionTest extends BaseCIFSTest {
         try ( SmbResource f = new SmbFile(getTestShareGuestURL(), withTestGuestCredentials()) ) {
             checkConnection(f);
         }
+        catch ( SmbAuthException e ) {
+            ignoreAuthFailure(e);
+        }
+    }
+
+
+    @Test
+    public void logonGuestAlternative () throws IOException {
+
+        CIFSContext ctx = getContext();
+        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public String getGuestUsername () {
+                return "jcifs-guest";
+            }
+        }).withGuestCrendentials();
+
+        try ( SmbResource f = new SmbFile(getTestShareGuestURL(), ctx) ) {
+            checkConnection(f);
+        }
+        catch ( SmbAuthException e ) {
+            ignoreAuthFailure(e);
+        }
+    }
+
+
+    @Test
+    public void logonGuestFallback () throws IOException {
+
+        CIFSContext ctx = getContext();
+        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public boolean isAllowGuestFallback () {
+                return true;
+            }
+
+        }).withCredentials(new NtlmPasswordAuthenticator("invalid", "invalid"));
+
+        try ( SmbResource f = new SmbFile(getTestShareGuestURL(), ctx) ) {
+            checkConnection(f);
+        }
+        catch ( SmbAuthException e ) {
+            ignoreAuthFailure(e);
+        }
+    }
+
+
+    @Test
+    public void logonGuestLegacy () throws IOException {
+
+        CIFSContext ctx = getContext().withCredentials(new NtlmPasswordAuthenticator("guest", ""));
+
+        try ( SmbResource f = new SmbFile(getTestShareGuestURL(), ctx) ) {
+            checkConnection(f);
+        }
+        catch ( SmbAuthException e ) {
+            ignoreAuthFailure(e);
+        }
+    }
+
+
+    @Test
+    public void logonGuestLegacy2 () throws IOException {
+        CIFSContext ctx = getContext().withCredentials(new NtlmPasswordAuthentication(getContext(), null, "guest", ""));
+
+        try ( SmbResource f = new SmbFile(getTestShareGuestURL(), ctx) ) {
+            checkConnection(f);
+        }
+        catch ( SmbAuthException e ) {
+            ignoreAuthFailure(e);
+        }
+    }
+
+
+    protected void ignoreAuthFailure ( SmbAuthException e ) throws SmbAuthException {
+        if ( e.getNtStatus() != NtStatus.NT_STATUS_LOGON_FAILURE && e.getNtStatus() != NtStatus.NT_STATUS_ACCOUNT_DISABLED ) {
+            throw e;
+        }
+        Assume.assumeNoException(e);
     }
 
 
@@ -188,6 +280,12 @@ public class SessionTest extends BaseCIFSTest {
                 f2.exists();
                 connectionMatches(f1, f2);
             }
+        }
+        catch ( SmbAuthException e ) {
+            if ( e.getNtStatus() != NtStatus.NT_STATUS_ACCESS_DENIED ) {
+                throw e;
+            }
+            Assume.assumeNoException(e);
         }
     }
 
@@ -278,7 +376,6 @@ public class SessionTest extends BaseCIFSTest {
     }
 
 
-    @SuppressWarnings ( "deprecation" )
     protected void testCredentialUrl ( String url, String user, String pass, String dom ) throws SmbException, MalformedURLException {
         try ( SmbFile f = new SmbFile(url) ) {
             Credentials creds = f.getContext().getCredentials();
@@ -303,7 +400,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     // #68
-    @SuppressWarnings ( "deprecation" )
     @Test
     public void testPoolLogonSuccess () throws CIFSException, UnknownHostException {
         CIFSContext ctx = withTestNTLMCredentials(getContext());
@@ -312,7 +408,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     // #68
-    @SuppressWarnings ( "deprecation" )
     @Test ( expected = SmbAuthException.class )
     public void testPoolLogonInvalid () throws CIFSException, UnknownHostException {
         CIFSContext ctx = getContext().withCredentials(new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), "invalid"));
@@ -321,7 +416,6 @@ public class SessionTest extends BaseCIFSTest {
 
 
     // #68
-    @SuppressWarnings ( "deprecation" )
     @Test ( expected = SmbException.class )
     public void testPoolLogonFail () throws CIFSException, UnknownHostException {
         CIFSContext ctx = withTestNTLMCredentials(getContext());
