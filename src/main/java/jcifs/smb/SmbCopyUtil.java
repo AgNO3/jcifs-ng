@@ -111,6 +111,9 @@ final class SmbCopyUtil {
                 serverSideCopy(src, dest, sh, dh, false);
                 return;
             }
+            catch ( SmbUnsupportedOperationException e ) {
+                log.debug("Server side copy not supported, falling back to normal copying", e);
+            }
             catch ( CIFSException e ) {
                 log.warn("Server side copy failed", e);
                 throw SmbException.wrap(e);
@@ -304,6 +307,9 @@ final class SmbCopyUtil {
                 }
                 while ( retry );
             }
+        }
+        catch ( SmbUnsupportedOperationException e ) {
+            throw e;
         }
         catch ( IOException se ) {
             throw new CIFSException("Server side copy failed", se);

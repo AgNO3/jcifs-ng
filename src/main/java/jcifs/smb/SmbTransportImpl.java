@@ -1434,6 +1434,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         case NtStatus.NT_STATUS_NOTIFY_ENUM_DIR:
             break;
         case 0xC00000BB: // NT_STATUS_NOT_SUPPORTED
+        case 0xC0000010: // NT_STATUS_INVALID_DEVICE_REQUEST
             throw new SmbUnsupportedOperationException();
         case NtStatus.NT_STATUS_PATH_NOT_COVERED:
             if ( ! ( req instanceof RequestWithPath ) ) {
