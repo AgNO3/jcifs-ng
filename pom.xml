@@ -195,6 +195,22 @@
 							<differenceType>7012</differenceType>
 							<method>boolean isSendNTLMTargetName()</method>
 						</difference>
+
+						<difference>
+							<className>jcifs/Configuration</className>
+							<differenceType>7012</differenceType>
+							<method>boolean isAllowGuestFallback()</method>
+						</difference>
+						<difference>
+							<className>jcifs/Configuration</className>
+							<differenceType>7012</differenceType>
+							<method>java.lang.String getGuestUsername()</method>
+						</difference>
+						<difference>
+							<className>jcifs/Configuration</className>
+							<differenceType>7012</differenceType>
+							<method>java.lang.String getGuestPassword()</method>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>

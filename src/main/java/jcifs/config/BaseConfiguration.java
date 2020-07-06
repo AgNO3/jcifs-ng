@@ -137,6 +137,9 @@ public class BaseConfiguration implements Configuration {
     protected boolean requireSecureNegotiate = true;
     protected boolean sendNTLMTargetName = true;
     private byte[] machineId;
+    protected String guestUsername = "GUEST";
+    protected String guestPassword = "";
+    protected boolean allowGuestFallback = false;
 
 
     /**
@@ -576,56 +579,48 @@ public class BaseConfiguration implements Configuration {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#getMaxRequestRetries()
-     */
     @Override
     public int getMaxRequestRetries () {
         return this.maxRequestRetries;
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#isTraceResourceUsage()
-     */
     @Override
     public boolean isTraceResourceUsage () {
         return this.traceResourceUsage;
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#isStrictResourceLifecycle()
-     */
     @Override
     public boolean isStrictResourceLifecycle () {
         return this.strictResourceLifecycle;
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#isSendNTLMTargetName()
-     */
     @Override
     public boolean isSendNTLMTargetName () {
         return this.sendNTLMTargetName;
     }
 
 
-    /**
-     * 
-     * {@inheritDoc}
-     *
-     * @see jcifs.Configuration#getMachineId()
-     */
+    @Override
+    public String getGuestUsername () {
+        return this.guestUsername;
+    }
+
+
+    @Override
+    public String getGuestPassword () {
+        return this.guestPassword;
+    }
+
+
+    @Override
+    public boolean isAllowGuestFallback () {
+        return this.allowGuestFallback;
+    }
+
+
     @Override
     public byte[] getMachineId () {
         return this.machineId;

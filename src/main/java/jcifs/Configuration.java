@@ -764,4 +764,27 @@ public interface Configuration {
      */
     boolean isSendNTLMTargetName ();
 
+
+    /**
+     * Property <tt>jcifs.smb.client.guestPassword</tt>, defaults to empty string
+     * 
+     * @return password used when guest authentication is requested
+     */
+    String getGuestPassword ();
+
+
+    /**
+     * Property <tt>jcifs.smb.client.guestUsername</tt>, defaults to GUEST
+     * 
+     * @return username used when guest authentication is requested
+     */
+    String getGuestUsername ();
+
+
+    /**
+     * Property <tt>jcifs.smb.client.allowGuestFallback</tt>, defaults to false
+     * 
+     * @return whether to permit guest logins when user authentication is requested
+     */
+    boolean isAllowGuestFallback ();
 }

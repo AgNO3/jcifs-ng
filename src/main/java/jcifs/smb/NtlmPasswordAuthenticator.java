@@ -46,8 +46,12 @@ import jcifs.util.Strings;
 /**
  * This class stores and encrypts NTLM user credentials.
  * 
+ * Contrary to {@link NtlmPasswordAuthentication} this does not cause guest authentication
+ * when the "guest" username is supplied. Use {@link AuthenticationType} instead.
+ * 
  * @author mbechler
  */
+@SuppressWarnings ( "javadoc" )
 public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal, Serializable {
 
     /**
@@ -57,6 +61,7 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
 
     private static final Logger log = LoggerFactory.getLogger(NtlmPasswordAuthenticator.class);
 
+    private AuthenticationType type;
     private String domain;
     private String username;
     private String password;
@@ -67,9 +72,15 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
      * Construct anonymous credentials
      */
     public NtlmPasswordAuthenticator () {
+        this(AuthenticationType.NULL);
+    }
+
+
+    public NtlmPasswordAuthenticator ( AuthenticationType type ) {
         this.domain = "";
         this.username = "";
         this.password = "";
+        this.type = type;
     }
 
 
@@ -92,6 +103,20 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
      * @param password
      */
     public NtlmPasswordAuthenticator ( String domain, String username, String password ) {
+        this(domain, username, password, AuthenticationType.USER);
+    }
+
+
+    /**
+     * Create username/password credentials with specified domain
+     * 
+     * @param domain
+     * @param username
+     * @param password
+     * @param type
+     *            authentication type
+     */
+    public NtlmPasswordAuthenticator ( String domain, String username, String password, AuthenticationType type ) {
         if ( username != null ) {
             int ci = username.indexOf('@');
             if ( ci > 0 ) {
@@ -110,13 +135,24 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
         this.domain = domain != null ? domain : "";
         this.username = username != null ? username : "";
         this.password = password != null ? password : "";
+        if ( type == null ) {
+            this.type = guessAuthenticationType();
+        }
+        else {
+            this.type = type;
+        }
+    }
+
+
+    protected NtlmPasswordAuthenticator ( String userInfo, String defDomain, String defUser, String defPassword ) {
+        this(userInfo, defDomain, defUser, defPassword, null);
     }
 
 
     /**
      * @param userInfo
      */
-    protected NtlmPasswordAuthenticator ( String userInfo, String defDomain, String defUser, String defPassword ) {
+    protected NtlmPasswordAuthenticator ( String userInfo, String defDomain, String defUser, String defPassword, AuthenticationType type ) {
         String dom = null, user = null, pass = null;
         if ( userInfo != null ) {
             try {
@@ -144,13 +180,35 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
         this.domain = dom != null ? dom : ( defDomain != null ? defDomain : "" );
         this.username = user != null ? user : ( defUser != null ? defUser : "" );
         this.password = pass != null ? pass : ( defPassword != null ? defPassword : "" );
+
+        if ( type == null ) {
+            this.type = guessAuthenticationType();
+        }
+        else {
+            this.type = type;
+        }
+    }
+
+
+    /**
+     * @return
+     */
+    protected AuthenticationType guessAuthenticationType () {
+        AuthenticationType t = AuthenticationType.USER;
+        if ( "guest".equalsIgnoreCase(this.username) ) {
+            t = AuthenticationType.GUEST;
+        }
+        else if ( ( getUserDomain() == null || getUserDomain().isEmpty() ) && getUsername().isEmpty() && ( getPassword().isEmpty() ) ) {
+            t = AuthenticationType.NULL;
+        }
+        return t;
     }
 
 
     @SuppressWarnings ( "unchecked" )
     @Override
-    public <T extends Credentials> T unwrap ( Class<T> type ) {
-        if ( type.isAssignableFrom(this.getClass()) ) {
+    public <T extends Credentials> T unwrap ( Class<T> t ) {
+        if ( t.isAssignableFrom(this.getClass()) ) {
             return (T) this;
         }
         return null;
@@ -225,6 +283,7 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
         cloned.domain = toClone.domain;
         cloned.username = toClone.username;
         cloned.password = toClone.password;
+        cloned.type = toClone.type;
     }
 
 
@@ -294,7 +353,7 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
             NtlmPasswordAuthenticator ntlm = (NtlmPasswordAuthenticator) obj;
             String domA = ntlm.getUserDomain() != null ? ntlm.getUserDomain().toUpperCase() : null;
             String domB = this.getUserDomain() != null ? this.getUserDomain().toUpperCase() : null;
-            return Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUsername())
+            return ntlm.type == this.type && Objects.equals(domA, domB) && ntlm.getUsername().equalsIgnoreCase(this.getUsername())
                     && Objects.equals(getPassword(), ntlm.getPassword());
         }
         return false;
@@ -322,13 +381,13 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
 
     @Override
     public boolean isAnonymous () {
-        return ( getUserDomain() == null || getUserDomain().isEmpty() ) && ( getUsername().isEmpty() || isGuest() ) && ( getPassword().isEmpty() );
+        return this.type == AuthenticationType.NULL;
     }
 
 
     @Override
     public boolean isGuest () {
-        return "GUEST".equalsIgnoreCase(getUsername());
+        return this.type == AuthenticationType.GUEST;
     }
 
 
@@ -541,5 +600,30 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
         catch ( Exception e ) {
             throw new SmbException("", e);
         }
+    }
+
+    /**
+     * Authentication strategy
+     * 
+     * 
+     */
+    public enum AuthenticationType {
+        /**
+         * Null/anonymous authentication
+         * 
+         * Login with no credentials
+         */
+        NULL,
+        /**
+         * Guest authentication
+         * 
+         * Allows login with invalid credentials (username and/or password)
+         * Fallback to anonymous authentication is permitted
+         */
+        GUEST,
+        /**
+         * Regular user authentication
+         */
+        USER
     }
 }

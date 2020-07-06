@@ -881,4 +881,37 @@ public class DelegatingConfiguration implements Configuration {
     public byte[] getMachineId () {
         return this.delegate.getMachineId();
     }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getGuestUsername()
+     */
+    @Override
+    public String getGuestUsername () {
+        return this.delegate.getGuestUsername();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#getGuestPassword()
+     */
+    @Override
+    public String getGuestPassword () {
+        return this.delegate.getGuestPassword();
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see jcifs.Configuration#isAllowGuestFallback()
+     */
+    @Override
+    public boolean isAllowGuestFallback () {
+        return this.delegate.isAllowGuestFallback();
+    }
 }

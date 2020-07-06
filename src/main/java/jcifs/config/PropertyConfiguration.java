@@ -141,6 +141,10 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.traceResourceUsage = Config.getBoolean(p, "jcifs.traceResources", false);
         this.strictResourceLifecycle = Config.getBoolean(p, "jcifs.smb.client.strictResourceLifecycle", false);
 
+        this.allowGuestFallback = Config.getBoolean(p, "jcifs.smb.client.allowGuestFallback", false);
+        this.guestUsername = p.getProperty("jcifs.smb.client.guestUsername", "JCIFSGUEST");
+        this.guestPassword = p.getProperty("jcifs.smb.client.guestPassword", "");
+
         String minVer = p.getProperty("jcifs.smb.client.minVersion");
         String maxVer = p.getProperty("jcifs.smb.client.maxVersion");
 

@@ -624,7 +624,8 @@ class SmbTreeConnection {
     private SmbTreeImpl retryAuthentication ( SmbResourceLocatorImpl loc, String share, SmbTransportInternal trans, SmbTreeImpl t,
             DfsReferralData referral, SmbAuthException sae ) throws SmbAuthException, CIFSException {
         try ( SmbSessionImpl treesess = t.getSession() ) {
-            if ( treesess.getCredentials().isAnonymous() ) { // anonymous session, refresh
+            if ( treesess.getCredentials().isAnonymous() || treesess.getCredentials().isGuest() ) {
+                // refresh anonymous session or fallback to anonymous from guest login
                 try ( SmbSessionInternal s = trans
                         .getSmbSession(this.ctx.withAnonymousCredentials(), treesess.getTargetHost(), treesess.getTargetDomain())
                         .unwrap(SmbSessionInternal.class);

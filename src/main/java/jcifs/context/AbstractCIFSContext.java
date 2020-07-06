@@ -25,6 +25,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.Credentials;
 import jcifs.smb.NtlmPasswordAuthenticator;
+import jcifs.smb.NtlmPasswordAuthenticator.AuthenticationType;
 
 
 /**
@@ -85,7 +86,7 @@ public abstract class AbstractCIFSContext extends Thread implements CIFSContext 
      */
     @Override
     public CIFSContext withGuestCrendentials () {
-        return withCredentials(new NtlmPasswordAuthenticator(null, "GUEST", ""));
+        return withCredentials(new NtlmPasswordAuthenticator(null, null, null, AuthenticationType.GUEST));
     }
 
 
