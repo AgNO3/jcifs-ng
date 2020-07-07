@@ -204,7 +204,8 @@ public class FileAttributesTest extends BaseCIFSTest {
     public void testSetAttributes () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestFile() ) {
             try {
-                int attrs = f.getAttributes() ^ SmbConstants.ATTR_ARCHIVE ^ SmbConstants.ATTR_HIDDEN ^ SmbConstants.ATTR_READONLY;
+                int hid = Boolean.parseBoolean(getProperties().getOrDefault("test.skip.hidden", "false")) ? SmbConstants.ATTR_HIDDEN : 0;
+                int attrs = f.getAttributes() ^ SmbConstants.ATTR_ARCHIVE ^ hid ^ SmbConstants.ATTR_READONLY;
                 f.setAttributes(attrs);
                 assertEquals(attrs, f.getAttributes());
             }

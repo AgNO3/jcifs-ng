@@ -499,7 +499,7 @@ public class EnumTest extends BaseCIFSTest {
                 assertNotNull(dirs);
                 assertEquals(1, dirs.length);
 
-                if ( haveHidden ) {
+                if ( haveHidden && !Boolean.parseBoolean(getProperties().getOrDefault("test.skip.hidden", "false")) ) {
                     SmbFile[] hidden = f.listFiles(new DosFileFilter("*", SmbConstants.ATTR_HIDDEN));
                     assertNotNull(hidden);
                     assertEquals(1, hidden.length);
