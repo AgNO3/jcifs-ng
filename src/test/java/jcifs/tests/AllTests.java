@@ -242,6 +242,16 @@ public class AllTests {
             }
         });
 
+        MUTATIONS.put("smb2-nego", new TestMutation() {
+
+            @Override
+            public Map<String, String> mutate ( Map<String, String> cfg ) {
+                cfg.put("jcifs.smb.client.minVersion", "SMB202");
+                cfg.put("jcifs.smb.client.useSMB2Negotiation", "true");
+                return cfg;
+            }
+        });
+
         MUTATIONS.put("smb30", new TestMutation() {
 
             @Override

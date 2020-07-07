@@ -96,6 +96,7 @@ public class SessionTest extends BaseCIFSTest {
             "forceUnicode",
             "noNTStatus",
             "smb2",
+            "smb2-nego",
             "smb30",
             "smb31");
     }
@@ -206,6 +207,12 @@ public class SessionTest extends BaseCIFSTest {
 
 
     protected void ignoreAuthFailure ( SmbAuthException e ) throws SmbAuthException {
+        if ( e.getCause() != null && e.getCause() instanceof SmbException
+                && ( (SmbException) e.getCause() ).getNtStatus() == NtStatus.NT_STATUS_INVALID_PARAMETER ) {
+            // broken samba servers
+            Assume.assumeNoException(e);
+        }
+
         if ( e.getNtStatus() != NtStatus.NT_STATUS_LOGON_FAILURE && e.getNtStatus() != NtStatus.NT_STATUS_ACCOUNT_DISABLED ) {
             throw e;
         }
