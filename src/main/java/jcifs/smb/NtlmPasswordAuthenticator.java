@@ -562,12 +562,12 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
     public void getUserSessionKey ( CIFSContext tc, byte[] chlng, byte[] dest, int offset ) throws SmbException {
         try {
             MessageDigest md4 = Crypto.getMD4();
-            md4.update(Strings.getUNIBytes(this.password));
+            byte[] ntHash = getNTHash();
             switch ( tc.getConfig().getLanManCompatibility() ) {
             case 0:
             case 1:
             case 2:
-                md4.update(md4.digest());
+                md4.update(ntHash);
                 md4.digest(dest, offset, 16);
                 break;
             case 3:
@@ -580,7 +580,7 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
                     }
                 }
 
-                MessageDigest hmac = Crypto.getHMACT64(md4.digest());
+                MessageDigest hmac = Crypto.getHMACT64(ntHash);
                 hmac.update(Strings.getUNIBytes(this.username.toUpperCase()));
                 hmac.update(Strings.getUNIBytes(this.domain.toUpperCase()));
                 byte[] ntlmv2Hash = hmac.digest();
@@ -592,7 +592,7 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
                 userKey.digest(dest, offset, 16);
                 break;
             default:
-                md4.update(md4.digest());
+                md4.update(ntHash);
                 md4.digest(dest, offset, 16);
                 break;
             }
@@ -600,6 +600,17 @@ public class NtlmPasswordAuthenticator implements Principal, CredentialsInternal
         catch ( Exception e ) {
             throw new SmbException("", e);
         }
+    }
+
+
+    /**
+     * @return
+     */
+    protected byte[] getNTHash () {
+        MessageDigest md4 = Crypto.getMD4();
+        md4.update(Strings.getUNIBytes(this.password));
+        byte[] ntHash = md4.digest();
+        return ntHash;
     }
 
     /**

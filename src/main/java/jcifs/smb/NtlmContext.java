@@ -266,18 +266,7 @@ public class NtlmContext implements SSPContext {
             }
 
             this.ntlmsspFlags &= msg2.getFlags();
-
-            Type3Message msg3 = new Type3Message(
-                this.transportContext,
-                msg2,
-                this.targetName,
-                this.auth.isGuest() ? this.transportContext.getConfig().getGuestPassword() : this.auth.getPassword(),
-                this.auth.isGuest() ? null : this.auth.getUserDomain(),
-                this.auth.isGuest() ? this.transportContext.getConfig().getGuestUsername() : this.auth.getUsername(),
-                this.workstation,
-                this.ntlmsspFlags,
-                this.auth.isGuest() || !this.auth.isAnonymous());
-
+            Type3Message msg3 = createType3Message(msg2);
             msg3.setupMIC(this.type1Bytes, token);
 
             byte[] out = msg3.toByteArray();
@@ -303,6 +292,38 @@ public class NtlmContext implements SSPContext {
         catch ( Exception e ) {
             throw new SmbException(e.getMessage(), e);
         }
+    }
+
+
+    /**
+     * @param msg2
+     * @return
+     * @throws GeneralSecurityException
+     * @throws CIFSException
+     */
+    protected Type3Message createType3Message ( Type2Message msg2 ) throws GeneralSecurityException, CIFSException {
+        if ( this.auth instanceof NtlmNtHashAuthenticator ) {
+            return new Type3Message(
+                this.transportContext,
+                msg2,
+                this.targetName,
+                this.auth.getNTHash(),
+                this.auth.getUserDomain(),
+                this.auth.getUsername(),
+                this.workstation,
+                this.ntlmsspFlags);
+        }
+
+        return new Type3Message(
+            this.transportContext,
+            msg2,
+            this.targetName,
+            this.auth.isGuest() ? this.transportContext.getConfig().getGuestPassword() : this.auth.getPassword(),
+            this.auth.isGuest() ? null : this.auth.getUserDomain(),
+            this.auth.isGuest() ? this.transportContext.getConfig().getGuestUsername() : this.auth.getUsername(),
+            this.workstation,
+            this.ntlmsspFlags,
+            this.auth.isGuest() || !this.auth.isAnonymous());
     }
 
 

@@ -103,12 +103,38 @@ public final class NtlmUtil {
      * @return the caclulated mac
      */
     public static byte[] nTOWFv2 ( String domain, String username, String password ) {
-        MessageDigest md4 = Crypto.getMD4();
-        md4.update(Strings.getUNIBytes(password));
-        MessageDigest hmac = Crypto.getHMACT64(md4.digest());
+        return nTOWFv2(domain, username, getNTHash(password));
+    }
+
+
+    /**
+     * 
+     * @param domain
+     * @param username
+     * @param passwordHash
+     *            NT password hash
+     * 
+     * @return the caclulated mac
+     */
+    public static byte[] nTOWFv2 ( String domain, String username, byte[] passwordHash ) {
+        MessageDigest hmac = Crypto.getHMACT64(passwordHash);
         hmac.update(Strings.getUNIBytes(username.toUpperCase()));
         hmac.update(Strings.getUNIBytes(domain));
         return hmac.digest();
+    }
+
+
+    /**
+     * @param password
+     * @return nt password hash
+     */
+    public static byte[] getNTHash ( String password ) {
+        if ( password == null ) {
+            throw new NullPointerException("Password parameter is required");
+        }
+        MessageDigest md4 = Crypto.getMD4();
+        md4.update(Strings.getUNIBytes(password));
+        return md4.digest();
     }
 
 
@@ -118,23 +144,19 @@ public final class NtlmUtil {
      * @return the calculated hash
      */
     public static byte[] nTOWFv1 ( String password ) {
-        if ( password == null )
-            throw new NullPointerException("Password parameter is required");
-        MessageDigest md4 = Crypto.getMD4();
-        md4.update(Strings.getUNIBytes(password));
-        return md4.digest();
+        return getNTHash(password);
     }
 
 
     /**
      * 
-     * @param nTOWFv1
+     * @param passwordHash
      * @param serverChallenge
      * @param clientChallenge
      * @return the calculated response
      * @throws GeneralSecurityException
      */
-    public static byte[] getNTLM2Response ( byte[] nTOWFv1, byte[] serverChallenge, byte[] clientChallenge ) throws GeneralSecurityException {
+    public static byte[] getNTLM2Response ( byte[] passwordHash, byte[] serverChallenge, byte[] clientChallenge ) throws GeneralSecurityException {
         byte[] sessionHash = new byte[8];
 
         MessageDigest md5 = Crypto.getMD5();;
@@ -143,7 +165,7 @@ public final class NtlmUtil {
         System.arraycopy(md5.digest(), 0, sessionHash, 0, 8);
 
         byte[] key = new byte[21];
-        System.arraycopy(nTOWFv1, 0, key, 0, 16);
+        System.arraycopy(passwordHash, 0, key, 0, 16);
         byte[] ntResponse = new byte[24];
         NtlmUtil.E(key, sessionHash, ntResponse);
         return ntResponse;
@@ -168,11 +190,30 @@ public final class NtlmUtil {
      */
     public static byte[] getLMv2Response ( String domain, String user, String password, byte[] challenge, byte[] clientChallenge )
             throws GeneralSecurityException {
+        return getLMv2Response(domain, user, getNTHash(password), challenge, clientChallenge);
+    }
+
+
+    /**
+     * Creates the LMv2 response for the supplied information.
+     *
+     * @param domain
+     *            The domain in which the username exists.
+     * @param user
+     *            The username.
+     * @param passwordHash
+     *            The user's NT hash.
+     * @param challenge
+     *            The server challenge.
+     * @param clientChallenge
+     *            The client challenge (nonce).
+     * @return the calculated response
+     * @throws GeneralSecurityException
+     */
+    public static byte[] getLMv2Response ( String domain, String user, byte[] passwordHash, byte[] challenge, byte[] clientChallenge )
+            throws GeneralSecurityException {
         byte[] response = new byte[24];
-        // The next 2-1/2 lines of this should be placed with nTOWFv1 in place of password
-        MessageDigest md4 = Crypto.getMD4();
-        md4.update(Strings.getUNIBytes(password));
-        MessageDigest hmac = Crypto.getHMACT64(md4.digest());
+        MessageDigest hmac = Crypto.getHMACT64(passwordHash);
         hmac.update(Strings.getUNIBytes(user.toUpperCase()));
         hmac.update(Strings.getUNIBytes(domain.toUpperCase()));
         hmac = Crypto.getHMACT64(hmac.digest());
@@ -192,14 +233,24 @@ public final class NtlmUtil {
      * @return the calculated response
      * @throws GeneralSecurityException
      */
-    static public byte[] getNTLMResponse ( String password, byte[] challenge ) throws GeneralSecurityException {
+    public static byte[] getNTLMResponse ( String password, byte[] challenge ) throws GeneralSecurityException {
+        return getNTLMResponse(getNTHash(password), challenge);
+    }
+
+
+    /**
+     * Generate the Unicode MD4 hash for the password associated with these credentials.
+     * 
+     * @param passwordHash
+     *            NT Hash
+     * @param challenge
+     * @return the calculated response
+     * @throws GeneralSecurityException
+     */
+    public static byte[] getNTLMResponse ( byte[] passwordHash, byte[] challenge ) throws GeneralSecurityException {
         byte[] p21 = new byte[21];
         byte[] p24 = new byte[24];
-
-        byte[] uni = Strings.getUNIBytes(password);
-        MessageDigest md4 = Crypto.getMD4();
-        md4.update(uni);
-        md4.digest(p21, 0, 16);
+        System.arraycopy(passwordHash, 0, p21, 0, 16);
         NtlmUtil.E(p21, challenge, p24);
         return p24;
     }

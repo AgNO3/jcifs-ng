@@ -46,8 +46,10 @@ import jcifs.SmbResource;
 import jcifs.SmbTransport;
 import jcifs.config.DelegatingConfiguration;
 import jcifs.smb.NtStatus;
+import jcifs.smb.NtlmNtHashAuthenticator;
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.NtlmPasswordAuthenticator;
+import jcifs.smb.NtlmUtil;
 import jcifs.smb.SmbAuthException;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
@@ -105,6 +107,18 @@ public class SessionTest extends BaseCIFSTest {
     @Test
     public void logonUser () throws IOException {
         try ( SmbResource f = getDefaultShareRoot() ) {
+            checkConnection(f);
+            f.resolve("test").exists();
+        }
+    }
+
+
+    @Test
+    public void logonUserHash () throws IOException {
+        Assume.assumeTrue(Boolean.parseBoolean(getProperties().getOrDefault("jcifs.smb.client.useExtendedSecurity", "true")));
+        byte[] hash = NtlmUtil.getNTHash(getTestUserPassword());
+        CIFSContext ctx = getContext().withCredentials(new NtlmNtHashAuthenticator(getTestUserDomain(), getTestUser(), hash));
+        try ( SmbResource f = new SmbFile(getTestShareURL(), ctx); ) {
             checkConnection(f);
             f.resolve("test").exists();
         }

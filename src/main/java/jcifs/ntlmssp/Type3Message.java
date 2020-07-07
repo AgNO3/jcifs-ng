@@ -127,15 +127,80 @@ public class Type3Message extends NtlmMessage {
      */
     public Type3Message ( CIFSContext tc, Type2Message type2, String targetName, String password, String domain, String user, String workstation,
             int flags, boolean nonAnonymous ) throws GeneralSecurityException, CIFSException {
+        this(tc, type2, targetName, null, password, domain, user, workstation, flags, nonAnonymous);
+    }
+
+
+    /**
+     * Creates a Type-3 message in response to the given Type-2 message.
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message which this represents a response to.
+     * @param targetName
+     *            SPN of the target system, optional
+     * @param passwordHash
+     *            The NT password hash to use when constructing the response.
+     * @param domain
+     *            The domain in which the user has an account.
+     * @param user
+     *            The username for the authenticating user.
+     * @param workstation
+     *            The workstation from which authentication is
+     *            taking place.
+     * @param flags
+     * @throws GeneralSecurityException
+     * @throws CIFSException
+     */
+    public Type3Message ( CIFSContext tc, Type2Message type2, String targetName, byte[] passwordHash, String domain, String user, String workstation,
+            int flags ) throws CIFSException, GeneralSecurityException {
+        this(tc, type2, targetName, passwordHash, null, domain, user, workstation, flags, true);
+    }
+
+
+    /**
+     * Creates a Type-3 message in response to the given Type-2 message.
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message which this represents a response to.
+     * @param targetName
+     *            SPN of the target system, optional
+     * @param passwordHash
+     *            The NT password hash, takes precedence over password (which is no longer required unless legacy LM
+     *            authentication is needed)
+     * @param password
+     *            The password to use when constructing the response.
+     * @param domain
+     *            The domain in which the user has an account.
+     * @param user
+     *            The username for the authenticating user.
+     * @param workstation
+     *            The workstation from which authentication is
+     *            taking place.
+     * @param flags
+     * @param nonAnonymous
+     *            actually perform authentication with empty password
+     * @throws GeneralSecurityException
+     * @throws CIFSException
+     */
+    public Type3Message ( CIFSContext tc, Type2Message type2, String targetName, byte[] passwordHash, String password, String domain, String user,
+            String workstation, int flags, boolean nonAnonymous ) throws GeneralSecurityException, CIFSException {
         setFlags(flags | getDefaultFlags(tc, type2));
         setWorkstation(workstation);
         setDomain(domain);
         setUser(user);
 
-        if ( password == null || ( !nonAnonymous && password.length() == 0 ) ) {
+        if ( ( password == null && passwordHash == null ) || ( !nonAnonymous && ( password != null && password.length() == 0 ) ) ) {
             setLMResponse(null);
             setNTResponse(null);
             return;
+        }
+
+        if ( passwordHash == null ) {
+            passwordHash = NtlmUtil.getNTHash(password);
         }
 
         switch ( tc.getConfig().getLanManCompatibility() ) {
@@ -143,7 +208,7 @@ public class Type3Message extends NtlmMessage {
         case 1:
             if ( !getFlag(NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY) ) {
                 setLMResponse(getLMResponse(tc, type2, password));
-                setNTResponse(getNTResponse(tc, type2, password));
+                setNTResponse(getNTResponse(tc, type2, passwordHash));
             }
             else {
                 // NTLM2 Session Response
@@ -152,8 +217,7 @@ public class Type3Message extends NtlmMessage {
                 tc.getConfig().getRandom().nextBytes(clientChallenge);
                 java.util.Arrays.fill(clientChallenge, 8, 24, (byte) 0x00);
 
-                byte[] responseKeyNT = NtlmUtil.nTOWFv1(password);
-                byte[] ntlm2Response = NtlmUtil.getNTLM2Response(responseKeyNT, type2.getChallenge(), clientChallenge);
+                byte[] ntlm2Response = NtlmUtil.getNTLM2Response(passwordHash, type2.getChallenge(), clientChallenge);
 
                 setLMResponse(clientChallenge);
                 setNTResponse(ntlm2Response);
@@ -163,7 +227,7 @@ public class Type3Message extends NtlmMessage {
                 System.arraycopy(clientChallenge, 0, sessionNonce, 8, 8);
 
                 MessageDigest md4 = Crypto.getMD4();
-                md4.update(responseKeyNT);
+                md4.update(passwordHash);
                 byte[] userSessionKey = md4.digest();
 
                 MessageDigest hmac = Crypto.getHMACT64(userSessionKey);
@@ -185,7 +249,7 @@ public class Type3Message extends NtlmMessage {
             }
             break;
         case 2:
-            byte[] nt = getNTResponse(tc, type2, password);
+            byte[] nt = getNTResponse(tc, type2, passwordHash);
             setLMResponse(nt);
             setNTResponse(nt);
             break;
@@ -201,7 +265,7 @@ public class Type3Message extends NtlmMessage {
             if ( !haveTimestamp ) {
                 byte[] lmClientChallenge = new byte[8];
                 tc.getConfig().getRandom().nextBytes(lmClientChallenge);
-                setLMResponse(getLMv2Response(tc, type2, domain, user, password, lmClientChallenge));
+                setLMResponse(getLMv2Response(tc, type2, domain, user, passwordHash, lmClientChallenge));
             }
             else {
                 setLMResponse(new byte[24]);
@@ -212,7 +276,7 @@ public class Type3Message extends NtlmMessage {
                 setFlag(NtlmFlags.NTLMSSP_NEGOTIATE_TARGET_INFO, true);
             }
 
-            byte[] responseKeyNT = NtlmUtil.nTOWFv2(domain, user, password);
+            byte[] responseKeyNT = NtlmUtil.nTOWFv2(domain, user, passwordHash);
             byte[] ntlmClientChallenge = new byte[8];
             tc.getConfig().getRandom().nextBytes(ntlmClientChallenge);
 
@@ -244,7 +308,7 @@ public class Type3Message extends NtlmMessage {
             break;
         default:
             setLMResponse(getLMResponse(tc, type2, password));
-            setNTResponse(getNTResponse(tc, type2, password));
+            setNTResponse(getNTResponse(tc, type2, passwordHash));
         }
 
     }
@@ -690,10 +754,31 @@ public class Type3Message extends NtlmMessage {
      */
     public static byte[] getLMv2Response ( CIFSContext tc, Type2Message type2, String domain, String user, String password, byte[] clientChallenge )
             throws GeneralSecurityException {
-        if ( type2 == null || domain == null || user == null || password == null || clientChallenge == null ) {
+        if ( password == null ) {
             return null;
         }
-        return NtlmUtil.getLMv2Response(domain, user, password, type2.getChallenge(), clientChallenge);
+        return getLMv2Response(tc, type2, domain, user, NtlmUtil.getNTHash(password), clientChallenge);
+    }
+
+
+    /**
+     * 
+     * @param tc
+     * @param type2
+     * @param domain
+     * @param user
+     * @param passwordHash
+     *            NT password hash
+     * @param clientChallenge
+     * @return the calculated response
+     * @throws GeneralSecurityException
+     */
+    public static byte[] getLMv2Response ( CIFSContext tc, Type2Message type2, String domain, String user, byte[] passwordHash,
+            byte[] clientChallenge ) throws GeneralSecurityException {
+        if ( type2 == null || domain == null || user == null || passwordHash == null || clientChallenge == null ) {
+            return null;
+        }
+        return NtlmUtil.getLMv2Response(domain, user, passwordHash, type2.getChallenge(), clientChallenge);
     }
 
 
@@ -733,9 +818,29 @@ public class Type3Message extends NtlmMessage {
      * @throws GeneralSecurityException
      */
     public static byte[] getNTResponse ( CIFSContext tc, Type2Message type2, String password ) throws GeneralSecurityException {
-        if ( type2 == null || password == null )
+        if ( password == null )
             return null;
-        return NtlmUtil.getNTLMResponse(password, type2.getChallenge());
+        return getNTResponse(tc, type2, NtlmUtil.getNTHash(password));
+    }
+
+
+    /**
+     * Constructs the NT response to the given Type-2 message using
+     * the supplied password.
+     * 
+     * @param tc
+     *            context to use
+     * @param type2
+     *            The Type-2 message.
+     * @param passwordHash
+     *            The NT password hash.
+     * @return A <code>byte[]</code> containing the NT response.
+     * @throws GeneralSecurityException
+     */
+    public static byte[] getNTResponse ( CIFSContext tc, Type2Message type2, byte[] passwordHash ) throws GeneralSecurityException {
+        if ( type2 == null || passwordHash == null )
+            return null;
+        return NtlmUtil.getNTLMResponse(passwordHash, type2.getChallenge());
     }
 
 
