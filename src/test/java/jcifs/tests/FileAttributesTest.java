@@ -201,6 +201,35 @@ public class FileAttributesTest extends BaseCIFSTest {
 
 
     @Test
+    public void testSetFileTimes () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbResource f = createTestFile() ) {
+            try {
+                long time = System.currentTimeMillis() - 1000 * 60 * 60 * 12;
+                f.setFileTimes(time, time, time);
+
+                if ( ( getContext().getConfig().getCapabilities() & SmbConstants.CAP_NT_SMBS ) == 0 ) {
+                    // only have second precision
+                    // there seems to be some random factor (adding one second)
+                    int diff = Math.abs((int) ( ( time / 1000 ) - ( f.lastModified() / 1000 ) ));
+                    Assert.assertTrue("Have set time correctly", diff < 2);
+                }
+                else {
+                    assertEquals(time, f.lastModified());
+                    assertEquals(time, f.lastAccess());
+                    assertEquals(time, f.createTime());
+                }
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                Assume.assumeTrue("No Ntsmbs", false);
+            }
+            finally {
+                f.delete();
+            }
+        }
+    }
+
+
+    @Test
     public void testSetAttributes () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile f = createTestFile() ) {
             try {

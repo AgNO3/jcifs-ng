@@ -211,6 +211,11 @@
 							<differenceType>7012</differenceType>
 							<method>java.lang.String getGuestPassword()</method>
 						</difference>
+						<difference>
+							<className>jcifs/SmbResource</className>
+							<differenceType>7012</differenceType>
+							<method>void setFileTimes(long, long, long)</method>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>
