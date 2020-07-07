@@ -362,7 +362,7 @@ public class NtlmContext implements SSPContext {
 
     @Override
     public boolean isMICAvailable () {
-        return this.signKey != null && this.verifyKey != null;
+        return !this.auth.isGuest() && this.signKey != null && this.verifyKey != null;
     }
 
 
