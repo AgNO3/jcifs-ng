@@ -75,7 +75,7 @@
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.61</version>
+			<version>1.66</version>
 		</dependency>
 
 		<dependency>
@@ -121,7 +121,7 @@
 						<Import-Package>
 							javax.servlet*;resolution:=optional,
 							com.sun.security.jgss;resolution:=optional,
-							org.bouncycastle*;version="1.54",
+							org.bouncycastle*;version="1.63",
 							!jcifs.internal*,
 							*
 						</Import-Package>
