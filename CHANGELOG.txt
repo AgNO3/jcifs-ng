@@ -1,3 +1,34 @@
+jcifs-ng 2.1.5
+- Fix invalid negotitate context parsing that caused 
+  OutOfMemoryException for pre 3.11 protocols (#178)
+- Fix SMB1 initial pipe transaction response size,
+  resulted in padding being used as data and
+  thereby IPC parsing errors (#210)
+- Fix SMB_COM_TRANSACTION padding (#211)
+- Set maximum protocol version to at least minimum version (#216)
+- Fix use of sharing flags in SmbFileInputStream (#222)
+- Redesign guest authentication, fix guest logon on various
+  systems: Username/password for guest authentication can
+  now be configured, default username now is JCIFSGUEST.
+  Proper login with the username guest is now possible.
+  Also add configuration to permit silent guest fallback,
+  when actually a username/password is specified. 
+- Add fallback when server does not support server-side copy
+- Workaround Samba bug, causing "Invalid parameter" error
+  when invalid credentials are used a MIC is present.
+  This avoids sending a MIC when guest auth is used,
+  also remaps the error to an SmbAuthException (#226)
+- Inherit URLStreamHandler when creating child resources (#231)
+- Fix "Invalid parameter" DOS error mapping
+- Add one-shot setFileTimes operaiton (#233)
+- Add ability to directly autenticate using NT hash (#235)
+- Marked logon check functions as deprecated.
+  No replacement planned, use an actual authentication protocol
+  instead.
+- Bump bouncycastle version, no longer compatible with pre 
+  1.62 
+
+
 jcifs-ng 2.1.4
 - Send AvTargetName during SMB SessionSetup with NTLM (#203)
 - Add methods to ensure opening of the target files (#199)
