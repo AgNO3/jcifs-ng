@@ -28,7 +28,7 @@
 
 	<scm>
 		<connection>scm:git:https://github.com/AgNO3/jcifs-ng.git</connection>
-		<developerConnection>scm:git:https://github.com/AgNO3/jcifs-ng.git</developerConnection>
+		<developerConnection>scm:git:git@github.com:AgNO3/jcifs-ng.git</developerConnection>
 		<url>git@github.com:AgNO3/jcifs-ng.git</url>
 		<tag>HEAD</tag>
 	</scm>
