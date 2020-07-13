@@ -20,6 +20,7 @@ package jcifs.internal.smb2.create;
 
 import java.nio.charset.StandardCharsets;
 
+import jcifs.SmbConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,8 @@ import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.Smb2Constants;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Hexdump;
+
+import static jcifs.SmbConstants.MAXIMUM_ALLOWED;
 
 
 /**
@@ -210,7 +213,7 @@ public class Smb2CreateRequest extends ServerMessageBlock2Request<Smb2CreateResp
     private byte requestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
     private int impersonationLevel = SMB2_IMPERSONATION_LEVEL_IMPERSONATION;
     private long smbCreateFlags;
-    private int desiredAccess = 0x00120089; // 0x80000000 | 0x1;
+    private int desiredAccess = MAXIMUM_ALLOWED;
     private int fileAttributes;
     private int shareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE;
     private int createDisposition = FILE_OPEN;

@@ -122,6 +122,7 @@ public interface SmbConstants {
     static final int WRITE_DAC = 0x00040000; // 18
     static final int WRITE_OWNER = 0x00080000; // 19
     static final int SYNCHRONIZE = 0x00100000; // 20
+    static final int MAXIMUM_ALLOWED = 0x02000000; // 25
     static final int GENERIC_ALL = 0x10000000; // 28
     static final int GENERIC_EXECUTE = 0x20000000; // 29
     static final int GENERIC_WRITE = 0x40000000; // 30

@@ -1708,7 +1708,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     protected <T extends ServerMessageBlock2Response> T withOpen ( SmbTreeHandleImpl th, ServerMessageBlock2Request<T> first,
             ServerMessageBlock2Request<?>... others ) throws CIFSException {
-        return withOpen(th, Smb2CreateRequest.FILE_OPEN, 0x00120089, SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE, first, others);
+        return withOpen(th, Smb2CreateRequest.FILE_OPEN, MAXIMUM_ALLOWED, SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE, first, others);
     }
 
 
