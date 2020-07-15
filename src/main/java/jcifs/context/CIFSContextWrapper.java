@@ -155,8 +155,8 @@ public class CIFSContextWrapper implements CIFSContext {
 
 
     @Override
-    public CIFSContext withGuestCrendentials () {
-        return wrap(this.delegate.withGuestCrendentials());
+    public CIFSContext withGuestCredentials () {
+        return wrap(this.delegate.withGuestCredentials());
     }
 
 
