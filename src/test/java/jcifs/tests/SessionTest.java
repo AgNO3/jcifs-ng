@@ -160,7 +160,7 @@ public class SessionTest extends BaseCIFSTest {
             public String getGuestUsername () {
                 return "jcifs-guest";
             }
-        }).withGuestCredentials();
+        }).withGuestCrendentials();
 
         try ( SmbResource f = new SmbFile(getTestShareGuestURL(), ctx) ) {
             checkConnection(f);

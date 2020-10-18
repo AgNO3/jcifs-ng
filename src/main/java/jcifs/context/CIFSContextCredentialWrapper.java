@@ -41,7 +41,7 @@ public final class CIFSContextCredentialWrapper extends CIFSContextWrapper imple
     /**
      * @param delegate
      * @param creds
-     *            Credentials to use
+     *            Crendentials to use
      */
     public CIFSContextCredentialWrapper ( AbstractCIFSContext delegate, Credentials creds ) {
         super(delegate);

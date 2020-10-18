@@ -144,7 +144,7 @@ public interface CIFSContext {
      * 
      * @return a child context using guest credentials
      */
-    CIFSContext withGuestCredentials ();
+    CIFSContext withGuestCrendentials ();
 
 
     /**

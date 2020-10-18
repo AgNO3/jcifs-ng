@@ -78,7 +78,7 @@ public class ContextConfigTest {
 
     @Test
     public void testFixedCredentials () {
-        Credentials guestCreds = this.context.withGuestCredentials().getCredentials();
+        Credentials guestCreds = this.context.withGuestCrendentials().getCredentials();
         assertThat(guestCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
         NtlmPasswordAuthenticator ntlmGuestCreds = guestCreds.unwrap(NtlmPasswordAuthenticator.class);
         assertThat("anonymous", ntlmGuestCreds.isAnonymous(), CoreMatchers.is(false));

@@ -165,7 +165,7 @@ public abstract class BaseCIFSTest {
 
 
     protected CIFSContext withTestGuestCredentials () {
-        return getContext().withGuestCredentials();
+        return getContext().withGuestCrendentials();
     }
 
 
