@@ -469,7 +469,10 @@ public abstract class Transport implements Runnable, AutoCloseable {
                 if ( closed ) {
                     log.trace("Remote closed connection");
                 }
-                else if ( !timeout ) {
+                else if ( timeout ) {
+                    log.warn("socket timeout in non peek state", ex);
+                }
+                else {
                     log.debug("recv failed", ex);
                 }
 
@@ -483,14 +486,21 @@ public abstract class Transport implements Runnable, AutoCloseable {
                     }
                     log.debug("Disconnected");
 
+                    boolean notified = false;
                     Iterator<Entry<Long, Response>> iterator = this.response_map.entrySet().iterator();
                     while ( iterator.hasNext() ) {
                         Response resp = iterator.next().getValue();
                         resp.exception(ex);
                         iterator.remove();
+                        notified = true;
 
                     }
-                    log.debug("Notified clients");
+                    if ( notified ) {
+                        log.debug("Notified clients");
+                    }
+                    else {
+                        log.warn("Exception without a request pending", ex);
+                    }
                     return;
                 }
             }

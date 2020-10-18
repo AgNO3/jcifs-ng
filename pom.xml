@@ -5,7 +5,7 @@
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
-	<version>2.1.5-SNAPSHOT</version>
+	<version>2.1.6-SNAPSHOT</version>
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>
 
@@ -28,7 +28,7 @@
 
 	<scm>
 		<connection>scm:git:https://github.com/AgNO3/jcifs-ng.git</connection>
-		<developerConnection>scm:git:https://github.com/AgNO3/jcifs-ng.git</developerConnection>
+		<developerConnection>scm:git:git@github.com:AgNO3/jcifs-ng.git</developerConnection>
 		<url>git@github.com:AgNO3/jcifs-ng.git</url>
 		<tag>HEAD</tag>
 	</scm>
@@ -74,8 +74,8 @@
 		 
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.61</version>
+			<artifactId>bcprov-jdk15to18</artifactId>
+			<version>1.66</version>
 		</dependency>
 
 		<dependency>
@@ -121,7 +121,7 @@
 						<Import-Package>
 							javax.servlet*;resolution:=optional,
 							com.sun.security.jgss;resolution:=optional,
-							org.bouncycastle*;version="1.54",
+							org.bouncycastle*;version="1.63",
 							!jcifs.internal*,
 							*
 						</Import-Package>
