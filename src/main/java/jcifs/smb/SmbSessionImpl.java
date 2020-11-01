@@ -409,7 +409,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         response = this.transport.send(request, response, params);
                     }
                     catch ( SmbException e ) {
-                        if ( e.getNtStatus() != 0xC000035C || !trans.isSMB2() ) {
+                        if ( (e.getNtStatus() != 0xC000035C && e.getNtStatus() != 0xC000203) || !trans.isSMB2() ) {
                             throw e;
                         }
                         log.debug("Session expired, trying reauth", e);
