@@ -470,7 +470,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                     log.trace("Remote closed connection");
                 }
                 else if ( timeout ) {
-                    log.warn("socket timeout in non peek state", ex);
+                    log.debug("socket timeout in non peek state", ex);
                 }
                 else {
                     log.debug("recv failed", ex);
@@ -499,7 +499,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                         log.debug("Notified clients");
                     }
                     else {
-                        log.warn("Exception without a request pending", ex);
+                        log.debug("Exception without a request pending", ex);
                     }
                     return;
                 }
