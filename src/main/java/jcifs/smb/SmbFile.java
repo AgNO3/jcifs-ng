@@ -774,7 +774,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
          */
 
         if ( th.isSMB2() ) {
-            return (SmbBasicFileInfo) withOpen(th, null); // just open and close. withOpen will store the attributes
+        	// just open and close. withOpen will store the attributes
+        	return (SmbBasicFileInfo) withOpen(th, Smb2CreateRequest.FILE_OPEN, 0x00000080, SmbConstants.FILE_SHARE_READ | SmbConstants.FILE_SHARE_WRITE, null);
         }
         else if ( th.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
             /*
