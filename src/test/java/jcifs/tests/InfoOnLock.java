@@ -59,7 +59,6 @@ public class InfoOnLock extends BaseCIFSTest {
     @Test
     public void testExistsOnLock () throws IOException {
         try ( SmbFile f = createTestFile() ) {
-        	System.out.println("created file: " + f.getCanonicalPath());
             SmbFileOutputStream ostream = f.openOutputStream(true, SmbConstants.FILE_NO_SHARE);
             SmbFile checkFile = new SmbFile(f.getCanonicalPath(), f.getContext());
 
@@ -76,7 +75,6 @@ public class InfoOnLock extends BaseCIFSTest {
     @Test
     public void testSizeOnLock () throws IOException {
         try ( SmbFile f = createTestFile() ) {
-        	System.out.println("created file: " + f.getCanonicalPath());
             SmbFileOutputStream ostream = f.openOutputStream(true, SmbConstants.FILE_NO_SHARE);
             SmbFile checkFile = new SmbFile(f.getCanonicalPath(), f.getContext());
             try {
