@@ -77,6 +77,7 @@ public class ContextConfigTest {
 
 
     @Test
+    @SuppressWarnings ( "deprecation" )
     public void testFixedCredentials () {
         Credentials guestCreds = this.context.withGuestCrendentials().getCredentials();
         assertThat(guestCreds, CoreMatchers.is(CoreMatchers.instanceOf(NtlmPasswordAuthenticator.class)));
