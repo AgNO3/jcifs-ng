@@ -19,6 +19,8 @@
 package jcifs.netbios;
 
 
+import java.util.Arrays;
+
 import jcifs.Configuration;
 
 
@@ -70,6 +72,7 @@ class NameQueryResponse extends NameServicePacket {
 
     @Override
     public String toString () {
-        return new String("NameQueryResponse[" + super.toString() + ",addrEntry=" + this.addrEntry + "]");
+        return new String(
+            "NameQueryResponse[" + super.toString() + ",addrEntry=" + ( this.addrEntry != null ? Arrays.toString(this.addrEntry) : "" ) + "]");
     }
 }

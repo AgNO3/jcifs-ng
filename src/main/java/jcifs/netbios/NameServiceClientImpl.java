@@ -27,6 +27,7 @@ import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -510,6 +511,13 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             try {
                 send(request, response, config.getNetbiosRetryTimeout());
             }
+            catch ( InterruptedIOException ioe ) {
+                // second query thread to finish gets interrupted so this is expected
+                if ( log.isTraceEnabled() ) {
+                    log.trace("Failed to send nameservice request for " + name.name, ioe);
+                }
+                throw new UnknownHostException(name.name);
+            }
             catch ( IOException ioe ) {
                 log.info("Failed to send nameservice request for " + name.name, ioe);
                 throw new UnknownHostException(name.name);
@@ -813,7 +821,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         private Sem sem;
         private String host, scope;
         private int type;
-        private NetbiosAddress ans = null;
+        private NetbiosAddress[] ans = null;
         private InetAddress svr;
         private UnknownHostException uhe;
         private CIFSContext tc;
@@ -833,7 +841,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         @Override
         public void run () {
             try {
-                this.ans = this.tc.getNameServiceClient().getNbtByName(this.host, this.type, this.scope, this.svr);
+                this.ans = this.tc.getNameServiceClient().getNbtAllByName(this.host, this.type, this.scope, this.svr);
             }
             catch ( UnknownHostException ex ) {
                 this.uhe = ex;
@@ -853,7 +861,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         /**
          * @return the ans
          */
-        public NetbiosAddress getAnswer () {
+        public NetbiosAddress[] getAnswer () {
             return this.ans;
         }
 
@@ -868,7 +876,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
     }
 
 
-    NetbiosAddress lookupServerOrWorkgroup ( String name, InetAddress svr ) throws UnknownHostException {
+    NetbiosAddress[] lookupServerOrWorkgroup ( String name, InetAddress svr ) throws UnknownHostException {
         Sem sem = new Sem(2);
         int type = isWINS(svr) ? 0x1b : 0x1d;
 
@@ -954,7 +962,6 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
     @Override
     public UniAddress[] getAllByName ( String hostname, boolean possibleNTDomainOrWorkgroup ) throws UnknownHostException {
-        Object addr;
         if ( hostname == null || hostname.length() == 0 ) {
             throw new UnknownHostException();
         }
@@ -970,12 +977,17 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         }
 
         for ( ResolverType resolver : this.transportContext.getConfig().getResolveOrder() ) {
+            NetbiosAddress[] addr = null;
             try {
                 switch ( resolver ) {
                 case RESOLVER_LMHOSTS:
-                    if ( ( addr = getLmhosts().getByName(hostname, this.transportContext) ) == null ) {
+                    NbtAddress lmaddr;
+                    if ( ( lmaddr = getLmhosts().getByName(hostname, this.transportContext) ) == null ) {
                         continue;
                     }
+                    addr = new NetbiosAddress[] {
+                        lmaddr
+                    };
                     break;
                 case RESOLVER_WINS:
                     if ( hostname.equals(NbtAddress.MASTER_BROWSER_NAME) || hostname.length() > 15 ) {
@@ -986,7 +998,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                         addr = lookupServerOrWorkgroup(hostname, getWINSAddress());
                     }
                     else {
-                        addr = getNbtByName(hostname, 0x20, null, getWINSAddress());
+                        addr = getNbtAllByName(hostname, 0x20, null, getWINSAddress());
                     }
                     break;
                 case RESOLVER_BCAST:
@@ -998,31 +1010,54 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                         addr = lookupServerOrWorkgroup(hostname, this.transportContext.getConfig().getBroadcastAddress());
                     }
                     else {
-                        addr = getNbtByName(hostname, 0x20, null, this.transportContext.getConfig().getBroadcastAddress());
+                        addr = getNbtAllByName(hostname, 0x20, null, this.transportContext.getConfig().getBroadcastAddress());
                     }
                     break;
                 case RESOLVER_DNS:
                     if ( isAllDigits(hostname) ) {
                         throw new UnknownHostException(hostname);
                     }
-                    InetAddress[] iaddrs = InetAddress.getAllByName(hostname);
-                    UniAddress[] addrs = new UniAddress[iaddrs.length];
-                    for ( int ii = 0; ii < iaddrs.length; ii++ ) {
-                        addrs[ ii ] = new UniAddress(iaddrs[ ii ]);
+                    UniAddress[] addrs = wrapInetAddresses(InetAddress.getAllByName(hostname));
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Resolved '{}' to {} using DNS", hostname, Arrays.toString(addrs));
                     }
                     return addrs; // Success
                 default:
                     throw new UnknownHostException(hostname);
                 }
-                UniAddress[] addrs = new UniAddress[1];
-                addrs[ 0 ] = new UniAddress(addr);
-                return addrs; // Success
+
+                if ( addr != null ) { // Success
+                    if ( log.isDebugEnabled() ) {
+                        log.debug("Resolved '{}' to addrs {} via {}", hostname, Arrays.toString(addr), resolver);
+                    }
+                    return wrapNetbiosAddresses(addr);
+                }
             }
             catch ( IOException ioe ) {
                 // Failure
+                log.trace("Resolving {} via {} failed:", hostname, resolver);
+                log.trace("Exception is", ioe);
             }
         }
         throw new UnknownHostException(hostname);
+    }
+
+
+    private static UniAddress[] wrapInetAddresses ( InetAddress[] iaddrs ) {
+        UniAddress[] addrs = new UniAddress[iaddrs.length];
+        for ( int ii = 0; ii < iaddrs.length; ii++ ) {
+            addrs[ ii ] = new UniAddress(iaddrs[ ii ]);
+        }
+        return addrs;
+    }
+
+
+    private static UniAddress[] wrapNetbiosAddresses ( NetbiosAddress[] addr ) {
+        UniAddress[] addrs = new UniAddress[addr.length];
+        for ( int i = 0; i < addr.length; i++ ) {
+            addrs[ i ] = new UniAddress(addr[ i ]);
+        }
+        return addrs;
     }
 
 
