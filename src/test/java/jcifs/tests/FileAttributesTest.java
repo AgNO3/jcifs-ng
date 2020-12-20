@@ -19,6 +19,7 @@ package jcifs.tests;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -42,6 +43,7 @@ import jcifs.SmbResource;
 import jcifs.smb.NtStatus;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
+import jcifs.smb.SmbFileOutputStream;
 import jcifs.smb.SmbUnsupportedOperationException;
 import jcifs.smb.WinError;
 
@@ -244,6 +246,12 @@ public class FileAttributesTest extends BaseCIFSTest {
                 Assume.assumeTrue("No Ntsmbs", false);
             }
             finally {
+                try {
+                    f.setAttributes(f.getAttributes() & ~SmbConstants.ATTR_READONLY);
+                }
+                catch ( Exception e ) {
+                    // ignore
+                }
                 f.delete();
             }
         }
@@ -344,4 +352,47 @@ public class FileAttributesTest extends BaseCIFSTest {
         }
     }
 
+
+    /**
+     * @author Ilan Goldfeld
+     */
+    // #261
+    @Test
+    public void testExistsOnLock () throws IOException {
+        try ( SmbFile f = createTestFile();
+              SmbFileOutputStream ostream = f.openOutputStream(true, SmbConstants.FILE_NO_SHARE);
+              SmbFile checkFile = new SmbFile(f.getCanonicalPath(), f.getContext()) ) {
+
+            try {
+                assertTrue(checkFile.exists());
+            }
+            finally {
+                ostream.close();
+                checkFile.close();
+                f.delete();
+            }
+        }
+    }
+
+
+    /**
+     * @author Ilan Goldfeld
+     */
+    // #261
+    @Test
+    public void testSizeOnLock () throws IOException {
+        try ( SmbFile f = createTestFile();
+              SmbFileOutputStream ostream = f.openOutputStream(true, SmbConstants.FILE_NO_SHARE);
+              SmbFile checkFile = new SmbFile(f.getCanonicalPath(), f.getContext()) ) {
+
+            try {
+                assertNotEquals(checkFile.length(), -1);
+            }
+            finally {
+                ostream.close();
+                checkFile.close();
+                f.delete();
+            }
+        }
+    }
 }

@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
 import jcifs.ResourceNameFilter;
+import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
@@ -86,6 +87,7 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
         String uncPath = getParent().getLocator().getUNCPath();
         Smb2CreateRequest create = new Smb2CreateRequest(th.getConfig(), uncPath);
         create.setCreateOptions(Smb2CreateRequest.FILE_DIRECTORY_FILE);
+        create.setDesiredAccess(SmbConstants.FILE_READ_DATA | SmbConstants.FILE_READ_ATTRIBUTES);
         Smb2QueryDirectoryRequest query = new Smb2QueryDirectoryRequest(th.getConfig());
         query.setFileName(getWildcard());
         create.chain(query);
