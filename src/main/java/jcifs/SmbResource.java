@@ -219,21 +219,21 @@ public interface SmbResource extends AutoCloseable {
      * <br>
      * This method does not apply to workgroups, servers, or shares.
      * 
-     * @see setCreateTime
-     * @see setLastAccess
-     * @see setLastModified
+     * @see #setCreateTime
+     * @see #setLastAccess
+     * @see #setLastModified
      *
      * @param createTime
      *            the create time as milliseconds since Jan 1, 1970
-     * @param time
+     * @param lastModified
      *            the last modified time as milliseconds since Jan 1, 1970
-     * @param lastLastAccess
+     * @param lastAccess
      *            the last access time as milliseconds since Jan 1, 1970
      * @throws CIFSException
      * @throws jcifs.smb.SmbUnsupportedOperationException
      *             if CAP_NT_SMBS is unavailable
      */
-     void setFileTimes ( long createTime, long lastLastModified, long lastLastAccess ) throws CIFSException;
+    void setFileTimes ( long createTime, long lastModified, long lastAccess ) throws CIFSException;
 
 
     /**

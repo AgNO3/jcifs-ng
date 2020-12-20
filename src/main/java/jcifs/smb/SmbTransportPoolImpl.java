@@ -212,6 +212,9 @@ public class SmbTransportPoolImpl implements SmbTransportPool {
 
         IOException ex = null;
         for ( Address addr : addrs ) {
+            if ( log.isDebugEnabled() ) {
+                log.debug("Trying address {}", addr);
+            }
             try ( SmbTransportImpl trans = getSmbTransport(tf, addr, port, exclusive, forceSigning).unwrap(SmbTransportImpl.class) ) {
                 try {
                     trans.ensureConnected();
