@@ -25,14 +25,15 @@ import java.io.IOException;
 import java.util.Enumeration;
 
 import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1Enumerated;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
+import org.bouncycastle.asn1.ASN1OutputStream;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.ASN1TaggedObject;
 import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DEROutputStream;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 
@@ -91,7 +92,7 @@ public class NegTokenTarg extends SpnegoToken {
     public byte[] toByteArray () {
         try {
             ByteArrayOutputStream collector = new ByteArrayOutputStream();
-            DEROutputStream der = new DEROutputStream(collector);
+            ASN1OutputStream der = ASN1OutputStream.create(collector, ASN1Encoding.DER);
             ASN1EncodableVector fields = new ASN1EncodableVector();
             int res = getResult();
             if ( res != UNSPECIFIED_RESULT ) {
