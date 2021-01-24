@@ -21,8 +21,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.DEROutputStream;
+import org.bouncycastle.asn1.ASN1OutputStream;
 import org.bouncycastle.asn1.DERSequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -366,7 +367,7 @@ class SpnegoContext implements SSPContext {
     private static byte[] encodeMechs ( ASN1ObjectIdentifier[] mechs ) throws CIFSException {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DEROutputStream dos = new DEROutputStream(bos);
+            ASN1OutputStream dos = ASN1OutputStream.create(bos, ASN1Encoding.DER);
             dos.writeObject(new DERSequence(mechs));
             dos.close();
             return bos.toByteArray();
