@@ -261,6 +261,33 @@ public class EnumTest extends BaseCIFSTest {
 
 
     @Test
+    public void testDirEnumLarge () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbFile f = createTestDirectory() ) {
+            try {
+                String prefix = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+                int n = getContext().getConfig().getMaximumBufferSize() / 100;
+                for ( int i = 0; i < n; i++ ) {
+                    try ( SmbResource c = f.resolve(String.format("%s%d.tmp", prefix, i)) ) {
+                        c.createNewFile();
+                    }
+                }
+
+                String[] found = f.list();
+                Arrays.sort(found);
+
+                for ( int i = 0; i < n; i++ ) {
+                    Assert.assertTrue(Arrays.binarySearch(found, String.format("%s%d.tmp", prefix, i)) >= 0);
+                }
+            }
+            finally {
+                f.delete();
+            }
+        }
+
+    }
+
+
+    @Test
     public void testEnumDeepUnresolved () throws IOException {
         try ( SmbFile r = getDefaultShareRoot();
               SmbFile f = new SmbFile(r, "enum-test/a/b/") ) {
