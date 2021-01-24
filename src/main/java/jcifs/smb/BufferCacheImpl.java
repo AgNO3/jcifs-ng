@@ -89,6 +89,9 @@ public class BufferCacheImpl implements BufferCache {
      */
     @Override
     public void releaseBuffer ( byte[] buf ) {
+        if ( buf == null ) {
+            return;
+        }
         // better safe than sorry: prevent leaks if there is some out of bound access
         Arrays.fill(buf, (byte) 0);
         synchronized ( this.cache ) {

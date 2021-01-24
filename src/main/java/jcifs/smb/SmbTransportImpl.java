@@ -1680,6 +1680,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
             finally {
                 this.response_map.remove(k);
+                getContext().getBufferCache().releaseBuffer(resp.releaseBuffer());
             }
         }
         catch ( InterruptedException ie ) {
@@ -1687,7 +1688,6 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         }
         finally {
             getContext().getBufferCache().releaseBuffer(req.releaseBuffer());
-            getContext().getBufferCache().releaseBuffer(resp.releaseBuffer());
         }
 
     }
