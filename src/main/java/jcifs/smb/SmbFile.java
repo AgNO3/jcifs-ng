@@ -26,6 +26,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1340,7 +1341,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 // trigger requests to resolve the actual target
                 exists();
                 dest.exists();
-                if ( !sh.isSameTree(th) ) {
+
+                if ( !Objects.equals(getServerWithDfs(), dest.getServerWithDfs()) || !Objects.equals(getShare(), dest.getShare()) ) {
                     throw new SmbException("Cannot rename between different trees");
                 }
             }
