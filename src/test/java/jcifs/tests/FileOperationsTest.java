@@ -157,6 +157,32 @@ public class FileOperationsTest extends BaseCIFSTest {
 
 
     @Test
+    public void testRenameDifferentTrees () throws CIFSException, MalformedURLException, UnknownHostException {
+        try ( SmbFile defaultShareRoot = getDefaultShareRoot();
+              SmbResource f = new SmbFile(defaultShareRoot, makeRandomName());
+              SmbResource p = new SmbFile(getTestShareGuestURL(), getContext());
+              SmbResource tgt = new SmbFile(p, "other-share") ) {
+            f.createNewFile();
+            boolean renamed = false;
+            try {
+                f.renameTo(tgt, true);
+            }
+            catch ( SmbUnsupportedOperationException e ) {
+                try ( SmbTreeHandle th = defaultShareRoot.getTreeHandle() ) {
+                    Assume.assumeTrue("Not SMB2", th.isSMB2());
+                }
+                throw e;
+            }
+            finally {
+                if ( !renamed && f.exists() ) {
+                    f.delete();
+                }
+            }
+        }
+    }
+
+
+    @Test
     public void testMoveFile () throws CIFSException, MalformedURLException, UnknownHostException {
         try ( SmbFile defaultShareRoot = getDefaultShareRoot();
               SmbFile d = createTestDirectory();
