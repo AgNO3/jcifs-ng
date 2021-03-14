@@ -1308,7 +1308,12 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     return;
                 }
                 log.warn("Skipping message " + key);
-                this.in.skip(size - 32);
+                if ( this.isSMB2() ) {
+                    this.in.skip(size - Smb2Constants.SMB2_HEADER_LENGTH);
+                }
+                else {
+                    this.in.skip(size - SmbConstants.SMB1_HEADER_LENGTH);
+                }
             }
         }
     }

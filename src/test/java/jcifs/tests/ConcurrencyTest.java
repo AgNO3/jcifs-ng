@@ -45,12 +45,21 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jcifs.CIFSContext;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.SmbSession;
+import jcifs.internal.smb2.Smb2Constants;
+import jcifs.internal.smb2.create.Smb2CloseRequest;
+import jcifs.internal.smb2.create.Smb2CreateRequest;
 import jcifs.smb.NtStatus;
 import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFileOutputStream;
+import jcifs.smb.SmbSessionInternal;
+import jcifs.smb.SmbTransportInternal;
+import jcifs.smb.SmbTreeInternal;
+import jcifs.util.transport.TransportException;
 
 
 /**
@@ -256,6 +265,82 @@ public class ConcurrencyTest extends BaseCIFSTest {
             }
         }
 
+    }
+
+
+    @Test
+    public void testInterrupt () throws UnknownHostException, IOException, InterruptedException {
+
+        final Object lock = new Object();
+        final Thread t = Thread.currentThread();
+
+        this.executor.submit(new Runnable() {
+
+            @Override
+            public void run () {
+
+                try {
+                    synchronized ( lock ) {
+                        lock.wait(1000);
+                    }
+
+                    Thread.sleep(100);
+                    t.interrupt();
+                }
+                catch ( InterruptedException e ) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        try {
+            CIFSContext c = getContext();
+            c = withTestNTLMCredentials(c);
+            try ( SmbTransportInternal trans = c.getTransportPool().getSmbTransport(c, getTestServer(), 0, false, true)
+                    .unwrap(SmbTransportInternal.class);
+                  SmbSession sess = trans.unwrap(SmbTransportInternal.class).getSmbSession(c, getTestServer(), null);
+                  SmbTreeInternal tree = sess.unwrap(SmbSessionInternal.class).getSmbTree(getTestShare(), null).unwrap(SmbTreeInternal.class) ) {
+
+                if ( trans.isSMB2() ) {
+                    Smb2CreateRequest create = new Smb2CreateRequest(sess.getConfig(), "\\foocc");
+                    create.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
+                    create.setRequestedOplockLevel(Smb2CreateRequest.SMB2_OPLOCK_LEVEL_BATCH);
+
+                    tree.send(create);
+
+                    Smb2CreateRequest create2 = new Smb2CreateRequest(sess.getConfig(), "\\foocc");
+                    create2.setOverrideTimeout(1000);
+                    create2.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
+                    create2.setRequestedOplockLevel(Smb2CreateRequest.SMB2_OPLOCK_LEVEL_BATCH);
+
+                    create2.chain(new Smb2CloseRequest(sess.getConfig(), Smb2Constants.UNSPECIFIED_FILEID));
+
+                    try {
+                        synchronized ( lock ) {
+                            lock.notify();
+                        }
+                        tree.send(create2);
+                    }
+                    catch ( Exception e ) {
+
+                        if ( e.getCause() instanceof TransportException && e.getCause().getCause() instanceof InterruptedException ) {
+
+                            Smb2CreateRequest create3 = new Smb2CreateRequest(sess.getConfig(), "\\xyz");
+                            create3.setOverrideTimeout(1000);
+                            create3.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
+                            create3.chain(new Smb2CloseRequest(sess.getConfig(), Smb2Constants.UNSPECIFIED_FILEID));
+                        }
+                        else {
+                            fail("Failed to interrupt sendrecv");
+                        }
+                    }
+                }
+            }
+        }
+        finally {
+            this.executor.shutdown();
+            this.executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
     }
 
     private class ExclusiveLockSecond extends MultiTestCase {
