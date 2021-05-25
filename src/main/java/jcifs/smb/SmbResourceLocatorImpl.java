@@ -163,8 +163,12 @@ class SmbResourceLocatorImpl implements SmbResourceLocatorInternal, Cloneable {
                 this.share = shr;
             }
             else {
-                this.unc = uncPath + name.replace('/', '\\') + ( trailingSlash ? "\\" : "" );
-                this.canon = context.getURLPath() + name + ( trailingSlash ? "/" : "" );
+            	// Make sure there's a file separator between uncPath and name.
+            	String separator = (uncPath.endsWith("\\") || name.startsWith("/")) ? "" : "\\";
+                this.unc = uncPath + separator + name.replace('/', '\\') + ( trailingSlash ? "\\" : "" );
+                // Make sure there's a file separator between context's url path and name
+                separator = (context.getURLPath().endsWith("/") || name.startsWith("/")) ? "" : "/";
+                this.canon = context.getURLPath() + separator + name + ( trailingSlash ? "/" : "" );
                 this.share = shr;
             }
         }
