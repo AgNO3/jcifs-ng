@@ -21,6 +21,7 @@ package jcifs.util;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
@@ -37,7 +38,7 @@ import jcifs.CIFSUnsupportedCryptoException;
  */
 public final class Crypto {
 
-    private static final BouncyCastleProvider BCPROV = new BouncyCastleProvider();
+    private static Provider provider = null;
 
 
     /**
@@ -52,7 +53,7 @@ public final class Crypto {
      */
     public static MessageDigest getMD4 () {
         try {
-            return MessageDigest.getInstance("MD4", BCPROV);
+            return MessageDigest.getInstance("MD4", getProvider());
         }
         catch ( NoSuchAlgorithmException e ) {
             throw new CIFSUnsupportedCryptoException(e);
@@ -162,4 +163,29 @@ public final class Crypto {
         return key8;
     }
 
+    /**
+     * Default provider is BouncyCastleProvider.
+     * For registering custom provider
+     * @see jcifs.util.Crypto#initProvider(Provider)
+     * @return Provider
+     */
+    public static Provider getProvider() {
+        if (provider != null) {
+            return provider;
+        }
+        provider = new BouncyCastleProvider();
+        return provider;
+    }
+
+    /**
+     * Initialize Provider Instance with customProvider
+     * @param customProvider
+     * @throws Exception if Provider has already been initialized.
+     */
+    public static void initProvider(Provider customProvider) throws CIFSUnsupportedCryptoException {
+        if (provider != null) {
+            throw new CIFSUnsupportedCryptoException("Provider can't be re-initialized. Provider has already been initialized with "+ provider.getInfo());
+        }
+        provider = customProvider;
+    }
 }
