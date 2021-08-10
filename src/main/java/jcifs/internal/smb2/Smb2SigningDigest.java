@@ -20,12 +20,11 @@ package jcifs.internal.smb2;
 
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
-import java.security.Provider;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import jcifs.util.Crypto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +48,6 @@ public class Smb2SigningDigest implements SMBSigningDigest {
     private static final int SIGNATURE_LENGTH = 16;
     private final Mac digest;
 
-    private static final Provider BC = new BouncyCastleProvider();
-
-
     /**
      * @param sessionKey
      * @param dialect
@@ -71,14 +67,14 @@ public class Smb2SigningDigest implements SMBSigningDigest {
         case Smb2Constants.SMB2_DIALECT_0300:
         case Smb2Constants.SMB2_DIALECT_0302:
             signingKey = Smb3KeyDerivation.deriveSigningKey(dialect, sessionKey, new byte[0] /* unimplemented */);
-            m = Mac.getInstance("AESCMAC", BC);
+            m = Mac.getInstance("AESCMAC", Crypto.getProvider());
             break;
         case Smb2Constants.SMB2_DIALECT_0311:
             if ( preauthIntegrityHash == null ) {
                 throw new IllegalArgumentException("Missing preauthIntegrityHash for SMB 3.1");
             }
             signingKey = Smb3KeyDerivation.deriveSigningKey(dialect, sessionKey, preauthIntegrityHash);
-            m = Mac.getInstance("AESCMAC", BC);
+            m = Mac.getInstance("AESCMAC", Crypto.getProvider());
             break;
         default:
             throw new IllegalArgumentException("Unknown dialect");
