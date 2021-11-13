@@ -419,6 +419,7 @@ public class DfsReferralDataImpl implements DfsReferralDataInternal {
         do {
             if ( ri == rlast ) {
                 result[ rlast ] = path.substring(b);
+                result[ rlast ] = path.substring(b);
                 return strip;
             }
             if ( i == len || path.charAt(i) == '\\' ) {

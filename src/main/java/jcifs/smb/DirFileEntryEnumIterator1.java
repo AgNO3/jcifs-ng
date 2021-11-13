@@ -36,6 +36,7 @@ import jcifs.internal.smb1.trans2.Trans2FindNext2;
 class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
 
     private static final Logger log = LoggerFactory.getLogger(DirFileEntryEnumIterator1.class);
+    private static final int FIND_OVERHEAD = 100; // plenty enough
 
     private Trans2FindNext2 nextRequest;
     private Trans2FindFirst2Response response;
@@ -71,7 +72,7 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
                     this.getWildcard(),
                     this.getSearchAttributes(),
                     th.getConfig().getListCount(),
-                    th.getConfig().getListSize()),
+                    th.getConfig().getListSize() - FIND_OVERHEAD),
                 this.response);
 
             this.nextRequest = new Trans2FindNext2(
@@ -80,7 +81,7 @@ class DirFileEntryEnumIterator1 extends DirFileEntryEnumIteratorBase {
                 this.response.getResumeKey(),
                 this.response.getLastName(),
                 th.getConfig().getListCount(),
-                th.getConfig().getListSize());
+                th.getConfig().getListSize() - FIND_OVERHEAD);
         }
         catch ( SmbException e ) {
             if ( this.response != null && this.response.isReceived() && e.getNtStatus() == NtStatus.NT_STATUS_NO_SUCH_FILE ) {
