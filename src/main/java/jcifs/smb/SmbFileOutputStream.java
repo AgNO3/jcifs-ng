@@ -316,7 +316,7 @@ public class SmbFileOutputStream extends OutputStream {
         try ( SmbFileHandleImpl fh = ensureOpen();
               SmbTreeHandleImpl th = fh.getTree() ) {
             if ( log.isDebugEnabled() ) {
-                log.debug("write: fid=" + fh + ",off=" + off + ",len=" + len);
+                log.debug("write: fid=" + fh + ",off=" + off + ",len=" + len + ",fp=" +  this.fp);
             }
 
             int w;
