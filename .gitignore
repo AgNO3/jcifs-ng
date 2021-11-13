@@ -18,3 +18,5 @@ hs_err_pid*
 .settings
 
 .repository
+
+.idea
