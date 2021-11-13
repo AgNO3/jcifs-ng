@@ -452,7 +452,7 @@ public class DfsImpl implements DfsResolver {
                         DfsReferralDataInternal r = start;
                         do {
                             log.trace("    " + entry3.getKey() + " => " + entry3.getValue());
-                            r = start.next();
+                            r = r.next();
                         }
                         while ( r != start );
                     }
