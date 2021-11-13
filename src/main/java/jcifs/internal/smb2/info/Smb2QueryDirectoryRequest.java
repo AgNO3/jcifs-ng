@@ -107,7 +107,7 @@ public class Smb2QueryDirectoryRequest extends ServerMessageBlock2Request<Smb2Qu
      */
     public Smb2QueryDirectoryRequest ( Configuration config, byte[] fileId ) {
         super(config, SMB2_QUERY_DIRECTORY);
-        this.outputBufferLength = ( config.getMaximumBufferSize() - Smb2QueryDirectoryResponse.OVERHEAD ) & ~0x7;
+        this.outputBufferLength = ( config.getListSize() - Smb2QueryDirectoryResponse.OVERHEAD ) & ~0x7;
         this.fileId = fileId;
     }
 

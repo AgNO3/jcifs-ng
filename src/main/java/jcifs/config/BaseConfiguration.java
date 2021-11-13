@@ -124,7 +124,7 @@ public class BaseConfiguration implements Configuration {
     protected int maximumBufferSize = 0x10000;
     protected int transactionBufferSize = 0xFFFF - 512;
     protected int bufferCacheSize = 16;
-    protected int smbListSize = 65535;
+    protected int smbListSize = 65435;
     protected int smbListCount = 200;
     protected long smbAttributeExpiration = 5000L;
     protected boolean ignoreCopyToException = false;

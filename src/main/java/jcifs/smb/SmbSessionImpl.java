@@ -409,8 +409,16 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         response = this.transport.send(request, response, params);
                     }
                     catch ( SmbException e ) {
-                        if ( (e.getNtStatus() != 0xC000035C && e.getNtStatus() != 0xC000203) || !trans.isSMB2() ) {
+                        if ( (e.getNtStatus() != 0xC000035C && e.getNtStatus() != 0xC0000203) || !trans.isSMB2() ) {
                             throw e;
+                        }
+                        if (e.getNtStatus() == 0xC0000203) { // USER_SESSION_DELETED
+                            try {
+								this.transport.disconnect(true);
+								log.warn("Got NT_STATUS_USER_SESSION_DELETED, disconnected transport");
+							} catch (IOException e1) {
+								log.warn("Got NT_STATUS_USER_SESSION_DELETED, disconnected transport with error", e1);
+							}   
                         }
                         log.debug("Session expired, trying reauth", e);
                         return reauthenticate(trans, this.targetDomain, request, response, params);

@@ -131,7 +131,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.transactionBufferSize = Config.getInt(p, "jcifs.smb.client.transaction_buf_size", 0xFFFF) - 512;
         this.bufferCacheSize = Config.getInt(p, "jcifs.smb.maxBuffers", 16);
 
-        this.smbListSize = Config.getInt(p, "jcifs.smb.client.listSize", 65535);
+        this.smbListSize = Config.getInt(p, "jcifs.smb.client.listSize", 65435);
         this.smbListCount = Config.getInt(p, "jcifs.smb.client.listCount", 200);
 
         this.smbAttributeExpiration = Config.getLong(p, "jcifs.smb.client.attrExpirationPeriod", 5000L);

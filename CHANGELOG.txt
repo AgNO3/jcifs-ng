@@ -1,3 +1,25 @@
+jcifs-ng 2.1.7
+- Handle USER_SESSION_DELETED by resetting/disconnecting the
+  transport connection (#242,#294)
+- More consistent configuration of SMB2 enumeration/info
+  requested buffer size. Slighly lower requested size to 
+  allow for exzessive, but legal, additional padding. 
+- Update dependencies
+- Switch back to regular Boucycastle multi-release JAR,
+  users with broken tooling should override the dependency
+- Add debugging of filePointer when writing.
+- Fix endless loop when dumping DFS referral cache on TRACE
+  level
+
+jcifs-ng 2.1.6
+- Request minimal access when querying file information to avoid
+  sharing violations (#261,#239)
+- Fix NetBIOS lookup when multiple addresses are returned (#258)
+- Fix skipping of unexpected messages when using SMB2 (#268)
+- Guard against NPE when releasing buffers (#266)
+- No longer require same connection/session/tree for rename target (#118)
+- Bump bouncycastle, forward compat (#262)
+
 jcifs-ng 2.1.5
 - Fix invalid negotitate context parsing that caused 
   OutOfMemoryException for pre 3.11 protocols (#178)

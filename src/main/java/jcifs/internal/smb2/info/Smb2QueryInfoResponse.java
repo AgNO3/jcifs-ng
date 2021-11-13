@@ -39,6 +39,8 @@ import jcifs.internal.util.SMBUtil;
  */
 public class Smb2QueryInfoResponse extends ServerMessageBlock2Response {
 
+    public static final int OVERHEAD = Smb2Constants.SMB2_HEADER_LENGTH + 8;
+
     private byte expectInfoType;
     private byte expectInfoClass;
     private Decodable info;
