@@ -306,16 +306,18 @@ public class ConcurrencyTest extends BaseCIFSTest {
                     create.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
                     create.setRequestedOplockLevel(Smb2CreateRequest.SMB2_OPLOCK_LEVEL_BATCH);
 
-                    tree.send(create);
 
-                    Smb2CreateRequest create2 = new Smb2CreateRequest(sess.getConfig(), "\\foocc");
-                    create2.setOverrideTimeout(1000);
-                    create2.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
-                    create2.setRequestedOplockLevel(Smb2CreateRequest.SMB2_OPLOCK_LEVEL_BATCH);
-
-                    create2.chain(new Smb2CloseRequest(sess.getConfig(), Smb2Constants.UNSPECIFIED_FILEID));
 
                     try {
+                        tree.send(create);
+
+                        Smb2CreateRequest create2 = new Smb2CreateRequest(sess.getConfig(), "\\foocc");
+                        create2.setOverrideTimeout(1000);
+                        create2.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
+                        create2.setRequestedOplockLevel(Smb2CreateRequest.SMB2_OPLOCK_LEVEL_BATCH);
+
+                        create2.chain(new Smb2CloseRequest(sess.getConfig(), Smb2Constants.UNSPECIFIED_FILEID));
+
                         synchronized ( lock ) {
                             lock.notify();
                         }
@@ -331,6 +333,7 @@ public class ConcurrencyTest extends BaseCIFSTest {
                             create3.chain(new Smb2CloseRequest(sess.getConfig(), Smb2Constants.UNSPECIFIED_FILEID));
                         }
                         else {
+                            e.printStackTrace();
                             fail("Failed to interrupt sendrecv");
                         }
                     }

@@ -733,7 +733,7 @@ public class EnumTest extends BaseCIFSTest {
 
             @Override
             public int getListSize () {
-                return 256;
+                return 1024;
             }
         });
         ctx = withTestNTLMCredentials(ctx);
@@ -759,6 +759,9 @@ public class EnumTest extends BaseCIFSTest {
                 assertEquals(numFiles, cnt);
             }
             finally {
+
+                String[] s = ((SmbFile)f).list();
+
                 f.delete();
             }
         }
