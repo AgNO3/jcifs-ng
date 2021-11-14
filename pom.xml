@@ -5,7 +5,7 @@
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
-	<version>2.1.7-SNAPSHOT</version>
+	<version>2.1.7</version>
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>
 
@@ -30,7 +30,7 @@
 		<connection>scm:git:https://github.com/AgNO3/jcifs-ng.git</connection>
 		<developerConnection>scm:git:git@github.com:AgNO3/jcifs-ng.git</developerConnection>
 		<url>git@github.com:AgNO3/jcifs-ng.git</url>
-		<tag>HEAD</tag>
+		<tag>jcifs-ng-2.1.7</tag>
 	</scm>
 
 	<distributionManagement>
@@ -47,8 +47,8 @@
 		<maven.build.timestamp.format>yyyyMMddHHmm</maven.build.timestamp.format>
 		<osgi-version-qualifier>${maven.build.timestamp}</osgi-version-qualifier>
 		<project.scm.id>github</project.scm.id>
-		<sign.alias></sign.alias>
-		<sign.tsa></sign.tsa>
+		<sign.alias />
+		<sign.tsa />
 		<osgi.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</osgi.version>
 		<osgi.pkg.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</osgi.pkg.version>
 	</properties>
