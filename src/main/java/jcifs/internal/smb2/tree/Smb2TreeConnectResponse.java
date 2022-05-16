@@ -199,7 +199,7 @@ public class Smb2TreeConnectResponse extends ServerMessageBlock2Response impleme
 
     @Override
     public boolean isValidTid () {
-        return getTreeId() != 0;
+        return getTreeId() >= 0;
     }
 
 
