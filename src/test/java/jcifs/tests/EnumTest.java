@@ -657,6 +657,8 @@ public class EnumTest extends BaseCIFSTest {
     }
 
 
+
+
     private void testListCount ( final int pageSize, int numFiles ) throws CIFSException {
         CIFSContext ctx = getContext();
         ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
@@ -723,6 +725,47 @@ public class EnumTest extends BaseCIFSTest {
 
     }
 
+    @Test
+    public void testListSmallBufferSize() throws CIFSException {
+        int numFiles = 100;
+        CIFSContext ctx = getContext();
+        ctx = withConfig(ctx, new DelegatingConfiguration(ctx.getConfig()) {
+
+            @Override
+            public int getListSize () {
+                return 1024;
+            }
+        });
+        ctx = withTestNTLMCredentials(ctx);
+        try ( SmbResource root = ctx.get(getTestShareURL());
+              SmbResource f = root.resolve(makeRandomDirectoryName()) ) {
+            f.mkdir();
+            try {
+                for ( int i = 0; i < numFiles; i++ ) {
+                    try ( SmbResource r = f.resolve(String.format("%04x", i)) ) {
+                        r.createNewFile();
+                    }
+                }
+
+                int cnt = 0;
+                try ( CloseableIterator<SmbResource> chld = f.children() ) {
+                    while ( chld.hasNext() ) {
+                        try ( SmbResource next = chld.next() ) {
+                            cnt++;
+                        }
+                    }
+                }
+
+                assertEquals(numFiles, cnt);
+            }
+            finally {
+
+                String[] s = ((SmbFile)f).list();
+
+                f.delete();
+            }
+        }
+    }
 
     private static String repeat ( char c, int n ) {
         char chs[] = new char[n];

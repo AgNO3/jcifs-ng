@@ -414,8 +414,8 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         }
                         if (e.getNtStatus() == 0xC0000203) { // USER_SESSION_DELETED
                             try {
+                                log.warn("Got NT_STATUS_USER_SESSION_DELETED, disconnecting transport");
 								this.transport.disconnect(true);
-								log.warn("Got NT_STATUS_USER_SESSION_DELETED, disconnected transport");
 							} catch (IOException e1) {
 								log.warn("Got NT_STATUS_USER_SESSION_DELETED, disconnected transport with error", e1);
 							}   

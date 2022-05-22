@@ -464,4 +464,21 @@ public class SessionTest extends BaseCIFSTest {
 
     }
 
+
+    // this test is meant to test server-side session invalidation behavior
+    // and not part of the regular test suite as manual steps are required
+    //@Test
+    public void testSessionMaintenance () throws IOException, InterruptedException {
+        try ( SmbFile f = getDefaultShareRoot() ) {
+            checkConnection(f);
+            while ( true ) {
+                f.list();
+                Thread.sleep(5000);
+            }
+
+        }
+    }
+
+
+
 }

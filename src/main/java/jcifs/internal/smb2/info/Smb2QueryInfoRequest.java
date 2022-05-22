@@ -56,7 +56,7 @@ public class Smb2QueryInfoRequest extends ServerMessageBlock2Request<Smb2QueryIn
      */
     public Smb2QueryInfoRequest ( Configuration config, byte[] fileId ) {
         super(config, SMB2_QUERY_INFO);
-        this.outputBufferLength = ( config.getListSize() - Smb2QueryInfoResponse.OVERHEAD ) & ~0x7;
+        this.outputBufferLength = ( Math.min(config.getMaximumBufferSize(),  config.getListSize()) - Smb2QueryInfoResponse.OVERHEAD ) & ~0x7;
         this.fileId = fileId;
     }
 
