@@ -47,6 +47,9 @@
 		<maven.build.timestamp.format>yyyyMMddHHmm</maven.build.timestamp.format>
 		<osgi-version-qualifier>${maven.build.timestamp}</osgi-version-qualifier>
 		<project.scm.id>github</project.scm.id>
+		<parsedVersion.majorVersion></parsedVersion.majorVersion>
+		<parsedVersion.minorVersion></parsedVersion.minorVersion>
+		<parsedVersion.incrementalVersion></parsedVersion.incrementalVersion>
 		<sign.alias></sign.alias>
 		<sign.tsa></sign.tsa>
 		<osgi.version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}.${osgi-version-qualifier}</osgi.version>
