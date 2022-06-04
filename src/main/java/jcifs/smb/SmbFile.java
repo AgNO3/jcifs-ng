@@ -364,6 +364,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     private long size;
     private long sizeExpiration;
     private boolean isExists;
+    private boolean isSymlink;
 
     private CIFSContext transportContext;
     private SmbTreeConnection treeConnection;
@@ -831,10 +832,19 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public boolean exists () throws SmbException {
+        return exists(false);
+    }
 
-        if ( this.attrExpiration > System.currentTimeMillis() ) {
-            log.trace("Using cached attributes");
-            return this.isExists;
+
+    @Override
+    public boolean exists (boolean symLink) throws SmbException {
+        this.isSymlink = false;
+
+        if (!symLink) {
+            if ( this.attrExpiration > System.currentTimeMillis() ) {
+                log.trace("Using cached attributes");
+                return this.isExists;
+            }
         }
 
         this.attributes = ATTR_READONLY | ATTR_DIRECTORY;
@@ -879,14 +889,17 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         catch ( SmbException se ) {
             log.trace("exists:", se);
-            switch ( se.getNtStatus() ) {
-            case NtStatus.NT_STATUS_NO_SUCH_FILE:
-            case NtStatus.NT_STATUS_OBJECT_NAME_INVALID:
-            case NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND:
-            case NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND:
-                break;
-            default:
-                throw se;
+            switch (se.getNtStatus()) {
+                case NtStatus.NT_STATUS_NO_SUCH_FILE:
+                case NtStatus.NT_STATUS_OBJECT_NAME_INVALID:
+                case NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND:
+                case NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND:
+                    break;
+                case NtStatus.NT_STATUS_STOPPED_ON_SYMLINK:
+                    this.isSymlink = true;
+                    break;
+                default:
+                    throw se;
             }
         }
         catch ( CIFSException e ) {
@@ -1103,6 +1116,16 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         exists();
         return ( this.attributes & ATTR_HIDDEN ) == ATTR_HIDDEN;
+    }
+
+
+    @Override
+    public boolean isSymlink () throws SmbException {
+        if ( !this.fileLocator.isRootOrShare() ) {
+            exists(true);
+            return this.isSymlink;
+        }
+        return false;
     }
 
 
