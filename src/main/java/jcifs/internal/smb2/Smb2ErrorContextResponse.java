@@ -25,12 +25,15 @@ import jcifs.internal.util.SMBUtil;
 import jcifs.util.Strings;
 
 /**
+ * Defines methods to decode a SMB2 Error Context Response byte array.
+ * Currently only supports a Symbolic Link Error Response, however can
+ * be enhanced to support others.
  * 
  * @author Gregory Bragg
  */
-public class Smb2ErrorResponse {
+public class Smb2ErrorContextResponse {
 
-    private static Logger log = LoggerFactory.getLogger(Smb2ErrorResponse.class);
+    private static Logger log = LoggerFactory.getLogger(Smb2ErrorContextResponse.class);
 
     private int errorDataLengthLength;
     private int errorId;
@@ -43,10 +46,10 @@ public class Smb2ErrorResponse {
      * 2.2.2.1 SMB2 ERROR Context Response
      * 
      * @param buffer
-     * @return The length, in bytes, of the response including the variable-length portion and excluding SymLinkLength
+     * @return The length, in bytes, of the response including the variable-length portion
      * @throws Smb2ProtocolDecodingException
      */
-    public int readSymLinkErrorContextResponse ( byte[] buffer ) throws SMBProtocolDecodingException {
+    public int readErrorContextResponse ( byte[] buffer ) throws SMBProtocolDecodingException {
         // start at the beginning of the 8-byte aligned boundary
         // for the SMB2 ERROR Context structure
         int bufferIndex = 0;
@@ -55,22 +58,25 @@ public class Smb2ErrorResponse {
         this.errorDataLengthLength = SMBUtil.readInt4(buffer, bufferIndex);
         bufferIndex += 4;
 
-        // ErrorId (4 bytes), for STATUS_STOPPED_ON_SYMLINK this is always 0x00000000
+        // ErrorId (4 bytes)
+        // STATUS_STOPPED_ON_SYMLINK is always 0x00000000
         this.errorId = SMBUtil.readInt4(buffer, bufferIndex);
         if ( this.errorId != 0 ) {
             throw new SMBProtocolDecodingException("ErrorId should be 0 for STATUS_STOPPED_ON_SYMLINK");
         }
-        bufferIndex += 4;
-
-        return this.readSymLinkErrorResponse( buffer, bufferIndex );
+        else {
+            bufferIndex += 4;
+            return this.readSymLinkErrorResponse( buffer, bufferIndex );
+        }
     }
-    
+
     /**
      * 2.2.2.2.1 Symbolic Link Error Response
      * 
      * @param buffer
      * @param bufferIndex
-     * @return The length, in bytes, of the response including the variable-length portion and excluding SymLinkLength
+     * @return The length, in bytes, of the response including the variable-length portion
+     * and excluding SymLinkLength
      * @throws Smb2ProtocolDecodingException
      */
     protected int readSymLinkErrorResponse ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
@@ -80,7 +86,7 @@ public class Smb2ErrorResponse {
 
         // SymLinkErrorTag (4 bytes) (always 0x4C4D5953)
         int symLinkErrorTag = SMBUtil.readInt4(buffer, bufferIndex);
-        log.info("symLinkErrorTag -> {}", symLinkErrorTag);
+        log.debug("symLinkErrorTag -> {}", symLinkErrorTag);
         if ( !Integer.toHexString(symLinkErrorTag).toUpperCase().equals("4C4D5953") ) {
             throw new SMBProtocolDecodingException("SymLinkErrorTag should be 0x4C4D5953");
         }
@@ -92,41 +98,41 @@ public class Smb2ErrorResponse {
 
         // UnparsedPathLength (2 bytes)
         int unparsedPathLength = SMBUtil.readInt2(buffer, bufferIndex);
-        log.info("unparsedPathLength -> {}", unparsedPathLength);
+        log.debug("unparsedPathLength -> {}", unparsedPathLength);
         bufferIndex += 2;
 
         // SubstituteNameOffset (2 bytes)
         int substituteNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
-        log.info("substituteNameOffset -> {}", substituteNameOffset);
+        log.debug("substituteNameOffset -> {}", substituteNameOffset);
         bufferIndex += 2;
 
         // SubstituteNameLength (2 bytes)
         int substituteNameLength = SMBUtil.readInt2(buffer, bufferIndex);
-        log.info("substituteNameLength -> {}", substituteNameLength);
+        log.debug("substituteNameLength -> {}", substituteNameLength);
         bufferIndex += 2;
 
         // PrintNameOffset (2 bytes)
         int printNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
-        log.info("printNameOffset -> {}", printNameOffset);
+        log.debug("printNameOffset -> {}", printNameOffset);
         bufferIndex += 2;
 
         // PrintNameLength (2 bytes)
         int printNameLength = SMBUtil.readInt2(buffer, bufferIndex);
-        log.info("printNameLength -> {}", printNameLength);
+        log.debug("printNameLength -> {}", printNameLength);
         bufferIndex += 2;
 
         // Flags (4 bytes)
         this.absolutePath = SMBUtil.readInt4(buffer, bufferIndex) == 0;
-        log.info("absolutePath -> {}", this.absolutePath);
+        log.debug("absolutePath -> {}", this.absolutePath);
         bufferIndex += 4;
 
         // PathBuffer (variable), substitute name
         this.substituteName = Strings.fromUNIBytes(buffer, substituteNameOffset + bufferIndex, substituteNameLength);
-        log.info("substituteName -> {}", this.substituteName);
+        log.debug("substituteName -> {}", this.substituteName);
 
         // PathBuffer (variable), print name that also identifies the target of the symbolic link
         this.printName = Strings.fromUNIBytes(buffer, printNameOffset + bufferIndex, printNameLength);
-        log.info("printName -> {}", this.printName);
+        log.debug("printName -> {}", this.printName);
 
         return symLinkLength;
     }
