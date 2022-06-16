@@ -26,6 +26,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -84,6 +85,7 @@ import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
+import jcifs.internal.smb2.Smb2ErrorContextResponse;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CloseResponse;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
@@ -91,6 +93,7 @@ import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryInfoRequest;
 import jcifs.internal.smb2.info.Smb2QueryInfoResponse;
 import jcifs.internal.smb2.info.Smb2SetInfoRequest;
+import jcifs.util.Strings;
 
 
 /**
@@ -836,8 +839,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     }
 
 
-    @Override
-    public boolean exists (boolean symLink) throws SmbException {
+    protected boolean exists (boolean symLink) throws SmbException {
         this.isSymlink = false;
 
         if (!symLink) {
@@ -1754,10 +1756,18 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     }
 
 
-    @SuppressWarnings ( "unchecked" )
     protected <T extends ServerMessageBlock2Response> T withOpen ( SmbTreeHandleImpl th, int createDisposition, int createOptions, int fileAttributes,
             int desiredAccess, int shareAccess, ServerMessageBlock2Request<T> first, ServerMessageBlock2Request<?>... others ) throws CIFSException {
-        Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), getUncPath());
+        String path = getUncPath();
+        log.info("path -> {}", path);
+        return withOpen(th, createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, path, first, others);
+    }
+
+
+    @SuppressWarnings ( "unchecked" )
+    protected <T extends ServerMessageBlock2Response> T withOpen ( SmbTreeHandleImpl th, int createDisposition, int createOptions, int fileAttributes,
+            int desiredAccess, int shareAccess, String path, ServerMessageBlock2Request<T> first, ServerMessageBlock2Request<?>... others ) throws CIFSException {
+        Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), path);
         try {
             cr.setCreateDisposition(createDisposition);
             cr.setCreateOptions(createOptions);
@@ -1807,9 +1817,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         catch (
             CIFSException |
             RuntimeException e ) {
+            Smb2CreateResponse createResp = cr.getResponse();
             try {
                 // make sure that the handle is closed when one of the requests fails
-                Smb2CreateResponse createResp = cr.getResponse();
                 if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
                     th.send(new Smb2CloseRequest(th.getConfig(), createResp.getFileId()), RequestParam.NO_RETRY);
                 }
@@ -1818,7 +1828,34 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 log.debug("Failed to close after failure", e2);
                 e.addSuppressed(e2);
             }
-            throw e;
+
+            // we hit a symbolic link, parse the error data and resend for 'real' directory or file
+            if (createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+                this.isSymlink = true;
+                log.info("Smb2CreateResponse - errorContextCount -> {}", createResp.getErrorContextCount());
+
+                byte[] errorData = createResp.getErrorData();
+                log.info("Smb2CreateResponse - Error data -> {}", Arrays.toString(errorData));
+                log.info("Smb2CreateResponse - Error data length -> {}", errorData.length);
+                log.info("Smb2CreateResponse - Error data string -> {}", Strings.fromUNIBytes(errorData, 0, errorData.length));
+
+                Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
+                int symLinkLength = ecr.readErrorContextResponse(errorData);
+                log.info("Smb2ErrorContextResponse - symLinkLength -> {}", symLinkLength);
+                log.info("Smb2ErrorContextResponse - errorDataLengthLength -> {}", ecr.getErrorDataLengthLength());
+                log.info("Smb2ErrorContextResponse - errorId -> {}", ecr.getErrorId());
+                log.info("Smb2ErrorContextResponse - absolutePath -> {}", ecr.isAbsolutePath());
+                log.info("Smb2ErrorContextResponse - substituteName -> {}", ecr.getSubstituteName());
+                log.info("Smb2ErrorContextResponse - printName -> {}", ecr.getPrintName());
+
+                // After decode error data, resend the request for the 'real' directory or file.
+                String targetPath = ecr.getSubstituteName().replace("\\??\\D:\\GWTEST", "");
+                log.info("targetPath -> {}", targetPath);
+                return withOpen(th, createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, targetPath, first, others);
+            }
+            else {
+                throw e;
+            }
         }
     }
 

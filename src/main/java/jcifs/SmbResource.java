@@ -96,24 +96,6 @@ public interface SmbResource extends AutoCloseable {
 
 
     /**
-     * Tests to see if the SMB resource exists. If the resource refers
-     * only to a server, this method determines if the server exists on the
-     * network and is advertising SMB services. If this resource refers to
-     * a workgroup, this method determines if the workgroup name is valid on
-     * the local SMB network. If this <code>SmbResource</code> refers to the root
-     * <code>smb://</code> resource <code>true</code> is always returned. If
-     * this <code>SmbResource</code> is a traditional file or directory, it will
-     * be queried for on the specified server as expected.
-     *
-     * @param symLink true if this is a symbolic link, false otherwise
-     * @return <code>true</code> if the resource exists or is alive or
-     *         <code>false</code> otherwise
-     * @throws CIFSException
-     */
-    boolean exists (boolean symLink) throws CIFSException;
-
-
-    /**
      * Fetch a child resource
      * 
      * @param name
