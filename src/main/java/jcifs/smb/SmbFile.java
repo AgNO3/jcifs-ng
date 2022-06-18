@@ -661,30 +661,64 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             long fileSize = 0;
             if ( h.isSMB2() ) {
                 Smb2CreateRequest req = new Smb2CreateRequest(config, uncPath);
-                req.setDesiredAccess(access);
+                try {
+                    req.setDesiredAccess(access);
 
-                if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC && ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE_IF);
-                }
-                else if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE);
-                }
-                else if ( ( flags & SmbConstants.O_EXCL ) == O_EXCL ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_CREATE);
-                }
-                else if ( ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
-                }
-                else {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN);
-                }
+                    if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC && ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE_IF);
+                    }
+                    else if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE);
+                    }
+                    else if ( ( flags & SmbConstants.O_EXCL ) == O_EXCL ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_CREATE);
+                    }
+                    else if ( ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
+                    }
+                    else {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN);
+                    }
 
-                req.setShareAccess(sharing);
-                req.setFileAttributes(attrs);
-                Smb2CreateResponse resp = h.send(req);
-                info = resp;
-                fileSize = resp.getEndOfFile();
-                fh = new SmbFileHandleImpl(config, resp.getFileId(), h, uncPath, flags, access, 0, 0, resp.getEndOfFile());
+                    req.setShareAccess(sharing);
+                    req.setFileAttributes(attrs);
+                    Smb2CreateResponse resp = h.send(req);
+                    info = resp;
+                    fileSize = resp.getEndOfFile();
+                    fh = new SmbFileHandleImpl(config, resp.getFileId(), h, uncPath, flags, access, 0, 0, resp.getEndOfFile());
+                }
+                catch (
+                    CIFSException |
+                    RuntimeException e ) {
+                    Smb2CreateResponse resp = req.getResponse();
+                    info = resp;
+
+                    // We hit a symbolic link, parse the error data and resend for 'real' directory or file path
+                    if (resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+                        this.isSymlink = true;
+                        log.info("Smb2CreateResponse - errorContextCount -> {}", resp.getErrorContextCount());
+
+                        byte[] errorData = resp.getErrorData();
+                        log.info("Smb2CreateResponse - Error data -> {}", Arrays.toString(errorData));
+                        log.info("Smb2CreateResponse - Error data length -> {}", errorData.length);
+                        log.info("Smb2CreateResponse - Error data string -> {}", Strings.fromUNIBytes(errorData, 0, errorData.length));
+
+                        Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
+                        int symLinkLength = ecr.readErrorContextResponse(errorData);
+                        log.info("Smb2ErrorContextResponse - symLinkLength -> {}", symLinkLength);
+                        log.info("Smb2ErrorContextResponse - errorDataLengthLength -> {}", ecr.getErrorDataLengthLength());
+                        log.info("Smb2ErrorContextResponse - errorId -> {}", ecr.getErrorId());
+                        log.info("Smb2ErrorContextResponse - absolutePath -> {}", ecr.isAbsolutePath());
+                        log.info("Smb2ErrorContextResponse - substituteName -> {}", ecr.getSubstituteName());
+                        log.info("Smb2ErrorContextResponse - printName -> {}", ecr.getPrintName());
+
+                        int i = ecr.getSubstituteName().indexOf(this.getShare());
+                        String realPath = ecr.getSubstituteName().substring(this.getShare().length() + i);
+                        log.info("symLinkPath -> {}", uncPath);
+                        log.info("realPath -> {}", realPath);
+                        return openUnshared (realPath, flags, access, sharing, attrs, options);
+                    }
+                }
             }
             else if ( h.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                 SmbComNTCreateAndXResponse resp = new SmbComNTCreateAndXResponse(config);
@@ -891,17 +925,17 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         catch ( SmbException se ) {
             log.trace("exists:", se);
-            switch (se.getNtStatus()) {
-                case NtStatus.NT_STATUS_NO_SUCH_FILE:
-                case NtStatus.NT_STATUS_OBJECT_NAME_INVALID:
-                case NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND:
-                case NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND:
-                    break;
-                case NtStatus.NT_STATUS_STOPPED_ON_SYMLINK:
-                    this.isSymlink = true;
-                    break;
-                default:
-                    throw se;
+            switch ( se.getNtStatus() ) {
+            case NtStatus.NT_STATUS_NO_SUCH_FILE:
+            case NtStatus.NT_STATUS_OBJECT_NAME_INVALID:
+            case NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND:
+            case NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND:
+                break;
+            case NtStatus.NT_STATUS_STOPPED_ON_SYMLINK:
+                this.isSymlink = true;
+                break;
+            default:
+                throw se;
             }
         }
         catch ( CIFSException e ) {
@@ -1756,18 +1790,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     }
 
 
-    protected <T extends ServerMessageBlock2Response> T withOpen ( SmbTreeHandleImpl th, int createDisposition, int createOptions, int fileAttributes,
-            int desiredAccess, int shareAccess, ServerMessageBlock2Request<T> first, ServerMessageBlock2Request<?>... others ) throws CIFSException {
-        String path = getUncPath();
-        log.info("path -> {}", path);
-        return withOpen(th, createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, path, first, others);
-    }
-
-
     @SuppressWarnings ( "unchecked" )
     protected <T extends ServerMessageBlock2Response> T withOpen ( SmbTreeHandleImpl th, int createDisposition, int createOptions, int fileAttributes,
-            int desiredAccess, int shareAccess, String path, ServerMessageBlock2Request<T> first, ServerMessageBlock2Request<?>... others ) throws CIFSException {
-        Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), path);
+            int desiredAccess, int shareAccess, ServerMessageBlock2Request<T> first, ServerMessageBlock2Request<?>... others ) throws CIFSException {
+        Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), getUncPath());
         try {
             cr.setCreateDisposition(createDisposition);
             cr.setCreateOptions(createOptions);
@@ -1817,9 +1843,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         catch (
             CIFSException |
             RuntimeException e ) {
-            Smb2CreateResponse createResp = cr.getResponse();
             try {
                 // make sure that the handle is closed when one of the requests fails
+                Smb2CreateResponse createResp = cr.getResponse();
                 if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
                     th.send(new Smb2CloseRequest(th.getConfig(), createResp.getFileId()), RequestParam.NO_RETRY);
                 }
@@ -1828,34 +1854,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 log.debug("Failed to close after failure", e2);
                 e.addSuppressed(e2);
             }
-
-            // we hit a symbolic link, parse the error data and resend for 'real' directory or file
-            if (createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
-                this.isSymlink = true;
-                log.info("Smb2CreateResponse - errorContextCount -> {}", createResp.getErrorContextCount());
-
-                byte[] errorData = createResp.getErrorData();
-                log.info("Smb2CreateResponse - Error data -> {}", Arrays.toString(errorData));
-                log.info("Smb2CreateResponse - Error data length -> {}", errorData.length);
-                log.info("Smb2CreateResponse - Error data string -> {}", Strings.fromUNIBytes(errorData, 0, errorData.length));
-
-                Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
-                int symLinkLength = ecr.readErrorContextResponse(errorData);
-                log.info("Smb2ErrorContextResponse - symLinkLength -> {}", symLinkLength);
-                log.info("Smb2ErrorContextResponse - errorDataLengthLength -> {}", ecr.getErrorDataLengthLength());
-                log.info("Smb2ErrorContextResponse - errorId -> {}", ecr.getErrorId());
-                log.info("Smb2ErrorContextResponse - absolutePath -> {}", ecr.isAbsolutePath());
-                log.info("Smb2ErrorContextResponse - substituteName -> {}", ecr.getSubstituteName());
-                log.info("Smb2ErrorContextResponse - printName -> {}", ecr.getPrintName());
-
-                // After decode error data, resend the request for the 'real' directory or file.
-                String targetPath = ecr.getSubstituteName().replace("\\??\\D:\\GWTEST", "");
-                log.info("targetPath -> {}", targetPath);
-                return withOpen(th, createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, targetPath, first, others);
-            }
-            else {
-                throw e;
-            }
+            throw e;
         }
     }
 
