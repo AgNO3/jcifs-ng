@@ -687,36 +687,36 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     fileSize = resp.getEndOfFile();
                     fh = new SmbFileHandleImpl(config, resp.getFileId(), h, uncPath, flags, access, 0, 0, resp.getEndOfFile());
                 }
-                catch (
-                    CIFSException |
-                    RuntimeException e ) {
+                catch ( CIFSException | RuntimeException e ) {
                     Smb2CreateResponse resp = req.getResponse();
                     info = resp;
 
-                    // We hit a symbolic link, parse the error data and resend for 'real' directory or file path
+                    // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
                     if (resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
                         this.isSymlink = true;
-                        log.info("Smb2CreateResponse - errorContextCount -> {}", resp.getErrorContextCount());
 
-                        byte[] errorData = resp.getErrorData();
-                        log.info("Smb2CreateResponse - Error data -> {}", Arrays.toString(errorData));
-                        log.info("Smb2CreateResponse - Error data length -> {}", errorData.length);
-                        log.info("Smb2CreateResponse - Error data string -> {}", Strings.fromUNIBytes(errorData, 0, errorData.length));
+                        try {
+                            byte[] errorData = resp.getErrorData();
+                            Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
+                            int symLinkLength = ecr.readErrorContextResponse(errorData);
+                            log.debug("symLinkLength -> {}", symLinkLength);
 
-                        Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
-                        int symLinkLength = ecr.readErrorContextResponse(errorData);
-                        log.info("Smb2ErrorContextResponse - symLinkLength -> {}", symLinkLength);
-                        log.info("Smb2ErrorContextResponse - errorDataLengthLength -> {}", ecr.getErrorDataLengthLength());
-                        log.info("Smb2ErrorContextResponse - errorId -> {}", ecr.getErrorId());
-                        log.info("Smb2ErrorContextResponse - absolutePath -> {}", ecr.isAbsolutePath());
-                        log.info("Smb2ErrorContextResponse - substituteName -> {}", ecr.getSubstituteName());
-                        log.info("Smb2ErrorContextResponse - printName -> {}", ecr.getPrintName());
+                            String substituteName = ecr.getSubstituteName();
+                            log.debug("substituteName -> {}", substituteName);
 
-                        int i = ecr.getSubstituteName().indexOf(this.getShare());
-                        String realPath = ecr.getSubstituteName().substring(this.getShare().length() + i);
-                        log.info("symLinkPath -> {}", uncPath);
-                        log.info("realPath -> {}", realPath);
-                        return openUnshared (realPath, flags, access, sharing, attrs, options);
+                            int i = substituteName.indexOf(this.getShare());
+                            String realPath = substituteName.substring(i + this.getShare().length());
+                            log.debug("symLinkPath -> {}", uncPath);
+                            log.debug("realPath -> {}", realPath);
+
+                            return openUnshared (realPath, flags, access, sharing, attrs, options);
+                        }
+                        catch ( CIFSException | RuntimeException e2 ) {
+                            throw e2;
+                        }
+                    }
+                    else {
+                        throw e;
                     }
                 }
             }
