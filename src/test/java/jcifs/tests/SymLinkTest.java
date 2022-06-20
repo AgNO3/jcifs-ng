@@ -132,7 +132,7 @@ public class SymLinkTest extends BaseCIFSTest {
                 }
 
                 if (file.isFile()) {
-                    long l = copyInputStreamToFile(is, new File("C:\\temp\\" + file.getName()));
+                    long l = copyInputStreamToFile(is, File.createTempFile(file.getName(), ".txt"));
                     assertTrue("No bytes written", l > 0);
                     assertTrue("Bytes written should be 9", l == 9);
                 }
