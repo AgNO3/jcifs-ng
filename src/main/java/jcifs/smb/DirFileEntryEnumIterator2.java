@@ -25,6 +25,7 @@ import jcifs.CIFSException;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.internal.smb2.Smb2ErrorContextResponse;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
 import jcifs.internal.smb2.create.Smb2CreateResponse;
@@ -74,17 +75,26 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
 
     /**
-     * @param th
-     * @param parent
-     * @param wildcard
+     * 
+     * @return
+     * @throws CIFSException
+     */
+    @Override
+    protected FileEntry open () throws CIFSException {
+        String uncPath = getParent().getLocator().getUNCPath();
+        return open(uncPath);
+    }
+
+
+    /**
+     * 
+     * @param path
      * @return
      * @throws CIFSException
      */
     @SuppressWarnings ( "resource" )
-    @Override
-    protected FileEntry open () throws CIFSException {
+    private FileEntry open ( String uncPath ) throws CIFSException {
         SmbTreeHandleImpl th = getTreeHandle();
-        String uncPath = getParent().getLocator().getUNCPath();
         Smb2CreateRequest create = new Smb2CreateRequest(th.getConfig(), uncPath);
         create.setCreateOptions(Smb2CreateRequest.FILE_DIRECTORY_FILE);
         create.setDesiredAccess(SmbConstants.FILE_READ_DATA | SmbConstants.FILE_READ_ATTRIBUTES);
@@ -103,6 +113,29 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
                 }
                 catch ( SmbException e2 ) {
                     e.addSuppressed(e2);
+                }
+            }
+
+            // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
+            if (cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+                try {
+                    byte[] errorData = cr.getErrorData();
+                    Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
+                    int symLinkLength = ecr.readErrorContextResponse(errorData);
+                    log.debug("symLinkLength -> {}", symLinkLength);
+
+                    String substituteName = ecr.getSubstituteName();
+                    log.debug("substituteName -> {}", substituteName);
+
+                    int i = substituteName.indexOf(getParent().getLocator().getShare());
+                    String realPath = substituteName.substring(i + getParent().getLocator().getShare().length());
+                    log.debug("symLinkPath -> {}", uncPath);
+                    log.debug("realPath -> {}", realPath);
+
+                    return open(realPath);
+                }
+                catch ( CIFSException | RuntimeException e3 ) {
+                    e.addSuppressed(e3);
                 }
             }
 

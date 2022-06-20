@@ -26,7 +26,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -93,7 +92,6 @@ import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryInfoRequest;
 import jcifs.internal.smb2.info.Smb2QueryInfoResponse;
 import jcifs.internal.smb2.info.Smb2SetInfoRequest;
-import jcifs.util.Strings;
 
 
 /**
@@ -692,7 +690,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     info = resp;
 
                     // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
-                    if (resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+                    if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
                         this.isSymlink = true;
 
                         try {
@@ -712,7 +710,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                             return openUnshared (realPath, flags, access, sharing, attrs, options);
                         }
                         catch ( CIFSException | RuntimeException e2 ) {
-                            throw e2;
+                            e.addSuppressed(e2);
+                            throw e;
                         }
                     }
                     else {
@@ -873,7 +872,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     }
 
 
-    protected boolean exists (boolean symLink) throws SmbException {
+    private boolean exists (boolean symLink) throws SmbException {
         this.isSymlink = false;
 
         if (!symLink) {
