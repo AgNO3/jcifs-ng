@@ -89,77 +89,80 @@ public class SymLinkTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSymlink1 () throws MalformedURLException, CIFSException {
-        SmbFile smbFile = null;
+    public void testSymlink1() throws MalformedURLException, CIFSException {
+        SmbFile smbFile = createSession();
+        assertNotNull(smbFile);
 
-        try {
-            Properties props = new Properties();
-            props.setProperty("jcifs.smb.client.minVersion", DialectVersion.SMB210.name());
-            props.setProperty("jcifs.smb.client.maxVersion", DialectVersion.SMB311.name());
+        SmbFile[] files = smbFile.listFiles();
+        log.info(Arrays.toString(files));
+        assertNotNull(files);
+        assertTrue("No share found", files.length > 0);
 
-            smbFile = new SmbFile("smb://" + getTestServer() + SMB_FILE_SEPARATOR + getTestShare(),
-                    new BaseContext(
-                        new PropertyConfiguration(props)).withCredentials(
-                            new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), getTestUserPassword())));
+        for (SmbFile file : files) {
+            assertNotNull(file);
 
-            SmbFile[] files = smbFile.listFiles();
-            assertNotNull(files);
-            assertTrue("No share found", files.length > 0);
-            log.info(Arrays.toString(files));
+            if (file.isDirectory()) {
+                log.info("Resource [" + file.getName() + "] is a directory.");
+            }
+            else {
+                log.info("Resource [" + file.getName() + "] is not a directory.");
+            }
 
-            for (SmbFile file : files) {
-                assertNotNull(file);
+            if (file.isFile()) {
+                log.info("Resource [" + file.getName() + "] is a file.");
+            }
+            else {
+                log.info("Resource [" + file.getName() + "] is not a file.");
+            }
+
+            if (file.isSymlink()) {
+                log.info("Resource [" + file.getName() + "] is a symbolic link.");
+            }
+            else {
+                log.info("Resource [" + file.getName() + "] is not a symbolic link.");
+            }
+
+            try {
+                InputStream is = file.getInputStream();
+                assertNotNull(is);
 
                 if (file.isDirectory()) {
-                    log.info("Resource [" + file.getName() + "] is a directory.");
-                }
-                else {
-                    log.info("Resource [" + file.getName() + "] is not a directory.");
+                    log.info("file.list() -> {}", Arrays.toString(file.list()));
+                    log.info("file.listFiles() -> {}", Arrays.toString(file.listFiles()));
                 }
 
                 if (file.isFile()) {
-                    log.info("Resource [" + file.getName() + "] is a file.");
-                }
-                else {
-                    log.info("Resource [" + file.getName() + "] is not a file.");
-                }
-
-                if (file.isSymlink()) {
-                    log.info("Resource [" + file.getName() + "] is a symbolic link.");
-                }
-                else {
-                    log.info("Resource [" + file.getName() + "] is not a symbolic link.");
-                }
-
-                try {
-                    InputStream is = file.getInputStream();
-                    assertNotNull(is);
-                    if (file.isDirectory()) {
-                        log.info("file.list() -> {}", Arrays.toString(file.list()));
-                        log.info("file.listFiles() -> {}", Arrays.toString(file.listFiles()));
-                    }
-                    if (file.isFile()) {
-                        long l = copyInputStreamToFile(is, new File("C:\\temp\\" + file.getName()));
-                        assertTrue("No bytes written", l > 0);
-                    }
-                } catch (IOException ioe) {
-                    log.error("testSymlink1 error", ioe);
-                }
-                finally {
-                    file.close();
+                    long l = copyInputStreamToFile(is, new File("C:\\temp\\" + file.getName()));
+                    assertTrue("No bytes written", l > 0);
+                    assertTrue("Bytes written should be 9", l == 9);
                 }
             }
+            catch (IOException ioe) {
+                throw new SmbException("testSymlink1 error", ioe);
+            }
+            finally {
+                file.close();
+            }
         }
-        catch (SmbException se) {
-            log.error("testSymlink1 error", se);
-        }
-        finally {
-            smbFile.close();
-        }
+
+        smbFile.close();
     }
 
 
-    private long copyInputStreamToFile(InputStream is, File file) throws IOException {  
+    private SmbFile createSession() throws MalformedURLException, CIFSException {
+        Properties props = new Properties();
+        props.setProperty("jcifs.smb.client.minVersion", DialectVersion.SMB210.name());
+        props.setProperty("jcifs.smb.client.maxVersion", DialectVersion.SMB311.name());
+
+        SmbFile smbFile = new SmbFile("smb://" + getTestServer() + SMB_FILE_SEPARATOR + getTestShare(),
+                new BaseContext(
+                    new PropertyConfiguration(props)).withCredentials(
+                        new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), getTestUserPassword())));
+        return smbFile;
+    }
+
+
+    private long copyInputStreamToFile(InputStream is, File file) throws IOException {
         try (OutputStream output = new FileOutputStream(file)) {
             return is.transferTo(output);
         } catch (IOException ioe) {
