@@ -17,9 +17,6 @@
  */
 package jcifs.internal.smb2;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Strings;
@@ -32,8 +29,6 @@ import jcifs.util.Strings;
  * @author Gregory Bragg
  */
 public class Smb2ErrorContextResponse {
-
-    private static Logger log = LoggerFactory.getLogger(Smb2ErrorContextResponse.class);
 
     private int errorDataLengthLength;
     private int errorId;
@@ -86,7 +81,6 @@ public class Smb2ErrorContextResponse {
 
         // SymLinkErrorTag (4 bytes) (always 0x4C4D5953)
         int symLinkErrorTag = SMBUtil.readInt4(buffer, bufferIndex);
-        log.debug("symLinkErrorTag -> {}", symLinkErrorTag);
         if ( !Integer.toHexString(symLinkErrorTag).toUpperCase().equals("4C4D5953") ) {
             throw new SMBProtocolDecodingException("SymLinkErrorTag should be 0x4C4D5953");
         }
@@ -98,41 +92,33 @@ public class Smb2ErrorContextResponse {
 
         // UnparsedPathLength (2 bytes)
         int unparsedPathLength = SMBUtil.readInt2(buffer, bufferIndex);
-        log.debug("unparsedPathLength -> {}", unparsedPathLength);
         bufferIndex += 2;
 
         // SubstituteNameOffset (2 bytes)
         int substituteNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
-        log.debug("substituteNameOffset -> {}", substituteNameOffset);
         bufferIndex += 2;
 
         // SubstituteNameLength (2 bytes)
         int substituteNameLength = SMBUtil.readInt2(buffer, bufferIndex);
-        log.debug("substituteNameLength -> {}", substituteNameLength);
         bufferIndex += 2;
 
         // PrintNameOffset (2 bytes)
         int printNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
-        log.debug("printNameOffset -> {}", printNameOffset);
         bufferIndex += 2;
 
         // PrintNameLength (2 bytes)
         int printNameLength = SMBUtil.readInt2(buffer, bufferIndex);
-        log.debug("printNameLength -> {}", printNameLength);
         bufferIndex += 2;
 
         // Flags (4 bytes)
         this.absolutePath = SMBUtil.readInt4(buffer, bufferIndex) == 0;
-        log.debug("absolutePath -> {}", this.absolutePath);
         bufferIndex += 4;
 
         // PathBuffer (variable), substitute name
         this.substituteName = Strings.fromUNIBytes(buffer, substituteNameOffset + bufferIndex, substituteNameLength);
-        log.debug("substituteName -> {}", this.substituteName);
 
         // PathBuffer (variable), print name that also identifies the target of the symbolic link
         this.printName = Strings.fromUNIBytes(buffer, printNameOffset + bufferIndex, printNameLength);
-        log.debug("printName -> {}", this.printName);
 
         return symLinkLength;
     }
