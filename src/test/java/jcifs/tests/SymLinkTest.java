@@ -131,6 +131,7 @@ public class SymLinkTest extends BaseCIFSTest {
 
                     if (file.getName().equals("symlinkTestDir/")) {
                         SmbFile[] files2 = file.listFiles();
+                        assertNotNull(files2);
                         log.info("file.listFiles() -> {}", Arrays.toString(files2));
 
                         for (SmbFile file2 : files2) {
