@@ -128,7 +128,20 @@ public class SymLinkTest extends BaseCIFSTest {
 
                 if (file.isDirectory()) {
                     log.info("file.list() -> {}", Arrays.toString(file.list()));
-                    log.info("file.listFiles() -> {}", Arrays.toString(file.listFiles()));
+
+                    if (file.getName().equals("symlinkTestDir/")) {
+                        SmbFile[] files2 = file.listFiles();
+                        log.info("file.listFiles() -> {}", Arrays.toString(files2));
+
+                        for (SmbFile file2 : files2) {
+                            InputStream is2 = file2.getInputStream();
+                            assertNotNull(is2);
+
+                            long l2 = copyInputStreamToFile(is2, File.createTempFile(file2.getName(), ".txt"));
+                            assertTrue("No bytes written", l2 > 0);
+                            assertTrue("Bytes written should be 10", l2 == 10);
+                        }
+                    }
                 }
 
                 if (file.isFile() && file.getName().equals("symlinkTestFoo.file")) {

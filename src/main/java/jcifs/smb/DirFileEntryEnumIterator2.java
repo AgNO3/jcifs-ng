@@ -135,6 +135,7 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
                     return open(realPath);
                 }
                 catch ( CIFSException | RuntimeException e3 ) {
+                    log.error("Exception thrown while processing symbolic link error data", e3);
                     e.addSuppressed(e3);
                 }
             }

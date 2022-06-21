@@ -687,7 +687,6 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 }
                 catch ( CIFSException | RuntimeException e ) {
                     Smb2CreateResponse resp = req.getResponse();
-                    info = resp;
 
                     // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
                     if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
@@ -707,14 +706,22 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                             log.debug("symLinkPath -> {}", uncPath);
                             log.debug("realPath -> {}", realPath);
 
-                            return openUnshared (realPath, flags, access, sharing, attrs, options);
+                            if (this.isFile() && !uncPath.endsWith("\\")) { // is this a file in a symlink directory?
+                                String fileName = uncPath.substring(uncPath.lastIndexOf("\\") + 1);
+                                log.debug("fileName -> {}", fileName);
+                                return openUnshared (realPath + fileName, flags, access, sharing, attrs, options);
+                            }
+                            else {
+                                return openUnshared (realPath, flags, access, sharing, attrs, options);
+                            }
                         }
                         catch ( CIFSException | RuntimeException e2 ) {
-                            e.addSuppressed(e2);
-                            throw e;
+                            log.error("Exception thrown while processing symbolic link error data", e2);
+                            throw e2;
                         }
                     }
                     else {
+                        log.error("Exception thrown while processing SMB2 request", e);
                         throw e;
                     }
                 }
