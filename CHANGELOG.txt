@@ -1,3 +1,6 @@
+jcifs-ng 2.1.8
+- Relax SMB2 tree id check, all but -1 are valid 
+
 jcifs-ng 2.1.7
 - Handle USER_SESSION_DELETED by resetting/disconnecting the
   transport connection (#242,#294)
