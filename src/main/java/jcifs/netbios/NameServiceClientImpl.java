@@ -496,14 +496,15 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         NameQueryResponse response = new NameQueryResponse(config);
 
         request.addr = addr != null ? addr : getWINSAddress();
-        request.isBroadcast = request.addr == null;
+        request.isBroadcast = request.addr == null || isBroadcastAddress(request.addr);
 
         if ( request.isBroadcast ) {
-            request.addr = this.baddr;
+            if ( request.addr == null ) {
+                request.addr = this.baddr;
+            }
             n = config.getNetbiosRetryCount();
         }
         else {
-            request.isBroadcast = false;
             n = 1;
         }
 
@@ -542,7 +543,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                                * because it specifies addr
                                */
             request.addr = addr; /* if addr ends with 255 flag it bcast */
-            request.isBroadcast = ( addr.getAddress()[ 3 ] == (byte) 0xFF );
+            request.isBroadcast = isBroadcastAddress(addr);
 
             int n = this.transportContext.getConfig().getNetbiosRetryCount();
             do {
@@ -636,6 +637,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
         }
         throw new UnknownHostException(name.name);
     }
+
 
 
     @Override
@@ -798,6 +800,16 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             }
         }
         return false;
+    }
+
+
+    /**
+     *
+     * @param svr
+     * @return whether the given address is the configured broadcast address
+     */
+    private boolean isBroadcastAddress(InetAddress svr) {
+        return svr.equals(this.baddr) || svr.getAddress()[3] == (byte) 0xFF;
     }
 
 
