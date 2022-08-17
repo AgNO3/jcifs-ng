@@ -676,34 +676,39 @@ public class DfsImpl implements DfsResolver {
         }
 
         if ( dr == null ) {
-            try ( SmbTransportInternal trans = getReferralTransport(tf, rootDr) ) {
-                if ( trans == null )
-                    return null;
+            DfsReferralDataInternal currentRootDr = rootDr;
+            do {
+                try ( SmbTransportInternal trans = getReferralTransport(tf, currentRootDr) ) {
+                    if ( trans == null )
+                        return null;
 
-                dr = getReferral(tf, trans, domain, domain, trans.getRemoteHostName(), root, path);
-                if ( dr != null ) {
+                    dr = getReferral(tf, trans, domain, domain, trans.getRemoteHostName(), root, path);
+                    if ( dr != null ) {
 
-                    if ( tf.getConfig().isDfsConvertToFQDN() && dr instanceof DfsReferralDataImpl ) {
-                        ( (DfsReferralDataImpl) dr ).fixupDomain(domain);
+                        if ( tf.getConfig().isDfsConvertToFQDN() && dr instanceof DfsReferralDataImpl ) {
+                            ( (DfsReferralDataImpl) dr ).fixupDomain(domain);
+                        }
+
+                        dr.stripPathConsumed(1 + domain.length() + 1 + root.length());
+
+                        if ( dr.getPathConsumed() > ( path != null ? path.length() : 0 ) ) {
+                            log.error("Consumed more than we provided");
+                        }
+
+                        link = path != null && dr.getPathConsumed() > 0 ? path.substring(0, dr.getPathConsumed()) : "\\";
+                        dr.setLink(link);
+                        if ( log.isTraceEnabled() ) {
+                            log.trace("Have referral " + dr);
+                        }
+                        links.map.put(link, dr);
+                        break;
                     }
-
-                    dr.stripPathConsumed(1 + domain.length() + 1 + root.length());
-
-                    if ( dr.getPathConsumed() > ( path != null ? path.length() : 0 ) ) {
-                        log.error("Consumed more than we provided");
+                    else {
+                        log.debug("No referral found for " + link + ", trying next root referral");
+                        currentRootDr = currentRootDr.next();
                     }
-
-                    link = path != null && dr.getPathConsumed() > 0 ? path.substring(0, dr.getPathConsumed()) : "\\";
-                    dr.setLink(link);
-                    if ( log.isTraceEnabled() ) {
-                        log.trace("Have referral " + dr);
-                    }
-                    links.map.put(link, dr);
                 }
-                else {
-                    log.debug("No referral found for " + link);
-                }
-            }
+            } while (currentRootDr != rootDr);
         }
         else if ( log.isTraceEnabled() ) {
             log.trace("Have cached referral for " + dr.getLink() + " " + dr);
