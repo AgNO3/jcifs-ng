@@ -1741,6 +1741,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 rn = dfsResp.getNumReferrals();
             }
 
+            DfsReferralDataImpl head = null;
             DfsReferralDataImpl cur = null;
             long expiration = System.currentTimeMillis() + ( ctx.getConfig().getDfsTtl() * 1000 );
             Referral[] refs = dfsResp.getReferrals();
@@ -1754,6 +1755,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 }
 
                 if ( cur == null ) {
+                    head = dr;
                     cur = dr;
                 }
                 else {
@@ -1763,9 +1765,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
 
             if ( log.isDebugEnabled() ) {
-                log.debug("Got referral " + cur);
+                log.debug("Got referral " + head);
             }
-            return cur;
+            return head;
         }
     }
 
