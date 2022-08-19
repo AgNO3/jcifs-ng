@@ -19,128 +19,79 @@ package jcifs.internal.smb2;
 
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.util.SMBUtil;
-import jcifs.util.Strings;
 
 /**
+ * 2.2.2.1 SMB2 ERROR Context Response
+ * 
  * Defines methods to decode a SMB2 Error Context Response byte array.
- * Currently only supports a Symbolic Link Error Response, however can
- * be enhanced to support others.
  * 
  * @author Gregory Bragg
  */
-public class Smb2ErrorContextResponse {
+public abstract class Smb2ErrorContextResponse {
 
-    private int errorDataLengthLength;
-    private int errorId;
-
-    private boolean absolutePath;
-    private String substituteName;
-    private String printName;
+    protected int errorDataLength;
+    protected int errorId;
 
     /**
      * 2.2.2.1 SMB2 ERROR Context Response
+     * 
+     * For the SMB dialect 3.1.1, the servers format the error data as an array of SMB2 ERROR Context
+     * structures. Each error context is a variable-length structure that contains an identifier for
+     * the error context followed by the error data.
+     * 
+     * Each SMB2 ERROR Context MUST start at an 8-byte aligned boundary relative to the start of the
+     * SMB2 ERROR Response. Otherwise, it SHOULD be formatted as specified in section 2.2.2.2.
+     * 
+     * This method must be called first in any of the methods implemented by the subclasses.
      * 
      * @param buffer
      * @return The length, in bytes, of the response including the variable-length portion
      * @throws Smb2ProtocolDecodingException
      */
-    public int readErrorContextResponse ( byte[] buffer ) throws SMBProtocolDecodingException {
+    protected int readErrorContextResponse(byte[] buffer) {
         // start at the beginning of the 8-byte aligned boundary
         // for the SMB2 ERROR Context structure
         int bufferIndex = 0;
 
         // ErrorDataLength (4 bytes)
-        this.errorDataLengthLength = SMBUtil.readInt4(buffer, bufferIndex);
+        this.errorDataLength = SMBUtil.readInt4(buffer, bufferIndex);
         bufferIndex += 4;
 
         // ErrorId (4 bytes)
-        // STATUS_STOPPED_ON_SYMLINK is always 0x00000000
         this.errorId = SMBUtil.readInt4(buffer, bufferIndex);
-        if ( this.errorId != 0 ) {
-            throw new SMBProtocolDecodingException("ErrorId should be 0 for STATUS_STOPPED_ON_SYMLINK");
-        }
-        else {
-            bufferIndex += 4;
-            return this.readSymLinkErrorResponse( buffer, bufferIndex );
-        }
+        bufferIndex += 4;
+
+        return bufferIndex;
     }
 
     /**
      * 2.2.2.2.1 Symbolic Link Error Response
      * 
+     * The Symbolic Link Error Response is used to indicate that a symbolic link was encountered on
+     * create; it describes the target path that the client MUST use if it requires to follow the
+     * symbolic link. This structure is contained in the ErrorData section of the SMB2 ERROR
+     * Response (section 2.2.2). This structure MUST NOT be returned in an SMB2 ERROR Response
+     * unless the Status code in the header of that response is set to STATUS_STOPPED_ON_SYMLINK.
+     * 
      * @param buffer
-     * @param bufferIndex
-     * @return The length, in bytes, of the response including the variable-length portion
-     * and excluding SymLinkLength
+     * @return The length, in bytes, of the response
      * @throws Smb2ProtocolDecodingException
      */
-    protected int readSymLinkErrorResponse ( byte[] buffer, int bufferIndex ) throws SMBProtocolDecodingException {
-        // SymLinkLength (4 bytes)
-        int symLinkLength = SMBUtil.readInt4(buffer, bufferIndex);
-        bufferIndex += 4;
+    public abstract int readSymLinkErrorResponse ( byte[] buffer ) throws SMBProtocolDecodingException;
 
-        // SymLinkErrorTag (4 bytes) (always 0x4C4D5953)
-        int symLinkErrorTag = SMBUtil.readInt4(buffer, bufferIndex);
-        if ( !Integer.toHexString(symLinkErrorTag).toUpperCase().equals("4C4D5953") ) {
-            throw new SMBProtocolDecodingException("SymLinkErrorTag should be 0x4C4D5953");
-        }
-        bufferIndex += 4;
-
-        // skip, not needed
-        bufferIndex += 4; // ReparseTag (4 bytes) (always 0xA000000C)
-        bufferIndex += 2; // ReparseDataLength (2 bytes)
-
-        // UnparsedPathLength (2 bytes)
-        int unparsedPathLength = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-
-        // SubstituteNameOffset (2 bytes)
-        int substituteNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-
-        // SubstituteNameLength (2 bytes)
-        int substituteNameLength = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-
-        // PrintNameOffset (2 bytes)
-        int printNameOffset = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-
-        // PrintNameLength (2 bytes)
-        int printNameLength = SMBUtil.readInt2(buffer, bufferIndex);
-        bufferIndex += 2;
-
-        // Flags (4 bytes)
-        this.absolutePath = SMBUtil.readInt4(buffer, bufferIndex) == 0;
-        bufferIndex += 4;
-
-        // PathBuffer (variable), substitute name
-        this.substituteName = Strings.fromUNIBytes(buffer, substituteNameOffset + bufferIndex, substituteNameLength);
-
-        // PathBuffer (variable), print name that also identifies the target of the symbolic link
-        this.printName = Strings.fromUNIBytes(buffer, printNameOffset + bufferIndex, printNameLength);
-
-        return symLinkLength;
-    }
-
-    public int getErrorDataLengthLength () {
-        return this.errorDataLengthLength;
-    }
-
-    public int getErrorId () {
-        return this.errorId;
-    }
-
-    public boolean isAbsolutePath () {
-        return this.absolutePath;
-    }
-
-    public String getSubstituteName () {
-        return this.substituteName;
-    }
-
-    public String getPrintName () {
-        return this.printName;
-    }
+    /**
+     * 2.2.2.2.2 Share Redirect Error Context Response
+     * 
+     * Servers which negotiate SMB 3.1.1 or higher can return this error context to a client in
+     * response to a tree connect request with the SMB2_TREE_CONNECT_FLAG_REDIRECT_TO_OWNER bit set
+     * in the Flags field of the SMB2 TREE_CONNECT request. The corresponding Status code in the
+     * SMB2 header of the response MUST be set to STATUS_BAD_NETWORK_NAME. The error context data is
+     * formatted as follows.
+     * 
+     * @param buffer
+     * @return The length, in bytes, of the response
+     * @throws SMBProtocolDecodingException
+     */
+    public abstract int readShareRedirectErrorContextResponse ( byte[] buffer ) throws SMBProtocolDecodingException;
 
 }

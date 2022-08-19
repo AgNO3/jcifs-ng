@@ -161,7 +161,7 @@ public interface SmbResource extends AutoCloseable {
      * @return <code>true</code> if this <code>SmbResource</code> is a symbolic link
      * @throws CIFSException
      */
-    boolean isSymlink () throws CIFSException;
+    boolean isSymLink () throws CIFSException;
 
 
     /**

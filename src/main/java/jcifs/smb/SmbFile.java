@@ -47,6 +47,7 @@ import jcifs.context.SingletonContext;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
 import jcifs.internal.AllocInfo;
+import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.SmbBasicFileInfo;
 import jcifs.internal.dtyp.ACE;
 import jcifs.internal.dtyp.SecurityDescriptor;
@@ -84,7 +85,7 @@ import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
-import jcifs.internal.smb2.Smb2ErrorContextResponse;
+import jcifs.internal.smb2.Smb2ErrorDataFormat;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CloseResponse;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
@@ -92,6 +93,7 @@ import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryInfoRequest;
 import jcifs.internal.smb2.info.Smb2QueryInfoResponse;
 import jcifs.internal.smb2.info.Smb2SetInfoRequest;
+import jcifs.internal.util.RecursionLimiter;
 
 
 /**
@@ -365,7 +367,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     private long size;
     private long sizeExpiration;
     private boolean isExists;
-    private boolean isSymlink;
+    private boolean isSymLink;
+    private String symLinkTargetPath;
 
     private CIFSContext transportContext;
     private SmbTreeConnection treeConnection;
@@ -646,6 +649,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     SmbFileHandleImpl openUnshared ( String uncPath, int flags, int access, int sharing, int attrs, int options ) throws CIFSException {
+        RecursionLimiter.emerge();
+
         SmbFileHandleImpl fh = null;
         try ( SmbTreeHandleImpl h = ensureTreeConnected() ) {
 
@@ -690,30 +695,14 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
                     // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
                     if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
-                        this.isSymlink = true;
+                        this.isSymLink = true;
 
                         try {
                             byte[] errorData = resp.getErrorData();
-                            Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
-                            int symLinkLength = ecr.readErrorContextResponse(errorData);
-                            log.debug("symLinkLength -> {}", symLinkLength);
+                            String targetPath = parseSymLinkErrorData(uncPath, errorData);
+                            this.symLinkTargetPath = targetPath;
 
-                            String substituteName = ecr.getSubstituteName();
-                            log.debug("substituteName -> {}", substituteName);
-
-                            int i = substituteName.indexOf(this.getShare());
-                            String realPath = substituteName.substring(i + this.getShare().length());
-                            log.debug("symLinkPath -> {}", uncPath);
-                            log.debug("realPath -> {}", realPath);
-
-                            if (this.isFile() && !uncPath.endsWith("\\")) { // is this a file in a symlink directory?
-                                String fileName = uncPath.substring(uncPath.lastIndexOf("\\") + 1);
-                                log.debug("fileName -> {}", fileName);
-                                return openUnshared (realPath + fileName, flags, access, sharing, attrs, options);
-                            }
-                            else {
-                                return openUnshared (realPath, flags, access, sharing, attrs, options);
-                            }
+                            return openUnshared (targetPath, flags, access, sharing, attrs, options);
                         }
                         catch ( CIFSException | RuntimeException e2 ) {
                             log.error("Exception thrown while processing symbolic link error data", e2);
@@ -787,6 +776,57 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             this.isExists = true;
             return fh;
         }
+    }
+
+
+    private String parseSymLinkErrorData(String uncPath, byte[] errorData) throws SMBProtocolDecodingException {
+        log.debug("SymLink Path -> {}", uncPath);
+
+        Smb2ErrorDataFormat erdf = new Smb2ErrorDataFormat();
+        int symLinkLength = erdf.readSymLinkErrorResponse(errorData);
+        log.debug("SymLink Length -> {}", symLinkLength);
+
+        log.debug("Absolute Path -> {}", erdf.isAbsolutePath());
+        log.debug("Print Name -> {}", erdf.getPrintName());
+
+        String substituteName = erdf.getSubstituteName();
+        log.debug("Substitute Name -> {}", substituteName);
+
+        String targetPath;
+        if (erdf.isAbsolutePath()) {
+            int i = substituteName.indexOf(this.getShare());
+            String rootPath = substituteName.substring(i + this.getShare().length());
+            log.debug("Root Path -> {}", rootPath);
+
+            if (!uncPath.endsWith("\\") && rootPath.endsWith("\\")) { // is this a file in a symlink directory?
+                String fileName = uncPath.substring(uncPath.lastIndexOf("\\") + 1);
+                log.debug("File Name -> {}", fileName);
+                targetPath = rootPath + fileName;
+            }
+            else {
+                targetPath = rootPath;
+            }
+        }
+        else {
+            if (!uncPath.endsWith("\\")) { // is this a file in a symlink directory?
+                String symLinkFileName = uncPath.substring(uncPath.lastIndexOf("\\") + 1);
+                log.debug("SymLink File Name -> {}", symLinkFileName);
+                targetPath = erdf.normalizeSymLinkPath(uncPath.replace(symLinkFileName, "") + substituteName);
+            }
+            else {
+                String symLinkDir = this.getName().replace('/', '\\');
+                log.debug("SymLink Directory -> {}", symLinkDir);
+                targetPath = erdf.normalizeSymLinkPath(uncPath.replace(symLinkDir, "") + substituteName);
+            }
+        }
+
+        log.debug("Target Path -> {}", targetPath);
+        return targetPath;
+    }
+
+
+    public String getSymLinkTargetPath() {
+        return this.symLinkTargetPath;
     }
 
 
@@ -880,7 +920,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     private boolean exists (boolean symLink) throws SmbException {
-        this.isSymlink = false;
+        this.isSymLink = false;
 
         if (!symLink) {
             if ( this.attrExpiration > System.currentTimeMillis() ) {
@@ -938,7 +978,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             case NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND:
                 break;
             case NtStatus.NT_STATUS_STOPPED_ON_SYMLINK:
-                this.isSymlink = true;
+                this.isSymLink = true;
                 break;
             default:
                 throw se;
@@ -1162,10 +1202,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     @Override
-    public boolean isSymlink () throws SmbException {
+    public boolean isSymLink () throws SmbException {
         if ( !this.fileLocator.isRootOrShare() ) {
             exists(true);
-            return this.isSymlink;
+            return this.isSymLink;
         }
         return false;
     }

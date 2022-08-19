@@ -55,15 +55,23 @@ import jcifs.smb.SmbFile;
  * for a successful completion of these unit tests:
  *
  * <pre class="code">
- *  smbSource/
- *  |-- subSmbSource/
+ *  smbSource\
+ *  |-- subSmbSource\
  *      |-- subSmbSource1.txt - contains 'subSource1'
  *      |-- subSmbSource2.txt - contains 'subSource2'
- *  smbTarget/
+ *      |-- symlinkRelativeTest2Dir\ - relative symlink to directory \smbTarget\
+ *                                     using 'mklink /D symlinkRelativeTest2Dir ..\..\smbTarget'
+ *      |-- symlinkRelative2Foo.file - relative symlink to \smbTarget\foo.file 
+ *                                     using 'mklink symlinkRelative2Foo.file ..\..\smbTarget\foo.file'
+ *  smbTarget\
  *  |-- foo.file - contains 'foofoofoo'
- *  symlinkTestDir/ - symbolic link to directory smbSource/subSmbSource/
+ *  symlinkRelativeTestDir\ - relative symbolic link to directory \smbSource\subSmbSource\
+ *                            using 'mklink /D symlinkRelativeTestDir smbSource\subSmbSource'
+ *  symlinkTestDir\ - absolute symbolic link to directory \smbSource\subSmbSource\
  *                    using 'mklink /D symlinkTestDir <share root>\smbSource\subSmbSource\'
- *  symlinkTestFoo.file - symbolic link to file smbTarget/foo.file
+ *  symlinkRelativeFoo.file - relative symbolic link to file \smbTarget\foo.file
+ *                            using 'mklink symlinkTestFoo.file \smbTarget\foo.file'
+ *  symlinkTestFoo.file - absolute symbolic link to file \smbTarget\foo.file
  *                        using 'mklink symlinkTestFoo.file <share root>\smbTarget\foo.file'
  * </pre>
  *
@@ -84,91 +92,101 @@ public class SymLinkTest extends BaseCIFSTest {
 
     @Parameters ( name = "{0}" )
     public static Collection<Object> configs () {
-        return getConfigs("smb1", "noUnicode", "forceUnicode", "noNTStatus", "noNTSmbs", "smb2", "smb30", "smb31");
+        return getConfigs("smb31");
     }
 
 
     @Test
     public void testSymlink1() throws MalformedURLException, CIFSException {
-        SmbFile smbFile = createSession();
-        assertNotNull(smbFile);
+//        try ( SmbFile smbFile = createSession() ) {
+        try ( SmbFile smbFile = this.getDefaultShareRoot() ) {
+            assertNotNull(smbFile);
 
-        SmbFile[] files = smbFile.listFiles();
-        log.info(Arrays.toString(files));
-        assertNotNull(files);
-        assertTrue("No share found", files.length > 0);
+            SmbFile[] files = smbFile.listFiles();
+            log.info(Arrays.toString(files));
+            assertNotNull(files);
+            assertTrue("No share found", files.length > 0);
 
-        for (SmbFile file : files) {
-            assertNotNull(file);
-
-            if (file.isDirectory()) {
-                log.info("Resource [" + file.getName() + "] is a directory.");
-            }
-            else {
-                log.info("Resource [" + file.getName() + "] is not a directory.");
-            }
-
-            if (file.isFile()) {
-                log.info("Resource [" + file.getName() + "] is a file.");
-            }
-            else {
-                log.info("Resource [" + file.getName() + "] is not a file.");
-            }
-
-            if (file.isSymlink()) {
-                log.info("Resource [" + file.getName() + "] is a symbolic link.");
-            }
-            else {
-                log.info("Resource [" + file.getName() + "] is not a symbolic link.");
-            }
-
-            try {
-                InputStream is = file.getInputStream();
-                assertNotNull(is);
+            for (SmbFile file : files) {
+                assertNotNull(file);
 
                 if (file.isDirectory()) {
-                    log.info("file.list() -> {}", Arrays.toString(file.list()));
+                    log.info("Resource [" + file.getName() + "] is a directory.");
+                }
+                else {
+                    log.info("Resource [" + file.getName() + "] is not a directory.");
+                }
 
-                    if (file.getName().equals("symlinkTestDir/")) {
-                        SmbFile[] files2 = file.listFiles();
-                        assertNotNull(files2);
-                        log.info("file.listFiles() -> {}", Arrays.toString(files2));
+                if (file.isFile()) {
+                    log.info("Resource [" + file.getName() + "] is a file.");
+                }
+                else {
+                    log.info("Resource [" + file.getName() + "] is not a file.");
+                }
 
-                        for (SmbFile file2 : files2) {
-                            InputStream is2 = file2.getInputStream();
-                            assertNotNull(is2);
+                if (file.isSymLink()) {
+                    log.info("Resource [" + file.getName() + "] is a symbolic link.");
+                }
+                else {
+                    log.info("Resource [" + file.getName() + "] is not a symbolic link.");
+                }
 
-                            long l2 = copyInputStreamToFile(is2, File.createTempFile(file2.getName(), ".txt"));
-                            assertTrue("No bytes written", l2 > 0);
-                            assertTrue("Bytes written should be 10", l2 == 10);
+                try {
+                    InputStream is = file.getInputStream();
+                    assertNotNull(is);
+
+                    if (file.isDirectory()) {
+                        log.info("file.list() -> {}", Arrays.toString(file.list()));
+
+                        if (file.getName().equals("symlinkTestDir/") || file.getName().equals("symlinkRelativeTest2Dir/")) {
+                            SmbFile[] files2 = file.listFiles();
+                            assertNotNull(files2);
+                            log.info("file.listFiles() -> {}", Arrays.toString(files2));
+
+                            for (SmbFile file2 : files2) {
+                                log.info("file2.getName() -> {}", file2.getName());
+
+                                InputStream is2 = file2.getInputStream();
+                                assertNotNull(is2);
+
+                                if (!file2.getName().equals("symlinkRelativeTest2Dir/")) {
+                                    long l2 = copyInputStreamToFile(is2, File.createTempFile(file2.getName(), ".txt"));
+                                    assertTrue("No bytes written", l2 > 0);
+
+                                    if (file2.getName().equals("symlinkRelative2Foo.file")) {
+                                        assertTrue("Bytes written should be 9", l2 == 9);
+                                    }
+                                    else {
+                                        assertTrue("Bytes written should be 10", l2 == 10);
+                                    }
+                                }
+                            }
                         }
                     }
-                }
 
-                if (file.isFile() && file.getName().equals("symlinkTestFoo.file")) {
-                    long l = copyInputStreamToFile(is, File.createTempFile(file.getName(), ".txt"));
-                    assertTrue("No bytes written", l > 0);
-                    assertTrue("Bytes written should be 9", l == 9);
+                    if (file.isFile() && file.getName().equals("symlinkTestFoo.file")) {
+                        long l = copyInputStreamToFile(is, File.createTempFile(file.getName(), ".txt"));
+                        assertTrue("No bytes written", l > 0);
+                        assertTrue("Bytes written should be 9", l == 9);
+                    }
                 }
-            }
-            catch (IOException ioe) {
-                throw new SmbException("testSymlink1 error", ioe);
-            }
-            finally {
-                file.close();
+                catch (IOException ioe) {
+                    throw new SmbException("testSymlink1 error", ioe);
+                }
+                finally {
+                    file.close();
+                }
             }
         }
-
-        smbFile.close();
     }
 
 
     private SmbFile createSession() throws MalformedURLException, CIFSException {
         Properties props = new Properties();
-        props.setProperty("jcifs.smb.client.minVersion", DialectVersion.SMB210.name());
+        props.setProperty("jcifs.smb.client.minVersion", DialectVersion.SMB311.name());
         props.setProperty("jcifs.smb.client.maxVersion", DialectVersion.SMB311.name());
 
-        SmbFile smbFile = new SmbFile("smb://" + getTestServer() + SMB_FILE_SEPARATOR + getTestShare(),
+        SmbFile smbFile = new SmbFile("smb://" + getTestServer() + SMB_FILE_SEPARATOR + getTestShare() + SMB_FILE_SEPARATOR,
                 new BaseContext(
                     new PropertyConfiguration(props)).withCredentials(
                         new NtlmPasswordAuthenticator(getTestUserDomain(), getTestUser(), getTestUserPassword())));

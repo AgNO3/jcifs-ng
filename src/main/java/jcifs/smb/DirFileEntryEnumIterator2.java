@@ -25,12 +25,14 @@ import jcifs.CIFSException;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
-import jcifs.internal.smb2.Smb2ErrorContextResponse;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.smb2.Smb2ErrorDataFormat;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
 import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryDirectoryRequest;
 import jcifs.internal.smb2.info.Smb2QueryDirectoryResponse;
+import jcifs.internal.util.RecursionLimiter;
 
 
 /**
@@ -94,6 +96,8 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
      */
     @SuppressWarnings ( "resource" )
     private FileEntry open ( String uncPath ) throws CIFSException {
+        RecursionLimiter.emerge();
+
         SmbTreeHandleImpl th = getTreeHandle();
         Smb2CreateRequest create = new Smb2CreateRequest(th.getConfig(), uncPath);
         create.setCreateOptions(Smb2CreateRequest.FILE_DIRECTORY_FILE);
@@ -120,19 +124,7 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
             if (cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
                 try {
                     byte[] errorData = cr.getErrorData();
-                    Smb2ErrorContextResponse ecr = new Smb2ErrorContextResponse();
-                    int symLinkLength = ecr.readErrorContextResponse(errorData);
-                    log.debug("symLinkLength -> {}", symLinkLength);
-
-                    String substituteName = ecr.getSubstituteName();
-                    log.debug("substituteName -> {}", substituteName);
-
-                    int i = substituteName.indexOf(getParent().getLocator().getShare());
-                    String realPath = substituteName.substring(i + getParent().getLocator().getShare().length());
-                    log.debug("symLinkPath -> {}", uncPath);
-                    log.debug("realPath -> {}", realPath);
-
-                    return open(realPath);
+                    return open(parseSymLinkErrorData(uncPath, errorData));
                 }
                 catch ( CIFSException | RuntimeException e3 ) {
                     log.error("Exception thrown while processing symbolic link error data", e3);
@@ -157,6 +149,35 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
             doClose();
         }
         return n;
+    }
+
+
+    private String parseSymLinkErrorData(String uncPath, byte[] errorData) throws SMBProtocolDecodingException {
+        log.debug("SymLink Path -> {}", uncPath);
+
+        Smb2ErrorDataFormat erdf = new Smb2ErrorDataFormat();
+        int symLinkLength = erdf.readSymLinkErrorResponse(errorData);
+        log.debug("SymLink Length -> {}", symLinkLength);
+
+        log.debug("Absolute Path -> {}", erdf.isAbsolutePath());
+        log.debug("Print Name -> {}", erdf.getPrintName());
+
+        String substituteName = erdf.getSubstituteName();
+        log.debug("Substitute Name -> {}", substituteName);
+
+        String targetPath;
+        if (erdf.isAbsolutePath()) {
+            int i = substituteName.indexOf(getParent().getLocator().getShare());
+            targetPath = substituteName.substring(i + getParent().getLocator().getShare().length());
+        }
+        else {
+            String symLinkDir = getParent().getLocator().getName().replace('/', '\\');
+            log.debug("SymLink Directory -> {}", symLinkDir);
+            targetPath = erdf.normalizeSymLinkPath(uncPath.replace(symLinkDir, "") + substituteName);
+        }
+
+        log.debug("Target Path -> {}", targetPath);
+        return targetPath;
     }
 
 
