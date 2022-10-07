@@ -698,11 +698,10 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
                         this.isSymLink = true;
 
-                        if (config.getMinimumVersion() != DialectVersion.SMB311
-                                || config.getMaximumVersion() != DialectVersion.SMB311) {
+                        if (config.getMinimumVersion() != DialectVersion.SMB311) {
                             throw new SMBProtocolDecodingException(
-                                    "Configuration must be set to version SMB 3.1.1 for properties 'jcifs.smb.client.minVersion'"
-                                            + "and 'jcifs.smb.client.maxVersion' to resolve symbolic link target path");
+                                    "Configuration must be set to a minimum of version SMB 3.1.1 for property "
+                                            + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
                         }
 
                         try {

@@ -101,10 +101,11 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
         RecursionLimiter.emerge();
 
         SmbTreeHandleImpl th = getTreeHandle();
-        Smb2CreateRequest create = new Smb2CreateRequest(th.getConfig(), uncPath);
+        Configuration config = th.getConfig();
+        Smb2CreateRequest create = new Smb2CreateRequest(config, uncPath);
         create.setCreateOptions(Smb2CreateRequest.FILE_DIRECTORY_FILE);
         create.setDesiredAccess(SmbConstants.FILE_READ_DATA | SmbConstants.FILE_READ_ATTRIBUTES);
-        Smb2QueryDirectoryRequest query = new Smb2QueryDirectoryRequest(th.getConfig());
+        Smb2QueryDirectoryRequest query = new Smb2QueryDirectoryRequest(config);
         query.setFileName(getWildcard());
         create.chain(query);
         Smb2CreateResponse createResp;
@@ -115,7 +116,7 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
             Smb2CreateResponse cr = create.getResponse();
             if ( cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_OK ) {
                 try {
-                    th.send(new Smb2CloseRequest(th.getConfig(), cr.getFileId()));
+                    th.send(new Smb2CloseRequest(config, cr.getFileId()));
                 }
                 catch ( SmbException e2 ) {
                     e.addSuppressed(e2);
@@ -124,13 +125,11 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
             // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
             if (cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
-                Configuration config = th.getConfig();
 
-                if (config.getMinimumVersion() != DialectVersion.SMB311
-                        || config.getMaximumVersion() != DialectVersion.SMB311) {
+                if (config.getMinimumVersion() != DialectVersion.SMB311) {
                     throw new SMBProtocolDecodingException(
-                            "Configuration must be set to version SMB 3.1.1 for properties 'jcifs.smb.client.minVersion'"
-                                    + "and 'jcifs.smb.client.maxVersion' to resolve symbolic link target path");
+                            "Configuration must be set to a minimum of version SMB 3.1.1 for property "
+                                    + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
                 }
 
                 try {
