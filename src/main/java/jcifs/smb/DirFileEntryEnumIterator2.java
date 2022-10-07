@@ -22,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
+import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
@@ -122,6 +124,15 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
             // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
             if (cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+                Configuration config = th.getConfig();
+
+                if (config.getMinimumVersion() != DialectVersion.SMB311
+                        || config.getMaximumVersion() != DialectVersion.SMB311) {
+                    throw new SMBProtocolDecodingException(
+                            "Configuration must be set to version SMB 3.1.1 for properties 'jcifs.smb.client.minVersion'"
+                                    + "and 'jcifs.smb.client.maxVersion' to resolve symbolic link target path");
+                }
+
                 try {
                     byte[] errorData = cr.getErrorData();
                     return open(parseSymLinkErrorData(uncPath, errorData));
@@ -152,8 +163,8 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
     }
 
 
-    private String parseSymLinkErrorData(String uncPath, byte[] errorData) throws SMBProtocolDecodingException {
-        log.debug("SymLink Path -> {}", uncPath);
+    private String parseSymLinkErrorData(String symLinkPath, byte[] errorData) throws SMBProtocolDecodingException {
+        log.debug("SymLink Path -> {}", symLinkPath);
 
         Smb2ErrorDataFormat erdf = new Smb2ErrorDataFormat();
         int symLinkLength = erdf.readSymLinkErrorResponse(errorData);
@@ -173,7 +184,7 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
         else {
             String symLinkDir = getParent().getLocator().getName().replace('/', '\\');
             log.debug("SymLink Directory -> {}", symLinkDir);
-            targetPath = erdf.normalizeSymLinkPath(uncPath.replace(symLinkDir, "") + substituteName);
+            targetPath = erdf.normalizeSymLinkPath(symLinkPath.replace(symLinkDir, "") + substituteName);
         }
 
         log.debug("Target Path -> {}", targetPath);

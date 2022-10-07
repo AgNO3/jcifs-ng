@@ -171,6 +171,7 @@ public class SymLinkTest extends BaseCIFSTest {
                     }
                 }
                 catch (IOException ioe) {
+                    log.error("testSymlink1 error", ioe);
                     throw new SmbException("testSymlink1 error", ioe);
                 }
                 finally {
