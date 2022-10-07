@@ -48,7 +48,7 @@ public abstract class Smb2ErrorContextResponse {
      * @return The length, in bytes, of the response including the variable-length portion
      * @throws Smb2ProtocolDecodingException
      */
-    protected int readErrorContextResponse(byte[] buffer) {
+    protected int readErrorContextResponse ( byte[] buffer ) {
         // start at the beginning of the 8-byte aligned boundary
         // for the SMB2 ERROR Context structure
         int bufferIndex = 0;

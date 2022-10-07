@@ -37,7 +37,7 @@ public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
     private String printName;
 
     @Override
-    public int readSymLinkErrorResponse ( byte[] buffer) throws SMBProtocolDecodingException {
+    public int readSymLinkErrorResponse ( byte[] buffer ) throws SMBProtocolDecodingException {
         int bufferIndex = super.readErrorContextResponse(buffer);
         if ( this.errorId != 0 ) {
             throw new SMBProtocolDecodingException("ErrorId should be 0 for STATUS_STOPPED_ON_SYMLINK");
@@ -49,20 +49,23 @@ public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
 
         // SymLinkErrorTag (4 bytes) (always 0x4C4D5953)
         int symLinkErrorTag = SMBUtil.readInt4(buffer, bufferIndex);
-        if ( !Integer.toHexString(symLinkErrorTag).toUpperCase().equals("4C4D5953") ) {
+        if ( symLinkErrorTag != 0x4C4D5953 ) {
             throw new SMBProtocolDecodingException("SymLinkErrorTag should be 0x4C4D5953");
         }
         bufferIndex += 4;
 
         // ReparseTag (4 bytes) (always 0xA000000C)
         int reparseTag = SMBUtil.readInt4(buffer, bufferIndex);
-        if ( !Integer.toHexString(reparseTag).toUpperCase().equals("A000000C") ) {
+        if ( reparseTag != 0xA000000C ) {
             throw new SMBProtocolDecodingException("ReparseTag should be 0xA000000C");
         }
         bufferIndex += 4;
 
         // ReparseDataLength (2 bytes)
         int reparsedPathLength = SMBUtil.readInt2(buffer, bufferIndex);
+        if ( reparsedPathLength != symLinkLength - 12 ) {
+            throw new SMBProtocolDecodingException("ReparseDataLength should be the size of PathBuffer[], in bytes, plus 12");
+        }
         bufferIndex += 2; 
 
         // UnparsedPathLength (2 bytes)
@@ -101,7 +104,7 @@ public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
     }
 
 
-    public String normalizeSymLinkPath(String path) {
+    public String normalizeSymLinkPath ( String path ) {
         List<String> parts = Strings.split(path, '\\');
 
         for (int i = 0; i < parts.size(); ) {
@@ -144,7 +147,7 @@ public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
 
 
     @Override
-    public int readShareRedirectErrorContextResponse(byte[] buffer)
+    public int readShareRedirectErrorContextResponse ( byte[] buffer )
             throws SMBProtocolDecodingException {
         throw new UnsupportedOperationException("Not implemented");
     }
