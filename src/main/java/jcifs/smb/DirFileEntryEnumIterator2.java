@@ -28,7 +28,7 @@ import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
 import jcifs.internal.SMBProtocolDecodingException;
-import jcifs.internal.smb2.Smb2ErrorDataFormat;
+import jcifs.internal.smb2.Smb2SymLinkResolver;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
 import jcifs.internal.smb2.create.Smb2CreateResponse;
@@ -133,8 +133,8 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
                 }
 
                 try {
-                    byte[] errorData = cr.getErrorData();
-                    return open(parseSymLinkErrorData(uncPath, errorData));
+                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                    return open(resolver.parseSymLinkErrorData(cr.getFileName(), cr.getErrorData()));
                 }
                 catch ( CIFSException | RuntimeException e3 ) {
                     log.error("Exception thrown while processing symbolic link error data", e3);
@@ -159,35 +159,6 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
             doClose();
         }
         return n;
-    }
-
-
-    private String parseSymLinkErrorData(String symLinkPath, byte[] errorData) throws SMBProtocolDecodingException {
-        log.debug("SymLink Path -> {}", symLinkPath);
-
-        Smb2ErrorDataFormat erdf = new Smb2ErrorDataFormat();
-        int symLinkLength = erdf.readSymLinkErrorResponse(errorData);
-        log.debug("SymLink Length -> {}", symLinkLength);
-
-        log.debug("Absolute Path -> {}", erdf.isAbsolutePath());
-        log.debug("Print Name -> {}", erdf.getPrintName());
-
-        String substituteName = erdf.getSubstituteName();
-        log.debug("Substitute Name -> {}", substituteName);
-
-        String targetPath;
-        if (erdf.isAbsolutePath()) {
-            int i = substituteName.indexOf(getParent().getLocator().getShare());
-            targetPath = substituteName.substring(i + getParent().getLocator().getShare().length());
-        }
-        else {
-            String symLinkDir = getParent().getLocator().getName().replace('/', '\\');
-            log.debug("SymLink Directory -> {}", symLinkDir);
-            targetPath = erdf.normalizeSymLinkPath(symLinkPath.replace(symLinkDir, "") + substituteName);
-        }
-
-        log.debug("Target Path -> {}", targetPath);
-        return targetPath;
     }
 
 

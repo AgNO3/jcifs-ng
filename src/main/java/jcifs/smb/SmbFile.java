@@ -86,7 +86,7 @@ import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
-import jcifs.internal.smb2.Smb2ErrorDataFormat;
+import jcifs.internal.smb2.Smb2SymLinkResolver;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CloseResponse;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
@@ -705,8 +705,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                         }
 
                         try {
-                            byte[] errorData = resp.getErrorData();
-                            String targetPath = parseSymLinkErrorData(uncPath, errorData);
+                            Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                            String targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
                             this.symLinkTargetPath = targetPath;
 
                             return openUnshared (targetPath, flags, access, sharing, attrs, options);
@@ -783,52 +783,6 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             this.isExists = true;
             return fh;
         }
-    }
-
-
-    private String parseSymLinkErrorData(String symLinkPath, byte[] errorData) throws SMBProtocolDecodingException {
-        log.debug("SymLink Path -> {}", symLinkPath);
-
-        Smb2ErrorDataFormat erdf = new Smb2ErrorDataFormat();
-        int symLinkLength = erdf.readSymLinkErrorResponse(errorData);
-        log.debug("SymLink Length -> {}", symLinkLength);
-
-        log.debug("Absolute Path -> {}", erdf.isAbsolutePath());
-        log.debug("Print Name -> {}", erdf.getPrintName());
-
-        String substituteName = erdf.getSubstituteName();
-        log.debug("Substitute Name -> {}", substituteName);
-
-        String targetPath;
-        if (erdf.isAbsolutePath()) {
-            int i = substituteName.indexOf(this.getShare());
-            String rootPath = substituteName.substring(i + this.getShare().length());
-            log.debug("Root Path -> {}", rootPath);
-
-            if (!symLinkPath.endsWith("\\") && rootPath.endsWith("\\")) { // is this a file in a symlink directory?
-                String fileName = symLinkPath.substring(symLinkPath.lastIndexOf("\\") + 1);
-                log.debug("File Name -> {}", fileName);
-                targetPath = rootPath + fileName;
-            }
-            else {
-                targetPath = rootPath;
-            }
-        }
-        else {
-            if (!symLinkPath.endsWith("\\")) { // is this a file in a symlink directory?
-                String symLinkFileName = symLinkPath.substring(symLinkPath.lastIndexOf("\\") + 1);
-                log.debug("SymLink File Name -> {}", symLinkFileName);
-                targetPath = erdf.normalizeSymLinkPath(symLinkPath.replace(symLinkFileName, "") + substituteName);
-            }
-            else {
-                String symLinkDir = this.getName().replace('/', '\\');
-                log.debug("SymLink Directory -> {}", symLinkDir);
-                targetPath = erdf.normalizeSymLinkPath(symLinkPath.replace(symLinkDir, "") + substituteName);
-            }
-        }
-
-        log.debug("Target Path -> {}", targetPath);
-        return targetPath;
     }
 
 

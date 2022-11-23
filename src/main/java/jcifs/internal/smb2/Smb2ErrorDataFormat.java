@@ -17,8 +17,6 @@
  */
 package jcifs.internal.smb2;
 
-import java.util.List;
-
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.util.SMBUtil;
 import jcifs.util.Strings;
@@ -33,6 +31,7 @@ import jcifs.util.Strings;
 public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
 
     private boolean absolutePath;
+    private int unparsedPathLength;
     private String substituteName;
     private String printName;
 
@@ -69,7 +68,7 @@ public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
         bufferIndex += 2; 
 
         // UnparsedPathLength (2 bytes)
-        int unparsedPathLength = SMBUtil.readInt2(buffer, bufferIndex);
+        this.unparsedPathLength = SMBUtil.readInt2(buffer, bufferIndex);
         bufferIndex += 2;
 
         // SubstituteNameOffset (2 bytes)
@@ -104,42 +103,30 @@ public class Smb2ErrorDataFormat extends Smb2ErrorContextResponse {
     }
 
 
-    public String normalizeSymLinkPath ( String path ) {
-        List<String> parts = Strings.split(path, '\\');
-
-        for (int i = 0; i < parts.size(); ) {
-            String s = parts.get(i);
-            if (".".equals(s)) {
-                parts.remove(i);
-            } else if ("..".equals(s)) {
-                if (i > 0) {
-                    parts.remove(i--);
-                }
-                parts.remove(i);
-            } else {
-                i++;
-            }
-        }
-
-        return Strings.join(parts, '\\');
-    }
-
-
     public int getErrorDataLength () {
         return this.errorDataLength;
     }
+
 
     public int getErrorId () {
         return this.errorId;
     }
 
+
     public boolean isAbsolutePath () {
         return this.absolutePath;
     }
 
+
+    public int getUnparsedPathLength() {
+        return this.unparsedPathLength;
+    }
+
+
     public String getSubstituteName () {
         return this.substituteName;
     }
+
 
     public String getPrintName () {
         return this.printName;
