@@ -45,12 +45,8 @@ public class Smb2SymLinkResolver {
 
         log.debug("Absolute Path -> {}", erdf.isAbsolutePath());
         log.debug("Print Name -> {}", erdf.getPrintName());
-
-        int unparsedPathLength = erdf.getUnparsedPathLength();
-        log.debug("Unparsed Path Length -> {}", unparsedPathLength);
-
-        String substituteName = erdf.getSubstituteName();
-        log.debug("Substitute Name -> {}", substituteName);
+        log.debug("Unparsed Path Length -> {}", erdf.getUnparsedPathLength());
+        log.debug("Substitute Name -> {}", erdf.getSubstituteName());
 
         String targetPath = this.resolveSymLinkTarget(symLinkPath);
         log.debug("Target Path -> {}", targetPath);

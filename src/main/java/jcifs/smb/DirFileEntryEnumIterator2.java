@@ -134,7 +134,13 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
                 try {
                     Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
-                    return open(resolver.parseSymLinkErrorData(cr.getFileName(), cr.getErrorData()));
+                    String targetPath = resolver.parseSymLinkErrorData(cr.getFileName(), cr.getErrorData());
+
+                    if (targetPath.startsWith("\\??\\")) {
+                        throw new SMBProtocolDecodingException("SymLink target is a local path: " + targetPath);
+                    } else {
+                        return open(targetPath);
+                    }
                 }
                 catch ( CIFSException | RuntimeException e3 ) {
                     log.error("Exception thrown while processing symbolic link error data", e3);

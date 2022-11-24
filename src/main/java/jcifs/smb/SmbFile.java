@@ -709,7 +709,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                             String targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
                             this.symLinkTargetPath = targetPath;
 
-                            return openUnshared (targetPath, flags, access, sharing, attrs, options);
+                            if (targetPath.startsWith("\\??\\")) {
+                                throw new SMBProtocolDecodingException("SymLink target is a local path: " + targetPath);
+                            } else {
+                                return openUnshared(targetPath, flags, access, sharing, attrs, options);
+                            }
                         }
                         catch ( CIFSException | RuntimeException e2 ) {
                             log.error("Exception thrown while processing symbolic link error data", e2);
