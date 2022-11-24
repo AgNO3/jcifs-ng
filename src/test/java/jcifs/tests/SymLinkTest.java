@@ -42,8 +42,8 @@ import jcifs.CIFSException;
 import jcifs.DialectVersion;
 import jcifs.config.PropertyConfiguration;
 import jcifs.context.BaseContext;
+import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.smb.NtlmPasswordAuthenticator;
-import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 
 
@@ -97,7 +97,7 @@ public class SymLinkTest extends BaseCIFSTest {
 
 
     @Test
-    public void testSymlink1() throws MalformedURLException, CIFSException {
+    public void testSymlink1 () throws MalformedURLException, CIFSException {
         try ( SmbFile smbFile = createSession() ) {
 //        try ( SmbFile smbFile = this.getDefaultShareRoot() ) {
             assertNotNull(smbFile);
@@ -131,10 +131,41 @@ public class SymLinkTest extends BaseCIFSTest {
                     log.info("Resource [" + file.getName() + "] is not a symbolic link.");
                 }
 
+                InputStream is = null;
                 try {
-                    InputStream is = file.getInputStream();
+                    is = file.getInputStream();
                     assertNotNull(is);
+                }
+                catch (IOException ioe1) {
+                    log.error("testSymlink1 error on opening input stream, 1st time", ioe1);
 
+                    if (ioe1.getCause().getClass().equals(SMBProtocolDecodingException.class)) {
+                        String symLinkPath = file.getSymLinkTargetPath();
+                        log.info("SymLink Path -> {}", symLinkPath);
+
+                        String targetPath = "";
+                        try {
+                            int i = symLinkPath.lastIndexOf(getTestShare().replace("/", "\\"));
+                            if (i != -1) {
+                                targetPath = symLinkPath.substring(i + getTestShare().length());
+                                log.info("Target Path -> {}", targetPath);
+                            }
+
+                            file = new SmbFile(
+                                    "smb://" + getTestServer() + SMB_FILE_SEPARATOR + getTestShare() + targetPath.replace("\\", "/"),
+                                    file.getContext());
+                            assertNotNull(file);
+
+                            is = file.getInputStream();
+                            assertNotNull(is);
+                        }
+                        catch (IOException ioe2) {
+                            log.error("testSymlink1 error on opening input stream for symlink target path, 2nd time", ioe2);
+                        }
+                    }
+                }
+
+                try {
                     if (file.isDirectory()) {
                         log.info("file.list() -> {}", Arrays.toString(file.list()));
 
@@ -170,9 +201,8 @@ public class SymLinkTest extends BaseCIFSTest {
                         assertTrue("Bytes written should be 9", l == 9);
                     }
                 }
-                catch (IOException ioe) {
-                    log.error("testSymlink1 error", ioe);
-                    //throw new SmbException("testSymlink1 error", ioe);
+                catch (IOException ioe3) {
+                    log.error("testSymlink1 error", ioe3);
                 }
                 finally {
                     file.close();
