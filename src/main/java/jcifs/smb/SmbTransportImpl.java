@@ -924,20 +924,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     @SuppressWarnings ( "unchecked" )
     public <T extends CommonServerMessageBlockResponse> T sendrecv ( CommonServerMessageBlockRequest request, T response, Set<RequestParam> params )
             throws IOException {
-        if ( request instanceof jcifs.internal.Request ) {
-            if ( response == null ) {
-                response = (T) ( (jcifs.internal.Request<?>) request ).initResponse(getContext());
-            }
-            else if ( isSMB2() ) {
-                throw new IOException("Should not provide response argument for SMB2");
-            }
-        }
-        else {
-            request.setResponse(response);
-        }
-        if ( response == null ) {
-            throw new IOException("Invalid response");
-        }
+        response = setupResponses(request, response);
 
         CommonServerMessageBlockRequest curHead = request;
 
@@ -1050,7 +1037,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
                     CommonServerMessageBlockResponse resp = curReq.getResponse();
 
-                    if ( resp.isReceived() ) {
+                    if ( resp == null ) {
+                        log.warn("Response not properly set up for" + curReq );
+                    } else if ( resp.isReceived() ) {
                         grantedCredits += resp.getGrantedCredits();
                     }
                     CommonServerMessageBlockRequest next = curReq.getNext();
@@ -1082,6 +1071,46 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         }
         return response;
 
+    }
+
+    private <T extends CommonServerMessageBlockResponse> T setupResponses(CommonServerMessageBlockRequest request, T response) throws IOException {
+        if ( request instanceof jcifs.internal.Request ) {
+            if ( response == null ) {
+                response = (T) ( (jcifs.internal.Request<?>) request).initResponse(getContext());
+            }
+            else if ( isSMB2() ) {
+                throw new IOException("Should not provide response argument for SMB2");
+            }
+        }
+        else if ( request instanceof AndXServerMessageBlock ) {
+            AndXServerMessageBlock curReq = (AndXServerMessageBlock) request;
+            AndXServerMessageBlock curResp = (AndXServerMessageBlock) response;
+
+            do {
+                curReq.setResponse(curResp);
+
+                ServerMessageBlock nextReq = curReq.getAndx();
+                if ( nextReq == null ) {
+                    break;
+                }
+                ServerMessageBlock nextResp = curResp.getAndx();
+                nextReq.setResponse(nextReq);
+
+                if ( ! ( nextReq instanceof AndXServerMessageBlock )) {
+                    break;
+                }
+                curReq = (AndXServerMessageBlock) nextReq;
+                curResp = (AndXServerMessageBlock) nextResp;
+
+            } while ( true );
+        }
+        else {
+            request.setResponse(response);
+        }
+        if ( response == null ) {
+            throw new IOException("Invalid response");
+        }
+        return response;
     }
 
 

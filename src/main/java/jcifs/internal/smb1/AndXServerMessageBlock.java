@@ -203,7 +203,7 @@ public abstract class AndXServerMessageBlock extends ServerMessageBlock {
          * very indirect and simple batching control mechanism.
          */
 
-        if ( this.andx == null || getConfig().isUseBatching() || this.batchLevel >= getBatchLimit(getConfig(), (byte) this.andx.getCommand()) ) {
+        if ( this.andx == null || !getConfig().isUseBatching() || this.batchLevel >= getBatchLimit(getConfig(), (byte) this.andx.getCommand()) ) {
             this.andxCommand = (byte) 0xFF;
             this.andx = null;
 
