@@ -1855,9 +1855,21 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             CIFSException |
             RuntimeException e ) {
             try {
-                // make sure that the handle is closed when one of the requests fails
                 Smb2CreateResponse createResp = cr.getResponse();
-                if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
+                if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK ) {
+                    this.isSymLink = true;
+
+                    if (th.getConfig().getMinimumVersion() != DialectVersion.SMB311) {
+                        throw new SMBProtocolDecodingException(
+                                "Configuration must be set to a minimum of version SMB 3.1.1 for property "
+                                        + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
+                    }
+
+                    // we hit a symbolic link, parse the error data to retrieve the target path
+                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                    this.symLinkTargetPath = resolver.parseSymLinkErrorData(createResp.getFileName(), createResp.getErrorData());
+                } else if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
+                    // make sure that the handle is closed when one of the requests fails
                     th.send(new Smb2CloseRequest(th.getConfig(), createResp.getFileId()), RequestParam.NO_RETRY);
                 }
             }
