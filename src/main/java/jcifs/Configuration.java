@@ -161,7 +161,7 @@ public interface Configuration {
 
     /**
      * 
-     * Property <tt>jcifs.smb.client.useBatching</tt> (boolean, default true)
+     * Property <tt>jcifs.smb.client.useBatching</tt> (boolean, default false)
      * 
      * @return whether to enable support for SMB1 AndX command batching
      */
