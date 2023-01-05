@@ -1,3 +1,10 @@
+jcifs-ng 2.1.9
+- Properly set broadcast flag when NetBIOS name requests (#314) 
+- Fix default credential initialization (#324) 
+- Properly initialize AndX respones, guard against NPE (#321)
+- Fix AndX SMB1 batching configuration, disable by default
+- Fixup short names in root DFS referral, if enabled
+
 jcifs-ng 2.1.8
 - Relax SMB2 tree id check, all but -1 are valid 
 
