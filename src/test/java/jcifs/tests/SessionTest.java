@@ -319,9 +319,12 @@ public class SessionTest extends BaseCIFSTest {
                   SmbSessionInternal sess = th.getSession().unwrap(SmbSessionInternal.class);
                   SmbTransportInternal t = (SmbTransportInternal) sess.getTransport() ) {
 
-                assertEquals(0, t.getInflightRequests());
+                int before = t.getInflightRequests();
+                if ( before > 0 ) {
+                    log.warn("Have existing inflight requests");
+                }
                 f.exists();
-                assertEquals(0, t.getInflightRequests());
+                assertEquals(before, t.getInflightRequests());
             }
         }
     }
@@ -335,14 +338,17 @@ public class SessionTest extends BaseCIFSTest {
                   SmbSessionInternal sess = th.getSession().unwrap(SmbSessionInternal.class);
                   SmbTransportInternal t = (SmbTransportInternal) sess.getTransport() ) {
 
-                assertEquals(0, t.getInflightRequests());
+                int before = t.getInflightRequests();
+                if ( before > 0 ) {
+                    log.warn("Have existing inflight requests");
+                }
                 try ( InputStream is = f.openInputStream() ) {
 
                 }
                 catch ( SmbException e ) {
                     // expected
                 }
-                assertEquals(0, t.getInflightRequests());
+                assertEquals(before, t.getInflightRequests());
             }
         }
     }

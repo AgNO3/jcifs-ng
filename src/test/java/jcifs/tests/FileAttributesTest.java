@@ -252,7 +252,11 @@ public class FileAttributesTest extends BaseCIFSTest {
                 catch ( Exception e ) {
                     // ignore
                 }
-                f.delete();
+                try {
+                    f.delete();
+                } catch ( Exception e ) {
+                    // ignore
+                }
             }
         }
     }
