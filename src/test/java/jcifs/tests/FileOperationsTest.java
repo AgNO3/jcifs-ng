@@ -173,15 +173,15 @@ public class FileOperationsTest extends BaseCIFSTest {
                 }
                 throw e;
             }
+            catch ( SmbAuthException e )  {
+                // guest share not accessible
+            }
             catch ( SmbException e) {
                 if ("Cannot rename between different trees".equals(e.getMessage())) {
                     // expected
                     return;
                 }
                 throw e;
-            }
-            catch ( SmbAuthException e )  {
-                // guest share not accessible
             }
             finally {
                 if ( !renamed && f.exists() ) {
