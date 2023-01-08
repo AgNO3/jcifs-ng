@@ -21,11 +21,7 @@ package jcifs.config;
 import java.net.InetAddress;
 import java.util.Properties;
 
-import jcifs.CIFSException;
-import jcifs.Config;
-import jcifs.Configuration;
-import jcifs.DialectVersion;
-import jcifs.SmbConstants;
+import jcifs.*;
 
 
 /**
@@ -144,6 +140,8 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
         this.allowGuestFallback = Config.getBoolean(p, "jcifs.smb.client.allowGuestFallback", false);
         this.guestUsername = p.getProperty("jcifs.smb.client.guestUsername", "JCIFSGUEST");
         this.guestPassword = p.getProperty("jcifs.smb.client.guestPassword", "");
+
+        this.symlinkBehavior = SymlinkBehavior.valueOf(p.getProperty("jcifs.smb.client.symlinkBehavior", "THROW"));
 
         String minVer = p.getProperty("jcifs.smb.client.minVersion");
         String maxVer = p.getProperty("jcifs.smb.client.maxVersion");

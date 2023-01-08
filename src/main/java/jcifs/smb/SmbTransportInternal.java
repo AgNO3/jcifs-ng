@@ -20,11 +20,7 @@ package jcifs.smb;
 
 import java.io.IOException;
 
-import jcifs.CIFSContext;
-import jcifs.CIFSException;
-import jcifs.DfsReferralData;
-import jcifs.SmbSession;
-import jcifs.SmbTransport;
+import jcifs.*;
 
 
 /**
@@ -125,4 +121,11 @@ public interface SmbTransportInternal extends SmbTransport {
      * @return number of inflight requests
      */
     int getInflightRequests ();
+
+
+    /**
+     *
+     * @return negotiated SMB version
+     */
+    DialectVersion getSelectedDialect() throws SmbException;
 }

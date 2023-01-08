@@ -697,22 +697,20 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
                     if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
                         this.isSymLink = true;
-
-                        if (config.getMinimumVersion() != DialectVersion.SMB311) {
-                            throw new SMBProtocolDecodingException(
-                                    "Configuration must be set to a minimum of version SMB 3.1.1 for property "
-                                            + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
-                        }
-
                         try {
+                            if (!h.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class).getSelectedDialect().atLeast(DialectVersion.SMB311)) {
+                                // symlink error context information is only available since SMB3.1.1
+                                // TODO: might be able to get the target information via some IOCTL for earlier versions?
+                                throw e;
+                            }
                             Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
-                            String targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
-                            this.symLinkTargetPath = targetPath;
-
-                            if (targetPath.startsWith("\\??\\")) {
-                                throw new SMBProtocolDecodingException("SymLink target is a local path: " + targetPath);
-                            } else {
+                            try {
+                                String targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
+                                this.symLinkTargetPath = targetPath;
                                 return openUnshared(targetPath, flags, access, sharing, attrs, options);
+                            }  catch ( CIFSException | RuntimeException e3 ) {
+                                log.error("Exception thrown while processing symbolic link error data", e3);
+                                e.addSuppressed(e3);
                             }
                         }
                         catch ( CIFSException | RuntimeException e2 ) {
@@ -720,11 +718,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                             throw e2;
                         }
                     }
-                    else {
-                        log.error("Exception thrown while processing SMB2 request", e);
-                        throw e;
-                    }
+                    throw e;
                 }
+
             }
             else if ( h.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                 SmbComNTCreateAndXResponse resp = new SmbComNTCreateAndXResponse(config);
@@ -1804,7 +1800,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     @SuppressWarnings ( "unchecked" )
     protected <T extends ServerMessageBlock2Response> T withOpen ( SmbTreeHandleImpl th, int createDisposition, int createOptions, int fileAttributes,
             int desiredAccess, int shareAccess, ServerMessageBlock2Request<T> first, ServerMessageBlock2Request<?>... others ) throws CIFSException {
-        Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), getUncPath());
+        return withOpen(th, getUncPath(), createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, first, others);
+    }
+
+    private <T extends ServerMessageBlock2Response> T withOpen(SmbTreeHandleImpl th, String path, int createDisposition, int createOptions, int fileAttributes, int desiredAccess, int shareAccess, ServerMessageBlock2Request<T> first,ServerMessageBlock2Request<?>... others) throws CIFSException {
+        Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), path);
         try {
             cr.setCreateDisposition(createDisposition);
             cr.setCreateOptions(createOptions);
@@ -1818,7 +1818,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 cr.chain(first);
                 cur = first;
 
-                for ( ServerMessageBlock2Request<?> req : others ) {
+                for ( ServerMessageBlock2Request<?> req : others) {
                     cur.chain(req);
                     cur = req;
                 }
@@ -1859,15 +1859,21 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK ) {
                     this.isSymLink = true;
 
-                    if (th.getConfig().getMinimumVersion() != DialectVersion.SMB311) {
-                        throw new SMBProtocolDecodingException(
-                                "Configuration must be set to a minimum of version SMB 3.1.1 for property "
-                                        + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
-                    }
 
-                    // we hit a symbolic link, parse the error data to retrieve the target path
+                    if (!th.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class).getSelectedDialect().atLeast(DialectVersion.SMB311)) {
+                        // symlink error context information is only available since SMB3.1.1
+                        // TODO: might be able to get the target information via some IOCTL for earlier versions?
+                        throw e;
+                    }
                     Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
-                    this.symLinkTargetPath = resolver.parseSymLinkErrorData(createResp.getFileName(), createResp.getErrorData());
+                    try {
+                        this.symLinkTargetPath = resolver.processSymlinkError(th, createResp);
+                        // retry the request with the adjusted path
+                        return withOpen(th, this.symLinkTargetPath, createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, first, others);
+                    }  catch ( CIFSException | RuntimeException e3 ) {
+                        log.error("Exception thrown while processing symbolic link error data", e3);
+                        e.addSuppressed(e3);
+                    }
                 } else if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
                     // make sure that the handle is closed when one of the requests fails
                     th.send(new Smb2CloseRequest(th.getConfig(), createResp.getFileId()), RequestParam.NO_RETRY);

@@ -26,6 +26,7 @@ import java.util.TimeZone;
 import jcifs.Configuration;
 import jcifs.DialectVersion;
 import jcifs.ResolverType;
+import jcifs.SymlinkBehavior;
 
 
 /**
@@ -913,5 +914,10 @@ public class DelegatingConfiguration implements Configuration {
     @Override
     public boolean isAllowGuestFallback () {
         return this.delegate.isAllowGuestFallback();
+    }
+
+    @Override
+    public SymlinkBehavior getSymlinkBehavior() {
+        return this.delegate.getSymlinkBehavior();
     }
 }

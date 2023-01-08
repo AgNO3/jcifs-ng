@@ -18,16 +18,7 @@
 package jcifs.smb;
 
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import jcifs.CIFSException;
-import jcifs.Configuration;
-import jcifs.DialectVersion;
-import jcifs.ResourceNameFilter;
-import jcifs.SmbConstants;
-import jcifs.SmbResource;
-import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.*;
 import jcifs.internal.smb2.Smb2SymLinkResolver;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
@@ -35,6 +26,8 @@ import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryDirectoryRequest;
 import jcifs.internal.smb2.info.Smb2QueryDirectoryResponse;
 import jcifs.internal.util.RecursionLimiter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -92,7 +85,7 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
     /**
      * 
-     * @param path
+     * @param uncPath
      * @return
      * @throws CIFSException
      */
@@ -125,24 +118,15 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
             // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
             if (cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
-
-                if (config.getMinimumVersion() != DialectVersion.SMB311) {
-                    throw new SMBProtocolDecodingException(
-                            "Configuration must be set to a minimum of version SMB 3.1.1 for property "
-                                    + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
+                if (!th.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class).getSelectedDialect().atLeast(DialectVersion.SMB311)) {
+                    // symlink error context information is only available since SMB3.1.1
+                    // TODO: might be able to get the target information via some IOCTL for earlier versions?
+                    throw e;
                 }
-
+                Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
                 try {
-                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
-                    String targetPath = resolver.parseSymLinkErrorData(cr.getFileName(), cr.getErrorData());
-
-                    if (targetPath.startsWith("\\??\\")) {
-                        throw new SMBProtocolDecodingException("SymLink target is a local path: " + targetPath);
-                    } else {
-                        return open(targetPath);
-                    }
-                }
-                catch ( CIFSException | RuntimeException e3 ) {
+                    return open(resolver.processSymlinkError(th, cr));
+                }  catch ( CIFSException | RuntimeException e3 ) {
                     log.error("Exception thrown while processing symbolic link error data", e3);
                     e.addSuppressed(e3);
                 }

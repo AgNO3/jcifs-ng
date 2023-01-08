@@ -227,7 +227,15 @@ public class SymLinkTest extends BaseCIFSTest {
 
     private long copyInputStreamToFile(InputStream is, File file) throws IOException {
         try (OutputStream output = new FileOutputStream(file)) {
-            return is.transferTo(output);
+            int read = 0;
+            long total = 0;
+            byte[] buffer = new byte[1024];
+
+            while ( (read = is.read(buffer)) != 0 ) {
+                output.write(buffer, 0, read);
+                total += read;
+            }
+            return total;
         } catch (IOException ioe) {
             log.error("copyInputStreamToFile error", ioe);
             throw ioe;

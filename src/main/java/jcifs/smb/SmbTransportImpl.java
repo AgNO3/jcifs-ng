@@ -150,11 +150,6 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.util.transport.Transport#getResponseTimeout()
-     */
     @Override
     protected int getResponseTimeout ( Request req ) {
         if ( req instanceof CommonServerMessageBlockRequest ) {
@@ -213,6 +208,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         return getNegotiateResponse().haveCapabilitiy(cap);
     }
 
+    @Override
+    public DialectVersion getSelectedDialect() throws SmbException {
+        return getNegotiateResponse().getSelectedDialect();
+    }
 
     /**
      * @return the negotiated

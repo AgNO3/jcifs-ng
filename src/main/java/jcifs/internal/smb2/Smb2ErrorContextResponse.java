@@ -64,34 +64,6 @@ public abstract class Smb2ErrorContextResponse {
         return bufferIndex;
     }
 
-    /**
-     * 2.2.2.2.1 Symbolic Link Error Response
-     * 
-     * The Symbolic Link Error Response is used to indicate that a symbolic link was encountered on
-     * create; it describes the target path that the client MUST use if it requires to follow the
-     * symbolic link. This structure is contained in the ErrorData section of the SMB2 ERROR
-     * Response (section 2.2.2). This structure MUST NOT be returned in an SMB2 ERROR Response
-     * unless the Status code in the header of that response is set to STATUS_STOPPED_ON_SYMLINK.
-     * 
-     * @param buffer
-     * @return The length, in bytes, of the response
-     * @throws Smb2ProtocolDecodingException
-     */
-    public abstract int readSymLinkErrorResponse ( byte[] buffer ) throws SMBProtocolDecodingException;
 
-    /**
-     * 2.2.2.2.2 Share Redirect Error Context Response
-     * 
-     * Servers which negotiate SMB 3.1.1 or higher can return this error context to a client in
-     * response to a tree connect request with the SMB2_TREE_CONNECT_FLAG_REDIRECT_TO_OWNER bit set
-     * in the Flags field of the SMB2 TREE_CONNECT request. The corresponding Status code in the
-     * SMB2 header of the response MUST be set to STATUS_BAD_NETWORK_NAME. The error context data is
-     * formatted as follows.
-     * 
-     * @param buffer
-     * @return The length, in bytes, of the response
-     * @throws SMBProtocolDecodingException
-     */
-    public abstract int readShareRedirectErrorContextResponse ( byte[] buffer ) throws SMBProtocolDecodingException;
 
 }

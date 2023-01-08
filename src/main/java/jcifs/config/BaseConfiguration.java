@@ -32,14 +32,9 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 
+import jcifs.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import jcifs.CIFSException;
-import jcifs.Configuration;
-import jcifs.DialectVersion;
-import jcifs.ResolverType;
-import jcifs.SmbConstants;
 
 
 /**
@@ -140,7 +135,7 @@ public class BaseConfiguration implements Configuration {
     protected String guestUsername = "GUEST";
     protected String guestPassword = "";
     protected boolean allowGuestFallback = false;
-
+    protected SymlinkBehavior symlinkBehavior = SymlinkBehavior.THROW;
 
     /**
      * @throws CIFSException
@@ -620,6 +615,11 @@ public class BaseConfiguration implements Configuration {
         return this.allowGuestFallback;
     }
 
+
+    @Override
+    public SymlinkBehavior getSymlinkBehavior() {
+        return this.symlinkBehavior;
+    }
 
     @Override
     public byte[] getMachineId () {

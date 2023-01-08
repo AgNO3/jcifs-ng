@@ -787,4 +787,17 @@ public interface Configuration {
      * @return whether to permit guest logins when user authentication is requested
      */
     boolean isAllowGuestFallback ();
+
+
+    /**
+     *  Property <tt>jcifs.smb.client.symlinkBehavior</tt>, defaults to THROW
+     *
+     * See {@link SymlinkBehavior}
+     *
+     * Currently, automatic symlink following is only supported when using
+     * SMB 3.1.1 and only for symlinks pointing to the same share.
+     *
+     * @return how to handle encountered symlinks
+     */
+    SymlinkBehavior getSymlinkBehavior();
 }

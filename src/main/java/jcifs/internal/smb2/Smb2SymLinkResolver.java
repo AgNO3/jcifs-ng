@@ -17,14 +17,19 @@
  */
 package jcifs.internal.smb2;
 
-import java.nio.charset.Charset;
-import java.util.List;
-
+import jcifs.SymlinkBehavior;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.smb2.create.Smb2CreateResponse;
+import jcifs.smb.SmbSymlinkException;
+import jcifs.smb.SmbTreeHandleInternal;
+import jcifs.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jcifs.internal.SMBProtocolDecodingException;
-import jcifs.util.Strings;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Defines methods to resolve a symlink target path.
@@ -80,13 +85,13 @@ public class Smb2SymLinkResolver {
 
 
     private String getSymLinkParsedPath ( String fileName, int unparsedPathLength ) {
-        byte[] fileNameBytes = fileName.getBytes(Charset.forName("UTF-16LE"));
+        byte[] fileNameBytes = fileName.getBytes(StandardCharsets.UTF_16LE);
         return new String(fileNameBytes, 0, fileNameBytes.length - unparsedPathLength, Charset.forName("UTF-16LE"));
     }
 
 
     private String getSymLinkUnparsedPath ( String fileName, int unparsedPathLength ) {
-        byte[] fileNameBytes = fileName.getBytes(Charset.forName("UTF-16LE"));
+        byte[] fileNameBytes = fileName.getBytes(StandardCharsets.UTF_16LE);
         return new String(fileNameBytes, fileNameBytes.length - unparsedPathLength, unparsedPathLength, Charset.forName("UTF-16LE"));
     }
 
@@ -111,4 +116,40 @@ public class Smb2SymLinkResolver {
         return Strings.join(parts, '\\');
     }
 
+    public String processSymlinkError(SmbTreeHandleInternal th, Smb2CreateResponse cr)  throws SMBProtocolDecodingException, SmbSymlinkException {
+        String targetPath = this.parseSymLinkErrorData(cr.getFileName(), cr.getErrorData());
+
+        if (SymlinkBehavior.THROW == th.getConfig().getSymlinkBehavior()) {
+            throw new SmbSymlinkException(targetPath, th.getSession().getContext());
+        }
+
+        String lcaseTgt = targetPath.toLowerCase(Locale.ROOT);
+        if (lcaseTgt.startsWith("\\??\\unc\\")) {
+            // this symlink references a UNC path, this can only be (easily) handled
+            // if the target resides on the share and we simply can adjust the request
+            // path. For more extensive support, the tree connection needs to be
+            // switched.
+
+            // cut off \\??\\unc\\ prefix
+            targetPath = targetPath.substring(8);
+            String curShareUnc = th.getRemoteHostName().toLowerCase(Locale.ROOT) +
+                    "\\" + th.getConnectedShare().toLowerCase(Locale.ROOT) + "\\";
+
+            if ( !targetPath.startsWith(curShareUnc)) {
+                // TODO: convert to URL
+                throw new SmbSymlinkException(targetPath, th.getSession().getContext());
+            }
+
+            // return path below share
+            return targetPath.substring(curShareUnc.length());
+        } else if (targetPath.startsWith("\\??\\")) {
+            // this is a link to local file, cut off prefix \??\
+            // handling is up to the user
+            // TODO: convert to file URL?
+            throw new SmbSymlinkException(targetPath.substring(4), th.getSession().getContext());
+        } else {
+            // this is a relative symlink
+            return targetPath;
+        }
+    }
 }
