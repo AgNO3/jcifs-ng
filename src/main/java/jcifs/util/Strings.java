@@ -20,6 +20,8 @@ package jcifs.util;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,4 +166,44 @@ public final class Strings {
         }
         return len;
     }
+
+
+    /**
+     * Split a string on a character.
+     *
+     * @param string The string to split.
+     * @param c The character to split on.
+     * @return The split parts of the string.
+     */
+    public static List<String> split(String string, char c) {
+        List<String> parts = new ArrayList<>();
+        int off = 0;
+        int next;
+        while ((next = string.indexOf(c, off)) != -1) {
+            parts.add(string.substring(off, next));
+            off = next + 1;
+        }
+        parts.add(string.substring(off));
+        return parts;
+    }
+
+
+    /**
+     * Join a string on a character.
+     *
+     * @param strings The strings to join.
+     * @param c The character to join on.
+     * @return The joined parts of the string.
+     */
+    public static String join(List<String> strings, char c) {
+        StringBuilder joiner = new StringBuilder();
+        for (int i = 0; i < strings.size(); i++) {
+            if (i > 0) {
+                joiner.append(c);
+            }
+            joiner.append(strings.get(i));
+        }
+        return joiner.toString();
+    }
+
 }
