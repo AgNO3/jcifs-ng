@@ -43,7 +43,7 @@ public final class PropertyConfiguration extends BaseConfiguration implements Co
      * 
      */
     public PropertyConfiguration ( Properties p ) throws CIFSException {
-        this.useBatching = Config.getBoolean(p, "jcifs.smb.client.useBatching", true);
+        this.useBatching = Config.getBoolean(p, "jcifs.smb.client.useBatching", false);
         this.useUnicode = Config.getBoolean(p, "jcifs.smb.client.useUnicode", true);
         this.useLargeReadWrite = Config.getBoolean(p, "jcifs.smb.client.useLargeReadWrite", true);
         this.forceUnicode = Config.getBoolean(p, "jcifs.smb.client.forceUnicode", false);

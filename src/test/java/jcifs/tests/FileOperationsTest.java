@@ -30,6 +30,8 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 
+import jcifs.smb.*;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,9 +41,6 @@ import org.junit.runners.Parameterized.Parameters;
 import jcifs.CIFSException;
 import jcifs.SmbResource;
 import jcifs.SmbTreeHandle;
-import jcifs.smb.SmbFile;
-import jcifs.smb.SmbRandomAccessFile;
-import jcifs.smb.SmbUnsupportedOperationException;
 
 
 /**
@@ -166,10 +165,21 @@ public class FileOperationsTest extends BaseCIFSTest {
             boolean renamed = false;
             try {
                 f.renameTo(tgt, true);
+                Assert.assertFalse("Should not be able to rename between trees", true);
             }
             catch ( SmbUnsupportedOperationException e ) {
                 try ( SmbTreeHandle th = defaultShareRoot.getTreeHandle() ) {
                     Assume.assumeTrue("Not SMB2", th.isSMB2());
+                }
+                throw e;
+            }
+            catch ( SmbAuthException e )  {
+                // guest share not accessible
+            }
+            catch ( SmbException e) {
+                if ("Cannot rename between different trees".equals(e.getMessage())) {
+                    // expected
+                    return;
                 }
                 throw e;
             }

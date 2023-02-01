@@ -74,7 +74,14 @@ public class BaseContext extends AbstractCIFSContext {
         this.nameServiceClient = new NameServiceClientImpl(this);
         this.bufferCache = new BufferCacheImpl(this.config);
         this.transportPool = new SmbTransportPoolImpl();
-        this.defaultCredentials = new NtlmPasswordAuthenticator();
+        String defUser = config.getDefaultUsername();
+        String defPassword = config.getDefaultPassword();
+        String defDomain = config.getDefaultDomain();
+        if ( defUser != null ) {
+            this.defaultCredentials = new NtlmPasswordAuthenticator(defDomain, defUser, defPassword);
+        } else {
+            this.defaultCredentials = new NtlmPasswordAuthenticator();
+        }
     }
 
 

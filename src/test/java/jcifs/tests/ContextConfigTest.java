@@ -18,16 +18,14 @@
 package jcifs.tests;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
-
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Properties;
 
+import jcifs.context.BaseContext;
 import org.hamcrest.CoreMatchers;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -41,6 +39,9 @@ import jcifs.config.PropertyConfiguration;
 import jcifs.context.SingletonContext;
 import jcifs.smb.NtlmPasswordAuthenticator;
 import jcifs.smb.SmbFile;
+import org.mockito.Matchers;
+
+import static org.junit.Assert.*;
 
 
 /**
@@ -194,6 +195,51 @@ public class ContextConfigTest {
         PropertyConfiguration p3 = new PropertyConfiguration(prop3);
 
         assertEquals(DialectVersion.SMB202, p3.getMinimumVersion());
+    }
+
+
+    @Test
+    // #324
+    public void testDefaultCredentials() throws CIFSException
+    {
+        Properties props = new Properties();
+        props.put("jcifs.smb.client.domain", "my-domain");
+        props.put("jcifs.smb.client.username", "my-default-user-id");
+        props.put("jcifs.smb.client.password", "my-default-password");
+
+        CIFSContext auth = new BaseContext(new PropertyConfiguration(props));
+        assertTrue(auth.hasDefaultCredentials());
+        assertTrue( auth.getCredentials() instanceof NtlmPasswordAuthenticator);
+
+        NtlmPasswordAuthenticator pa = (NtlmPasswordAuthenticator) auth.getCredentials();
+
+        assertEquals("my-domain", pa.getUserDomain());
+        assertEquals("my-default-user-id", pa.getUsername());
+        assertEquals("my-default-password", pa.getPassword());
+
+        assertTrue(auth.withAnonymousCredentials().withDefaultCredentials().hasDefaultCredentials());
+
+    }
+
+
+
+    @Test
+    public void testPasswordAt() throws MalformedURLException, CIFSException {
+        Config.registerSmbURLHandler();
+
+        try ( SmbFile f = new SmbFile("smb://foo:b%40r@127.0.0.1/") ) {
+            Assert.assertEquals("foo:b%40r", f.getLocator().getURL().getUserInfo());
+            NtlmPasswordAuthenticator na = f.getContext().getCredentials().unwrap(NtlmPasswordAuthenticator.class);
+            Assert.assertEquals("b@r", na.getPassword());
+        }
+
+        try ( SmbFile f = new SmbFile(new URL("smb://foo:b%40r@127.0.0.1/")) ) {
+            Assert.assertEquals("foo:b%40r", f.getLocator().getURL().getUserInfo());
+            NtlmPasswordAuthenticator na = f.getContext().getCredentials().unwrap(NtlmPasswordAuthenticator.class);
+            Assert.assertEquals("b@r", na.getPassword());
+        }
+
+
     }
 
 }
