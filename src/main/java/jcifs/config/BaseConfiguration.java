@@ -60,7 +60,7 @@ public class BaseConfiguration implements Configuration {
     protected int localPid = -1;
     protected TimeZone localTimeZone;
     protected SecureRandom random;
-    protected boolean useBatching = true;
+    protected boolean useBatching = false;
     protected boolean useUnicode = true;
     protected boolean forceUnicode = false;
     protected boolean signingPreferred = false;

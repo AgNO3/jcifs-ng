@@ -109,15 +109,17 @@ public class OplockTests extends BaseCIFSTest {
                 int options = 0;
                 String uncPath = "foo-oplock";
 
-                SmbComNTCreateAndXResponse resp = null;
+                SmbComNTCreateAndXResponse resp = new SmbComNTCreateAndXResponse(sess.getConfig());
                 SmbComNTCreateAndX req = new SmbComNTCreateAndX(sess.getConfig(), uncPath, flags, access, sharing, attrs, options, null);
                 req.addFlags0(0x2); // REQUEST_OPLOCK
+                req.setResponse(resp);
                 try {
                     resp = tree.send(req);
-                    SmbComNTCreateAndXResponse resp2 = null;
+                    SmbComNTCreateAndXResponse resp2 = new SmbComNTCreateAndXResponse(sess.getConfig());
                     SmbComNTCreateAndX req2 = new SmbComNTCreateAndX(sess.getConfig(), uncPath, flags, access, sharing, attrs, options, null);
                     req2.addFlags0(0x2); // REQUEST_OPLOCK
                     req2.setOverrideTimeout(1000);
+                    req2.setResponse(resp2);
 
                     try {
                         resp2 = tree.send(req2);

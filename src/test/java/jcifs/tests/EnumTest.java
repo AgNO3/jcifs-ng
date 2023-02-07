@@ -340,7 +340,10 @@ public class EnumTest extends BaseCIFSTest {
                 while ( chld.hasNext() ) {
 
                     try ( SmbResource next = chld.next() ) {
-                        try ( CloseableIterator<SmbResource> children = next.children() ) {}
+                        if ( next.isDirectory() ) {
+                            try (CloseableIterator<SmbResource> children = next.children()) {
+                            }
+                        }
                         names.add(next.getName());
                     }
                 }

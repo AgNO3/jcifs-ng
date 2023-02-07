@@ -1082,7 +1082,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 throw new IOException("Should not provide response argument for SMB2");
             }
         }
-        else if ( request instanceof AndXServerMessageBlock ) {
+        else if ( request instanceof AndXServerMessageBlock && response instanceof AndXServerMessageBlock ) {
             AndXServerMessageBlock curReq = (AndXServerMessageBlock) request;
             AndXServerMessageBlock curResp = (AndXServerMessageBlock) response;
 
@@ -1096,7 +1096,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 ServerMessageBlock nextResp = curResp.getAndx();
                 nextReq.setResponse(nextReq);
 
-                if ( ! ( nextReq instanceof AndXServerMessageBlock )) {
+                if ( ! ( nextReq instanceof AndXServerMessageBlock ) || ! ( nextResp instanceof AndXServerMessageBlock )) {
                     break;
                 }
                 curReq = (AndXServerMessageBlock) nextReq;

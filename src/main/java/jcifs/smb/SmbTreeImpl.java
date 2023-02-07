@@ -404,7 +404,7 @@ class SmbTreeImpl implements SmbTreeInternal {
     public <T extends CommonServerMessageBlockResponse> T send ( jcifs.internal.Request<T> request, RequestParam... params ) throws CIFSException {
         return send(
             (CommonServerMessageBlockRequest) request,
-            null,
+            request.getResponse(),
             ( params != null && params.length > 0 ) ? EnumSet.copyOf(Arrays.asList(params)) : EnumSet.noneOf(RequestParam.class));
     }
 
