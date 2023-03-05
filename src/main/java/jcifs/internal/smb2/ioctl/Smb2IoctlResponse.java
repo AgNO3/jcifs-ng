@@ -22,6 +22,7 @@ import jcifs.Configuration;
 import jcifs.Decodable;
 import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.dfs.DfsReferralResponseBuffer;
+import jcifs.internal.fscc.SymlinkReparseData;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.util.SMBUtil;
 import jcifs.smb.NtStatus;
@@ -228,6 +229,8 @@ public class Smb2IoctlResponse extends ServerMessageBlock2Response {
             return new ValidateNegotiateInfoResponse();
         case Smb2IoctlRequest.FSCTL_PIPE_PEEK:
             return new SrvPipePeekResponse();
+        case Smb2IoctlRequest.FSCTL_GET_REPARSE_POINT:
+            return new SymlinkReparseData();
         }
         return null;
     }

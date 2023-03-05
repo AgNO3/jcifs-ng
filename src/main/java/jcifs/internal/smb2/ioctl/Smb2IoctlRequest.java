@@ -81,6 +81,8 @@ public class Smb2IoctlRequest extends ServerMessageBlock2Request<Smb2IoctlRespon
      * 
      */
     public static final int FSCTL_SET_REPARSE_POINT = 0x000900A4;
+    public static final int FSCTL_GET_REPARSE_POINT = 0x000900A8;
+    public static final int FSCTL_DELETE_REPARSE_POINT = 0x000900AC;
     /**
      * 
      */

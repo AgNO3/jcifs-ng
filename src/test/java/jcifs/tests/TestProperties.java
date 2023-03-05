@@ -38,6 +38,12 @@ public final class TestProperties {
     static final String TEST_USER_NAME = "test.user.name";
     static final String TEST_USER_PASSWORD = "test.user.password";
     static final String TEST_USER_DOMAIN = "test.user.domain";
+
+
+    static final String ADMIN_USER_NAME = "admin.user.name";
+    static final String ADMIN_USER_PASSWORD = "admin.user.password";
+    static final String ADMIN_USER_DOMAIN = "admin.user.domain";
+
     static final String TEST_USER_DOMAIN_SHORT = "test.user.sdomain";
     static final String TEST_SERVER = "test.server";
 

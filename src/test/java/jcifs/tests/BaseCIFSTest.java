@@ -164,6 +164,14 @@ public abstract class BaseCIFSTest {
     }
 
 
+    protected CIFSContext withAdminNTLMCredentials ( CIFSContext ctx ) {
+        return ctx.withCredentials(new NtlmPasswordAuthenticator(
+                getRequiredProperty(TestProperties.ADMIN_USER_DOMAIN),
+                getRequiredProperty(TestProperties.ADMIN_USER_NAME),
+                getRequiredProperty(TestProperties.ADMIN_USER_PASSWORD)));
+    }
+
+
     protected CIFSContext withTestGuestCredentials () {
         return getContext().withGuestCrendentials();
     }

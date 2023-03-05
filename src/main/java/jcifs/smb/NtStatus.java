@@ -48,6 +48,8 @@ public interface NtStatus {
     public static final int NT_STATUS_SHARING_VIOLATION = 0xC0000043;
     public static final int NT_STATUS_DELETE_PENDING = 0xC0000056;
     public static final int NT_STATUS_NO_LOGON_SERVERS = 0xC000005e;
+
+    public static final int NT_STATUS_PRIVILEGE_NOT_HELD = 0xC0000061;
     public static final int NT_STATUS_USER_EXISTS = 0xC0000063;
     public static final int NT_STATUS_NO_SUCH_USER = 0xC0000064;
     public static final int NT_STATUS_WRONG_PASSWORD = 0xC000006a;
@@ -101,7 +103,7 @@ public interface NtStatus {
         NT_STATUS_NO_SUCH_FILE, NT_STATUS_END_OF_FILE, NT_STATUS_MORE_PROCESSING_REQUIRED, NT_STATUS_ACCESS_DENIED, NT_STATUS_BUFFER_TOO_SMALL,
         NT_STATUS_OBJECT_NAME_INVALID, NT_STATUS_OBJECT_NAME_NOT_FOUND, NT_STATUS_OBJECT_NAME_COLLISION, NT_STATUS_PORT_DISCONNECTED,
         NT_STATUS_OBJECT_PATH_INVALID, NT_STATUS_OBJECT_PATH_NOT_FOUND, NT_STATUS_OBJECT_PATH_SYNTAX_BAD, NT_STATUS_SHARING_VIOLATION,
-        NT_STATUS_DELETE_PENDING, NT_STATUS_NO_LOGON_SERVERS, NT_STATUS_USER_EXISTS, NT_STATUS_NO_SUCH_USER, NT_STATUS_WRONG_PASSWORD,
+        NT_STATUS_DELETE_PENDING, NT_STATUS_NO_LOGON_SERVERS, NT_STATUS_PRIVILEGE_NOT_HELD, NT_STATUS_USER_EXISTS, NT_STATUS_NO_SUCH_USER, NT_STATUS_WRONG_PASSWORD,
         NT_STATUS_LOGON_FAILURE, NT_STATUS_ACCOUNT_RESTRICTION, NT_STATUS_INVALID_LOGON_HOURS, NT_STATUS_INVALID_WORKSTATION,
         NT_STATUS_PASSWORD_EXPIRED, NT_STATUS_ACCOUNT_DISABLED, NT_STATUS_NONE_MAPPED, NT_STATUS_INVALID_SID, NT_STATUS_DISK_FULL,
         NT_STATUS_INSTANCE_NOT_AVAILABLE, NT_STATUS_PIPE_NOT_AVAILABLE, NT_STATUS_INVALID_PIPE_STATE, NT_STATUS_PIPE_BUSY,
@@ -124,7 +126,7 @@ public interface NtStatus {
         "Cannot create a file when that file already exists.", "The handle is invalid.", "The specified path is invalid.",
         "The system cannot find the path specified.", "The specified path is invalid.",
         "The process cannot access the file because it is being used by another process.", "Access is denied.",
-        "There are currently no logon servers available to service the logon request.", "The specified user already exists.",
+        "There are currently no logon servers available to service the logon request.", "Insufficient privileges" , "The specified user already exists.",
         "The specified user does not exist.", "The specified network password is not correct.", "Logon failure: unknown user name or bad password.",
         "Logon failure: user account restriction.", "Logon failure: account logon time restriction violation.",
         "Logon failure: user not allowed to log on to this computer.", "Logon failure: the specified account password has expired.",

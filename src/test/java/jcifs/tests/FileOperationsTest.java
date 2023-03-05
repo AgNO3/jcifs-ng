@@ -30,6 +30,7 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 
+import jcifs.internal.fscc.SymlinkInfo;
 import jcifs.smb.*;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -508,6 +509,58 @@ public class FileOperationsTest extends BaseCIFSTest {
             }
             finally {
                 r.delete();
+            }
+        }
+    }
+
+
+    @Test
+    public void testCreateSymlink() throws IOException, MalformedURLException, UnknownHostException {
+        try (  SmbFile r = new SmbFile(getTestShareURL(), withAdminNTLMCredentials(getContext()));
+               SmbFile e = new SmbFile(r, makeRandomDirectoryName());
+               SmbFile tdir = new SmbFile(e, "target-dir/");
+               SmbFile tfile = new SmbFile(e, "target-file");
+               SmbFile reltestfile = new SmbFile(e, "symlink-rel-file");
+               SmbFile reltestdir = new SmbFile(e, "symlink-rel-dir");
+               SmbFile abs = new SmbFile(e, "abs")) {
+            try {
+                e.mkdirs();
+                tdir.mkdirs();
+                tfile.createNewFile();
+
+                try {
+                    reltestfile.createSymlink(tfile.getName(), "print-file", true);
+                    SymlinkInfo symlinkInfo = reltestfile.querySymlink();
+                    assertTrue(symlinkInfo.isRelative());
+                    assertEquals(tfile.getName(), symlinkInfo.getSubstituteName());
+                    assertEquals("print-file", symlinkInfo.getPrintName());
+                } finally {
+                    reltestfile.removeSymlink();
+                }
+
+                try {
+                    reltestdir.createSymlink(tdir.getName(), "print-dir", true);
+                    SymlinkInfo symlinkInfo = reltestdir.querySymlink();
+                    assertTrue(symlinkInfo.isRelative());
+                    assertEquals(tdir.getName(), symlinkInfo.getSubstituteName());
+                    assertEquals("print-dir", symlinkInfo.getPrintName());
+                } finally {
+                    reltestdir.removeSymlink();
+                }
+
+                try {
+                    String unc = tdir.getUncPath();
+                    abs.createSymlink("\\??\\UNC\\" + unc, unc, false);
+                    SymlinkInfo symlinkInfo = abs.querySymlink();
+                    assertFalse(symlinkInfo.isRelative());
+                    assertEquals("\\??\\UNC\\" + unc, symlinkInfo.getSubstituteName());
+                    assertEquals(unc, symlinkInfo.getPrintName());
+                } finally {
+                    abs.removeSymlink();
+                }
+            }
+            finally {
+                e.delete();
             }
         }
     }

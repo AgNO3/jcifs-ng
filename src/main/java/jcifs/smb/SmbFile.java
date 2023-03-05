@@ -28,6 +28,9 @@ import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.util.Objects;
 
+import jcifs.internal.fscc.*;
+import jcifs.internal.smb2.ioctl.Smb2IoctlRequest;
+import jcifs.internal.smb2.ioctl.Smb2IoctlResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,18 +51,10 @@ import jcifs.context.SingletonContext;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
 import jcifs.internal.AllocInfo;
-import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.SmbBasicFileInfo;
 import jcifs.internal.dtyp.ACE;
 import jcifs.internal.dtyp.SecurityDescriptor;
 import jcifs.internal.dtyp.SecurityInfo;
-import jcifs.internal.fscc.BasicFileInformation;
-import jcifs.internal.fscc.FileBasicInfo;
-import jcifs.internal.fscc.FileInformation;
-import jcifs.internal.fscc.FileInternalInfo;
-import jcifs.internal.fscc.FileRenameInformation2;
-import jcifs.internal.fscc.FileStandardInfo;
-import jcifs.internal.fscc.FileSystemInformation;
 import jcifs.internal.smb1.com.SmbComBlankResponse;
 import jcifs.internal.smb1.com.SmbComCreateDirectory;
 import jcifs.internal.smb1.com.SmbComDelete;
@@ -701,6 +696,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                             if (!h.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class).getSelectedDialect().atLeast(DialectVersion.SMB311)) {
                                 // symlink error context information is only available since SMB3.1.1
                                 // TODO: might be able to get the target information via some IOCTL for earlier versions?
+
                                 throw e;
                             }
                             Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
@@ -2471,6 +2467,101 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 }
             }
             return aces;
+        }
+    }
+
+
+
+    public SymlinkInfo querySymlink() throws IOException {
+        try (SmbTreeHandleImpl th = ensureTreeConnected()) {
+            if (!th.isSMB2()) {
+                throw new SmbUnsupportedOperationException();
+            }
+
+            Smb2IoctlRequest symlinkReq = new Smb2IoctlRequest(th.getConfig(), Smb2IoctlRequest.FSCTL_GET_REPARSE_POINT);
+            symlinkReq.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+            Smb2IoctlResponse symlinkResp = withOpen(th, getUncPath(),
+                    Smb2CreateRequest.FILE_OPEN,
+                    Smb2CreateRequest.FILE_OPEN_REPARSE_POINT,
+                    SmbConstants.ATTR_NORMAL,
+                    SmbConstants.FILE_READ_ATTRIBUTES | SmbConstants.FILE_READ_EA,
+                    Smb2CreateRequest.FILE_SHARE_WRITE | Smb2CreateRequest.FILE_SHARE_READ,
+                    symlinkReq);
+
+
+
+            return symlinkResp.getOutputData(SymlinkReparseData.class);
+        }
+    }
+
+    public void createSymlink(String substituteName, String printName, boolean relative) throws IOException {
+        try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
+            if (!th.isSMB2()) {
+                throw new SmbUnsupportedOperationException();
+            }
+
+            Smb2IoctlRequest req = new Smb2IoctlRequest(th.getConfig(), Smb2IoctlRequest.FSCTL_SET_REPARSE_POINT);
+            req.setMaxOutputResponse(0);
+            req.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+            req.setInputData(new SymlinkReparseData(substituteName, printName, relative));
+
+
+            // quite annoying: failure to create the symlink will create a file...
+            // therefore this needs handling and we cannot use withOpen
+            Smb2CreateRequest cr = new Smb2CreateRequest(th.getConfig(), getUncPath());
+            cr.setCreateDisposition(Smb2CreateRequest.FILE_CREATE);
+            cr.setCreateOptions(Smb2CreateRequest.FILE_OPEN_REPARSE_POINT);
+            cr.setFileAttributes(SmbConstants.ATTR_NORMAL);
+            cr.setDesiredAccess(0x00110180); // READ_ATTRIBUTE/WRITE_ATTRIBUTE + herbs and spices
+            cr.setShareAccess(FILE_NO_SHARE);
+
+
+            cr.chain(req);
+
+            Smb2CreateResponse cresp;
+            try {
+                cresp = th.send(cr);
+            } catch ( SmbException e ) {
+                log.debug("Symlink creation failed", e);
+                cresp = cr.getResponse();
+            }
+            Smb2IoctlResponse resp = (Smb2IoctlResponse) cresp.getNextResponse();
+
+            if (cresp.getStatus() != NtStatus.NT_STATUS_OK) {
+                throw new SmbException(cresp.getStatus(), false);
+            }
+            Smb2CloseRequest close = new Smb2CloseRequest(th.getConfig(), cresp.getFileId());
+
+
+            if (resp.getStatus() != NtStatus.NT_STATUS_OK) {
+                Smb2SetInfoRequest fi = new Smb2SetInfoRequest(th.getConfig(), cresp.getFileId());
+                fi.setFileInformation(new FileDispositionInfo());
+                fi.chain(close);
+                th.send(fi, RequestParam.NO_RETRY);
+            } else {
+                th.send(close, RequestParam.NO_RETRY);
+            }
+
+        }
+    }
+
+    public void removeSymlink() throws IOException {
+        try ( SmbTreeHandleImpl th = ensureTreeConnected() ) {
+            if (!th.isSMB2()) {
+                throw new SmbUnsupportedOperationException();
+            }
+
+            Smb2IoctlRequest req = new Smb2IoctlRequest(th.getConfig(), Smb2IoctlRequest.FSCTL_DELETE_REPARSE_POINT);
+            req.setFlags(Smb2IoctlRequest.SMB2_O_IOCTL_IS_FSCTL);
+            req.setMaxOutputResponse(0);
+            req.setInputData(new FsctlDeleteReparsePointRequest());
+
+
+            Smb2IoctlResponse resp = withOpen(th,
+                    Smb2CreateRequest.FILE_OPEN,
+                    Smb2CreateRequest.FILE_OPEN_REPARSE_POINT,
+                    SmbConstants.ATTR_NORMAL,
+                    FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, req);
         }
     }
 
