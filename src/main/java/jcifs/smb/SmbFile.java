@@ -693,15 +693,19 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
                         this.isSymLink = true;
                         try {
-                            if (!h.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class).getSelectedDialect().atLeast(DialectVersion.SMB311)) {
-                                // symlink error context information is only available since SMB3.1.1
-                                // TODO: might be able to get the target information via some IOCTL for earlier versions?
 
-                                throw e;
-                            }
                             Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                            String targetPath;
+                            if (!h.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class)
+                                    .getSelectedDialect().atLeast(DialectVersion.SMB311)) {
+                                // symlink error context information is only available since SMB3.1.1
+                                targetPath = resolveSymlinkOnError(h, resolver, e);
+                            } else {
+                                targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
+                            }
+
                             try {
-                                String targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
+
                                 this.symLinkTargetPath = targetPath;
                                 return openUnshared(targetPath, flags, access, sharing, attrs, options);
                             }  catch ( CIFSException | RuntimeException e3 ) {
@@ -779,6 +783,15 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             this.isExists = true;
             return fh;
         }
+    }
+
+
+    private String resolveSymlinkOnError(SmbTreeHandleImpl h, Smb2SymLinkResolver resolve, Exception orig) throws CIFSException {
+        // TODO: do have querySymlink now, but this also needs to figure out which path compontent actually is the symlink
+        // looks like walking up the path is necessary for that
+        SmbException e =  new SmbException(NtStatus.NT_STATUS_STOPPED_ON_SYMLINK, false);
+        e.addSuppressed(orig);
+        throw e;
     }
 
 
@@ -1854,16 +1867,17 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                 Smb2CreateResponse createResp = cr.getResponse();
                 if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK ) {
                     this.isSymLink = true;
-
-
+                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                    String targetPath;
                     if (!th.getSession().unwrap(SmbSessionInternal.class).getTransport().unwrap(SmbTransportInternal.class).getSelectedDialect().atLeast(DialectVersion.SMB311)) {
                         // symlink error context information is only available since SMB3.1.1
-                        // TODO: might be able to get the target information via some IOCTL for earlier versions?
-                        throw e;
+                        targetPath = resolveSymlinkOnError(th, resolver, e);
+                    } else {
+                        targetPath = resolver.processSymlinkError(th, createResp);
                     }
-                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+
                     try {
-                        this.symLinkTargetPath = resolver.processSymlinkError(th, createResp);
+                        this.symLinkTargetPath = targetPath;
                         // retry the request with the adjusted path
                         return withOpen(th, this.symLinkTargetPath, createDisposition, createOptions, fileAttributes, desiredAccess, shareAccess, first, others);
                     }  catch ( CIFSException | RuntimeException e3 ) {
