@@ -26,7 +26,7 @@ package jcifs.internal.util;
  * This solution is thread-safe because it doesn't use any counter at all.
  */
 public class RecursionLimiter {
-    public static int maxLevel = 50;
+    public static int maxLevel = 100;
 
     public static void emerge() {
         if (maxLevel == 0)
