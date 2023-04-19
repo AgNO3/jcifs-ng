@@ -964,7 +964,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                         }
                         else {
                             if ( !this.credits.tryAcquire(cost, timeout, TimeUnit.MILLISECONDS) ) {
-                                throw new SmbException("Failed to acquire credits in time");
+                                throw new SmbException(String.format("Failed to acquire credits in time, timed out after %dms", timeout));
                             }
                         }
                         totalSize += size;
