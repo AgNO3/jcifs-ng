@@ -142,7 +142,7 @@ public class NegTokenInit extends SpnegoToken {
             ev.add(new DERTaggedObject(true, 0, new DERSequence(fields)));
             ByteArrayOutputStream collector = new ByteArrayOutputStream();
             ASN1OutputStream der = ASN1OutputStream.create(collector, ASN1Encoding.DER);
-            DERApplicationSpecific derApplicationSpecific = new DERApplicationSpecific(0, ev);
+            DERTaggedObject derApplicationSpecific = new DERTaggedObject(false, BERTags.APPLICATION, 0, new DERSequence(ev));
             der.writeObject(derApplicationSpecific);
             return collector.toByteArray();
         }
@@ -156,18 +156,19 @@ public class NegTokenInit extends SpnegoToken {
     protected void parse ( byte[] token ) throws IOException {
 
         try ( ASN1InputStream is = new ASN1InputStream(token) ) {
-            ASN1ApplicationSpecific constructed = (ASN1ApplicationSpecific) is.readObject();
-            if ( constructed == null || !constructed.isConstructed() )
-                throw new IOException(
-                    "Malformed SPNEGO token " + constructed
-                            + ( constructed != null ? " " + constructed.isConstructed() + " " + constructed.getApplicationTag() : "" ));
+            ASN1TaggedObject constructed = (ASN1TaggedObject) is.readObject();
+            if ( constructed == null || constructed.getTagClass() != BERTags.APPLICATION ||
+                    !(constructed.getBaseObject() instanceof  ASN1Sequence) )
+                throw new IOException("Malformed SPNEGO token " + constructed);
 
-            try ( ASN1InputStream der = new ASN1InputStream(constructed.getContents()) ) {
-                ASN1ObjectIdentifier spnego = (ASN1ObjectIdentifier) der.readObject();
+            ASN1Sequence vec = (ASN1Sequence) constructed.getBaseObject();
+
+
+                ASN1ObjectIdentifier spnego = (ASN1ObjectIdentifier) vec.getObjectAt(0);
                 if ( !SPNEGO_OID.equals(spnego) ) {
                     throw new IOException("Malformed SPNEGO token, OID " + spnego);
                 }
-                ASN1TaggedObject tagged = (ASN1TaggedObject) der.readObject();
+                ASN1TaggedObject tagged = (ASN1TaggedObject) vec.getObjectAt(1);
                 if ( tagged.getTagNo() != 0 ) {
                     throw new IOException("Malformed SPNEGO token: tag " + tagged.getTagNo() + " " + tagged);
                 }
@@ -194,7 +195,7 @@ public class NegTokenInit extends SpnegoToken {
                         break;
 
                     case 3:
-                        if ( ! ( tagged.getObject() instanceof DEROctetString ) ) {
+                        if ( ! ( tagged.getBaseObject() instanceof DEROctetString ) ) {
                             break;
                         }
                     case 4:
@@ -205,7 +206,6 @@ public class NegTokenInit extends SpnegoToken {
                         throw new IOException("Malformed token field.");
                     }
                 }
-            }
         }
     }
 

@@ -41,14 +41,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.kerberos.KerberosKey;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1Integer;
-import org.bouncycastle.asn1.ASN1TaggedObject;
-import org.bouncycastle.asn1.DERApplicationSpecific;
-import org.bouncycastle.asn1.DERGeneralString;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DERTaggedObject;
-import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.*;
 
 import jcifs.pac.ASN1Util;
 import jcifs.pac.PACDecodingException;
@@ -66,10 +59,10 @@ public class KerberosEncData {
 
     public KerberosEncData ( byte[] token, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
         ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token));
-        DERApplicationSpecific derToken;
+        ASN1TaggedObject derToken;
         try {
-            derToken = ASN1Util.as(DERApplicationSpecific.class, stream);
-            if ( !derToken.isConstructed() )
+            derToken = ASN1Util.as(ASN1TaggedObject.class, stream);
+            if ( derToken.getTagClass() != BERTags.APPLICATION )
                 throw new PACDecodingException("Malformed kerberos ticket");
             stream.close();
         }
@@ -77,11 +70,9 @@ public class KerberosEncData {
             throw new PACDecodingException("Malformed kerberos ticket", e);
         }
 
-        stream = new ASN1InputStream(new ByteArrayInputStream(derToken.getContents()));
-        DLSequence sequence;
+        ASN1Sequence sequence;
         try {
-            sequence = ASN1Util.as(DLSequence.class, stream);
-            stream.close();
+            sequence = ASN1Util.as(ASN1Sequence.class, derToken.getBaseObject());
         }
         catch ( IOException e ) {
             throw new PACDecodingException("Malformed kerberos ticket", e);
@@ -101,8 +92,8 @@ public class KerberosEncData {
                 this.userRealm = derRealm.getString();
                 break;
             case 3: // Principal
-                DLSequence principalSequence = ASN1Util.as(DLSequence.class, tagged);
-                DLSequence nameSequence = ASN1Util.as(DLSequence.class, ASN1Util.as(DERTaggedObject.class, principalSequence, 1));
+                ASN1Sequence principalSequence = ASN1Util.as(ASN1Sequence.class, tagged);
+                ASN1Sequence nameSequence = ASN1Util.as(ASN1Sequence.class, ASN1Util.as(ASN1TaggedObject.class, principalSequence, 1));
 
                 StringBuilder nameBuilder = new StringBuilder();
                 Enumeration<?> parts = nameSequence.getObjects();
@@ -134,10 +125,10 @@ public class KerberosEncData {
                 // DERGeneralizedTime.class);
                 break;
             case 9: // Host Addresses
-                DLSequence adressesSequence = ASN1Util.as(DLSequence.class, tagged);
+                ASN1Sequence adressesSequence = ASN1Util.as(ASN1Sequence.class, tagged);
                 Enumeration<?> adresses = adressesSequence.getObjects();
                 while ( adresses.hasMoreElements() ) {
-                    DLSequence addressSequence = ASN1Util.as(DLSequence.class, adresses);
+                    ASN1Sequence addressSequence = ASN1Util.as(ASN1Sequence.class, adresses);
                     ASN1Integer addressType = ASN1Util.as(ASN1Integer.class, addressSequence, 0);
                     DEROctetString addressOctets = ASN1Util.as(DEROctetString.class, addressSequence, 1);
 
@@ -153,14 +144,14 @@ public class KerberosEncData {
                 }
                 break;
             case 10: // Authorization Data
-                DLSequence authSequence = ASN1Util.as(DLSequence.class, tagged);
+                ASN1Sequence authSequence = ASN1Util.as(ASN1Sequence.class, tagged);
 
                 this.userAuthorizations = new ArrayList<>();
                 Enumeration<?> authElements = authSequence.getObjects();
                 while ( authElements.hasMoreElements() ) {
-                    DLSequence authElement = ASN1Util.as(DLSequence.class, authElements);
-                    ASN1Integer authType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(DERTaggedObject.class, authElement, 0));
-                    DEROctetString authData = ASN1Util.as(DEROctetString.class, ASN1Util.as(DERTaggedObject.class, authElement, 1));
+                    ASN1Sequence authElement = ASN1Util.as(ASN1Sequence.class, authElements);
+                    ASN1Integer authType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(ASN1TaggedObject.class, authElement, 0));
+                    DEROctetString authData = ASN1Util.as(DEROctetString.class, ASN1Util.as(ASN1TaggedObject.class, authElement, 1));
 
                     this.userAuthorizations.addAll(KerberosAuthData.parse(authType.getValue().intValue(), authData.getOctets(), keys));
                 }

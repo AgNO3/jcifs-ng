@@ -28,13 +28,7 @@ import java.util.Map;
 import javax.security.auth.kerberos.KerberosKey;
 import javax.security.auth.login.LoginException;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1Integer;
-import org.bouncycastle.asn1.ASN1TaggedObject;
-import org.bouncycastle.asn1.DERGeneralString;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DERTaggedObject;
-import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.*;
 
 import jcifs.pac.ASN1Util;
 import jcifs.pac.PACDecodingException;
@@ -52,10 +46,10 @@ public class KerberosTicket {
         if ( token.length <= 0 )
             throw new PACDecodingException("Empty kerberos ticket");
 
-        DLSequence sequence;
+        ASN1Sequence sequence;
         try {
             try ( ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token)) ) {
-                sequence = ASN1Util.as(DLSequence.class, stream);
+                sequence = ASN1Util.as(ASN1Sequence.class, stream);
             }
         }
         catch ( IOException e ) {
@@ -77,8 +71,8 @@ public class KerberosTicket {
                 this.serverRealm = derRealm.getString();
                 break;
             case 2:// Principal
-                DLSequence principalSequence = ASN1Util.as(DLSequence.class, tagged);
-                DLSequence nameSequence = ASN1Util.as(DLSequence.class, ASN1Util.as(DERTaggedObject.class, principalSequence, 1));
+                ASN1Sequence principalSequence = ASN1Util.as(ASN1Sequence.class, tagged);
+                ASN1Sequence nameSequence = ASN1Util.as(ASN1Sequence.class, ASN1Util.as(ASN1TaggedObject.class, principalSequence, 1));
 
                 StringBuilder nameBuilder = new StringBuilder();
                 Enumeration<?> parts = nameSequence.getObjects();
@@ -92,9 +86,9 @@ public class KerberosTicket {
                 this.serverPrincipalName = nameBuilder.toString();
                 break;
             case 3:// Encrypted part
-                DLSequence encSequence = ASN1Util.as(DLSequence.class, tagged);
-                ASN1Integer encType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(DERTaggedObject.class, encSequence, 0));
-                DEROctetString encOctets = ASN1Util.as(DEROctetString.class, ASN1Util.as(DERTaggedObject.class, encSequence, 2));
+                ASN1Sequence encSequence = ASN1Util.as(ASN1Sequence.class, tagged);
+                ASN1Integer encType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(ASN1TaggedObject.class, encSequence, 0));
+                DEROctetString encOctets = ASN1Util.as(DEROctetString.class, ASN1Util.as(ASN1TaggedObject.class, encSequence, 2));
                 byte[] crypt = encOctets.getOctets();
 
                 if ( keys == null ) {

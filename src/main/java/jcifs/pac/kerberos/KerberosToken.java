@@ -22,9 +22,7 @@ import java.io.IOException;
 
 import javax.security.auth.kerberos.KerberosKey;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.DERApplicationSpecific;
+import org.bouncycastle.asn1.*;
 
 import jcifs.pac.ASN1Util;
 import jcifs.pac.PACDecodingException;
@@ -46,18 +44,21 @@ public class KerberosToken {
         if ( token.length <= 0 )
             throw new PACDecodingException("Empty kerberos token");
 
-        try {
-            ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token));
-            DERApplicationSpecific derToken = ASN1Util.as(DERApplicationSpecific.class, stream);
-            if ( derToken == null || !derToken.isConstructed() )
-                throw new PACDecodingException("Malformed kerberos token");
-            stream.close();
+        byte[] content;
+        try ( ASN1InputStream stream = new ASN1InputStream(token) ) {
+            content = ASN1Util.readUnparsedTagged(0, 0x8000, stream);
+        }catch ( IOException e ) {
+            throw new PACDecodingException("Malformed kerberos token", e);
+        }
 
-            stream = new ASN1InputStream(new ByteArrayInputStream(derToken.getContents()));
-            ASN1ObjectIdentifier kerberosOid = ASN1Util.as(ASN1ObjectIdentifier.class, stream);
+        try ( ASN1InputStream stream = new ASN1InputStream(content) ) {
+
+            ASN1ObjectIdentifier kerberosOid = (ASN1ObjectIdentifier) stream.readObject();
             if ( !kerberosOid.getId().equals(KerberosConstants.KERBEROS_OID) )
                 throw new PACDecodingException("Not a kerberos token");
 
+
+            // yes, there really is non ASN.1/DER data inside the tagged object
             int read = 0;
             int readLow = stream.read() & 0xff;
             int readHigh = stream.read() & 0xff;
@@ -65,13 +66,12 @@ public class KerberosToken {
             if ( read != 0x01 )
                 throw new PACDecodingException("Malformed kerberos token");
 
-            DERApplicationSpecific krbToken = ASN1Util.as(DERApplicationSpecific.class, stream);
-            if ( krbToken == null || !krbToken.isConstructed() )
+            ASN1TaggedObject mechToken = ASN1Util.as(ASN1TaggedObject.class, stream.readObject());
+            if ( mechToken == null || mechToken.getTagClass() != BERTags.APPLICATION ||
+                    !(mechToken.getBaseObject() instanceof ASN1Sequence) )
                 throw new PACDecodingException("Malformed kerberos token");
 
-            stream.close();
-
-            this.apRequest = new KerberosApRequest(krbToken.getContents(), keys);
+            this.apRequest = new KerberosApRequest((ASN1Sequence) mechToken.getBaseObject(), keys);
         }
         catch ( IOException e ) {
             throw new PACDecodingException("Malformed kerberos token", e);

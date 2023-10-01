@@ -24,6 +24,7 @@ import java.util.Set;
 
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosKey;
+import javax.security.auth.kerberos.KeyTab;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
