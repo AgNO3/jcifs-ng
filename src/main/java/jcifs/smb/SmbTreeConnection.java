@@ -551,7 +551,7 @@ class SmbTreeConnection {
                           SmbTreeImpl ct = connectTree(loc, host, share, trans, uct, dr) ) {
 
                         if ( dr != null ) {
-                            ct.setTreeReferral(dr, path);
+                            ct.setTreeReferral(dr, loc.getPath());
                             if ( dr != start ) {
                                 dr.unwrap(DfsReferralDataInternal.class).replaceCache();
                             }
@@ -567,7 +567,7 @@ class SmbTreeConnection {
                       SmbTreeImpl uct = smbSession.getSmbTree(share, null).unwrap(SmbTreeImpl.class);
                       SmbTreeImpl ct = connectTree(loc, host, share, trans, uct, dr) ) {
                     if ( dr != null ) {
-                        ct.setTreeReferral(dr, path);
+                        ct.setTreeReferral(dr, loc.getPath());
                         if ( dr != start ) {
                             dr.unwrap(DfsReferralDataInternal.class).replaceCache();
                         }
@@ -711,9 +711,9 @@ class SmbTreeConnection {
             if ( t.isInDomainDfs() || !t.isPossiblyDfs() ) {
                 if ( t.isInDomainDfs() ) {
                     // need to adjust request path
-                    DfsReferralData dr = t.getTreeReferral(rpath);
-                    if (dr == null && loc.getDfsReferral() != null && loc.getDfsReferral().getLink() != null) {
-                        dr = t.getTreeReferral(loc.getDfsReferral().getLink());
+                    DfsReferralData dr = t.getTreeReferral(loc.getPath());
+                    if ( dr == null && t.hasTreeReferral(loc.getDfsReferral()) ) {
+                        dr = loc.getDfsReferral();
                     }
                     if ( dr != null ) {
                         if ( log.isDebugEnabled() ) {

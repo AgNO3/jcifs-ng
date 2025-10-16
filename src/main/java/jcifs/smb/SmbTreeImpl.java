@@ -340,10 +340,6 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @param referral
      */
     public void setTreeReferral ( DfsReferralData referral, String path ) {
-        if ( referral.getLink() != null ) {
-            log.debug("Mapping tree referral [{}] with link [{}]", referral, referral.getLink());
-            this.treeReferrals.put(referral.getLink(), referral);
-        }
         if ( path != null ) {
             log.debug("Mapping tree referral [{}] with path [{}]", referral, path);
             this.treeReferrals.put(path, referral);
@@ -355,18 +351,34 @@ class SmbTreeImpl implements SmbTreeInternal {
      * @return the treeReferral
      */
     public DfsReferralData getTreeReferral ( String path ) {
-        if (path != null) {
+        if ( path != null ) {
             log.debug("Finding tree referral for path [{}]", path);
-            for (String link : this.treeReferrals.keySet()) {
-                if (path.startsWith(link)) {
+            for ( String link : this.treeReferrals.keySet() ) {
+                if ( path.equals(link) ) {
                     DfsReferralData referral = this.treeReferrals.get(link);
                     log.debug("Found tree referral [{}] for path [{}]", referral, path);
-                    return this.treeReferrals.get(link);
+                    return referral;
                 }
             }
-            log.debug("No tree referral found for path [{}]", path);
+            log.debug("No tree referral found for path [{}] and keys [{}]", path, this.treeReferrals.keySet());
         }
         return null;
+    }
+
+    /**
+     * @return {@code true} if the provided referral is on the tree, {@code false} otherwise
+     */
+    public boolean hasTreeReferral ( DfsReferralData locReferral ) {
+        if ( locReferral != null ) {
+            for ( DfsReferralData referral : this.treeReferrals.values() ) {
+                if ( referral.equals(locReferral) ) {
+                    log.debug("Tree has referral [{}]", locReferral);
+                    return true;
+                }
+            }
+            log.debug("Tree does not have referral [{}]", locReferral);
+        }
+        return false;
     }
 
 
