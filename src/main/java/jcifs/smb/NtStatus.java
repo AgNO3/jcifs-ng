@@ -22,11 +22,6 @@ package jcifs.smb;
 @SuppressWarnings ( "javadoc" )
 public interface NtStatus {
 
-    /*
-     * Don't bother to edit this. Everything within the interface
-     * block is automatically generated from the ntstatus package.
-     */
-
     public static final int NT_STATUS_OK = 0x00000000;
     public static final int NT_STATUS_PENDING = 0x00000103;
     public static final int NT_STATUS_NOTIFY_ENUM_DIR = 0x0000010C;
@@ -98,6 +93,7 @@ public interface NtStatus {
     public static final int NT_STATUS_PATH_NOT_COVERED = 0xC0000257;
     public static final int NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED = 0xC0000279;
     public static final int NT_STATUS_NO_MORE_FILES = 0x80000006;
+    public static final int NT_STATUS_STOPPED_ON_SYMLINK = 0x8000002D;
 
     static final int[] NT_STATUS_CODES = {
         NT_STATUS_OK, NT_STATUS_PENDING, NT_STATUS_NOTIFY_ENUM_DIR, NT_STATUS_BUFFER_OVERFLOW, NT_STATUS_UNSUCCESSFUL, NT_STATUS_NOT_IMPLEMENTED,
@@ -115,7 +111,7 @@ public interface NtStatus {
         NT_STATUS_CANNOT_DELETE, NT_STATUS_INVALID_COMPUTER_NAME, NT_STATUS_PIPE_BROKEN, NT_STATUS_NO_SUCH_ALIAS, NT_STATUS_LOGON_TYPE_NOT_GRANTED,
         NT_STATUS_NO_TRUST_SAM_ACCOUNT, NT_STATUS_TRUSTED_DOMAIN_FAILURE, NT_STATUS_TRUSTED_RELATIONSHIP_FAILURE,
         NT_STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT, NT_STATUS_PASSWORD_MUST_CHANGE, NT_STATUS_NOT_FOUND, NT_STATUS_ACCOUNT_LOCKED_OUT,
-        NT_STATUS_CONNECTION_REFUSED, NT_STATUS_PATH_NOT_COVERED, NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED, NT_STATUS_NO_MORE_FILES,
+        NT_STATUS_CONNECTION_REFUSED, NT_STATUS_PATH_NOT_COVERED, NT_STATUS_IO_REPARSE_TAG_NOT_HANDLED, NT_STATUS_NO_MORE_FILES, NT_STATUS_STOPPED_ON_SYMLINK,
     };
 
     static final String[] NT_STATUS_MESSAGES = {
@@ -150,5 +146,6 @@ public interface NtStatus {
         "The referenced account is currently locked out and may not be logged on to.", "Connection refused",
         "The remote system is not reachable by the transport.", "The layered file system driver for this I/O tag did not handle it when needed.",
         "No more files were found that match the file specification.",
+        "The create operation stopped after reaching a symbolic link.",
     };
 }

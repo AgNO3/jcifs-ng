@@ -156,6 +156,15 @@ public interface SmbResource extends AutoCloseable {
 
 
     /**
+     * Tests to see if the file this <code>SmbResource</code> represents is a symbolic link.
+     *
+     * @return <code>true</code> if this <code>SmbResource</code> is a symbolic link
+     * @throws CIFSException
+     */
+    boolean isSymLink () throws CIFSException;
+
+
+    /**
      * Tests to see if the file this <code>SmbResource</code> represents
      * exists and is not marked read-only. By default, resources are
      * considered to be read-only and therefore for <code>smb://</code>,

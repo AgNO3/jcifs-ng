@@ -22,14 +22,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jcifs.CIFSException;
+import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
 import jcifs.SmbResource;
+import jcifs.internal.SMBProtocolDecodingException;
+import jcifs.internal.smb2.Smb2SymLinkResolver;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
 import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryDirectoryRequest;
 import jcifs.internal.smb2.info.Smb2QueryDirectoryResponse;
+import jcifs.internal.util.RecursionLimiter;
 
 
 /**
@@ -74,21 +79,33 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
 
 
     /**
-     * @param th
-     * @param parent
-     * @param wildcard
+     * 
+     * @return
+     * @throws CIFSException
+     */
+    @Override
+    protected FileEntry open () throws CIFSException {
+        String uncPath = getParent().getLocator().getUNCPath();
+        return open(uncPath);
+    }
+
+
+    /**
+     * 
+     * @param path
      * @return
      * @throws CIFSException
      */
     @SuppressWarnings ( "resource" )
-    @Override
-    protected FileEntry open () throws CIFSException {
+    private FileEntry open ( String uncPath ) throws CIFSException {
+        RecursionLimiter.emerge();
+
         SmbTreeHandleImpl th = getTreeHandle();
-        String uncPath = getParent().getLocator().getUNCPath();
-        Smb2CreateRequest create = new Smb2CreateRequest(th.getConfig(), uncPath);
+        Configuration config = th.getConfig();
+        Smb2CreateRequest create = new Smb2CreateRequest(config, uncPath);
         create.setCreateOptions(Smb2CreateRequest.FILE_DIRECTORY_FILE);
         create.setDesiredAccess(SmbConstants.FILE_READ_DATA | SmbConstants.FILE_READ_ATTRIBUTES);
-        Smb2QueryDirectoryRequest query = new Smb2QueryDirectoryRequest(th.getConfig());
+        Smb2QueryDirectoryRequest query = new Smb2QueryDirectoryRequest(config);
         query.setFileName(getWildcard());
         create.chain(query);
         Smb2CreateResponse createResp;
@@ -99,10 +116,35 @@ public class DirFileEntryEnumIterator2 extends DirFileEntryEnumIteratorBase {
             Smb2CreateResponse cr = create.getResponse();
             if ( cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_OK ) {
                 try {
-                    th.send(new Smb2CloseRequest(th.getConfig(), cr.getFileId()));
+                    th.send(new Smb2CloseRequest(config, cr.getFileId()));
                 }
                 catch ( SmbException e2 ) {
                     e.addSuppressed(e2);
+                }
+            }
+
+            // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
+            if (cr != null && cr.isReceived() && cr.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+
+                if (config.getMinimumVersion() != DialectVersion.SMB311) {
+                    throw new SMBProtocolDecodingException(
+                            "Configuration must be set to a minimum of version SMB 3.1.1 for property "
+                                    + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
+                }
+
+                try {
+                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                    String targetPath = resolver.parseSymLinkErrorData(cr.getFileName(), cr.getErrorData());
+
+                    if (targetPath.startsWith("\\??\\")) {
+                        throw new SMBProtocolDecodingException("SymLink target is a local path: " + targetPath);
+                    } else {
+                        return open(targetPath);
+                    }
+                }
+                catch ( CIFSException | RuntimeException e3 ) {
+                    log.error("Exception thrown while processing symbolic link error data", e3);
+                    e.addSuppressed(e3);
                 }
             }
 

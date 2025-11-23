@@ -610,6 +610,8 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
 
 
     /**
+     * 2.2.2 SMB2 ERROR Response
+     * 
      * @param buffer
      * @param bufferIndex
      * @return

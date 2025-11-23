@@ -35,6 +35,7 @@ import jcifs.CIFSContext;
 import jcifs.CIFSException;
 import jcifs.CloseableIterator;
 import jcifs.Configuration;
+import jcifs.DialectVersion;
 import jcifs.ResourceFilter;
 import jcifs.ResourceNameFilter;
 import jcifs.SmbConstants;
@@ -47,6 +48,7 @@ import jcifs.context.SingletonContext;
 import jcifs.dcerpc.DcerpcHandle;
 import jcifs.dcerpc.msrpc.MsrpcShareGetInfo;
 import jcifs.internal.AllocInfo;
+import jcifs.internal.SMBProtocolDecodingException;
 import jcifs.internal.SmbBasicFileInfo;
 import jcifs.internal.dtyp.ACE;
 import jcifs.internal.dtyp.SecurityDescriptor;
@@ -84,6 +86,7 @@ import jcifs.internal.smb1.trans2.Trans2SetFileInformationResponse;
 import jcifs.internal.smb2.ServerMessageBlock2Request;
 import jcifs.internal.smb2.ServerMessageBlock2Response;
 import jcifs.internal.smb2.Smb2Constants;
+import jcifs.internal.smb2.Smb2SymLinkResolver;
 import jcifs.internal.smb2.create.Smb2CloseRequest;
 import jcifs.internal.smb2.create.Smb2CloseResponse;
 import jcifs.internal.smb2.create.Smb2CreateRequest;
@@ -91,6 +94,7 @@ import jcifs.internal.smb2.create.Smb2CreateResponse;
 import jcifs.internal.smb2.info.Smb2QueryInfoRequest;
 import jcifs.internal.smb2.info.Smb2QueryInfoResponse;
 import jcifs.internal.smb2.info.Smb2SetInfoRequest;
+import jcifs.internal.util.RecursionLimiter;
 
 
 /**
@@ -364,6 +368,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
     private long size;
     private long sizeExpiration;
     private boolean isExists;
+    private boolean isSymLink;
+    private String symLinkTargetPath;
 
     private CIFSContext transportContext;
     private SmbTreeConnection treeConnection;
@@ -644,6 +650,8 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
 
     SmbFileHandleImpl openUnshared ( String uncPath, int flags, int access, int sharing, int attrs, int options ) throws CIFSException {
+        RecursionLimiter.emerge();
+
         SmbFileHandleImpl fh = null;
         try ( SmbTreeHandleImpl h = ensureTreeConnected() ) {
 
@@ -657,30 +665,66 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             long fileSize = 0;
             if ( h.isSMB2() ) {
                 Smb2CreateRequest req = new Smb2CreateRequest(config, uncPath);
-                req.setDesiredAccess(access);
+                try {
+                    req.setDesiredAccess(access);
 
-                if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC && ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE_IF);
-                }
-                else if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE);
-                }
-                else if ( ( flags & SmbConstants.O_EXCL ) == O_EXCL ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_CREATE);
-                }
-                else if ( ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
-                }
-                else {
-                    req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN);
-                }
+                    if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC && ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE_IF);
+                    }
+                    else if ( ( flags & SmbConstants.O_TRUNC ) == O_TRUNC ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OVERWRITE);
+                    }
+                    else if ( ( flags & SmbConstants.O_EXCL ) == O_EXCL ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_CREATE);
+                    }
+                    else if ( ( flags & SmbConstants.O_CREAT ) == O_CREAT ) {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN_IF);
+                    }
+                    else {
+                        req.setCreateDisposition(Smb2CreateRequest.FILE_OPEN);
+                    }
 
-                req.setShareAccess(sharing);
-                req.setFileAttributes(attrs);
-                Smb2CreateResponse resp = h.send(req);
-                info = resp;
-                fileSize = resp.getEndOfFile();
-                fh = new SmbFileHandleImpl(config, resp.getFileId(), h, uncPath, flags, access, 0, 0, resp.getEndOfFile());
+                    req.setShareAccess(sharing);
+                    req.setFileAttributes(attrs);
+                    Smb2CreateResponse resp = h.send(req);
+                    info = resp;
+                    fileSize = resp.getEndOfFile();
+                    fh = new SmbFileHandleImpl(config, resp.getFileId(), h, uncPath, flags, access, 0, 0, resp.getEndOfFile());
+                }
+                catch ( CIFSException | RuntimeException e ) {
+                    Smb2CreateResponse resp = req.getResponse();
+
+                    // We hit a symbolic link, parse the error data and resend for the 'real' directory or file path
+                    if (resp != null && resp.isReceived() && resp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK) {
+                        this.isSymLink = true;
+
+                        if (config.getMinimumVersion() != DialectVersion.SMB311) {
+                            throw new SMBProtocolDecodingException(
+                                    "Configuration must be set to a minimum of version SMB 3.1.1 for property "
+                                            + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
+                        }
+
+                        try {
+                            Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                            String targetPath = resolver.parseSymLinkErrorData(resp.getFileName(), resp.getErrorData());
+                            this.symLinkTargetPath = targetPath;
+
+                            if (targetPath.startsWith("\\??\\")) {
+                                throw new SMBProtocolDecodingException("SymLink target is a local path: " + targetPath);
+                            } else {
+                                return openUnshared(targetPath, flags, access, sharing, attrs, options);
+                            }
+                        }
+                        catch ( CIFSException | RuntimeException e2 ) {
+                            log.error("Exception thrown while processing symbolic link error data", e2);
+                            throw e2;
+                        }
+                    }
+                    else {
+                        log.error("Exception thrown while processing SMB2 request", e);
+                        throw e;
+                    }
+                }
             }
             else if ( h.hasCapability(SmbConstants.CAP_NT_SMBS) ) {
                 SmbComNTCreateAndXResponse resp = new SmbComNTCreateAndXResponse(config);
@@ -743,6 +787,11 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             this.isExists = true;
             return fh;
         }
+    }
+
+
+    public String getSymLinkTargetPath() {
+        return this.symLinkTargetPath;
     }
 
 
@@ -831,10 +880,18 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
 
     @Override
     public boolean exists () throws SmbException {
+        return exists(false);
+    }
 
-        if ( this.attrExpiration > System.currentTimeMillis() ) {
-            log.trace("Using cached attributes");
-            return this.isExists;
+
+    private boolean exists (boolean symLink) throws SmbException {
+        this.isSymLink = false;
+
+        if (!symLink) {
+            if ( this.attrExpiration > System.currentTimeMillis() ) {
+                log.trace("Using cached attributes");
+                return this.isExists;
+            }
         }
 
         this.attributes = ATTR_READONLY | ATTR_DIRECTORY;
@@ -884,6 +941,9 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             case NtStatus.NT_STATUS_OBJECT_NAME_INVALID:
             case NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND:
             case NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND:
+                break;
+            case NtStatus.NT_STATUS_STOPPED_ON_SYMLINK:
+                this.isSymLink = true;
                 break;
             default:
                 throw se;
@@ -1103,6 +1163,16 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
         }
         exists();
         return ( this.attributes & ATTR_HIDDEN ) == ATTR_HIDDEN;
+    }
+
+
+    @Override
+    public boolean isSymLink () throws SmbException {
+        if ( !this.fileLocator.isRootOrShare() ) {
+            exists(true);
+            return this.isSymLink;
+        }
+        return false;
     }
 
 
@@ -1785,9 +1855,21 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
             CIFSException |
             RuntimeException e ) {
             try {
-                // make sure that the handle is closed when one of the requests fails
                 Smb2CreateResponse createResp = cr.getResponse();
-                if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
+                if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_STOPPED_ON_SYMLINK ) {
+                    this.isSymLink = true;
+
+                    if (th.getConfig().getMinimumVersion() != DialectVersion.SMB311) {
+                        throw new SMBProtocolDecodingException(
+                                "Configuration must be set to a minimum of version SMB 3.1.1 for property "
+                                        + "'jcifs.smb.client.minVersion' to resolve symbolic link target path");
+                    }
+
+                    // we hit a symbolic link, parse the error data to retrieve the target path
+                    Smb2SymLinkResolver resolver = new Smb2SymLinkResolver();
+                    this.symLinkTargetPath = resolver.parseSymLinkErrorData(createResp.getFileName(), createResp.getErrorData());
+                } else if ( createResp.isReceived() && createResp.getStatus() == NtStatus.NT_STATUS_OK ) {
+                    // make sure that the handle is closed when one of the requests fails
                     th.send(new Smb2CloseRequest(th.getConfig(), createResp.getFileId()), RequestParam.NO_RETRY);
                 }
             }
