@@ -34,6 +34,12 @@ public interface BufferCache {
 
 
     /**
+     * @return the maximum size of buffers in this cache
+     */
+    int getMaximumBufferSize ();
+
+
+    /**
      * Return a buffer to the cache
      * 
      * @param buf
