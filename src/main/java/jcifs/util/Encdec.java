@@ -70,6 +70,14 @@ public final class Encdec {
     }
 
 
+    public static int enc_uint24be ( int i, byte[] dst, int di ) {
+        dst[ di++ ] = (byte) ( ( i >> 16 ) & 0xFF );
+        dst[ di++ ] = (byte) ( ( i >> 8 ) & 0xFF );
+        dst[ di ] = (byte) ( i & 0xFF );
+        return 3;
+    }
+
+
     public static int enc_uint16le ( short s, byte[] dst, int di ) {
         dst[ di++ ] = (byte) ( s & 0xFF );
         dst[ di ] = (byte) ( ( s >> 8 ) & 0xFF );
@@ -97,6 +105,11 @@ public final class Encdec {
 
     public static int dec_uint32be ( byte[] src, int si ) {
         return ( ( src[ si ] & 0xFF ) << 24 ) | ( ( src[ si + 1 ] & 0xFF ) << 16 ) | ( ( src[ si + 2 ] & 0xFF ) << 8 ) | ( src[ si + 3 ] & 0xFF );
+    }
+
+
+    public static int dec_uint24be ( byte[] src, int si ) {
+        return ( ( src[ si ] & 0xFF ) << 16 ) | ( ( src[ si + 1 ] & 0xFF ) << 8 ) | ( src[ si + 2 ] & 0xFF );
     }
 
 

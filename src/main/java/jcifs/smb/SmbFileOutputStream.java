@@ -327,6 +327,7 @@ public class SmbFileOutputStream extends OutputStream {
                 if ( this.smb2 ) {
                     Smb2WriteRequest wr = new Smb2WriteRequest(th.getConfig(), fh.getFileId());
                     wr.setOffset(this.fp);
+                    wr.setRemainingBytes(len - w);
                     wr.setData(b, off, w);
 
                     Smb2WriteResponse resp = th.send(wr, RequestParam.NO_RETRY);

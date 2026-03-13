@@ -31,6 +31,19 @@ public interface Request extends Message {
 
 
     /**
+     * @return the size of this request
+     */
+    int size ();
+
+
+    /**
+     * @param cost
+     */
+
+    void setCreditCharge ( int cost );
+
+
+    /**
      * @param credits
      */
     void setRequestCredits ( int credits );

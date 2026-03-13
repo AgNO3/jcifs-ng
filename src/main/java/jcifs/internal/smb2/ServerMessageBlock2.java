@@ -27,6 +27,9 @@ import jcifs.internal.util.SMBUtil;
 import jcifs.smb.SmbException;
 import jcifs.util.Hexdump;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * 
@@ -34,6 +37,8 @@ import jcifs.util.Hexdump;
  *
  */
 public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
+
+    private static final Logger log = LoggerFactory.getLogger(ServerMessageBlock2.class);
 
     /*
      * These are all the smbs supported by this library. This includes requests
@@ -96,7 +101,8 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
 
     private int command;
     private int flags;
-    private int length, headerStart, wordCount, byteCount;
+    private int length, wordCount, byteCount;
+    protected int headerStart;
 
     private byte[] signature = new byte[16];
     private Smb2SigningDigest digest = null;
@@ -251,6 +257,15 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
      */
     public final int getCreditCharge () {
         return this.creditCharge;
+    }
+
+
+    /**
+     * @param creditCharge
+     *            the creditCharge to set
+     */
+    public final void setCreditCharge ( int creditCharge ) {
+        this.creditCharge = creditCharge;
     }
 
 
@@ -680,6 +695,11 @@ public abstract class ServerMessageBlock2 implements CommonServerMessageBlock {
         bufferIndex += 4;
         this.mid = SMBUtil.readInt8(buffer, bufferIndex);
         bufferIndex += 8;
+
+        if ( log.isTraceEnabled() ) {
+            log.trace(String.format("SMB2 Header: mid=%d, command=%d, creditCharge=%d, creditGranted=%d, status=0x%08x, flags=0x%08x", 
+                this.mid, this.command, this.creditCharge, this.credit, this.status, this.flags));
+        }
 
         if ( ( this.flags & SMB2_FLAGS_ASYNC_COMMAND ) == SMB2_FLAGS_ASYNC_COMMAND ) {
             // async

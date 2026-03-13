@@ -61,6 +61,10 @@ public class Smb2NegotiateRequest extends ServerMessageBlock2Request<Smb2Negotia
             this.capabilities |= Smb2Constants.SMB2_GLOBAL_CAP_ENCRYPTION;
         }
 
+        if ( config.getMaximumVersion() != null && config.getMaximumVersion().atLeast(DialectVersion.SMB210) ) {
+            this.capabilities |= Smb2Constants.SMB2_GLOBAL_CAP_LARGE_MTU;
+        }
+
         Set<DialectVersion> dvs = DialectVersion
                 .range(DialectVersion.max(DialectVersion.SMB202, config.getMinimumVersion()), config.getMaximumVersion());
 
