@@ -81,6 +81,15 @@ public class Smb2ReadRequest extends ServerMessageBlock2Request<Smb2ReadResponse
     }
 
 
+    @Override
+    public int getCreditCost () {
+        if ( this.readLength <= 0 ) {
+            return 1;
+        }
+        return ( this.readLength - 1 ) / 65536 + 1;
+    }
+
+
     /**
      * {@inheritDoc}
      *
@@ -190,6 +199,14 @@ public class Smb2ReadRequest extends ServerMessageBlock2Request<Smb2ReadResponse
         // one byte in buffer must be zero
         dst[ dstIndex ] = 0;
         dstIndex += 1;
+
+        // pad to 8 byte boundary to match size()
+        int total = dstIndex - start + Smb2Constants.SMB2_HEADER_LENGTH;
+        int aligned = size8(total);
+        int pad = aligned - total;
+        for ( int i = 0; i < pad; i++ ) {
+            dst[ dstIndex++ ] = (byte) 0;
+        }
 
         return dstIndex - start;
     }
