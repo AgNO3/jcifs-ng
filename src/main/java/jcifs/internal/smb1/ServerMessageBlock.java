@@ -404,8 +404,6 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
         return 1;
     }
 
-
-    @Override
     public void setCreditCharge ( int cost ) {}
 
 

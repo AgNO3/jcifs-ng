@@ -82,12 +82,6 @@ public class BufferCacheImpl implements BufferCache {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @see jcifs.BufferCache#getMaximumBufferSize()
-     */
-    @Override
     public int getMaximumBufferSize () {
         return this.bufferSize;
     }

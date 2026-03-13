@@ -915,17 +915,18 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     protected void doSend ( Request request ) throws IOException {
 
         CommonServerMessageBlock smb = (CommonServerMessageBlock) request;
-        int size = request.size();
+        int size = ( (CommonServerMessageBlockRequest) request ).size();
         byte[] buffer = null;
         boolean fromCache = false;
+        int maximumBufferSize = getContext().getConfig().getMaximumBufferSize();
 
-        if ( size > 0 && size + 4 <= getContext().getBufferCache().getMaximumBufferSize() ) {
+        if ( size > 0 && size + 4 <= maximumBufferSize ) {
             buffer = getContext().getBufferCache().getBuffer();
             fromCache = true;
         }
 
         if ( buffer == null ) {
-            int bsize = Math.max(size + 4, getContext().getBufferCache().getMaximumBufferSize());
+            int bsize = Math.max(size + 4, maximumBufferSize);
             buffer = new byte[bsize];
         }
 
@@ -993,7 +994,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 }
                 if ( ( next == null || chain.allowChain(next) ) && totalSize + size < maxSize && this.credits.tryAcquire(cost) ) {
                     if ( this.largeMtu && cost > 1 ) {
-                        chain.setCreditCharge(cost);
+                        if ( chain instanceof ServerMessageBlock2 ) {
+                            ( (ServerMessageBlock2) chain ).setCreditCharge(cost);
+                        }
                     }
                     totalSize += size;
                     totalCost += cost;
@@ -1018,7 +1021,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                             }
                         }
                         if ( this.largeMtu && cost > 1 ) {
-                            chain.setCreditCharge(cost);
+                            if ( chain instanceof ServerMessageBlock2 ) {
+                                ( (ServerMessageBlock2) chain ).setCreditCharge(cost);
+                            }
                         }
                         totalSize += size;
                         totalCost += cost;
