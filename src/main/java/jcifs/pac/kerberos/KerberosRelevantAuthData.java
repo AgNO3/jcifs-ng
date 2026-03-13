@@ -26,11 +26,7 @@ import java.util.Map;
 
 import javax.security.auth.kerberos.KerberosKey;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1Integer;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DERTaggedObject;
-import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.*;
 
 import jcifs.pac.ASN1Util;
 import jcifs.pac.PACDecodingException;
@@ -43,10 +39,10 @@ public class KerberosRelevantAuthData extends KerberosAuthData {
 
 
     public KerberosRelevantAuthData ( byte[] token, Map<Integer, KerberosKey> keys ) throws PACDecodingException {
-        DLSequence authSequence;
+        ASN1Sequence authSequence;
         try {
             try ( ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token)) ) {
-                authSequence = ASN1Util.as(DLSequence.class, stream);
+                authSequence = ASN1Util.as(ASN1Sequence.class, stream);
             }
         }
         catch ( IOException e ) {
@@ -56,9 +52,9 @@ public class KerberosRelevantAuthData extends KerberosAuthData {
         this.authorizations = new ArrayList<>();
         Enumeration<?> authElements = authSequence.getObjects();
         while ( authElements.hasMoreElements() ) {
-            DLSequence authElement = ASN1Util.as(DLSequence.class, authElements);
-            ASN1Integer authType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(DERTaggedObject.class, authElement, 0));
-            DEROctetString authData = ASN1Util.as(DEROctetString.class, ASN1Util.as(DERTaggedObject.class, authElement, 1));
+            ASN1Sequence authElement = ASN1Util.as(ASN1Sequence.class, authElements);
+            ASN1Integer authType = ASN1Util.as(ASN1Integer.class, ASN1Util.as(ASN1TaggedObject.class, authElement, 0));
+            DEROctetString authData = ASN1Util.as(DEROctetString.class, ASN1Util.as(ASN1TaggedObject.class, authElement, 1));
 
             this.authorizations.addAll(KerberosAuthData.parse(authType.getValue().intValue(), authData.getOctets(), keys));
         }

@@ -30,6 +30,7 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 
+import jcifs.CIFSContext;
 import jcifs.smb.*;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -509,6 +510,38 @@ public class FileOperationsTest extends BaseCIFSTest {
             finally {
                 r.delete();
             }
+        }
+    }
+
+    @Test
+    public void testCopyMultipath() throws IOException {
+        int bufSize = 65536;
+        long length = 1024;
+        String uncA = getRequiredProperty("test.dfs.multipath.a");
+        String uncB = getRequiredProperty("test.dfs.multipath.b");
+
+        CIFSContext ctx = withTestNTLMCredentials(getContext());
+        try {
+            try (SmbResource a = ctx.get(uncA); SmbResource as = a.resolve("test-src")) {
+                try (OutputStream os = as.openOutputStream()) {
+                    ReadWriteTest.writeRandom(bufSize, length, os);
+                }
+            }
+
+
+            try (SmbResource a = ctx.get(uncA);
+                 SmbResource b = ctx.get(uncB);
+                 SmbResource src = a.resolve("test-src");
+                 SmbResource tgt = b.resolve("test-tgt")) {
+                src.copyTo(tgt);
+            }
+        } finally {
+            try {
+                ctx.get(uncA).resolve("test-src").delete();
+            } catch (CIFSException ignored) {}
+            try {
+                ctx.get(uncB).resolve("test-tgt").delete();
+            } catch (CIFSException ignored) {}
         }
     }
 }

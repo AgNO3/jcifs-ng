@@ -24,12 +24,7 @@ import java.util.Enumeration;
 
 import javax.security.auth.kerberos.KerberosKey;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1Integer;
-import org.bouncycastle.asn1.ASN1TaggedObject;
-import org.bouncycastle.asn1.DERApplicationSpecific;
-import org.bouncycastle.asn1.DERBitString;
-import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.*;
 
 import jcifs.pac.ASN1Util;
 import jcifs.pac.PACDecodingException;
@@ -43,20 +38,27 @@ public class KerberosApRequest {
 
 
     public KerberosApRequest ( byte[] token, KerberosKey[] keys ) throws PACDecodingException {
+        this(parseSequence(token), keys);
+    }
+
+    private static ASN1Sequence parseSequence(byte[] token) throws PACDecodingException {
         if ( token.length <= 0 )
             throw new PACDecodingException("Empty kerberos ApReq");
 
-        DLSequence sequence;
+        ASN1Sequence sequence;
         try {
             try ( ASN1InputStream stream = new ASN1InputStream(new ByteArrayInputStream(token)) ) {
-                sequence = ASN1Util.as(DLSequence.class, stream);
+                sequence = ASN1Util.as(ASN1Sequence.class, stream);
             }
         }
         catch ( IOException e ) {
             throw new PACDecodingException("Malformed Kerberos Ticket", e);
         }
+        return sequence;
+    }
 
-        Enumeration<?> fields = sequence.getObjects();
+    public KerberosApRequest(ASN1Sequence seq, KerberosKey[] keys) throws PACDecodingException {
+        Enumeration<?> fields = seq.getObjects();
         while ( fields.hasMoreElements() ) {
             ASN1TaggedObject tagged = ASN1Util.as(ASN1TaggedObject.class, fields.nextElement());
             switch ( tagged.getTagNo() ) {
@@ -76,10 +78,14 @@ public class KerberosApRequest {
                 this.apOptions = bitString.getBytes()[ 0 ];
                 break;
             case 3:
-                DERApplicationSpecific derTicket = ASN1Util.as(DERApplicationSpecific.class, tagged);
-                if ( !derTicket.isConstructed() )
+                ASN1TaggedObject derTicket = ASN1Util.as(ASN1TaggedObject.class, tagged);
+                if ( derTicket.getTagClass() != BERTags.APPLICATION )
                     throw new PACDecodingException("Malformed Kerberos Ticket");
-                this.ticket = new KerberosTicket(derTicket.getContents(), this.apOptions, keys);
+                try {
+                    this.ticket = new KerberosTicket(derTicket.getBaseObject().getEncoded(), this.apOptions, keys);
+                } catch (IOException e) {
+                    throw new PACDecodingException("Malformed Kerberos Ticket", e);
+                }
                 break;
             case 4:
                 // Let's ignore this for now

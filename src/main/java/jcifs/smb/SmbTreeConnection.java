@@ -1,16 +1,16 @@
 /*
  * © 2017 AgNO3 Gmbh & Co. KG
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -51,10 +51,10 @@ import jcifs.util.transport.TransportException;
 
 /**
  * This class encapsulates the logic for switching tree connections
- * 
+ *
  * Switching trees can occur either when the tree has been disconnected by failure or idle-timeout - as well as on
  * DFS referrals.
- * 
+ *
  * @author mbechler
  *
  */
@@ -211,7 +211,7 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      */
     public void release () {
         long usage = this.usageCount.decrementAndGet();
@@ -407,8 +407,8 @@ class SmbTreeConnection {
                 if ( dre.getData().unwrap(DfsReferralDataInternal.class).isResolveHashes() ) {
                     throw dre;
                 }
+                log.debug("Have referral (send0) {}", (Object)dre);
                 request.reset();
-                log.trace("send0", dre);
             }
         }
 
@@ -479,7 +479,7 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      * @param loc
      * @param host
      * @return tree handle
@@ -491,7 +491,7 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      * @param loc
      * @param host
      * @param referral
@@ -551,7 +551,6 @@ class SmbTreeConnection {
                           SmbTreeImpl ct = connectTree(loc, host, share, trans, uct, dr) ) {
 
                         if ( dr != null ) {
-                            ct.setTreeReferral(dr);
                             if ( dr != start ) {
                                 dr.unwrap(DfsReferralDataInternal.class).replaceCache();
                             }
@@ -567,7 +566,6 @@ class SmbTreeConnection {
                       SmbTreeImpl uct = smbSession.getSmbTree(share, null).unwrap(SmbTreeImpl.class);
                       SmbTreeImpl ct = connectTree(loc, host, share, trans, uct, dr) ) {
                     if ( dr != null ) {
-                        ct.setTreeReferral(dr);
                         if ( dr != start ) {
                             dr.unwrap(DfsReferralDataInternal.class).replaceCache();
                         }
@@ -708,28 +706,10 @@ class SmbTreeConnection {
 
             String rpath = request != null ? request.getPath() : loc.getUNCPath();
             String rfullpath = request != null ? request.getFullUNCPath() : ( '\\' + loc.getServer() + '\\' + loc.getShare() + loc.getUNCPath() );
-            if ( t.isInDomainDfs() || !t.isPossiblyDfs() ) {
-                if ( t.isInDomainDfs() ) {
-                    // need to adjust request path
-                    DfsReferralData dr = t.getTreeReferral();
-                    if ( dr != null ) {
-                        if ( log.isDebugEnabled() ) {
-                            log.debug(String.format("Need to adjust request path %s (full: %s) -> %s", rpath, rfullpath, dr));
-                        }
-                        String dunc = loc.handleDFSReferral(dr, rpath);
-                        if ( request != null ) {
-                            request.setPath(dunc);
-                        }
-                        return loc;
-                    }
 
-                    // fallthrough to normal handling
-                    log.debug("No tree referral but in DFS");
-                }
-                else {
-                    log.trace("Not in DFS");
-                    return loc;
-                }
+            if ( ! t.isPossiblyDfs() && ! t.isInDomainDfs() ) {
+                log.trace("Not in DFS");
+                return loc;
             }
 
             if ( request != null ) {
@@ -745,6 +725,8 @@ class SmbTreeConnection {
 
                 String dunc = loc.handleDFSReferral(dr, rpath);
                 if ( request != null ) {
+                    String refullpath = '\\' + dr.getServer() + '\\' + loc.getShare() + loc.getUNCPath();
+                    request.setFullUNCPath(dr.getDomain(), dr.getServer(), refullpath);
                     request.setPath(dunc);
                 }
 
@@ -777,7 +759,7 @@ class SmbTreeConnection {
                 if ( log.isDebugEnabled() ) {
                     log.debug("No referral available for  " + rfullpath);
                 }
-                throw new CIFSException("No referral but in domain DFS " + rfullpath);
+                return loc;
             }
             else {
                 log.trace("Not in DFS");
@@ -789,10 +771,10 @@ class SmbTreeConnection {
 
     /**
      * Use a exclusive connection for this tree
-     * 
+     *
      * If an exclusive connection is used the caller must make sure that the tree handle is kept alive,
      * otherwise the connection will be disconnected once the usage drops to zero.
-     * 
+     *
      * @param np
      *            whether to use an exclusive connection
      */
@@ -815,9 +797,9 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      * Only call this method while holding a tree handle
-     * 
+     *
      * @return session that this file has been loaded through
      */
     @SuppressWarnings ( "resource" )
@@ -831,9 +813,9 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      * Only call this method while holding a tree handle
-     * 
+     *
      * @param cap
      * @return whether the capability is available
      * @throws SmbException
@@ -852,7 +834,7 @@ class SmbTreeConnection {
 
     /**
      * Only call this method while holding a tree handle
-     * 
+     *
      * @return the connected tree type
      */
     public int getTreeType () {
@@ -863,9 +845,9 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      * Only call this method while holding a tree handle
-     * 
+     *
      * @return the share we are connected to
      */
     public String getConnectedShare () {
@@ -876,9 +858,9 @@ class SmbTreeConnection {
 
 
     /**
-     * 
+     *
      * Only call this method while holding a tree handle
-     * 
+     *
      * @param other
      * @return whether the connection refers to the same tree
      */

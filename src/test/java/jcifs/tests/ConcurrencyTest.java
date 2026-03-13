@@ -342,7 +342,9 @@ public class ConcurrencyTest extends BaseCIFSTest {
         }
         finally {
             this.executor.shutdown();
-            this.executor.awaitTermination(5, TimeUnit.SECONDS);
+            try {
+                this.executor.awaitTermination(5, TimeUnit.SECONDS);
+            } catch ( InterruptedException ignored ) {}
         }
     }
 

@@ -5,7 +5,7 @@
 	<artifactId>jcifs-ng</artifactId>
 	<groupId>eu.agno3.jcifs</groupId>
 	<packaging>bundle</packaging>
-	<version>2.1.10-SNAPSHOT</version>
+	<version>2.1.11-SNAPSHOT</version>
 	<description>A pure-java CIFS/SMB client library</description>
 	<url>https://github.com/AgNO3/jcifs-ng/</url>
 
@@ -64,20 +64,20 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.32</version>
+			<version>1.7.36</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-log4j12</artifactId>
-			<version>1.7.32</version>
+			<version>1.7.36</version>
 			<scope>test</scope>
 		</dependency>
 		 
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.69</version>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.81</version>
 		</dependency>
 
 		<dependency>
