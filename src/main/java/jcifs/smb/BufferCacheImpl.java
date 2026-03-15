@@ -81,12 +81,6 @@ public class BufferCacheImpl implements BufferCache {
         }
     }
 
-
-    public int getMaximumBufferSize () {
-        return this.bufferSize;
-    }
-
-
     /**
      * {@inheritDoc}
      *

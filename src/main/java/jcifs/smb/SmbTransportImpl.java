@@ -916,50 +916,34 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
         CommonServerMessageBlock smb = (CommonServerMessageBlock) request;
         int size = ( (CommonServerMessageBlockRequest) request ).size();
-        byte[] buffer = null;
-        boolean fromCache = false;
         int maximumBufferSize = getContext().getConfig().getMaximumBufferSize();
+        int bsize = Math.max(size + 4, maximumBufferSize);
+        byte[] buffer = new byte[bsize];
 
-        if ( size > 0 && size + 4 <= maximumBufferSize ) {
-            buffer = getContext().getBufferCache().getBuffer();
-            fromCache = true;
-        }
+        // synchronize around encode and write so that the ordering for SMB1 signing can be maintained
+        synchronized ( this.outLock ) {
+            int n = smb.encode(buffer, 4);
+            buffer[ 0 ] = (byte) 0x00;
+            buffer[ 1 ] = (byte) ( ( n >> 16 ) & 0xFF );
+            buffer[ 2 ] = (byte) ( ( n >> 8 ) & 0xFF );
+            buffer[ 3 ] = (byte) ( n & 0xFF );
 
-        if ( buffer == null ) {
-            int bsize = Math.max(size + 4, maximumBufferSize);
-            buffer = new byte[bsize];
-        }
-
-        try {
-            // synchronize around encode and write so that the ordering for SMB1 signing can be maintained
-            synchronized ( this.outLock ) {
-                int n = smb.encode(buffer, 4);
-                buffer[ 0 ] = (byte) 0x00;
-                buffer[ 1 ] = (byte) ( ( n >> 16 ) & 0xFF );
-                buffer[ 2 ] = (byte) ( ( n >> 8 ) & 0xFF );
-                buffer[ 3 ] = (byte) ( n & 0xFF );
-
-                if ( log.isTraceEnabled() ) {
-                    do {
-                        log.trace(smb.toString());
-                    }
-                    while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).getAndx() ) != null );
-                    log.trace(Hexdump.toHexString(buffer, 4, n));
-
+            if ( log.isTraceEnabled() ) {
+                do {
+                    log.trace(smb.toString());
                 }
-                /*
-                 * For some reason this can sometimes get broken up into another
-                 * "NBSS Continuation Message" frame according to WireShark
-                 */
+                while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).getAndx() ) != null );
+                log.trace(Hexdump.toHexString(buffer, 4, n));
 
-                this.out.write(buffer, 0, 4 + n);
-                this.out.flush();
             }
-        }
-        finally {
-            if ( fromCache ) {
-                this.getContext().getBufferCache().releaseBuffer(buffer);
-            }
+
+            /*
+             * For some reason this can sometimes get broken up into another
+             * "NBSS Continuation Message" frame according to WireShark
+             */
+
+            this.out.write(buffer, 0, 4 + n);
+            this.out.flush();
         }
     }
 
@@ -1274,38 +1258,62 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         int nextCommand = Encdec.dec_uint32le(this.sbuf, 4 + 20);
         int maximumBufferSize = getContext().getConfig().getMaximumBufferSize();
         int msgSize = nextCommand != 0 ? nextCommand : size;
-        
+
         ServerMessageBlock2Response cur = (ServerMessageBlock2Response) response;
-        byte[] buffer = null;
-        boolean fromCache = false;
-        
-        if ( this.largeMtu ) {
-            if ( msgSize + 4 <= maximumBufferSize ) {
-                buffer = getContext().getBufferCache().getBuffer();
-                fromCache = true;
-            }
-            else {
-                buffer = new byte[msgSize + 4];
-            }
-        }
-        else {
-            if ( msgSize > maximumBufferSize ) {
-                throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", msgSize, maximumBufferSize));
-            }
-            buffer = getContext().getBufferCache().getBuffer();
-            fromCache = true;
+        if ( !this.largeMtu && msgSize > maximumBufferSize ) {
+            throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", msgSize, maximumBufferSize));
         }
 
-        try {
-            int rl = nextCommand != 0 ? nextCommand : size;
+        byte[] buffer = new byte[msgSize];
 
-            // read and decode first
-            System.arraycopy(this.sbuf, 4, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
-            readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
+        int rl = nextCommand != 0 ? nextCommand : size;
+
+        // read and decode first
+        System.arraycopy(this.sbuf, 4, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
+        readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
+
+        cur.setReadSize(rl);
+        int len = cur.decode(buffer, 0);
+
+        if ( len > rl ) {
+            throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
+        }
+        else if ( nextCommand != 0 && len > nextCommand ) {
+            throw new IOException("Overlapping commands");
+        }
+        size -= rl;
+
+        while ( size > 0 && nextCommand != 0 ) {
+            cur = (ServerMessageBlock2Response) cur.getNextResponse();
+            if ( cur == null ) {
+                log.warn("Response not properly set up");
+                this.in.skip(size);
+                break;
+            }
+
+            // read next header
+            readn(this.in, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
+            nextCommand = Encdec.dec_uint32le(buffer, 20);
+
+            rl = nextCommand != 0 ? nextCommand : size;
+            if ( !this.largeMtu && rl > maximumBufferSize ) {
+                throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", rl, maximumBufferSize));
+            }
+
+            if ( rl > buffer.length ) {
+                byte[] newBuffer = new byte[rl];
+                System.arraycopy(buffer, 0, newBuffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
+                buffer = newBuffer;
+            }
+
+            if ( log.isDebugEnabled() ) {
+                log.debug(String.format("Compound next command %d read size %d remain %d", nextCommand, rl, size));
+            }
 
             cur.setReadSize(rl);
-            int len = cur.decode(buffer, 0);
+            readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
 
+            len = cur.decode(buffer, 0, true);
             if ( len > rl ) {
                 throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
             }
@@ -1313,55 +1321,6 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 throw new IOException("Overlapping commands");
             }
             size -= rl;
-
-            while ( size > 0 && nextCommand != 0 ) {
-                cur = (ServerMessageBlock2Response) cur.getNextResponse();
-                if ( cur == null ) {
-                    log.warn("Response not properly set up");
-                    this.in.skip(size);
-                    break;
-                }
-
-                // read next header
-                readn(this.in, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
-                nextCommand = Encdec.dec_uint32le(buffer, 20);
-
-                rl = nextCommand != 0 ? nextCommand : size;
-                if ( !this.largeMtu && rl > maximumBufferSize ) {
-                    throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", rl, maximumBufferSize));
-                }
-
-                if ( rl > buffer.length ) {
-                    byte[] newBuffer = new byte[rl];
-                    System.arraycopy(buffer, 0, newBuffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
-                    if ( fromCache ) {
-                        getContext().getBufferCache().releaseBuffer(buffer);
-                        fromCache = false;
-                    }
-                    buffer = newBuffer;
-                }
-
-                if ( log.isDebugEnabled() ) {
-                    log.debug(String.format("Compound next command %d read size %d remain %d", nextCommand, rl, size));
-                }
-
-                cur.setReadSize(rl);
-                readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
-
-                len = cur.decode(buffer, 0, true);
-                if ( len > rl ) {
-                    throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
-                }
-                else if ( nextCommand != 0 && len > nextCommand ) {
-                    throw new IOException("Overlapping commands");
-                }
-                size -= rl;
-            }
-        }
-        finally {
-            if ( fromCache && buffer != null ) {
-                getContext().getBufferCache().releaseBuffer(buffer);
-            }
         }
     }
 
