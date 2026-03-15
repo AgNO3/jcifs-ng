@@ -81,7 +81,6 @@ public class BufferCacheImpl implements BufferCache {
         }
     }
 
-
     /**
      * {@inheritDoc}
      *

@@ -126,6 +126,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     private final boolean signingEnforced;
 
     private SmbNegotiationResponse negotiated;
+    private DialectVersion selectedDialect;
+    private boolean largeMtu;
+    private int lastSize;
 
     private SMBSigningDigest digest;
 
@@ -740,7 +743,9 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         /* Adjust negotiated values */
         this.tconHostName = this.address.getHostName();
         this.negotiated = resp.getResponse();
-        if ( resp.getResponse().getSelectedDialect().atLeast(DialectVersion.SMB311) ) {
+        this.selectedDialect = this.negotiated.getSelectedDialect();
+        this.largeMtu = this.selectedDialect.atLeast(DialectVersion.SMB210) && this.negotiated.haveCapabilitiy(Smb2Constants.SMB2_GLOBAL_CAP_LARGE_MTU);
+        if ( this.selectedDialect.atLeast(DialectVersion.SMB311) ) {
             updatePreauthHash(resp.getRequestRaw());
             updatePreauthHash(resp.getResponseRaw());
             if ( log.isDebugEnabled() ) {
@@ -813,8 +818,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
     @Override
     protected long makeKey ( Request request ) throws IOException {
-        long m = this.mid.incrementAndGet() - 1;
-        if ( !this.smb2 ) {
+        long m;
+        if ( this.smb2 ) {
+            int cost = Math.max(1, request.getCreditCost());
+            m = this.mid.getAndAdd(cost);
+        }
+        else {
+            m = this.mid.incrementAndGet() - 1;
             m = ( m % 32000 );
         }
         ( (CommonServerMessageBlock) request ).setMid(m);
@@ -826,13 +836,40 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     protected Long peekKey () throws IOException {
         do {
             if ( ( readn(this.in, this.sbuf, 0, 4) ) < 4 ) {
+                if ( log.isDebugEnabled() )
+                    log.debug("Failed to read NBSS header");
                 return null;
             }
         }
         while ( this.sbuf[ 0 ] == (byte) 0x85 ); /* Dodge NetBIOS keep-alive */
+
+        this.lastSize = ( ( this.sbuf[ 1 ] & 0xFF ) << 16 ) | ( ( this.sbuf[ 2 ] & 0xFF ) << 8 ) | ( this.sbuf[ 3 ] & 0xFF );
+        if ( log.isTraceEnabled() ) {
+            log.trace("NBSS message size " + this.lastSize);
+        }
+
         /* read smb header */
         if ( ( readn(this.in, this.sbuf, 4, SmbConstants.SMB1_HEADER_LENGTH) ) < SmbConstants.SMB1_HEADER_LENGTH ) {
+            if ( log.isDebugEnabled() )
+                log.debug("Failed to read SMB1 header part");
             return null;
+        }
+
+        if ( this.sbuf[ 4 ] == (byte) 0xFE && this.sbuf[ 5 ] == (byte) 'S' && this.sbuf[ 6 ] == (byte) 'M' && this.sbuf[ 7 ] == (byte) 'B' ) {
+            this.smb2 = true;
+            this.lastSize = ( ( this.sbuf[ 1 ] & 0xFF ) << 16 ) | ( ( this.sbuf[ 2 ] & 0xFF ) << 8 ) | ( this.sbuf[ 3 ] & 0xFF );
+            /* also read the rest of the header */
+            int lenDiff = Smb2Constants.SMB2_HEADER_LENGTH - SmbConstants.SMB1_HEADER_LENGTH;
+            if ( readn(this.in, this.sbuf, 4 + SmbConstants.SMB1_HEADER_LENGTH, lenDiff) < lenDiff ) {
+                if ( log.isDebugEnabled() )
+                    log.debug("Failed to read SMB2 header part");
+                return null;
+            }
+            long mid = (long) Encdec.dec_uint64le(this.sbuf, 28);
+            if ( log.isTraceEnabled() ) {
+                log.trace("SMB2 message mid " + mid + " size " + this.lastSize);
+            }
+            return mid;
         }
 
         if ( log.isTraceEnabled() ) {
@@ -841,40 +878,26 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         }
 
         for ( ;; ) {
-            /*
-             * 01234567
-             * 00SSFSMB
-             * 0 - 0's
-             * S - size of payload
-             * FSMB - 0xFF SMB magic #
-             */
 
-            if ( this.sbuf[ 0 ] == (byte) 0x00 && this.sbuf[ 4 ] == (byte) 0xFE && this.sbuf[ 5 ] == (byte) 'S' && this.sbuf[ 6 ] == (byte) 'M'
+            if ( this.sbuf[ 0 ] == (byte) 0x00 && this.sbuf[ 4 ] == (byte) 0xFF && this.sbuf[ 5 ] == (byte) 'S' && this.sbuf[ 6 ] == (byte) 'M'
                     && this.sbuf[ 7 ] == (byte) 'B' ) {
-                this.smb2 = true;
-                // also read the rest of the header
-                int lenDiff = Smb2Constants.SMB2_HEADER_LENGTH - SmbConstants.SMB1_HEADER_LENGTH;
-                if ( readn(this.in, this.sbuf, 4 + SmbConstants.SMB1_HEADER_LENGTH, lenDiff) < lenDiff ) {
-                    return null;
-                }
-                return (long) Encdec.dec_uint64le(this.sbuf, 28);
-            }
-
-            if ( this.sbuf[ 0 ] == (byte) 0x00 && this.sbuf[ 1 ] == (byte) 0x00 && ( this.sbuf[ 4 ] == (byte) 0xFF ) && this.sbuf[ 5 ] == (byte) 'S'
-                    && this.sbuf[ 6 ] == (byte) 'M' && this.sbuf[ 7 ] == (byte) 'B' ) {
+                this.lastSize = ( ( this.sbuf[ 1 ] & 0xFF ) << 16 ) | ( ( this.sbuf[ 2 ] & 0xFF ) << 8 ) | ( this.sbuf[ 3 ] & 0xFF );
                 break; /* all good (SMB) */
             }
 
             /* out of phase maybe? */
             /* inch forward 1 byte and try again */
+            log.warn("Possibly out of phase, trying to resync " + Hexdump.toHexString(this.sbuf, 0, 16));
             for ( int i = 0; i < 35; i++ ) {
-                log.warn("Possibly out of phase, trying to resync " + Hexdump.toHexString(this.sbuf, 0, 16));
                 this.sbuf[ i ] = this.sbuf[ i + 1 ];
             }
             int b;
             if ( ( b = this.in.read() ) == -1 )
                 return null;
             this.sbuf[ 35 ] = (byte) b;
+
+            /* re-evaluate lastSize if we are shifting */
+            this.lastSize = ( ( this.sbuf[ 1 ] & 0xFF ) << 16 ) | ( ( this.sbuf[ 2 ] & 0xFF ) << 8 ) | ( this.sbuf[ 3 ] & 0xFF );
         }
 
         /*
@@ -892,31 +915,35 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
     protected void doSend ( Request request ) throws IOException {
 
         CommonServerMessageBlock smb = (CommonServerMessageBlock) request;
-        byte[] buffer = this.getContext().getBufferCache().getBuffer();
-        try {
-            // synchronize around encode and write so that the ordering for SMB1 signing can be maintained
-            synchronized ( this.outLock ) {
-                int n = smb.encode(buffer, 4);
-                Encdec.enc_uint32be(n & 0xFFFF, buffer, 0); /* 4 byte session message header */
-                if ( log.isTraceEnabled() ) {
-                    do {
-                        log.trace(smb.toString());
-                    }
-                    while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).getAndx() ) != null );
-                    log.trace(Hexdump.toHexString(buffer, 4, n));
+        int size = ( (CommonServerMessageBlockRequest) request ).size();
+        int maximumBufferSize = getContext().getConfig().getMaximumBufferSize();
+        int bsize = Math.max(size + 4, maximumBufferSize);
+        byte[] buffer = new byte[bsize];
 
+        // synchronize around encode and write so that the ordering for SMB1 signing can be maintained
+        synchronized ( this.outLock ) {
+            int n = smb.encode(buffer, 4);
+            buffer[ 0 ] = (byte) 0x00;
+            buffer[ 1 ] = (byte) ( ( n >> 16 ) & 0xFF );
+            buffer[ 2 ] = (byte) ( ( n >> 8 ) & 0xFF );
+            buffer[ 3 ] = (byte) ( n & 0xFF );
+
+            if ( log.isTraceEnabled() ) {
+                do {
+                    log.trace(smb.toString());
                 }
-                /*
-                 * For some reason this can sometimes get broken up into another
-                 * "NBSS Continuation Message" frame according to WireShark
-                 */
+                while ( smb instanceof AndXServerMessageBlock && ( smb = ( (AndXServerMessageBlock) smb ).getAndx() ) != null );
+                log.trace(Hexdump.toHexString(buffer, 4, n));
 
-                this.out.write(buffer, 0, 4 + n);
-                this.out.flush();
             }
-        }
-        finally {
-            this.getContext().getBufferCache().releaseBuffer(buffer);
+
+            /*
+             * For some reason this can sometimes get broken up into another
+             * "NBSS Continuation Message" frame according to WireShark
+             */
+
+            this.out.write(buffer, 0, 4 + n);
+            this.out.flush();
         }
     }
 
@@ -929,10 +956,14 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         CommonServerMessageBlockRequest curHead = request;
 
         int maxSize = getContext().getConfig().getMaximumBufferSize();
+        if ( this.largeMtu ) {
+            maxSize = Math.max(maxSize, 16 * 1024 * 1024);
+        }
 
         while ( curHead != null ) {
             CommonServerMessageBlockRequest nextHead = null;
             int totalSize = 0;
+            int totalCost = 0;
             int n = 0;
             CommonServerMessageBlockRequest last = null;
             CommonServerMessageBlockRequest chain = curHead;
@@ -946,7 +977,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                         String.format("%s costs %d avail %d (%s)", chain.getClass().getName(), cost, this.credits.availablePermits(), this.name));
                 }
                 if ( ( next == null || chain.allowChain(next) ) && totalSize + size < maxSize && this.credits.tryAcquire(cost) ) {
+                    if ( this.largeMtu && cost > 1 ) {
+                        if ( chain instanceof ServerMessageBlock2 ) {
+                            ( (ServerMessageBlock2) chain ).setCreditCharge(cost);
+                        }
+                    }
                     totalSize += size;
+                    totalCost += cost;
                     last = chain;
                     chain = next;
                 }
@@ -967,7 +1004,13 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                                 throw new SmbException("Failed to acquire credits in time");
                             }
                         }
+                        if ( this.largeMtu && cost > 1 ) {
+                            if ( chain instanceof ServerMessageBlock2 ) {
+                                ( (ServerMessageBlock2) chain ).setCreditCharge(cost);
+                            }
+                        }
                         totalSize += size;
+                        totalCost += cost;
                         // split off first request
 
                         synchronized ( chain ) {
@@ -997,17 +1040,30 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 }
             }
 
-            int reqCredits = Math.max(1, this.desiredCredits - this.credits.availablePermits() - n + 1);
+            int reqCredits = Math.max(totalCost, this.desiredCredits - this.credits.availablePermits() - n + 1);
             if ( log.isTraceEnabled() ) {
                 log.trace("Request credits " + reqCredits);
             }
-            request.setRequestCredits(reqCredits);
+            curHead.setRequestCredits(reqCredits);
 
             CommonServerMessageBlockRequest thisReq = curHead;
             try {
                 CommonServerMessageBlockResponse resp = thisReq.getResponse();
-                if ( log.isTraceEnabled() ) {
-                    log.trace("Sending " + thisReq);
+                if ( log.isDebugEnabled() ) {
+                    if ( thisReq instanceof ServerMessageBlock2 ) {
+                        ServerMessageBlock2 smb2Req = (ServerMessageBlock2) thisReq;
+                        log.debug(String.format("Sending %s (mid=%d, cost=%d, credits_avail=%d, reqCredits=%d, charge=%d)",
+                            thisReq.getClass().getSimpleName(),
+                            thisReq.getMid(),
+                            totalCost,
+                            this.credits.availablePermits(),
+                            smb2Req.getCredit(),
+                            smb2Req.getCreditCharge()));
+                    }
+                    else {
+                        log.debug(String.format("Sending %s (mid=%d, cost=%d, credits_avail=%d)",
+                            thisReq.getClass().getSimpleName(), thisReq.getMid(), totalCost, this.credits.availablePermits()));
+                    }
                 }
                 resp = super.sendrecv(curHead, resp, params);
 
@@ -1048,20 +1104,12 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                     }
                     curReq = next;
                 }
-                if ( !isDisconnected() && !curReq.isResponseAsync() && !curReq.getResponse().isAsync() && !curReq.getResponse().isError()
-                        && grantedCredits == 0 ) {
-                    if ( this.credits.availablePermits() > 0 || n > 0 ) {
-                        log.debug("Server " + this + " returned zero credits for " + curReq);
-                    }
-                    else {
-                        log.warn("Server " + this + " took away all our credits");
-                    }
-                }
-                else if ( !curReq.isResponseAsync() ) {
+                if ( !isDisconnected() && !curReq.isResponseAsync() ) {
+                    int toRelease = Math.max(grantedCredits, totalCost);
                     if ( log.isTraceEnabled() ) {
-                        log.trace("Adding credits " + grantedCredits);
+                        log.trace("Adding credits " + toRelease + " (granted " + grantedCredits + " cost " + totalCost + ")");
                     }
-                    this.credits.release(grantedCredits);
+                    this.credits.release(toRelease);
                 }
             }
         }
@@ -1197,7 +1245,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
      * @throws SMBProtocolDecodingException
      */
     private void doRecvSMB2 ( CommonServerMessageBlock response ) throws IOException, SMBProtocolDecodingException {
-        int size = ( Encdec.dec_uint16be(this.sbuf, 2) & 0xFFFF ) | ( this.sbuf[ 1 ] & 0xFF ) << 16;
+        int size = this.lastSize;
         if ( size < ( Smb2Constants.SMB2_HEADER_LENGTH + 1 ) ) {
             throw new IOException("Invalid payload size: " + size);
         }
@@ -1210,22 +1258,62 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
         int nextCommand = Encdec.dec_uint32le(this.sbuf, 4 + 20);
         int maximumBufferSize = getContext().getConfig().getMaximumBufferSize();
         int msgSize = nextCommand != 0 ? nextCommand : size;
-        if ( msgSize > maximumBufferSize ) {
+
+        ServerMessageBlock2Response cur = (ServerMessageBlock2Response) response;
+        if ( !this.largeMtu && msgSize > maximumBufferSize ) {
             throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", msgSize, maximumBufferSize));
         }
 
-        ServerMessageBlock2Response cur = (ServerMessageBlock2Response) response;
-        byte[] buffer = getContext().getBufferCache().getBuffer();
-        try {
-            int rl = nextCommand != 0 ? nextCommand : size;
+        byte[] buffer = new byte[msgSize];
 
-            // read and decode first
-            System.arraycopy(this.sbuf, 4, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
-            readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
+        int rl = nextCommand != 0 ? nextCommand : size;
+
+        // read and decode first
+        System.arraycopy(this.sbuf, 4, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
+        readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
+
+        cur.setReadSize(rl);
+        int len = cur.decode(buffer, 0);
+
+        if ( len > rl ) {
+            throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
+        }
+        else if ( nextCommand != 0 && len > nextCommand ) {
+            throw new IOException("Overlapping commands");
+        }
+        size -= rl;
+
+        while ( size > 0 && nextCommand != 0 ) {
+            cur = (ServerMessageBlock2Response) cur.getNextResponse();
+            if ( cur == null ) {
+                log.warn("Response not properly set up");
+                this.in.skip(size);
+                break;
+            }
+
+            // read next header
+            readn(this.in, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
+            nextCommand = Encdec.dec_uint32le(buffer, 20);
+
+            rl = nextCommand != 0 ? nextCommand : size;
+            if ( !this.largeMtu && rl > maximumBufferSize ) {
+                throw new IOException(String.format("Message size %d exceeds maxiumum buffer size %d", rl, maximumBufferSize));
+            }
+
+            if ( rl > buffer.length ) {
+                byte[] newBuffer = new byte[rl];
+                System.arraycopy(buffer, 0, newBuffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
+                buffer = newBuffer;
+            }
+
+            if ( log.isDebugEnabled() ) {
+                log.debug(String.format("Compound next command %d read size %d remain %d", nextCommand, rl, size));
+            }
 
             cur.setReadSize(rl);
-            int len = cur.decode(buffer, 0);
+            readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
 
+            len = cur.decode(buffer, 0, true);
             if ( len > rl ) {
                 throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
             }
@@ -1233,45 +1321,6 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                 throw new IOException("Overlapping commands");
             }
             size -= rl;
-
-            while ( size > 0 && nextCommand != 0 ) {
-                cur = (ServerMessageBlock2Response) cur.getNextResponse();
-                if ( cur == null ) {
-                    log.warn("Response not properly set up");
-                    this.in.skip(size);
-                    break;
-                }
-
-                // read next header
-                readn(this.in, buffer, 0, Smb2Constants.SMB2_HEADER_LENGTH);
-                nextCommand = Encdec.dec_uint32le(buffer, 20);
-
-                if ( ( nextCommand != 0 && nextCommand > maximumBufferSize ) || ( nextCommand == 0 && size > maximumBufferSize ) ) {
-                    throw new IOException(
-                        String.format("Message size %d exceeds maxiumum buffer size %d", nextCommand != 0 ? nextCommand : size, maximumBufferSize));
-                }
-
-                rl = nextCommand != 0 ? nextCommand : size;
-
-                if ( log.isDebugEnabled() ) {
-                    log.debug(String.format("Compound next command %d read size %d remain %d", nextCommand, rl, size));
-                }
-
-                cur.setReadSize(rl);
-                readn(this.in, buffer, Smb2Constants.SMB2_HEADER_LENGTH, rl - Smb2Constants.SMB2_HEADER_LENGTH);
-
-                len = cur.decode(buffer, 0, true);
-                if ( len > rl ) {
-                    throw new IOException(String.format("WHAT? ( read %d decoded %d ): %s", rl, len, cur));
-                }
-                else if ( nextCommand != 0 && len > nextCommand ) {
-                    throw new IOException("Overlapping commands");
-                }
-                size -= rl;
-            }
-        }
-        finally {
-            getContext().getBufferCache().releaseBuffer(buffer);
         }
     }
 

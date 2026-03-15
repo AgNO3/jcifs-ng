@@ -294,11 +294,22 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
         }
 
         int maxBufferSize = tc.getConfig().getTransactionBufferSize();
-        this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getReceiveBufferSize(), this.maxReadSize))
-                & ~0x7;
-        this.maxWriteSize = Math.min(maxBufferSize - Smb2WriteRequest.OVERHEAD, Math.min(tc.getConfig().getSendBufferSize(), this.maxWriteSize))
-                & ~0x7;
-        this.maxTransactSize = Math.min(maxBufferSize - 512, this.maxTransactSize) & ~0x7;
+        if ( this.selectedDialect.atLeast(DialectVersion.SMB210) && ( this.commonCapabilities & Smb2Constants.SMB2_GLOBAL_CAP_LARGE_MTU ) != 0 ) {
+            this.maxReadSize = Math.min(tc.getConfig().getReceiveBufferSize(), this.maxReadSize) & ~0x7;
+            this.maxWriteSize = Math.min(tc.getConfig().getSendBufferSize(), this.maxWriteSize) & ~0x7;
+            this.maxTransactSize = Math.min(maxBufferSize - 512, this.maxTransactSize) & ~0x7;
+        }
+        else {
+            this.maxReadSize = Math.min(maxBufferSize - Smb2ReadResponse.OVERHEAD, Math.min(tc.getConfig().getReceiveBufferSize(), this.maxReadSize))
+                    & ~0x7;
+            this.maxWriteSize = Math.min(maxBufferSize - Smb2WriteRequest.OVERHEAD, Math.min(tc.getConfig().getSendBufferSize(), this.maxWriteSize))
+                    & ~0x7;
+            this.maxTransactSize = Math.min(maxBufferSize - 512, this.maxTransactSize) & ~0x7;
+        }
+
+        if ( log.isDebugEnabled() ) {
+            log.debug(String.format("Negotiated maxReadSize=%d, maxWriteSize=%d, maxTransactSize=%d", this.maxReadSize, this.maxWriteSize, this.maxTransactSize));
+        }
 
         return true;
     }

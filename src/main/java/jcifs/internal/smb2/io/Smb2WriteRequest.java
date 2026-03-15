@@ -75,6 +75,15 @@ public class Smb2WriteRequest extends ServerMessageBlock2Request<Smb2WriteRespon
     }
 
 
+    @Override
+    public int getCreditCost () {
+        if ( this.dataLength <= 0 ) {
+            return 1;
+        }
+        return ( this.dataLength - 1 ) / 65536 + 1;
+    }
+
+
     /**
      * @param data
      *            the data to set
@@ -164,6 +173,15 @@ public class Smb2WriteRequest extends ServerMessageBlock2Request<Smb2WriteRespon
 
         System.arraycopy(this.data, this.dataOffset, dst, dstIndex, this.dataLength);
         dstIndex += this.dataLength;
+
+        /* pad to 8 byte boundary to match size() */
+        int total = dstIndex - start + Smb2Constants.SMB2_HEADER_LENGTH;
+        int aligned = size8(total);
+        int pad = aligned - total;
+        for ( int i = 0; i < pad; i++ ) {
+            dst[ dstIndex++ ] = (byte) 0;
+        }
+
         return dstIndex - start;
     }
 

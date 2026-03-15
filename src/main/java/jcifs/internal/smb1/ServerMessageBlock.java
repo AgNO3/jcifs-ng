@@ -404,6 +404,8 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
         return 1;
     }
 
+    public void setCreditCharge ( int cost ) {}
+
 
     /**
      * {@inheritDoc}
@@ -411,6 +413,7 @@ public abstract class ServerMessageBlock implements CommonServerMessageBlockRequ
      * @see jcifs.util.transport.Request#setRequestCredits(int)
      */
     @Override
+
     public void setRequestCredits ( int credits ) {
 
     }
