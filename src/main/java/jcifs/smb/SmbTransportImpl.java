@@ -916,9 +916,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
 
         CommonServerMessageBlock smb = (CommonServerMessageBlock) request;
         int size = ( (CommonServerMessageBlockRequest) request ).size();
-        int maximumBufferSize = getContext().getConfig().getMaximumBufferSize();
-        int bsize = Math.max(size + 4, maximumBufferSize);
-        byte[] buffer = new byte[bsize];
+        byte[] buffer = new byte[size + 4];
 
         // synchronize around encode and write so that the ordering for SMB1 signing can be maintained
         synchronized ( this.outLock ) {
