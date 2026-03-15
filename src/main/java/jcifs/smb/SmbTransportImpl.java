@@ -1049,10 +1049,10 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             CommonServerMessageBlockRequest thisReq = curHead;
             try {
                 CommonServerMessageBlockResponse resp = thisReq.getResponse();
-                if ( log.isInfoEnabled() ) {
+                if ( log.isDebugEnabled() ) {
                     if ( thisReq instanceof ServerMessageBlock2 ) {
                         ServerMessageBlock2 smb2Req = (ServerMessageBlock2) thisReq;
-                        log.info(String.format("Sending %s (mid=%d, cost=%d, credits_avail=%d, reqCredits=%d, charge=%d)",
+                        log.debug(String.format("Sending %s (mid=%d, cost=%d, credits_avail=%d, reqCredits=%d, charge=%d)",
                             thisReq.getClass().getSimpleName(),
                             thisReq.getMid(),
                             totalCost,
@@ -1061,7 +1061,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                             smb2Req.getCreditCharge()));
                     }
                     else {
-                        log.info(String.format("Sending %s (mid=%d, cost=%d, credits_avail=%d)",
+                        log.debug(String.format("Sending %s (mid=%d, cost=%d, credits_avail=%d)",
                             thisReq.getClass().getSimpleName(), thisReq.getMid(), totalCost, this.credits.availablePermits()));
                     }
                 }

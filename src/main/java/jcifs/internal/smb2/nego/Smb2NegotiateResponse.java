@@ -307,8 +307,8 @@ public class Smb2NegotiateResponse extends ServerMessageBlock2Response implement
             this.maxTransactSize = Math.min(maxBufferSize - 512, this.maxTransactSize) & ~0x7;
         }
 
-        if ( log.isInfoEnabled() ) {
-            log.info(String.format("Negotiated maxReadSize=%d, maxWriteSize=%d, maxTransactSize=%d", this.maxReadSize, this.maxWriteSize, this.maxTransactSize));
+        if ( log.isDebugEnabled() ) {
+            log.debug(String.format("Negotiated maxReadSize=%d, maxWriteSize=%d, maxTransactSize=%d", this.maxReadSize, this.maxWriteSize, this.maxTransactSize));
         }
 
         return true;
