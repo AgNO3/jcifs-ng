@@ -43,6 +43,9 @@ public class LargeFileTransferTest extends BaseCIFSTest {
 
     private static final Logger log = LoggerFactory.getLogger(LargeFileTransferTest.class);
     private static final int FILE_SIZE = 64 * 1024 * 1024; // 64 MB
+    private static final int[] BUFFER_SIZES = {
+        65536, 1048576
+    };
     private final int transportBufferSize;
 
     public LargeFileTransferTest(String name, Map<String, String> properties, int transportBufferSize) {
@@ -53,19 +56,9 @@ public class LargeFileTransferTest extends BaseCIFSTest {
     @Parameters(name = "{0} - {2} bytes buffer")
     public static Collection<Object> configs() {
         List<Object> configs = new ArrayList<>();
-        String dialectFilter = System.getProperty("largeFileTransfer.dialects", "smb2,smb30,smb31");
-        String[] dialects = dialectFilter.split(",");
-        String filter = System.getProperty("largeFileTransfer.bufferSizes", "65536,1048576");
-        String[] parts = filter.split(",");
-        int[] bufferSizes = new int[parts.length];
-        for ( int i = 0; i < parts.length; i++ ) {
-            bufferSizes[ i ] = Integer.parseInt(parts[ i ].trim());
-        }
-
-        for (Object baseObj : getConfigs(dialects)) {
-
+        for ( Object baseObj : getConfigs("smb2", "smb30", "smb31") ) {
             Object[] base = (Object[]) baseObj;
-            for (int bufSize : bufferSizes) {
+            for ( int bufSize : BUFFER_SIZES ) {
                 configs.add(new Object[] { base[0] + "-" + bufSize, base[1], bufSize });
             }
         }
@@ -75,22 +68,10 @@ public class LargeFileTransferTest extends BaseCIFSTest {
     @Override
     @org.junit.Before
     public void setUp() throws Exception {
-        if ( !getProperties().containsKey("jcifs.smb.client.maxVersion") ) {
-            getProperties().put("jcifs.smb.client.maxVersion", "SMB311");
-        }
-        if ( !getProperties().containsKey("jcifs.smb.client.minVersion") ) {
-            getProperties().put("jcifs.smb.client.minVersion", "SMB202");
-        }
-        getProperties().put("jcifs.smb.client.useSMB2Negotiation", "true");
-        getProperties().put("jcifs.smb.client.dfs.disabled", "true");
-        getProperties().put("jcifs.smb.client.ipcSigningEnforced", "false");
-        getProperties().put("jcifs.smb.client.disablePlainTextPasswords", "false");
-        getProperties().put("jcifs.smb.useRawNTLM", "true");
-        
-        // Set the transport buffer size for this run
+        // Run through the shared test configuration machinery, varying only transport buffer sizing here.
         getProperties().put("jcifs.smb.client.snd_buf_size", String.valueOf(transportBufferSize));
         getProperties().put("jcifs.smb.client.rcv_buf_size", String.valueOf(transportBufferSize));
-        
+
         super.setUp();
     }
 
