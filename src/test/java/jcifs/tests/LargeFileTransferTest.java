@@ -21,6 +21,8 @@ import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,10 +45,20 @@ public class LargeFileTransferTest extends BaseCIFSTest {
 
     private static final Logger log = LoggerFactory.getLogger(LargeFileTransferTest.class);
     private static final int FILE_SIZE = 64 * 1024 * 1024; // 64 MB
+    private static final long DATA_SEED = 0x4A434946534C4E47L;
     private static final int[] BUFFER_SIZES = {
         65536, 1048576
     };
     private final int transportBufferSize;
+
+    private static MessageDigest newDigest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        }
+        catch ( NoSuchAlgorithmException e ) {
+            throw new IllegalStateException("Missing SHA-256 support", e);
+        }
+    }
 
     public LargeFileTransferTest(String name, Map<String, String> properties, int transportBufferSize) {
         super(name, properties);
@@ -84,14 +96,17 @@ public class LargeFileTransferTest extends BaseCIFSTest {
             
             // Use a large application buffer to ensure we saturate the transport
             byte[] data = new byte[1024 * 1024]; 
-            new Random().nextBytes(data);
+            Random writeRandom = new Random(DATA_SEED);
+            MessageDigest expectedDigest = newDigest();
             
             long startWrite = System.currentTimeMillis();
             try (OutputStream os = f.getOutputStream()) {
                 int written = 0;
                 while (written < FILE_SIZE) {
                     int toWrite = Math.min(data.length, FILE_SIZE - written);
+                    writeRandom.nextBytes(data);
                     os.write(data, 0, toWrite);
+                    expectedDigest.update(data, 0, toWrite);
                     written += toWrite;
                 }
             }
@@ -102,12 +117,17 @@ public class LargeFileTransferTest extends BaseCIFSTest {
             long startRead = System.currentTimeMillis();
             try (InputStream is = f.getInputStream()) {
                 byte[] readBuf = new byte[1024 * 1024];
+                MessageDigest actualDigest = newDigest();
                 long totalRead = 0;
                 int r;
                 while ((r = is.read(readBuf)) != -1) {
+                    actualDigest.update(readBuf, 0, r);
                     totalRead += r;
                 }
                 assertEquals("Total bytes read should match", FILE_SIZE, totalRead);
+                assertEquals("Read digest should match written digest",
+                    toHex(expectedDigest.digest()),
+                    toHex(actualDigest.digest()));
             }
             long endRead = System.currentTimeMillis();
             double readTimeSec = (endRead - startRead) / 1000.0;
@@ -118,5 +138,13 @@ public class LargeFileTransferTest extends BaseCIFSTest {
             
             f.delete();
         }
+    }
+
+    private static String toHex(byte[] data) {
+        StringBuilder sb = new StringBuilder(data.length * 2);
+        for ( byte b : data ) {
+            sb.append(String.format("%02x", b & 0xff));
+        }
+        return sb.toString();
     }
 }
