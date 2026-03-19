@@ -146,6 +146,7 @@ final class SmbCopyUtil {
                                 w.wait();
                             }
                             catch ( InterruptedException ie ) {
+                                Thread.currentThread().interrupt();
                                 throw new SmbException(dest.getURL().toString(), ie);
                             }
                         }

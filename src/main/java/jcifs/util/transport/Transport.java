@@ -243,6 +243,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
             throw ioe;
         }
         catch ( InterruptedException ie ) {
+            Thread.currentThread().interrupt();
             throw new TransportException(ie);
         }
         finally {
@@ -375,7 +376,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                         log.debug("Wait returned state is " + this.state);
                     }
                     if ( isDisconnected() ) {
-                        throw new InterruptedException("Transport was disconnected while waiting for a response");
+                        throw new TransportException("Transport was disconnected while waiting for a response");
                     }
                     continue;
                 }
@@ -615,6 +616,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
             throw e;
         }
         catch ( InterruptedException ie ) {
+            Thread.currentThread().interrupt();
             this.state = 6;
             cleanupThread(timeout);
             throw new TransportException(ie);
@@ -654,6 +656,7 @@ public abstract class Transport implements Runnable, AutoCloseable {
                 log.debug("Joined transport thread");
             }
             catch ( InterruptedException e ) {
+                Thread.currentThread().interrupt();
                 throw new TransportException("Failed to join transport thread", e);
             }
         }

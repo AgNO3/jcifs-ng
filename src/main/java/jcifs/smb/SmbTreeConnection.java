@@ -356,6 +356,7 @@ class SmbTreeConnection {
                 }
             }
             catch ( InterruptedException e ) {
+                Thread.currentThread().interrupt();
                 log.debug("interrupted sleep in send", e);
             }
 
@@ -687,6 +688,7 @@ class SmbTreeConnection {
                 Thread.sleep(500 + RAND.nextInt(5000));
             }
             catch ( InterruptedException e ) {
+                Thread.currentThread().interrupt();
                 log.debug("resolveDfs", e);
             }
 

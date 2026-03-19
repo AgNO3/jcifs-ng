@@ -240,6 +240,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
                     this.inFlightLookups.wait();
                 }
                 catch ( InterruptedException e ) {
+                    Thread.currentThread().interrupt();
                     log.trace("Interrupted", e);
                 }
             }
@@ -466,6 +467,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
 
                 }
                 catch ( InterruptedException ie ) {
+                    Thread.currentThread().interrupt();
                     throw new InterruptedIOException();
                 }
                 finally {
@@ -907,6 +909,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             }
         }
         catch ( InterruptedException ie ) {
+            Thread.currentThread().interrupt();
             throw new UnknownHostException(name);
         }
         waitForQueryThreads(q1x, q20);
@@ -945,6 +948,7 @@ public class NameServiceClientImpl implements Runnable, NameServiceClient {
             thread.join();
         }
         catch ( InterruptedException e ) {
+            Thread.currentThread().interrupt();
             e.printStackTrace();
         }
     }

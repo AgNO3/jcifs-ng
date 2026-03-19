@@ -1441,6 +1441,7 @@ public class SmbFile extends URLConnection implements SmbResource, SmbConstants 
                     w.join();
                 }
                 catch ( InterruptedException e ) {
+                    Thread.currentThread().interrupt();
                     log.warn("Interrupted while joining copy thread", e);
                 }
             }
