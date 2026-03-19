@@ -464,6 +464,7 @@ final class SmbSessionImpl implements SmbSessionInternal {
                         this.transport.wait();
                     }
                     catch ( InterruptedException ie ) {
+                        Thread.currentThread().interrupt();
                         throw new SmbException(ie.getMessage(), ie);
                     }
                 }

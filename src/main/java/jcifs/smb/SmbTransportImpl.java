@@ -980,6 +980,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
                         break;
                     }
                     catch ( InterruptedException e ) {
+                        Thread.currentThread().interrupt();
                         InterruptedIOException ie = new InterruptedIOException("Interrupted while acquiring credits");
                         ie.initCause(e);
                         throw ie;
@@ -1718,6 +1719,7 @@ class SmbTransportImpl extends Transport implements SmbTransportInternal, SmbCon
             }
         }
         catch ( InterruptedException ie ) {
+            Thread.currentThread().interrupt();
             throw new TransportException(ie);
         }
         finally {
