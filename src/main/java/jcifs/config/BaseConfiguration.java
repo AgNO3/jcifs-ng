@@ -20,6 +20,7 @@ package jcifs.config;
 
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -40,6 +41,8 @@ import jcifs.Configuration;
 import jcifs.DialectVersion;
 import jcifs.ResolverType;
 import jcifs.SmbConstants;
+
+import javax.net.SocketFactory;
 
 
 /**
@@ -140,7 +143,7 @@ public class BaseConfiguration implements Configuration {
     protected String guestUsername = "GUEST";
     protected String guestPassword = "";
     protected boolean allowGuestFallback = false;
-
+    protected SocketFactory socketFactory;
 
     /**
      * @throws CIFSException
@@ -618,6 +621,11 @@ public class BaseConfiguration implements Configuration {
     @Override
     public boolean isAllowGuestFallback () {
         return this.allowGuestFallback;
+    }
+
+    @Override
+    public SocketFactory getSocketFactory() {
+        return this.socketFactory;
     }
 
 
