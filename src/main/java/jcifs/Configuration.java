@@ -23,6 +23,8 @@ import java.security.SecureRandom;
 import java.util.List;
 import java.util.TimeZone;
 
+import javax.net.SocketFactory;
+
 
 /**
  * 
@@ -787,4 +789,9 @@ public interface Configuration {
      * @return whether to permit guest logins when user authentication is requested
      */
     boolean isAllowGuestFallback ();
+
+    /**
+     * @return the {@link javax.net.SocketFactory} implementation or null
+     */
+    SocketFactory getSocketFactory();
 }

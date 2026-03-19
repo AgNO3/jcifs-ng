@@ -217,6 +217,11 @@
 							<differenceType>7012</differenceType>
 							<method>void setFileTimes(long, long, long)</method>
 						</difference>
+						<difference>
+							<className>jcifs/Configuration</className>
+							<differenceType>7012</differenceType>
+							<method>javax.net.SocketFactory getSocketFactory()</method>
+						</difference>
 					</ignored>
 				</configuration>
 			</plugin>

@@ -27,6 +27,8 @@ import jcifs.Configuration;
 import jcifs.DialectVersion;
 import jcifs.ResolverType;
 
+import javax.net.SocketFactory;
+
 
 /**
  * @author mbechler
@@ -913,5 +915,10 @@ public class DelegatingConfiguration implements Configuration {
     @Override
     public boolean isAllowGuestFallback () {
         return this.delegate.isAllowGuestFallback();
+    }
+
+    @Override
+    public SocketFactory getSocketFactory() {
+        return this.delegate.getSocketFactory();
     }
 }
